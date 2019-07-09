@@ -88,33 +88,8 @@ fi
 OPTIONS=""
 # sudo dpkg --add-architecture $TARGET_ARCH
 if [[ $TARGET_HOST_TRIPLET == "x86_64-apple-darwin14" ]]; then
-    unameOut="$(uname -s)"
-    case "${unameOut}" in
-        Linux*)
-            sudo apt-get update
-            sudo apt-get install g++ cmake libz-dev libbz2-dev \
-                     libcap-dev python python-dev python-setuptools
-            machine=Linux
-        ;;
-        Darwin*)
-            if ! command -v brew &> /dev/null
-            then
-                xcode-select --install
-                sudo mkdir /usr/local/Frameworks
-                sudo chown $(whoami):admin /usr/local/Frameworks
-                NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-                echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> /home/$USER/.profile
-                eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-            fi
-            brew update
-            brew install automake coreutils libtool python3 $ARCH_PACKAGES
-            machine=Mac
-        ;;
-        CYGWIN*)    machine=Cygwin;;
-        MINGW*)     machine=MinGw;;
-        *)          machine="UNKNOWN:${unameOut}"
-    esac
-    echo ${machine}
+    brew update
+    brew install automake coreutils libtool python3 $ARCH_PACKAGES
     SDK_VERSION=10.14
     SDK_URL=https://bitcoincore.org/depends-sources/sdks
     SDK_SHASUM="be17f48fd0b08fb4dcd229f55a6ae48d9f781d210839b4ea313ef17dd12d6ea5"

@@ -64,7 +64,8 @@ jobs:
             config-opts: "--enable-static --disable-shared"
             packages: cmake zlib xorriso
             goal: install
-            sdk: 12.1-12A7403
+            sdk: 12.1
+            sdk-build: 12A7403
             sdk-shasum: be17f48fd0b08fb4dcd229f55a6ae48d9f781d210839b4ea313ef17dd12d6ea5
           # - name: x86_64-win
           #   host: x86_64-w64-mingw32
@@ -108,22 +109,22 @@ jobs:
         run: |
           sudo dpkg --add-architecture ${{ matrix.arch }}
 
-      # - name: install packages
-      #   run: |
-      #     if ([ "${{ matrix.name }}" == "x86_64-macos" ]); then
-      #         brew update
-      #         brew install automake python3 ${{ matrix.packages }}
-      #     else
-      #       if ([ "${{ matrix.name }}" == "i686-win" ]); then
-      #         sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9
-      #         sudo add-apt-repository 'deb [arch=amd64] https://mirror.mxe.cc/repos/apt focal main'
-      #         sudo apt -qq update
-      #         sudo apt install -y --allow-downgrades libpcre2-8-0=10.34-7
-      #       else
-      #         sudo apt-get update          
-      #       fi
-      #       DEBIAN_FRONTEND=noninteractive sudo apt-get install -y autoconf automake libtool-bin libevent-dev build-essential curl python3 valgrind ${{ matrix.packages }}
-      #     fi
+      - name: install packages
+        run: |
+          if ([ "${{ matrix.name }}" == "x86_64-macos" ]); then
+              brew update
+              brew install automake python3 ${{ matrix.packages }}
+          else
+            if ([ "${{ matrix.name }}" == "i686-win" ]); then
+              sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9
+              sudo add-apt-repository 'deb [arch=amd64] https://mirror.mxe.cc/repos/apt focal main'
+              sudo apt -qq update
+              sudo apt install -y --allow-downgrades libpcre2-8-0=10.34-7
+            else
+              sudo apt-get update          
+            fi
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y autoconf automake libtool-bin libevent-dev build-essential curl python3 valgrind ${{ matrix.packages }}
+          fi
 
       - name: post install
         if: ${{ matrix.postinstall }}
@@ -144,82 +145,83 @@ jobs:
       - name: install sdk
         if: ${{ matrix.sdk }}
         run: |
-          contrib/scripts/run.sh --host x86_64-apple-darwin14 --depends --clean
-          # mkdir -p ./depends/sdk-sources
-          # mkdir -p ./depends/SDKs
-          # curl --location --fail $SDK_URL/MacOSX${{ matrix.sdk }}-extracted-SDK-with-libcxx-headers.sdk.tar.gz -o depends/sdk-sources/MacOSX${{ matrix.sdk }}-extracted-SDK-with-libcxx-headers.sdk.tar.gz
-          # tar -C depends/SDKs -xf depends/sdk-sources/Xcode-${{ matrix.sdk }}-extracted-SDK-with-libcxx-headers.sdk.tar.gz
+          mkdir -p ./depends/sdk-sources
+          mkdir -p ./depends/SDKs
+          echo "{{ matrix.sdk-shasum }} depends/sdk-sources/Xcode-${{ matrix.sdk }}-${{ matrix.sdk-build }}-extracted-SDK-with-libcxx-headers.tar.gz" | sha256sum -c || \
+          curl --location --fail $SDK_URL/Xcode-${{ matrix.sdk }}-${{ matrix.sdk-build }}-extracted-SDK-with-libcxx-headers.tar.gz -o depends/sdk-sources/Xcode-${{ matrix.sdk }}-${{ matrix.sdk-build }}-extracted-SDK-with-libcxx-headers.tar.gz && \
+          echo "{{ matrix.sdk-shasum }} depends/sdk-sources/Xcode-${{ matrix.sdk }}-${{ matrix.sdk-build }}-extracted-SDK-with-libcxx-headers.tar.gz" | sha256sum -c
+          tar -C depends/SDKs -xf depends/sdk-sources/Xcode-${{ matrix.sdk }}-${{ matrix.sdk-build }}-extracted-SDK-with-libcxx-headers.tar.gz
 
-      # - name: dependency cache
-      #   uses: actions/cache@v2
-      #   env:
-      #     cache-name: depends
-      #   with:
-      #     path: ./depends/built
-      #     key: ${{ matrix.name }}-${{ env.cache-name }}-${{ hashFiles('depends/packages/*') }}
+      - name: dependency cache
+        uses: actions/cache@v2
+        env:
+          cache-name: depends
+        with:
+          path: ./depends/built
+          key: ${{ matrix.name }}-${{ env.cache-name }}-${{ hashFiles('depends/packages/*') }}
 
-      # - name: build depends
-      #   run: |
-      #     make $MAKEJOBS -C depends HOST=${{ matrix.host }} ${{ matrix.dep-opts }}
+      - name: build depends
+        run: |
+          make $MAKEJOBS -C depends HOST=${{ matrix.host }} ${{ matrix.dep-opts }}
 
-      # - name: ccache
-      #   uses: actions/cache@v2
-      #   env:
-      #     cache-name: ccache
-      #   with:
-      #     path: ~/.ccache
-      #     key: ${{ matrix.name }}-${{ env.cache-name }}-${{ hashFiles('**/configure.ac') }}
+      - name: ccache
+        uses: actions/cache@v2
+        env:
+          cache-name: ccache
+        with:
+          path: ~/.ccache
+          key: ${{ matrix.name }}-${{ env.cache-name }}-${{ hashFiles('**/configure.ac') }}
 
-      # - name: configure libdogecoin
-      #   run: |
-      #     depends/${{ matrix.host }}/native/bin/ccache --max-size=$CCACHE_SIZE
-      #     ./autogen.sh
-      #     ./configure --prefix=`pwd`/depends/${{ matrix.host }} ${{ matrix.config-opts }} HOST=${{ matrix.host }} || ( cat config.log && false)
+      - name: configure libdogecoin
+        run: |
+          depends/${{ matrix.host }}/native/bin/ccache --max-size=$CCACHE_SIZE
+          ./autogen.sh
+          ./configure --prefix=`pwd`/depends/${{ matrix.host }} ${{ matrix.config-opts }} HOST=${{ matrix.host }} || ( cat config.log && false)
 
-      # - name: build libdogecoin
-      #   run: |
-      #     make -j"$(getconf _NPROCESSORS_ONLN)" SPEED=slow V=1
-      #     mkdir -p ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}
-      #     if ([ "${{ matrix.name }}" == "x86_64-win" ] || [ "${{ matrix.name }}" == "i686-win" ]); then
-      #         cp .libs/* such.exe sendtx.exe ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/
-      #     else
-      #         cp .libs/* such sendtx ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/
-      #     fi
-      #     chmod +x ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/*
+      - name: build libdogecoin
+        run: |
+          make -j"$(getconf _NPROCESSORS_ONLN)" SPEED=slow V=1
+          mkdir -p ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}
+          if ([ "${{ matrix.name }}" == "x86_64-win" ] || [ "${{ matrix.name }}" == "i686-win" ]); then
+              cp .libs/* such.exe sendtx.exe ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/
+          else
+              cp .libs/* such sendtx ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/
+          fi
+          chmod +x ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/*
 
-      # - name: test libdogecoin
-      #   if: ${{ matrix.run-tests }}
-      #   run: |
-      #       case "${{ matrix.name }}" in
-      #         "armhf-linux") 
-      #         qemu-arm -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib/ /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests
-      #         ;;
-      #         "aarch64-linux") 
-      #         qemu-aarch64 -E LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib/ /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests
-      #         ;;
-      #         "x86_64-win")
-      #         make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
-      #         ;;
-      #         "i686-win") 
-      #         make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
-      #         ;;
-      #         "x86_64-macos") 
-      #         ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests
-      #         ;;
-      #         "x86_64-linux-dbg") 
-      #         make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
-      #         python3 tooltests.py
-      #         ./wrappers/python/pytest/cython_tests.sh -host=${{ matrix.host }}
-      #         ./wrappers/golang/libdogecoin/build.sh
-      #         ;;
-      #         "i686-linux") 
-      #         make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
-      #         ;;
-      #       esac
+      - name: test libdogecoin
+        if: ${{ matrix.run-tests }}
+        run: |
+            case "${{ matrix.name }}" in
+              "armhf-linux") 
+              qemu-arm -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib/ /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests
+              ;;
+              "aarch64-linux") 
+              qemu-aarch64 -E LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib/ /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests
+              ;;
+              "x86_64-win")
+              make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
+              ;;
+              "i686-win") 
+              make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
+              ;;
+              "x86_64-macos") 
+              ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests
+              ;;
+              "x86_64-linux-dbg") 
+              make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
+              python3 tooltests.py
+              ./wrappers/python/pytest/cython_tests.sh -host=${{ matrix.host }}
+              ./wrappers/golang/libdogecoin/build.sh
+              ;;
+              "i686-linux") 
+              make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
+              ;;
+            esac
 
-      # - name: Upload artifacts
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: libdogecoin-${{ github.sha }}-${{ matrix.name }}
-      #     path: |
-      #       ${{ github.workspace }}/build/libdogecoin-${{ github.sha }}-${{ matrix.name }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: libdogecoin-${{ github.sha }}-${{ matrix.name }}
+          path: |
+            ${{ github.workspace }}/build/libdogecoin-${{ github.sha }}-${{ matrix.name }}
