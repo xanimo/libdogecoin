@@ -34,6 +34,9 @@ matrix:
         compiler: gcc
         env: VALGRIND_UNIT_TESTS="yes" RUN_TOOLTESTS="yes" VALGRIND_TOOLTESTS="yes" SUBMIT_COVERALLS="yes" $BUILD_CONFIG=''
       - os: linux
+        compiler: gcc
+        env: $BUILD_CONFIG='--disable-wallet'
+      - os: linux
         compiler: x86_64-w64-mingw32
         env: HOST="x86_64-w64-mingw32" CROSS_COMPILE="yes" RUN_WINE_UNIT_TESTS="yes" $BUILD_CONFIG="--disable-shared --enable-static --disable-net"
       - os: linux

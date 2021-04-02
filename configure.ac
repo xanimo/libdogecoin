@@ -132,6 +132,7 @@ AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_WALLET], [test "x$with_wallet" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
+AM_CONDITIONAL([WITH_LOGDB], [test "x$with_tools" = "xyes" -o "x$with_wallet" = "xyes"])
 
 ac_configure_args="${ac_configure_args} --enable-module-recovery"
 AC_CONFIG_SUBDIRS([src/secp256k1])
