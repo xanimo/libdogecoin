@@ -96,8 +96,7 @@ tests_LDFLAGS = -static
 TESTS = tests
 endif
 
-if WITH_WALLET
-
+if WITH_LOGDB
 libbtc_la_SOURCES += \
     src/logdb/logdb_core.c \
     src/logdb/logdb_memdb_llist.c \
@@ -115,6 +114,14 @@ logdbinclude_HEADERS = \
     src/logdb/include/logdb/logdb.h \
     src/logdb/include/logdb/red_black_tree.h
 
+if USE_TESTS
+tests_SOURCES += \
+    src/logdb/test/logdb_tests.c \
+    src/logdb/test/tests_red_black_tree.c
+endif
+endif
+
+if WITH_WALLET
 libbtcinclude_HEADERS += \
     include/btc/wallet.h
 
@@ -123,9 +130,7 @@ libbtc_la_SOURCES += \
 
 if USE_TESTS
 tests_SOURCES += \
-    test/wallet_tests.c \
-    src/logdb/test/logdb_tests.c \
-    src/logdb/test/tests_red_black_tree.c
+    test/wallet_tests.c
 endif
 endif
 

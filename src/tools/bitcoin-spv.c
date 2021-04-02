@@ -163,6 +163,10 @@ int main(int argc, char* argv[])
 
     if (strcmp(data, "scan") == 0) {
         btc_ecc_start();
+        btc_spv_client* client = btc_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false);
+        client->header_message_processed = spv_header_message_processed;
+        client->sync_completed = spv_sync_completed;
+        #if WITH_WALLEt
         btc_wallet *wallet = btc_wallet_new(chain);
         int error;
         btc_bool created;
@@ -202,11 +206,9 @@ int main(int argc, char* argv[])
             printf("Addr: %s\n", addr);
         }
         vector_free(addrs, true);
-        btc_spv_client* client = btc_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false);
-        client->header_message_processed = spv_header_message_processed;
-        client->sync_completed = spv_sync_completed;
         client->sync_transaction = btc_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
+        #endif
         if (!btc_spv_client_load(client, (dbfile ? dbfile : "headers.db"))) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
