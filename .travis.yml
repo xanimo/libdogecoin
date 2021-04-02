@@ -79,10 +79,7 @@ script:
           ./tests;
       fi
     - if ( [ "$RUN_MAKE_CHECK" == "yes" ] ); then
-          if ! make check; then
-              cat test-suite.log;
-              false;
-          fi
+          make check;
       fi
     - if ( [ "$RUN_WINE_UNIT_TESTS" == "yes" ] ); then
           wine $(pwd)/tests.exe;
