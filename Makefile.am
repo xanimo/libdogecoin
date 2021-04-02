@@ -1,4 +1,5 @@
 ACLOCAL_AMFLAGS = -I build-aux/m4
+AUTOMAKE_OPTIONS = serial-tests
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
