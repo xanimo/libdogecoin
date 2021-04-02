@@ -240,8 +240,8 @@ int main(int argc, char* argv[])
         int posanum = -1;
         int posbnum = -1;
         int end = -1;
-        uint64_t from;
-        uint64_t to;
+        uint64_t from = 0;
+        uint64_t to = 0;
 
         static char digits[] = "0123456789";
         for (unsigned int i = 0; i<strlen(keypath); i++) {
