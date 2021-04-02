@@ -452,7 +452,7 @@ void btc_net_spv_post_cmd(btc_node *node, btc_p2p_msg_hdr *hdr, struct const_buf
 
                 btc_tx_free(tx);
             }
-            printf("done (took %llu secs)\n", time(NULL) - start);
+            printf("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
         }
         else {
             fprintf(stderr, "Could not connect block on top of the chain\n");
