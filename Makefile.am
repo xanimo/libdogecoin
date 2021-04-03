@@ -118,7 +118,8 @@ logdbinclude_HEADERS = \
 if USE_TESTS
 tests_SOURCES += \
     src/logdb/test/logdb_tests.c \
-    src/logdb/test/tests_red_black_tree.c
+    src/logdb/test/tests_red_black_tree.c \
+    src/logdb/test/logdb_tests_sample.h
 endif
 endif
 
