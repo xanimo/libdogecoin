@@ -35,6 +35,7 @@
 #include <btc/ecc.h>
 #include <btc/ecc_key.h>
 #include <btc/hash.h>
+#include <btc/hmac.h>
 #include <btc/memory.h>
 #include <btc/ripemd160.h>
 #include <btc/sha2.h>

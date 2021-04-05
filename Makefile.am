@@ -26,6 +26,7 @@ libbtcinclude_HEADERS = \
     include/btc/ecc_key.h \
     include/btc/ecc.h \
     include/btc/hash.h \
+    include/btc/hmac.h \
     include/btc/memory.h \
     include/btc/portable_endian.h \
     include/btc/random.h \
@@ -38,6 +39,23 @@ libbtcinclude_HEADERS = \
     include/btc/tx.h \
     include/btc/utils.h \
     include/btc/vector.h
+
+trezorcryptoincludedir = $(includedir)/trezor-crypto
+trezorcryptoinclude_HEADERS = \
+    src/trezor-crypto/base58.h \
+    src/trezor-crypto/blake2_common.h \
+    src/trezor-crypto/blake2b.h \
+    src/trezor-crypto/blake256.h \
+    src/trezor-crypto/groestl.h \
+    src/trezor-crypto/groestl_internal.h \
+    src/trezor-crypto/hasher.h \
+    src/trezor-crypto/hmac.h \
+    src/trezor-crypto/memzero.h \
+    src/trezor-crypto/options.h \
+    src/trezor-crypto/ripemd160.h \
+    src/trezor-crypto/segwit_addr.h \
+    src/trezor-crypto/sha2.h \
+    src/trezor-crypto/sha3.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libbtc.pc
@@ -58,12 +76,23 @@ libbtc_la_SOURCES = \
     src/random.c \
     src/ripemd160.c \
     src/script.c \
-    src/segwit_addr.c \
     src/serialize.c \
-    src/sha2.c \
     src/tx.c \
     src/utils.c \
     src/vector.c
+
+libbtc_la_SOURCES += \
+    src/trezor-crypto/base58.c \
+    src/trezor-crypto/blake2b.c \
+    src/trezor-crypto/blake256.c \
+    src/trezor-crypto/groestl.c \
+    src/trezor-crypto/hasher.c \
+    src/trezor-crypto/hmac.c \
+    src/trezor-crypto/memzero.c \
+    src/trezor-crypto/ripemd160.c \
+    src/trezor-crypto/segwit_addr.c \
+    src/trezor-crypto/sha2.c \
+    src/trezor-crypto/sha3.c
 
 libbtc_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
 libbtc_la_LIBADD = $(LIBSECP256K1)

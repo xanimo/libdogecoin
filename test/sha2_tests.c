@@ -9,6 +9,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include <btc/hmac.h>
 #include <btc/sha2.h>
 #include <btc/utils.h>
 
@@ -438,7 +439,7 @@ void test_sha_256()
         } else {
             sha256_Update(&context, msg_buf, oLen);
         }
-        sha256_Final(buf, &context);
+        sha256_Final(&context, buf);
         digest_out = utils_hex_to_uint8((const char*)nist_sha256_test_vectors_long[i].digest_hex);
         assert(memcmp(buf, digest_out, SHA256_DIGEST_LENGTH) == 0);
     }
@@ -473,7 +474,7 @@ void test_sha_512()
         } else {
             sha512_Update(&context, msg_buf, oLen);
         }
-        sha512_Final(buf, &context);
+        sha512_Final(&context, buf);
 
         digest_out = utils_hex_to_uint8((const char*)nist_sha512_test_vectors_long[i].digest_hex);
         assert(memcmp(buf, digest_out, SHA512_DIGEST_LENGTH) == 0);
