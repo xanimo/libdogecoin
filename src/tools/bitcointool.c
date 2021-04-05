@@ -290,7 +290,7 @@ int main(int argc, char* argv[])
                 char keypathnew[strlen(keypath)+16];
                 memcpy(keypathnew, keypath, posanum-1);
                 char index[9] = {0};
-                sprintf(index, "%lld", i);
+                sprintf(index, "%lld", (long long)i);
                 memcpy(keypathnew+posanum-1, index, strlen(index));
                 memcpy(keypathnew+posanum-1+strlen(index), &keypath[end], strlen(keypath)-end);
 

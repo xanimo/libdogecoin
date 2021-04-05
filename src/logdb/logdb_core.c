@@ -405,6 +405,8 @@ logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec)
     if (fwrite(hash, db->hashlen, 1, db->file) != 1)
         return false;
     db->hashctx = ctx;
+
+    return true;
 }
 
 logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enum logdb_error *error)
