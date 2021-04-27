@@ -76,6 +76,7 @@ before_script:
 script: 
     - make -j2 V=1
     - ls -la
+    - sudo make install
     - if ( [ "$VALGRIND_UNIT_TESTS" == "yes" ] ); then
           valgrind --track-origins=yes --leak-check=full --error-exitcode=1 ./tests &&
           ./tests;

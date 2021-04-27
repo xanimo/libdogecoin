@@ -3,9 +3,10 @@ AUTOMAKE_OPTIONS = serial-tests
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
-DIST_SUBDIRS = src/secp256k1
+LIBSECP256K1_DIR = src/secp256k1
+DIST_SUBDIRS = $(LIBSECP256K1_DIR)
 
-LIBSECP256K1=src/secp256k1/libsecp256k1.la
+LIBSECP256K1=$(LIBSECP256K1_DIR)/libsecp256k1.la
 
 $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
@@ -95,7 +96,7 @@ libbtc_la_SOURCES += \
     src/trezor-crypto/sha3.c
 
 libbtc_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
-libbtc_la_LIBADD = $(LIBSECP256K1)
+libbtc_la_LIBADD = $(LIBSECP256K1) -L$(abs_top_builddir)/$(LIBSECP256K1_DIR)/.libs
 
 if USE_TESTS
 noinst_PROGRAMS = tests
