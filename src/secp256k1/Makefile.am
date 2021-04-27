@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I build-aux/m4
 
-lib_LTLIBRARIES = libsecp256k1.la
+noinst_LTLIBRARIES = libsecp256k1.la
 include_HEADERS = include/secp256k1.h
 include_HEADERS += include/secp256k1_preallocated.h
 noinst_HEADERS =
@@ -53,7 +53,7 @@ noinst_HEADERS += contrib/lax_der_privatekey_parsing.c
 
 if USE_EXTERNAL_ASM
 COMMON_LIB = libsecp256k1_common.la
-noinst_LTLIBRARIES = $(COMMON_LIB)
+noinst_LTLIBRARIES += $(COMMON_LIB)
 else
 COMMON_LIB =
 endif
