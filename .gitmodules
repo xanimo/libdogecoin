@@ -1,0 +1,3 @@
+[submodule "src/trezor-crypto/tests/wycheproof"]
+        path = src/trezor-crypto/tests/wycheproof
+        url = https://github.com/google/wycheproof
