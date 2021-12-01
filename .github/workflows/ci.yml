@@ -1,6 +1,6 @@
 # this ci will build, test and publish artifacts for linux, win, macosx
 
-name: ci for multiarch
+name: ci
 
 on:
   push:
