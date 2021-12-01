@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <img src="http://libdogecoin.github.io/images/libdogecoin/logo@2x.png" alt="Icon" style="width:64px;"/>
 
 libdogecoin – A fast, clean and small dogecoin C library
@@ -128,3 +129,7 @@ make check
 ./configure --disable-wallet --disable-tools
 make check
 ```
+=======
+# libdogecoin
+Libdogecoin provides low level C functions useful for building compliant Dogecoin Nodes &amp; Wallets.
+>>>>>>> f0045d7... Initial commit
