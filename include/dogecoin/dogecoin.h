@@ -1,6 +1,8 @@
 /*
 
  The MIT License (MIT)
+
+ Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2022 bluezr
  Copyright (c) 2022 The Dogecoin Foundation
 
@@ -21,36 +23,28 @@
  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  OTHER DEALINGS IN THE SOFTWARE.
-
+ 
 */
 
-#ifndef __LIBDOGECOIN_DOGECOIN_H__
-#define __LIBDOGECOIN_DOGECOIN_H__
+#ifndef _LIBDOGECOIN_H_
+#define _LIBDOGECOIN_H_
 
+#include <stdio.h>
 #include <limits.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
-#ifndef __cplusplus
-# ifndef true
-#  define true 1
-# endif
+#ifndef true
+#define true 1
+#endif
 
-# ifndef false
-#  define false 0
-# endif
-#endif //__cplusplus
+#ifndef false
+#define false 0
+#endif
 
 #ifdef __cplusplus
-# define LIBDOGECOIN_BEGIN_DECL extern "C" {
-# define LIBDOGECOIN_END_DECL	}
-#else
-# define LIBDOGECOIN_BEGIN_DECL /* empty */
-# define LIBDOGECOIN_END_DECL	/* empty */
+extern "C" {
 #endif
 
 #ifndef LIBDOGECOIN_API
@@ -67,9 +61,8 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 #endif
 #endif
 
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
+#ifdef __cplusplus
+}
 #endif
 
 #define DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH 65
@@ -78,14 +71,4 @@ typedef SSIZE_T ssize_t;
 #define DOGECOIN_ECKEY_PKEY_LENGTH 32
 #define DOGECOIN_HASH_LENGTH 32
 
-#define DOGECOIN_MIN(a,b) (((a)<(b))?(a):(b))
-#define DOGECOIN_MAX(a,b) (((a)>(b))?(a):(b))
-
-LIBDOGECOIN_BEGIN_DECL
-
-typedef uint8_t uint256[32];
-typedef uint8_t uint160[20];
-
-LIBDOGECOIN_END_DECL
-
-#endif // __LIBDOGECOIN_DOGECOIN_H__
+#endif //_LIBDOGECOIN_H_

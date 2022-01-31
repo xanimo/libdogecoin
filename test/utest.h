@@ -79,7 +79,7 @@
 #define _UTEST_H_
 #include <stdio.h>
 #include <string.h>
-#include <inttypes.h>
+#include <stdint.h>
 
 #define u_run_test(TEST)                      \
     do {                                      \
@@ -108,13 +108,13 @@
 
 #define u_assert_uint32_eq(R, E)                                         \
     {                                                                    \
-        uint64_t r_ = (R);                                               \
-        uint64_t e_ = (E);                                               \
+        long long r_ = (R);                                               \
+        long long e_ = (E);                                               \
         do {                                                             \
             if (r_ != e_) {                                              \
                 printf("FAILED - %s() - Line %d\n", __func__, __LINE__); \
-                printf("\tExpect: \t%" PRIu64 "\n", e_);                        \
-                printf("\tReceive:\t%" PRIu64 "\n", r_);                        \
+                printf("\tExpect: \t%lld\n", e_);                        \
+                printf("\tReceive:\t%lld\n", r_);                        \
                 U_TESTS_FAIL++;                                          \
                 return;                                                  \
             };                                                           \
@@ -224,6 +224,7 @@
             };                                                           \
         } while (0);                                                     \
     }
+
 
 extern int U_TESTS_RUN;
 extern int U_TESTS_FAIL;
