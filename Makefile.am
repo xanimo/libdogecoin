@@ -10,35 +10,35 @@ LIBSECP256K1=src/secp256k1/libsecp256k1.la
 $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
-lib_LTLIBRARIES = libbtc.la
-libbtcincludedir = $(includedir)/btc
-libbtcinclude_HEADERS = \
-    include/btc/aes256_cbc.h \
-    include/btc/base58.h \
-    include/btc/bip32.h \
-    include/btc/block.h \
-    include/btc/blockchain.h \
-    include/btc/btc.h \
-    include/btc/buffer.h \
-    include/btc/chainparams.h \
-    include/btc/cstr.h \
-    include/btc/ctaes.h \
-    include/btc/ecc_key.h \
-    include/btc/ecc.h \
-    include/btc/hash.h \
-    include/btc/hmac.h \
-    include/btc/memory.h \
-    include/btc/portable_endian.h \
-    include/btc/random.h \
-    include/btc/ripemd160.h \
-    include/btc/script.h \
-    include/btc/segwit_addr.h \
-    include/btc/serialize.h \
-    include/btc/sha2.h \
-    include/btc/tool.h \
-    include/btc/tx.h \
-    include/btc/utils.h \
-    include/btc/vector.h
+lib_LTLIBRARIES = libdogecoin.la
+libdogecoinincludedir = $(includedir)/dogecoin
+libdogecoininclude_HEADERS = \
+    include/dogecoin/aes256_cbc.h \
+    include/dogecoin/base58.h \
+    include/dogecoin/bip32.h \
+    include/dogecoin/block.h \
+    include/dogecoin/blockchain.h \
+    include/dogecoin/dogecoin.h \
+    include/dogecoin/buffer.h \
+    include/dogecoin/chainparams.h \
+    include/dogecoin/cstr.h \
+    include/dogecoin/ctaes.h \
+    include/dogecoin/ecc_key.h \
+    include/dogecoin/ecc.h \
+    include/dogecoin/hash.h \
+    include/dogecoin/hmac.h \
+    include/dogecoin/memory.h \
+    include/dogecoin/portable_endian.h \
+    include/dogecoin/random.h \
+    include/dogecoin/ripemd160.h \
+    include/dogecoin/script.h \
+    include/dogecoin/segwit_addr.h \
+    include/dogecoin/serialize.h \
+    include/dogecoin/sha2.h \
+    include/dogecoin/tool.h \
+    include/dogecoin/tx.h \
+    include/dogecoin/utils.h \
+    include/dogecoin/vector.h
 
 trezorcryptoincludedir = $(includedir)/trezor-crypto
 trezorcryptoinclude_HEADERS = \
@@ -58,9 +58,9 @@ trezorcryptoinclude_HEADERS = \
     src/trezor-crypto/sha3.h
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = libbtc.pc
+pkgconfig_DATA = libdogecoin.pc
 
-libbtc_la_SOURCES = \
+libdogecoin_la_SOURCES = \
     src/aes256_cbc.c \
     src/base58.c \
     src/bip32.c \
@@ -81,7 +81,7 @@ libbtc_la_SOURCES = \
     src/utils.c \
     src/vector.c
 
-libbtc_la_SOURCES += \
+libdogecoin_la_SOURCES += \
     src/trezor-crypto/base58.c \
     src/trezor-crypto/blake2b.c \
     src/trezor-crypto/blake256.c \
@@ -94,12 +94,12 @@ libbtc_la_SOURCES += \
     src/trezor-crypto/sha2.c \
     src/trezor-crypto/sha3.c
 
-libbtc_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
-libbtc_la_LIBADD = $(LIBSECP256K1)
+libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
+libdogecoin_la_LIBADD = $(LIBSECP256K1)
 
 if USE_TESTS
 noinst_PROGRAMS = tests
-tests_LDADD = libbtc.la
+tests_LDADD = libdogecoin.la
 tests_SOURCES = \
     test/aes_tests.c \
     test/base58check_tests.c \
@@ -120,14 +120,14 @@ tests_SOURCES = \
     test/utils_tests.c \
     test/vector_tests.c
 
-tests_CFLAGS = $(libbtc_la_CFLAGS)
+tests_CFLAGS = $(libdogecoin_la_CFLAGS)
 tests_CPPFLAGS = -I$(top_srcdir)/src
 tests_LDFLAGS = -static
 TESTS = tests
 endif
 
 if WITH_LOGDB
-libbtc_la_SOURCES += \
+libdogecoin_la_SOURCES += \
     src/logdb/logdb_core.c \
     src/logdb/logdb_memdb_llist.c \
     src/logdb/logdb_memdb_rbtree.c \
@@ -153,10 +153,10 @@ endif
 endif
 
 if WITH_WALLET
-libbtcinclude_HEADERS += \
-    include/btc/wallet.h
+libdogecoininclude_HEADERS += \
+    include/dogecoin/wallet.h
 
-libbtc_la_SOURCES += \
+libdogecoin_la_SOURCES += \
     src/wallet.c
 
 if USE_TESTS
@@ -166,21 +166,21 @@ endif
 endif
 
 if WITH_NET
-libbtcinclude_HEADERS += \
-    include/btc/headersdb.h \
-    include/btc/headersdb_file.h \
-    include/btc/protocol.h \
-    include/btc/net.h \
-    include/btc/netspv.h
+libdogecoininclude_HEADERS += \
+    include/dogecoin/headersdb.h \
+    include/dogecoin/headersdb_file.h \
+    include/dogecoin/protocol.h \
+    include/dogecoin/net.h \
+    include/dogecoin/netspv.h
 
-libbtc_la_SOURCES += \
+libdogecoin_la_SOURCES += \
     src/headersdb_file.c \
     src/net.c \
     src/netspv.c \
     src/protocol.c
 
-libbtc_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
-libbtc_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+libdogecoin_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 
 if USE_TESTS
 tests_SOURCES += \
@@ -197,30 +197,30 @@ tests_SOURCES += \
     test/tool_tests.c
 endif
 instdir=$(prefix)/bin
-inst_PROGRAMS = bitcointool
-bitcointool_LDADD = libbtc.la
-bitcointool_SOURCES = \
-    src/tools/bitcointool.c
-bitcointool_CFLAGS = $(libbtc_la_CFLAGS)
-bitcointool_CPPFLAGS = -I$(top_srcdir)/src
-bitcointool_LDFLAGS = -static
+inst_PROGRAMS = dogecointool
+dogecointool_LDADD = libdogecoin.la
+dogecointool_SOURCES = \
+    src/tools/dogecointool.c
+dogecointool_CFLAGS = $(libdogecoin_la_CFLAGS)
+dogecointool_CPPFLAGS = -I$(top_srcdir)/src
+dogecointool_LDFLAGS = -static
 
 if WITH_NET
-inst_PROGRAMS += bitcoin-send-tx
-bitcoin_send_tx_LDADD = libbtc.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
-bitcoin_send_tx_SOURCES = \
-    src/tools/bitcoin-send-tx.c
-bitcoin_send_tx_CFLAGS = $(libbtc_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
-bitcoin_send_tx_CPPFLAGS = -I$(top_srcdir)/src
-bitcoin_send_tx_LDFLAGS = -static
+inst_PROGRAMS += dogecoin-send-tx
+dogecoin_send_tx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+dogecoin_send_tx_SOURCES = \
+    src/tools/dogecoin-send-tx.c
+dogecoin_send_tx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+dogecoin_send_tx_CPPFLAGS = -I$(top_srcdir)/src
+dogecoin_send_tx_LDFLAGS = -static
 
-inst_PROGRAMS += bitcoin-spv
-bitcoin_spv_LDADD = libbtc.la
-bitcoin_spv_SOURCES = \
-    src/tools/bitcoin-spv.c
-bitcoin_spv_CFLAGS = $(libbtc_la_CFLAGS)
-bitcoin_spv_CPPFLAGS = -I$(top_srcdir)/src
-bitcoin_spv_LDFLAGS = -static
+inst_PROGRAMS += dogecoin-spv
+dogecoin_spv_LDADD = libdogecoin.la
+dogecoin_spv_SOURCES = \
+    src/tools/dogecoin-spv.c
+dogecoin_spv_CFLAGS = $(libdogecoin_la_CFLAGS)
+dogecoin_spv_CPPFLAGS = -I$(top_srcdir)/src
+dogecoin_spv_LDFLAGS = -static
 endif
 
 endif

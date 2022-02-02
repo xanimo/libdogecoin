@@ -3,12 +3,12 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.13) # 3.13: concise relative source paths
 SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_C_STANDARD_REQUIRED TRUE)
 
-SET(LIBBTC_NAME btc)
-PROJECT(lib${LIBBTC_NAME} VERSION 0.1)
+SET(LIBDOGECOIN_NAME dogecoin)
+PROJECT(lib${LIBDOGECOIN_NAME} VERSION 0.1)
 
 INCLUDE(CTest)
 SET(USE_TESTS ${CMAKE_TESTING_ENABLED})
-SET(WITH_TOOLS TRUE CACHE BOOL "enable bitcoin tool cli application")
+SET(WITH_TOOLS TRUE CACHE BOOL "enable dogecoin tool cli application")
 SET(WITH_WALLET TRUE CACHE BOOL "enable wallet/database functions")
 SET(WITH_NET TRUE CACHE BOOL "enable net functions")
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
@@ -52,39 +52,39 @@ ENDIF()
 IF(WITH_LOGDB)
     ADD_DEFINITIONS(-DWITH_LOGDB=1)
 ENDIF()
-FILE(TOUCH src/libbtc-config.h)
+FILE(TOUCH src/libdogecoin-config.h)
 
 
-ADD_LIBRARY(${LIBBTC_NAME})
+ADD_LIBRARY(${LIBDOGECOIN_NAME})
 
 INSTALL(FILES
-    include/btc/aes256_cbc.h
-    include/btc/base58.h
-    include/btc/bip32.h
-    include/btc/block.h
-    include/btc/blockchain.h
-    include/btc/btc.h
-    include/btc/buffer.h
-    include/btc/chainparams.h
-    include/btc/cstr.h
-    include/btc/ctaes.h
-    include/btc/ecc_key.h
-    include/btc/ecc.h
-    include/btc/hash.h
-    include/btc/hmac.h
-    include/btc/memory.h
-    include/btc/portable_endian.h
-    include/btc/random.h
-    include/btc/ripemd160.h
-    include/btc/script.h
-    include/btc/segwit_addr.h
-    include/btc/serialize.h
-    include/btc/sha2.h
-    include/btc/tool.h
-    include/btc/tx.h
-    include/btc/utils.h
-    include/btc/vector.h
-    DESTINATION include/btc
+    include/dogecoin/aes256_cbc.h
+    include/dogecoin/base58.h
+    include/dogecoin/bip32.h
+    include/dogecoin/block.h
+    include/dogecoin/blockchain.h
+    include/dogecoin/dogecoin.h
+    include/dogecoin/buffer.h
+    include/dogecoin/chainparams.h
+    include/dogecoin/cstr.h
+    include/dogecoin/ctaes.h
+    include/dogecoin/ecc_key.h
+    include/dogecoin/ecc.h
+    include/dogecoin/hash.h
+    include/dogecoin/hmac.h
+    include/dogecoin/memory.h
+    include/dogecoin/portable_endian.h
+    include/dogecoin/random.h
+    include/dogecoin/ripemd160.h
+    include/dogecoin/script.h
+    include/dogecoin/segwit_addr.h
+    include/dogecoin/serialize.h
+    include/dogecoin/sha2.h
+    include/dogecoin/tool.h
+    include/dogecoin/tx.h
+    include/dogecoin/utils.h
+    include/dogecoin/vector.h
+    DESTINATION include/dogecoin
 )
 
 INSTALL(FILES
@@ -105,7 +105,7 @@ INSTALL(FILES
     DESTINATION include/trezor-crypto
 )
 
-TARGET_SOURCES(${LIBBTC_NAME} PRIVATE
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/aes256_cbc.c
     src/base58.c
     src/bip32.c
@@ -127,7 +127,7 @@ TARGET_SOURCES(${LIBBTC_NAME} PRIVATE
     src/vector.c
 )
 
-TARGET_SOURCES(${LIBBTC_NAME} PRIVATE
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/trezor-crypto/base58.c
     src/trezor-crypto/blake2b.c
     src/trezor-crypto/blake256.c
@@ -164,7 +164,7 @@ ADD_DEFINITIONS(
     -DENABLE_MODULE_RECOVERY
     -DECMULT_WINDOW_SIZE=15
     -DECMULT_GEN_PREC_BITS=4)
-TARGET_SOURCES(${LIBBTC_NAME} PRIVATE ${SECP256K1})
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE ${SECP256K1})
 
 INCLUDE_DIRECTORIES(
     include
@@ -193,12 +193,12 @@ IF(USE_TESTS)
         test/utils_tests.c
         test/vector_tests.c
     )
-    TARGET_LINK_LIBRARIES(tests ${LIBBTC_NAME})
-    ADD_TEST(NAME ${LIBBTC_NAME}_tests COMMAND tests)
+    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME})
+    ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
 ENDIF()
 
 IF(WITH_LOGDB)
-    TARGET_SOURCES(${LIBBTC_NAME} PRIVATE
+    TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
         src/logdb/logdb_core.c
         src/logdb/logdb_memdb_llist.c
         src/logdb/logdb_memdb_rbtree.c
@@ -225,10 +225,10 @@ ENDIF()
 
 IF(WITH_WALLET)
     INSTALL(FILES
-        include/btc/wallet.h
-        DESTINATION include/btc
+        include/dogecoin/wallet.h
+        DESTINATION include/dogecoin
     )
-    TARGET_SOURCES(${LIBBTC_NAME} PRIVATE
+    TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
         src/wallet.c
     )
     IF(USE_TESTS)
@@ -240,21 +240,21 @@ ENDIF()
 
 IF(WITH_NET)
     INSTALL(FILES
-        include/btc/headersdb.h
-        include/btc/headersdb_file.h
-        include/btc/protocol.h
-        include/btc/net.h
-        include/btc/netspv.h
-        DESTINATION include/btc
+        include/dogecoin/headersdb.h
+        include/dogecoin/headersdb_file.h
+        include/dogecoin/protocol.h
+        include/dogecoin/net.h
+        include/dogecoin/netspv.h
+        DESTINATION include/dogecoin
     )
-    TARGET_SOURCES(${LIBBTC_NAME} PRIVATE
+    TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
         src/headersdb_file.c
         src/net.c
         src/netspv.c
         src/protocol.c
     )
 
-    TARGET_LINK_LIBRARIES(${LIBBTC_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS})
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS})
 
     IF(USE_TESTS)
         TARGET_SOURCES(tests PRIVATE
@@ -272,20 +272,20 @@ IF(WITH_TOOLS)
         )
     ENDIF()
 
-    ADD_EXECUTABLE(bitcointool src/tools/bitcointool.c)
-    INSTALL(TARGETS bitcointool RUNTIME)
-    TARGET_LINK_LIBRARIES(bitcointool ${LIBBTC_NAME})
-    TARGET_INCLUDE_DIRECTORIES(bitcointool PRIVATE src)
+    ADD_EXECUTABLE(dogecointool src/tools/dogecointool.c)
+    INSTALL(TARGETS dogecointool RUNTIME)
+    TARGET_LINK_LIBRARIES(dogecointool ${LIBDOGECOIN_NAME})
+    TARGET_INCLUDE_DIRECTORIES(dogecointool PRIVATE src)
 
     IF(WITH_NET)
-        ADD_EXECUTABLE(bitcoin-send-tx src/tools/bitcoin-send-tx.c)
-        INSTALL(TARGETS bitcoin-send-tx RUNTIME)
-        TARGET_LINK_LIBRARIES(bitcoin-send-tx ${LIBBTC_NAME})
-        TARGET_INCLUDE_DIRECTORIES(bitcoin-send-tx PRIVATE src)
-        ADD_EXECUTABLE(bitcoin-spv src/tools/bitcoin-spv.c)
-        INSTALL(TARGETS bitcoin-spv RUNTIME)
-        TARGET_LINK_LIBRARIES(bitcoin-spv ${LIBBTC_NAME})
-        TARGET_INCLUDE_DIRECTORIES(bitcoin-spv PRIVATE src)
+        ADD_EXECUTABLE(dogecoin-send-tx src/tools/dogecoin-send-tx.c)
+        INSTALL(TARGETS dogecoin-send-tx RUNTIME)
+        TARGET_LINK_LIBRARIES(dogecoin-send-tx ${LIBDOGECOIN_NAME})
+        TARGET_INCLUDE_DIRECTORIES(dogecoin-send-tx PRIVATE src)
+        ADD_EXECUTABLE(dogecoin-spv src/tools/dogecoin-spv.c)
+        INSTALL(TARGETS dogecoin-spv RUNTIME)
+        TARGET_LINK_LIBRARIES(dogecoin-spv ${LIBDOGECOIN_NAME})
+        TARGET_INCLUDE_DIRECTORIES(dogecoin-spv PRIVATE src)
     ENDIF()
 ENDIF()
 

@@ -4,6 +4,8 @@
 
  Copyright (c) 2015 Douglas J. Bakkum
  Copyright (c) 2015 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -32,8 +34,8 @@
 #include <string.h>
 #include <time.h>
 
-#include <btc/memory.h>
-#include <btc/utils.h>
+#include <dogecoin/memory.h>
+#include <dogecoin/utils.h>
 
 #ifdef WIN32
 
@@ -173,14 +175,14 @@ char* utils_uint8_to_hex(const uint8_t* bin, size_t l)
 
 void utils_reverse_hex(char* h, int len)
 {
-    char* copy = btc_malloc(len);
+    char* copy = dogecoin_malloc(len);
     int i;
     strncpy(copy, h, len);
     for (i = 0; i < len; i += 2) {
         h[i] = copy[len - i - 2];
         h[i + 1] = copy[len - i - 1];
     }
-    btc_free(copy);
+    dogecoin_free(copy);
 }
 
 const signed char p_util_hexdigit[256] =
@@ -250,7 +252,7 @@ void* safe_malloc(size_t size)
     }
 }
 
-void btc_cheap_random_bytes(uint8_t* buf, uint32_t len)
+void dogecoin_cheap_random_bytes(uint8_t* buf, uint32_t len)
 {
     srand(time(NULL));
     for (uint32_t i = 0; i < len; i++) {
@@ -258,12 +260,12 @@ void btc_cheap_random_bytes(uint8_t* buf, uint32_t len)
     }
 }
 
-void btc_get_default_datadir(cstring *path_out)
+void dogecoin_get_default_datadir(cstring *path_out)
 {
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\Bitcoin
     // Mac: ~/Library/Application Support/Bitcoin
-    // Unix: ~/.bitcoin
+    // Unix: ~/.dogecoin
 #ifdef WIN32
     // Windows
     char* homedrive = getenv("HOMEDRIVE");
@@ -282,13 +284,13 @@ void btc_get_default_datadir(cstring *path_out)
     cstr_append_buf(path_out, osx_home, strlen(osx_home));
 #else
     // Unix
-    char *posix_home = "/.bitcoin";
+    char *posix_home = "/.dogecoin";
     cstr_append_buf(path_out, posix_home, strlen(posix_home));
 #endif
 #endif
 }
 
-void btc_file_commit(FILE *file)
+void dogecoin_file_commit(FILE *file)
 {
     fflush(file); // harmless if redundantly called
 #ifdef WIN32

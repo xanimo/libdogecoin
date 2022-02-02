@@ -58,7 +58,7 @@ void MainWindow::on_spinAccount_valueChanged(int arg1)
         QTableWidget *list = chain == 0 ? ui->listAddress : ui->listChange;
         node = root;
         hdnode_private_ckd(&node, 44 | 0x80000000);
-        hdnode_private_ckd(&node, 0 | 0x80000000); // bitcoin
+        hdnode_private_ckd(&node, 0 | 0x80000000); // dogecoin
         hdnode_private_ckd(&node, (arg1 - 1) | 0x80000000);
         fingerprint = hdnode_fingerprint(&node);
         hdnode_serialize_private(&node, fingerprint, version_private, buf, buflen); QString xprv = QString(buf); ui->lineXprv->setText(xprv);

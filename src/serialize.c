@@ -3,8 +3,8 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.
  */
 
-#include <btc/cstr.h>
-#include <btc/serialize.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/serialize.h>
 
 #include <string.h>
 

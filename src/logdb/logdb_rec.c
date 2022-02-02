@@ -25,7 +25,7 @@
  */
 
 #include <logdb/logdb_rec.h>
-#include <btc/serialize.h>
+#include <dogecoin/serialize.h>
 
 #include <assert.h>
 #include <stdint.h>
