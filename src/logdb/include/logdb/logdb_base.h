@@ -52,12 +52,12 @@ extern "C" {
 
 #ifndef LIBLOGDB_API
 #if defined(_WIN32)
-#ifdef LIBBTC_BUILD
+#ifdef LIBDOGECOIN_BUILD
 #define LIBLOGDB_API __declspec(dllexport)
 #else
 #define LIBLOGDB_API
 #endif
-#elif defined(__GNUC__) && defined(LIBBTC_BUILD)
+#elif defined(__GNUC__) && defined(LIBDOGECOIN_BUILD)
 #define LIBLOGDB_API __attribute__((visibility("default")))
 #else
 #define LIBLOGDB_API

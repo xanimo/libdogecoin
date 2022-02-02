@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2015 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -24,240 +26,240 @@
  
 */
 
-#include <btc/ecc_key.h>
+#include <dogecoin/ecc_key.h>
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <btc/base58.h>
-#include <btc/chainparams.h>
-#include <btc/ecc.h>
-#include <btc/hash.h>
-#include <btc/random.h>
-#include <btc/ripemd160.h>
-#include <btc/script.h>
-#include <btc/segwit_addr.h>
-#include <btc/utils.h>
+#include <dogecoin/base58.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/ecc.h>
+#include <dogecoin/hash.h>
+#include <dogecoin/random.h>
+#include <dogecoin/ripemd160.h>
+#include <dogecoin/script.h>
+#include <dogecoin/segwit_addr.h>
+#include <dogecoin/utils.h>
 
 
-void btc_privkey_init(btc_key* privkey)
+void dogecoin_privkey_init(dogecoin_key* privkey)
 {
-    memset(&privkey->privkey, 0, BTC_ECKEY_PKEY_LENGTH);
+    memset(&privkey->privkey, 0, DOGECOIN_ECKEY_PKEY_LENGTH);
 }
 
 
-btc_bool btc_privkey_is_valid(const btc_key* privkey)
+dogecoin_bool dogecoin_privkey_is_valid(const dogecoin_key* privkey)
 {
     if (!privkey) {
         return false;
     }
-    return btc_ecc_verify_privatekey(privkey->privkey);
+    return dogecoin_ecc_verify_privatekey(privkey->privkey);
 }
 
 
-void btc_privkey_cleanse(btc_key* privkey)
+void dogecoin_privkey_cleanse(dogecoin_key* privkey)
 {
-    btc_mem_zero(&privkey->privkey, BTC_ECKEY_PKEY_LENGTH);
+    dogecoin_mem_zero(&privkey->privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
 }
 
 
-btc_bool btc_privkey_gen(btc_key* privkey)
+dogecoin_bool dogecoin_privkey_gen(dogecoin_key* privkey)
 {
     if (privkey == NULL)
         return false;
 
     do {
-        const btc_bool res = btc_random_bytes(privkey->privkey, BTC_ECKEY_PKEY_LENGTH, 0);
+        const dogecoin_bool res = dogecoin_random_bytes(privkey->privkey, DOGECOIN_ECKEY_PKEY_LENGTH, 0);
         if (!res)
             return false;
-    } while (btc_ecc_verify_privatekey(privkey->privkey) == 0);
+    } while (dogecoin_ecc_verify_privatekey(privkey->privkey) == 0);
     return true;
 }
 
 
-btc_bool btc_privkey_verify_pubkey(btc_key* privkey, btc_pubkey* pubkey)
+dogecoin_bool dogecoin_privkey_verify_pubkey(dogecoin_key* privkey, dogecoin_pubkey* pubkey)
 {
     uint256 rnddata, hash;
-    const btc_bool res = btc_random_bytes(rnddata, BTC_HASH_LENGTH, 0);
+    const dogecoin_bool res = dogecoin_random_bytes(rnddata, DOGECOIN_HASH_LENGTH, 0);
     if (!res)
         return false;
-    btc_hash(rnddata, BTC_HASH_LENGTH, hash);
+    dogecoin_hash(rnddata, DOGECOIN_HASH_LENGTH, hash);
 
     unsigned char sig[74];
     size_t siglen = 74;
 
-    if (!btc_key_sign_hash(privkey, hash, sig, &siglen))
+    if (!dogecoin_key_sign_hash(privkey, hash, sig, &siglen))
         return false;
 
-    return btc_pubkey_verify_sig(pubkey, hash, sig, siglen);
+    return dogecoin_pubkey_verify_sig(pubkey, hash, sig, siglen);
 }
 
-void btc_privkey_encode_wif(const btc_key* privkey, const btc_chainparams* chain, char *privkey_wif, size_t *strsize_inout) {
+void dogecoin_privkey_encode_wif(const dogecoin_key* privkey, const dogecoin_chainparams* chain, char *privkey_wif, size_t *strsize_inout) {
     uint8_t pkeybase58c[34];
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
 
-    memcpy(&pkeybase58c[1], privkey->privkey, BTC_ECKEY_PKEY_LENGTH);
-    assert(btc_base58_encode_check(pkeybase58c, 34, privkey_wif, *strsize_inout) != 0);
-    btc_mem_zero(&pkeybase58c, 34);
+    memcpy(&pkeybase58c[1], privkey->privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
+    assert(dogecoin_base58_encode_check(pkeybase58c, 34, privkey_wif, *strsize_inout) != 0);
+    dogecoin_mem_zero(&pkeybase58c, 34);
 }
 
-btc_bool btc_privkey_decode_wif(const char *privkey_wif, const btc_chainparams* chain, btc_key* privkey) {
+dogecoin_bool dogecoin_privkey_decode_wif(const char *privkey_wif, const dogecoin_chainparams* chain, dogecoin_key* privkey) {
 
     if (!privkey_wif || strlen(privkey_wif) < 50) {
         return false;
     }
 
     const size_t privkey_len = strlen(privkey_wif);
-    uint8_t *privkey_data = (uint8_t *)btc_malloc(privkey_len);
+    uint8_t *privkey_data = (uint8_t *)dogecoin_malloc(privkey_len);
     memset(privkey_data, 0, privkey_len);
     size_t outlen = 0;
 
-    outlen = btc_base58_decode_check(privkey_wif, privkey_data, privkey_len);
+    outlen = dogecoin_base58_decode_check(privkey_wif, privkey_data, privkey_len);
     if (!outlen) {
-        btc_free(privkey_data);
+        dogecoin_free(privkey_data);
         return false;
     }
     if (privkey_data[0] != chain->b58prefix_secret_address) {
-        btc_free(privkey_data);
+        dogecoin_free(privkey_data);
         return false;
     }
-    memcpy(privkey->privkey, &privkey_data[1], BTC_ECKEY_PKEY_LENGTH);
-    btc_mem_zero(privkey_data, sizeof(privkey_data));
-    btc_free(privkey_data);
+    memcpy(privkey->privkey, &privkey_data[1], DOGECOIN_ECKEY_PKEY_LENGTH);
+    dogecoin_mem_zero(privkey_data, sizeof(privkey_data));
+    dogecoin_free(privkey_data);
     return true;
 }
 
-void btc_pubkey_init(btc_pubkey* pubkey)
+void dogecoin_pubkey_init(dogecoin_pubkey* pubkey)
 {
     if (pubkey == NULL)
         return;
 
-    memset(pubkey->pubkey, 0, BTC_ECKEY_UNCOMPRESSED_LENGTH);
+    memset(pubkey->pubkey, 0, DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
     pubkey->compressed = false;
 }
 
 
-unsigned int btc_pubkey_get_length(unsigned char ch_header)
+unsigned int dogecoin_pubkey_get_length(unsigned char ch_header)
 {
     if (ch_header == 2 || ch_header == 3)
-        return BTC_ECKEY_COMPRESSED_LENGTH;
+        return DOGECOIN_ECKEY_COMPRESSED_LENGTH;
     if (ch_header == 4 || ch_header == 6 || ch_header == 7)
-        return BTC_ECKEY_UNCOMPRESSED_LENGTH;
+        return DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH;
     return 0;
 }
 
 
-btc_bool btc_pubkey_is_valid(const btc_pubkey* pubkey)
+dogecoin_bool dogecoin_pubkey_is_valid(const dogecoin_pubkey* pubkey)
 {
-    return btc_ecc_verify_pubkey(pubkey->pubkey, pubkey->compressed);
+    return dogecoin_ecc_verify_pubkey(pubkey->pubkey, pubkey->compressed);
 }
 
 
-void btc_pubkey_cleanse(btc_pubkey* pubkey)
+void dogecoin_pubkey_cleanse(dogecoin_pubkey* pubkey)
 {
     if (pubkey == NULL)
         return;
 
-    btc_mem_zero(pubkey->pubkey, BTC_ECKEY_UNCOMPRESSED_LENGTH);
+    dogecoin_mem_zero(pubkey->pubkey, DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
 }
 
 
-void btc_pubkey_get_hash160(const btc_pubkey* pubkey, uint160 hash160)
+void dogecoin_pubkey_get_hash160(const dogecoin_pubkey* pubkey, uint160 hash160)
 {
     uint256 hashout;
-    btc_hash_sngl_sha256(pubkey->pubkey, pubkey->compressed ? BTC_ECKEY_COMPRESSED_LENGTH : BTC_ECKEY_UNCOMPRESSED_LENGTH, hashout);
+    dogecoin_hash_sngl_sha256(pubkey->pubkey, pubkey->compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH, hashout);
 
-    btc_ripemd160(hashout, sizeof(hashout), hash160);
+    dogecoin_ripemd160(hashout, sizeof(hashout), hash160);
 }
 
 
-btc_bool btc_pubkey_get_hex(const btc_pubkey* pubkey, char* str, size_t* strsize)
+dogecoin_bool dogecoin_pubkey_get_hex(const dogecoin_pubkey* pubkey, char* str, size_t* strsize)
 {
-    if (*strsize < BTC_ECKEY_COMPRESSED_LENGTH * 2)
+    if (*strsize < DOGECOIN_ECKEY_COMPRESSED_LENGTH * 2)
         return false;
-    utils_bin_to_hex((unsigned char*)pubkey->pubkey, BTC_ECKEY_COMPRESSED_LENGTH, str);
-    *strsize = BTC_ECKEY_COMPRESSED_LENGTH * 2;
+    utils_bin_to_hex((unsigned char*)pubkey->pubkey, DOGECOIN_ECKEY_COMPRESSED_LENGTH, str);
+    *strsize = DOGECOIN_ECKEY_COMPRESSED_LENGTH * 2;
     return true;
 }
 
 
-void btc_pubkey_from_key(const btc_key* privkey, btc_pubkey* pubkey_inout)
+void dogecoin_pubkey_from_key(const dogecoin_key* privkey, dogecoin_pubkey* pubkey_inout)
 {
     if (pubkey_inout == NULL || privkey == NULL)
         return;
 
-    size_t in_out_len = BTC_ECKEY_COMPRESSED_LENGTH;
+    size_t in_out_len = DOGECOIN_ECKEY_COMPRESSED_LENGTH;
 
-    btc_ecc_get_pubkey(privkey->privkey, pubkey_inout->pubkey, &in_out_len, true);
+    dogecoin_ecc_get_pubkey(privkey->privkey, pubkey_inout->pubkey, &in_out_len, true);
     pubkey_inout->compressed = true;
 }
 
 
-btc_bool btc_key_sign_hash(const btc_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen)
+dogecoin_bool dogecoin_key_sign_hash(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen)
 {
-    return btc_ecc_sign(privkey->privkey, hash, sigout, outlen);
+    return dogecoin_ecc_sign(privkey->privkey, hash, sigout, outlen);
 }
 
 
-btc_bool btc_key_sign_hash_compact(const btc_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen)
+dogecoin_bool dogecoin_key_sign_hash_compact(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen)
 {
-    return btc_ecc_sign_compact(privkey->privkey, hash, sigout, outlen);
+    return dogecoin_ecc_sign_compact(privkey->privkey, hash, sigout, outlen);
 }
 
-btc_bool btc_key_sign_hash_compact_recoverable(const btc_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen, int* recid)
+dogecoin_bool dogecoin_key_sign_hash_compact_recoverable(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen, int* recid)
 {
-    return btc_ecc_sign_compact_recoverable(privkey->privkey, hash, sigout, outlen, recid);
+    return dogecoin_ecc_sign_compact_recoverable(privkey->privkey, hash, sigout, outlen, recid);
 }
 
-btc_bool btc_key_sign_recover_pubkey(const unsigned char* sig, const uint256 hash, int recid, btc_pubkey* pubkey)
+dogecoin_bool dogecoin_key_sign_recover_pubkey(const unsigned char* sig, const uint256 hash, int recid, dogecoin_pubkey* pubkey)
 {
     uint8_t pubkeybuf[128];
     size_t outlen = 128;
-    if (!btc_ecc_recover_pubkey(sig, hash, recid, pubkeybuf, &outlen) || outlen > BTC_ECKEY_UNCOMPRESSED_LENGTH) {
+    if (!dogecoin_ecc_recover_pubkey(sig, hash, recid, pubkeybuf, &outlen) || outlen > DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH) {
         return 0;
     }
     memset(pubkey->pubkey, 0, sizeof(pubkey->pubkey));
     memcpy(pubkey->pubkey, pubkeybuf, outlen);
-    if (outlen == BTC_ECKEY_COMPRESSED_LENGTH) {
+    if (outlen == DOGECOIN_ECKEY_COMPRESSED_LENGTH) {
         pubkey->compressed = true;
     }
     return 1;
 }
 
-btc_bool btc_pubkey_verify_sig(const btc_pubkey* pubkey, const uint256 hash, unsigned char* sigder, int len)
+dogecoin_bool dogecoin_pubkey_verify_sig(const dogecoin_pubkey* pubkey, const uint256 hash, unsigned char* sigder, int len)
 {
-    return btc_ecc_verify_sig(pubkey->pubkey, pubkey->compressed, hash, sigder, len);
+    return dogecoin_ecc_verify_sig(pubkey->pubkey, pubkey->compressed, hash, sigder, len);
 }
 
-btc_bool btc_pubkey_getaddr_p2sh_p2wpkh(const btc_pubkey* pubkey, const btc_chainparams* chain, char *addrout) {
+dogecoin_bool dogecoin_pubkey_getaddr_p2sh_p2wpkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char *addrout) {
     cstring *p2wphk_script = cstr_new_sz(22);
     uint160 keyhash;
-    btc_pubkey_get_hash160(pubkey, keyhash);
-    btc_script_build_p2wpkh(p2wphk_script, keyhash);
+    dogecoin_pubkey_get_hash160(pubkey, keyhash);
+    dogecoin_script_build_p2wpkh(p2wphk_script, keyhash);
 
     uint8_t hash160[sizeof(uint160)+1];
     hash160[0] = chain->b58prefix_script_address;
-    btc_script_get_scripthash(p2wphk_script, hash160+1);
+    dogecoin_script_get_scripthash(p2wphk_script, hash160+1);
     cstr_free(p2wphk_script, true);
 
-    btc_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
+    dogecoin_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
     return true;
 }
 
-btc_bool btc_pubkey_getaddr_p2pkh(const btc_pubkey* pubkey, const btc_chainparams* chain, char *addrout) {
+dogecoin_bool dogecoin_pubkey_getaddr_p2pkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char *addrout) {
     uint8_t hash160[sizeof(uint160)+1];
     hash160[0] = chain->b58prefix_pubkey_address;
-    btc_pubkey_get_hash160(pubkey, hash160 + 1);
-    btc_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
+    dogecoin_pubkey_get_hash160(pubkey, hash160 + 1);
+    dogecoin_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
     return true;
 }
 
-btc_bool btc_pubkey_getaddr_p2wpkh(const btc_pubkey* pubkey, const btc_chainparams* chain, char *addrout) {
+dogecoin_bool dogecoin_pubkey_getaddr_p2wpkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char *addrout) {
     uint160 hash160;
-    btc_pubkey_get_hash160(pubkey, hash160);
+    dogecoin_pubkey_get_hash160(pubkey, hash160);
     segwit_addr_encode(addrout, chain->bech32_hrp, 0, hash160, sizeof(hash160));
     return true;
 }

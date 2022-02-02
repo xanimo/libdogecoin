@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,7 +11,7 @@
 #include <assert.h>
 #include "limits.h"
 
-#include <btc/buffer.h>
+#include <dogecoin/buffer.h>
 
 void test_buffer()
 {

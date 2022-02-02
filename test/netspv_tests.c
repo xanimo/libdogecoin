@@ -1,16 +1,16 @@
 #include "utest.h"
-#include <btc/block.h>
-#include <btc/net.h>
-#include <btc/netspv.h>
+#include <dogecoin/block.h>
+#include <dogecoin/net.h>
+#include <dogecoin/netspv.h>
 
 #include <unistd.h>
 
-void test_spv_sync_completed(btc_spv_client* client) {
+void test_spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
-    btc_node_group_shutdown(client->nodegroup);
+    dogecoin_node_group_shutdown(client->nodegroup);
 }
 
-btc_bool test_spv_header_message_processed(struct btc_spv_client_ *client, btc_node *node, btc_blockindex *newtip) {
+dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip) {
     UNUSED(client);
     UNUSED(node);
     if (newtip) {
@@ -22,16 +22,16 @@ btc_bool test_spv_header_message_processed(struct btc_spv_client_ *client, btc_n
 void test_netspv()
 {
     unlink("headers.db");
-    btc_spv_client* client = btc_spv_client_new(&btc_chainparams_main, true, false);
+    dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_test, false, false);
     client->header_message_processed = test_spv_header_message_processed;
     client->sync_completed = test_spv_sync_completed;
 
-    btc_spv_client_load(client, "headers.db");
+    dogecoin_spv_client_load(client, "headers.db");
 
     printf("Discover peers...");
-    btc_spv_client_discover_peers(client, NULL);
+    dogecoin_spv_client_discover_peers(client, NULL);
     printf("done\n");
     printf("Start interacting with the p2p network...\n");
-    btc_spv_client_runloop(client);
-    btc_spv_client_free(client);
+    dogecoin_spv_client_runloop(client);
+    dogecoin_spv_client_free(client);
 }

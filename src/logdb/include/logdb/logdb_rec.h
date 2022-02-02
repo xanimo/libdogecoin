@@ -33,7 +33,7 @@ extern "C" {
 
 #include <logdb/logdb_base.h>
 
-#include <btc/cstr.h>
+#include <dogecoin/cstr.h>
 
 #include <stdint.h>
 #include <stddef.h>

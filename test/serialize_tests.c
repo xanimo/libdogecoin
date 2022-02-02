@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,9 +11,9 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/cstr.h>
-#include <btc/serialize.h>
-#include <btc/utils.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/serialize.h>
+#include <dogecoin/utils.h>
 
 void test_serialize()
 {

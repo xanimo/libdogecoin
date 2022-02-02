@@ -1,16 +1,18 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
-#include <btc/wallet.h>
-#include <btc/base58.h>
+#include <dogecoin/wallet.h>
+#include <dogecoin/base58.h>
 
 #include <logdb/logdb.h>
 
 #include "utest.h"
-#include <btc/utils.h>
+#include <dogecoin/utils.h>
 #include <unistd.h>
 
 static const char *wallettmpfile = "/tmp/dummy";
@@ -18,37 +20,37 @@ static const char *wallettmpfile = "/tmp/dummy";
 void test_wallet()
 {
     unlink(wallettmpfile);
-    btc_wallet *wallet = btc_wallet_new(&btc_chainparams_main);
+    dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     int error;
-    btc_bool created;
-    u_assert_int_eq(btc_wallet_load(wallet, wallettmpfile, &error, &created), true);
+    dogecoin_bool created;
+    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
 
-    char *xpriv = "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7";
+    char *xpriv = "dgpv51eADS3spNJh96VLmogsMe5dzQtcQ8DP8KeZZjcG2qqvbcL67n4cSRNqXWFmo65KSmpK8smF8n2haMVD5mM8Ztvq8UdkQt6jSi43eNcK5rz";
 
-    btc_hdnode node;
-    btc_wallet_hdnode *node2, *node3;
-    btc_bool suc = btc_hdnode_deserialize(xpriv, &btc_chainparams_main, &node);
+    dogecoin_hdnode node;
+    dogecoin_wallet_hdnode *node2, *node3;
+    dogecoin_bool suc = dogecoin_hdnode_deserialize(xpriv, &dogecoin_chainparams_main, &node);
     u_assert_int_eq(suc, 1);
-    btc_wallet_set_master_key_copy(wallet, &node);
+    dogecoin_wallet_set_master_key_copy(wallet, &node);
 
-    node2 = btc_wallet_next_key(wallet);
+    node2 = dogecoin_wallet_next_key(wallet);
 
-    btc_wallet_free(wallet);
+    dogecoin_wallet_free(wallet);
 
-    wallet = btc_wallet_new(&btc_chainparams_main);
-    u_assert_int_eq(btc_wallet_load(wallet, wallettmpfile, &error, &created), true);
-    node3 = btc_wallet_next_key(wallet);
+    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
+    node3 = dogecoin_wallet_next_key(wallet);
 
     //should not be equal because we autoincrementing child index
     u_assert_int_eq(memcmp(node2->hdnode->private_key, node3->hdnode->private_key, sizeof(node2->hdnode->private_key)) != 0, 1);
-    btc_wallet_hdnode_free(node3);
+    dogecoin_wallet_hdnode_free(node3);
 
     //force to regenerate child 0
     wallet->next_childindex = 0;
-    node3 = btc_wallet_next_key(wallet);
-    btc_wallet_hdnode_free(node3);
+    node3 = dogecoin_wallet_next_key(wallet);
+    dogecoin_wallet_hdnode_free(node3);
     wallet->next_childindex = 0;
-    node3 = btc_wallet_next_key(wallet);
+    node3 = dogecoin_wallet_next_key(wallet);
 
     //now it should be equal
     u_assert_int_eq(memcmp(node2->hdnode->private_key, node3->hdnode->private_key, sizeof(node2->hdnode->private_key)), 0);
@@ -56,35 +58,35 @@ void test_wallet()
     uint160 hash160;
 
     vector *addrs = vector_new(1, free);
-    btc_wallet_get_addresses(wallet, addrs);
+    dogecoin_wallet_get_addresses(wallet, addrs);
     u_assert_int_eq(addrs->len, 4);
     u_assert_int_eq(strcmp(addrs->data[3],"1JQheacLPdM5ySCkrZkV66G2ApAXe1mqLj"), 0)
     u_assert_int_eq(strcmp(addrs->data[0],"1LZaBnH11M2yN5ZNiK67yUbaspfX6XKmRr"), 0)
 
     vector_free(addrs, true);
-    btc_wallet_flush(wallet);
-    btc_wallet_free(wallet);
-    btc_wallet_hdnode_free(node2);
-    btc_wallet_hdnode_free(node3);
+    dogecoin_wallet_flush(wallet);
+    dogecoin_wallet_free(wallet);
+    dogecoin_wallet_hdnode_free(node2);
+    dogecoin_wallet_hdnode_free(node3);
 
-    wallet = btc_wallet_new(&btc_chainparams_main);
-    u_assert_int_eq(btc_wallet_load(wallet, wallettmpfile, &error, &created), true);
+    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
     addrs = vector_new(1, free);
-    btc_wallet_get_addresses(wallet, addrs);
+    dogecoin_wallet_get_addresses(wallet, addrs);
 
     u_assert_int_eq(addrs->len, 4);
     u_assert_int_eq(strcmp(addrs->data[3],"1JQheacLPdM5ySCkrZkV66G2ApAXe1mqLj"), 0)
     u_assert_int_eq(strcmp(addrs->data[0],"1LZaBnH11M2yN5ZNiK67yUbaspfX6XKmRr"), 0)
 
     // get a hdnode and compare
-    btc_wallet_hdnode *checknode = btc_wallet_find_hdnode_byaddr(wallet, addrs->data[0]);
+    dogecoin_wallet_hdnode *checknode = dogecoin_wallet_find_hdnode_byaddr(wallet, addrs->data[0]);
 
     hash160[0] = wallet->chain->b58prefix_pubkey_address;
-    btc_hdnode_get_hash160(checknode->hdnode, hash160+1);
+    dogecoin_hdnode_get_hash160(checknode->hdnode, hash160+1);
 
     size_t addrsize = 98;
     char addr[addrsize];
-    btc_base58_encode_check(hash160, sizeof(uint160)+1, addr, addrsize);
+    dogecoin_base58_encode_check(hash160, sizeof(uint160)+1, addr, addrsize);
     u_assert_int_eq(strcmp(addr, addrs->data[0]), 0);
     vector_free(addrs, true);
 
@@ -97,56 +99,56 @@ void test_wallet()
     uint8_t tx_data[strlen(hextx_coinbase) / 2];
     int outlen ;
     utils_hex_to_bin(hextx_coinbase, tx_data, strlen(hextx_coinbase), &outlen);
-    btc_wtx* wtx = btc_wallet_wtx_new();
-    btc_tx_deserialize(tx_data, outlen, wtx->tx, NULL, true);
+    dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
+    dogecoin_tx_deserialize(tx_data, outlen, wtx->tx, NULL, true);
 
     // add coinbase tx
     wtx->height = 0;
-    btc_wallet_add_wtx_move(wallet, wtx);
+    dogecoin_wallet_add_wtx_move(wallet, wtx);
 
-    uint64_t amount = btc_wallet_wtx_get_credit(wallet, wtx);
+    uint64_t amount = dogecoin_wallet_wtx_get_credit(wallet, wtx);
     u_assert_uint32_eq(amount, 0);
     wallet->bestblockheight = 200;
-    amount = btc_wallet_wtx_get_credit(wallet, wtx);
+    amount = dogecoin_wallet_wtx_get_credit(wallet, wtx);
 
     u_assert_uint32_eq(amount, 2504815547);
-    btc_wallet_wtx_free(wtx);
+    dogecoin_wallet_wtx_free(wtx);
 
     // form normal tx
     uint8_t tx_data_n[strlen(hextx_ntx) / 2];
     utils_hex_to_bin(hextx_ntx, tx_data_n, strlen(hextx_ntx), &outlen);
-    wtx = btc_wallet_wtx_new();
-    btc_tx_deserialize(tx_data_n, outlen, wtx->tx, NULL, true);
+    wtx = dogecoin_wallet_wtx_new();
+    dogecoin_tx_deserialize(tx_data_n, outlen, wtx->tx, NULL, true);
     
     // add normal tx
     wtx->height = 0;
-    btc_wallet_add_wtx_move(wallet, wtx);
+    dogecoin_wallet_add_wtx_move(wallet, wtx);
 
-    amount = btc_wallet_wtx_get_credit(wallet, wtx);
-    btc_wallet_wtx_free(wtx);
+    amount = dogecoin_wallet_wtx_get_credit(wallet, wtx);
+    dogecoin_wallet_wtx_free(wtx);
 
     u_assert_uint32_eq(amount, 13326620644);
 
-    btc_wallet_flush(wallet);
-    btc_wallet_free(wallet);
+    dogecoin_wallet_flush(wallet);
+    dogecoin_wallet_free(wallet);
 
-    wallet = btc_wallet_new(&btc_chainparams_main);
-    u_assert_int_eq(btc_wallet_load(wallet, wallettmpfile, &error, &created), true);
+    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
 
-    amount = btc_wallet_get_balance(wallet);
+    amount = dogecoin_wallet_get_balance(wallet);
 
-    vector *unspents = vector_new(10, (void (*)(void*))btc_wallet_output_free);
-    btc_wallet_get_unspent(wallet, unspents);
+    vector *unspents = vector_new(10, (void (*)(void*))dogecoin_wallet_output_free);
+    dogecoin_wallet_get_unspent(wallet, unspents);
 
-    amount = btc_wallet_get_balance(wallet);
+    amount = dogecoin_wallet_get_balance(wallet);
 
     unsigned int i;
     unsigned int found = 0;
     for (i = 0; i < unspents->len; i++)
     {
-        btc_output *output = unspents->data[i];
+        dogecoin_output *output = unspents->data[i];
         uint256 hash;
-        btc_tx_hash(output->wtx->tx, hash);
+        dogecoin_tx_hash(output->wtx->tx, hash);
         char str[65];
         utils_bin_to_hex(hash, sizeof(hash), str);
         utils_reverse_hex(str, 64);
@@ -158,11 +160,11 @@ void test_wallet()
     vector_free(unspents, true);
     u_assert_int_eq(found, 2);
 
-    amount = btc_wallet_get_balance(wallet);
+    amount = dogecoin_wallet_get_balance(wallet);
     u_assert_uint32_eq(amount, 13326620644);
     wallet->bestblockheight = 200;
-    amount = btc_wallet_get_balance(wallet);
+    amount = dogecoin_wallet_get_balance(wallet);
     u_assert_uint32_eq(amount, 13326620644+2504815547);
 
-    btc_wallet_free(wallet);
+    dogecoin_wallet_free(wallet);
 }

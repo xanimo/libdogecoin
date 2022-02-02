@@ -3,8 +3,8 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.
  */
 
-#include <btc/cstr.h>
-#include <btc/serialize.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/serialize.h>
 
 #include <string.h>
 
@@ -189,6 +189,7 @@ int deser_varlen(uint32_t* lo, struct const_buffer* buf)
         uint64_t v64;
         if (!deser_u64(&v64, buf))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L192-serialize.c\n\n", sizeof(v64));
         len = (uint32_t)v64; /* WARNING: truncate */
     } else
         len = c;
@@ -230,6 +231,7 @@ int deser_varlen_from_file(uint32_t* lo, FILE* file)
             return false;
         if (!deser_u64(&v64, &buf))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L234-serialize.c\n\n", sizeof(v64));
         len = (uint32_t)v64; /* WARNING: truncate */
     } else
         len = c;
@@ -280,10 +282,12 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
         uint64_t v64;
         if (fread((void*)buf.p, 1, sizeof(v64), file) != sizeof(v64))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L286-serialize.c\n\n", sizeof(v64));
         memcpy(rawdata + 1, buf.p, sizeof(uint32_t)); /* warning, truncate! */
         *buflen_inout += sizeof(uint32_t);
         if (!deser_u64(&v64, &buf))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L291-serialize.c\n\n", sizeof(v64));
         len = (uint32_t)v64; /* WARNING: truncate */
     } else
         len = c;

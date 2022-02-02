@@ -29,7 +29,7 @@
 
 #include <logdb/logdb_base.h>
 #include <logdb/logdb_rec.h>
-#include <btc/sha2.h>
+#include <dogecoin/sha2.h>
 
 #include <stdint.h>
 #include <stdio.h>

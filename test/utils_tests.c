@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,7 +11,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/utils.h>
+#include <dogecoin/utils.h>
 
 #include "utest.h"
 
@@ -27,9 +29,9 @@ void test_utils()
     char hex[sizeof(data) * 2 + 1];
     unsigned char data2[sizeof(data)];
     uint8_t* hash_bin = utils_hex_to_uint8(hash);
-    char* new_data = utils_uint8_to_hex(hash_bin, BTC_HASH_LENGTH);
-    unsigned char data3[BTC_HASH_LENGTH*2];
-    assert(strncmp(new_data, hash, BTC_HASH_LENGTH*2) == 0);
+    char* new_data = utils_uint8_to_hex(hash_bin, DOGECOIN_HASH_LENGTH);
+    unsigned char data3[DOGECOIN_HASH_LENGTH*2];
+    assert(strncmp(new_data, hash, DOGECOIN_HASH_LENGTH*2) == 0);
 
     utils_clear_buffers();
 

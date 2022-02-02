@@ -2,7 +2,7 @@
 
  The MIT License (MIT)
 
- Copyright (c) 2017 libbtc developers
+ Copyright (c) 2017 libdogecoin developers
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -24,103 +24,103 @@
 
 */
 
-#include <btc/memory.h>
+#include <dogecoin/memory.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 
-void* btc_malloc_internal(size_t size);
-void* btc_calloc_internal(size_t count, size_t size);
-void* btc_realloc_internal(void *ptr, size_t size);
-void btc_free_internal(void* ptr);
+void* dogecoin_malloc_internal(size_t size);
+void* dogecoin_calloc_internal(size_t count, size_t size);
+void* dogecoin_realloc_internal(void *ptr, size_t size);
+void dogecoin_free_internal(void* ptr);
 
-static const btc_mem_mapper default_mem_mapper = {btc_malloc_internal, btc_calloc_internal, btc_realloc_internal, btc_free_internal};
-static btc_mem_mapper current_mem_mapper = {btc_malloc_internal, btc_calloc_internal, btc_realloc_internal, btc_free_internal};
+static const dogecoin_mem_mapper default_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
+static dogecoin_mem_mapper current_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
 
-void btc_mem_set_mapper_default()
+void dogecoin_mem_set_mapper_default()
 {
     current_mem_mapper = default_mem_mapper;
 }
 
-void btc_mem_set_mapper(const btc_mem_mapper mapper)
+void dogecoin_mem_set_mapper(const dogecoin_mem_mapper mapper)
 {
     current_mem_mapper = mapper;
 }
 
-void* btc_malloc(size_t size)
+void* dogecoin_malloc(size_t size)
 {
-    return current_mem_mapper.btc_malloc(size);
+    return current_mem_mapper.dogecoin_malloc(size);
 }
 
-void* btc_calloc(size_t count, size_t size)
+void* dogecoin_calloc(size_t count, size_t size)
 {
-    return current_mem_mapper.btc_calloc(count, size);
+    return current_mem_mapper.dogecoin_calloc(count, size);
 }
 
-void* btc_realloc(void *ptr, size_t size)
+void* dogecoin_realloc(void *ptr, size_t size)
 {
-    return current_mem_mapper.btc_realloc(ptr, size);
+    return current_mem_mapper.dogecoin_realloc(ptr, size);
 }
 
-void btc_free(void* ptr)
+void dogecoin_free(void* ptr)
 {
-    current_mem_mapper.btc_free(ptr);
+    current_mem_mapper.dogecoin_free(ptr);
 }
 
-void* btc_malloc_internal(size_t size)
+void* dogecoin_malloc_internal(size_t size)
 {
     void* result;
 
     if ((result = malloc(size))) { /* assignment intentional */
         return (result);
     } else {
-        printf("memory overflow: malloc failed in btc_malloc.");
+        printf("memory overflow: malloc failed in dogecoin_malloc.");
         printf("  Exiting Program.\n");
         exit(-1);
         return (0);
     }
 }
 
-void* btc_calloc_internal(size_t count, size_t size)
+void* dogecoin_calloc_internal(size_t count, size_t size)
 {
     void* result;
 
     if ((result = calloc(count, size))) { /* assignment intentional */
         return (result);
     } else {
-        printf("memory overflow: calloc failed in btc_calloc.");
+        printf("memory overflow: calloc failed in dogecoin_calloc.");
         printf("  Exiting Program.\n");
         exit(-1);
         return (0);
     }
 }
 
-void* btc_realloc_internal(void *ptr, size_t size)
+void* dogecoin_realloc_internal(void *ptr, size_t size)
 {
     void* result;
 
     if ((result = realloc(ptr, size))) { /* assignment intentional */
         return (result);
     } else {
-        printf("memory overflow: realloc failed in btc_realloc.");
+        printf("memory overflow: realloc failed in dogecoin_realloc.");
         printf("  Exiting Program.\n");
         exit(-1);
         return (0);
     }
 }
 
-void btc_free_internal(void* ptr)
+void dogecoin_free_internal(void* ptr)
 {
     free(ptr);
 }
 
 #ifdef HAVE_MEMSET_S
-volatile void *btc_mem_zero(volatile void *dst, size_t len)
+volatile void *dogecoin_mem_zero(volatile void *dst, size_t len)
 {
     memset_s(dst, len, 0, len);
 }
 #else
-volatile void *btc_mem_zero(volatile void *dst, size_t len)
+volatile void *dogecoin_mem_zero(volatile void *dst, size_t len)
 {
     volatile char *buf;
     for (buf = (volatile char *)dst;  len;  buf[--len] = 0);

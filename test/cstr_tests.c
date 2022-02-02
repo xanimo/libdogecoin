@@ -1,6 +1,8 @@
 /**********************************************************************
  * Copyright (c) Copyright 2015 BitPay, Inc.                          *
- * Copyright (c) Copyright 2015 Jonas Schnelli                        *
+ * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -10,7 +12,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/cstr.h>
+#include <dogecoin/cstr.h>
 
 void test_cstr()
 {
