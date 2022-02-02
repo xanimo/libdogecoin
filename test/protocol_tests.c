@@ -9,9 +9,9 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/chainparams.h>
-#include <btc/utils.h>
-#include <btc/protocol.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/utils.h>
+#include <dogecoin/protocol.h>
 #include "utest.h"
 
 #include <event2/util.h>
@@ -35,65 +35,65 @@ void test_protocol()
     memset(&i6buf, 0, 1024);
 
     evutil_inet_pton(AF_INET6, "::1", &test_sa6.sin6_addr);
-    btc_p2p_address ipv6Test;
-    btc_p2p_address_init(&ipv6Test);
-    btc_addr_to_p2paddr((struct sockaddr *)&test_sa6, &ipv6Test);
-    btc_p2paddr_to_addr(&ipv6Test, (struct sockaddr *)&test_sa6_check);
+    dogecoin_p2p_address ipv6Test;
+    dogecoin_p2p_address_init(&ipv6Test);
+    dogecoin_addr_to_p2paddr((struct sockaddr *)&test_sa6, &ipv6Test);
+    dogecoin_p2paddr_to_addr(&ipv6Test, (struct sockaddr *)&test_sa6_check);
     memset(&i6buf, 0, 1024);
     u_assert_int_eq(test_sa6.sin6_port, test_sa6_check.sin6_port);
 
     /* copy socket_addr to p2p addr */
-    btc_p2p_address fromAddr;
-    btc_p2p_address_init(&fromAddr);
-    btc_p2p_address toAddr;
-    btc_p2p_address_init(&toAddr);
-    btc_addr_to_p2paddr((struct sockaddr *)&test_sa, &toAddr);
-    btc_p2paddr_to_addr(&toAddr, (struct sockaddr *)&test_sa_check);
+    dogecoin_p2p_address fromAddr;
+    dogecoin_p2p_address_init(&fromAddr);
+    dogecoin_p2p_address toAddr;
+    dogecoin_p2p_address_init(&toAddr);
+    dogecoin_addr_to_p2paddr((struct sockaddr *)&test_sa, &toAddr);
+    dogecoin_p2paddr_to_addr(&toAddr, (struct sockaddr *)&test_sa_check);
     u_assert_int_eq(test_sa.sin_port, test_sa_check.sin_port);
     evutil_inet_ntop(AF_INET, &test_sa_check.sin_addr, i6buf, 1024);
     u_assert_str_eq(i6buf, "10.0.0.1");
 
     /* create a inv message struct */
-    btc_p2p_inv_msg inv_msg, inv_msg_check;
+    dogecoin_p2p_inv_msg inv_msg, inv_msg_check;
     memset(&inv_msg, 0, sizeof(inv_msg));
 
     uint256 hash = {0};
 
-    btc_p2p_msg_inv_init(&inv_msg, 1, hash);
-    btc_p2p_msg_inv_ser(&inv_msg, inv_msg_cstr);
+    dogecoin_p2p_msg_inv_init(&inv_msg, 1, hash);
+    dogecoin_p2p_msg_inv_ser(&inv_msg, inv_msg_cstr);
 
     struct const_buffer buf_inv = {inv_msg_cstr->str, inv_msg_cstr->len};
-    u_assert_int_eq(btc_p2p_msg_inv_deser(&inv_msg_check, &buf_inv), true);
+    u_assert_int_eq(dogecoin_p2p_msg_inv_deser(&inv_msg_check, &buf_inv), true);
     u_assert_int_eq(inv_msg_check.type, 1);
     u_assert_mem_eq(inv_msg_check.hash, inv_msg.hash, sizeof(inv_msg.hash));
     cstr_free(inv_msg_cstr, true);
 
     /* create a version message struct */
-    btc_p2p_version_msg version_msg;
+    dogecoin_p2p_version_msg version_msg;
     memset(&version_msg, 0, sizeof(version_msg));
 
     /* create a serialized version message */
-    btc_p2p_msg_version_init(&version_msg, &fromAddr, &toAddr, "client", false);
-    btc_p2p_msg_version_ser(&version_msg, version_msg_cstr);
+    dogecoin_p2p_msg_version_init(&version_msg, &fromAddr, &toAddr, "client", false);
+    dogecoin_p2p_msg_version_ser(&version_msg, version_msg_cstr);
 
     /* create p2p message */
-    cstring *p2p_msg = btc_p2p_message_new((unsigned const char *)&btc_chainparams_main.netmagic, BTC_MSG_VERSION, version_msg_cstr->str, version_msg_cstr->len);
+    cstring *p2p_msg = dogecoin_p2p_message_new((unsigned const char *)&dogecoin_chainparams_main.netmagic, DOGECOIN_MSG_VERSION, version_msg_cstr->str, version_msg_cstr->len);
 
     struct const_buffer buf = {p2p_msg->str, p2p_msg->len};
-    btc_p2p_msg_hdr hdr;
-    btc_p2p_deser_msghdr(&hdr, &buf);
+    dogecoin_p2p_msg_hdr hdr;
+    dogecoin_p2p_deser_msghdr(&hdr, &buf);
 
-    u_assert_mem_eq(hdr.netmagic, &btc_chainparams_main.netmagic, 4);
-    u_assert_str_eq(hdr.command, BTC_MSG_VERSION);
+    u_assert_mem_eq(hdr.netmagic, &dogecoin_chainparams_main.netmagic, 4);
+    u_assert_str_eq(hdr.command, DOGECOIN_MSG_VERSION);
     u_assert_int_eq(hdr.data_len, version_msg_cstr->len);
     u_assert_int_eq(buf.len, hdr.data_len);
     u_assert_int_eq(buf.len, hdr.data_len);
     u_assert_mem_eq(buf.p, version_msg_cstr->str, hdr.data_len);
 
-    btc_p2p_version_msg v_msg_check;
-    u_assert_int_eq(btc_p2p_msg_version_deser(&v_msg_check, &buf), true);
+    dogecoin_p2p_version_msg v_msg_check;
+    u_assert_int_eq(dogecoin_p2p_msg_version_deser(&v_msg_check, &buf), true);
 
-    u_assert_int_eq(v_msg_check.version, BTC_PROTOCOL_VERSION);
+    u_assert_int_eq(v_msg_check.version, DOGECOIN_PROTOCOL_VERSION);
     u_assert_str_eq(v_msg_check.useragent, "client");
     u_assert_int_eq(v_msg_check.start_height, 0);
 
@@ -105,20 +105,20 @@ void test_protocol()
     vector *blocklocators = vector_new(1, NULL);
     vector_add(blocklocators, genesis_hash);
     cstring *getheader_msg = cstr_new_sz(256);
-    btc_p2p_msg_getheaders(blocklocators, NULL, getheader_msg);
-    p2p_msg = btc_p2p_message_new((unsigned const char *)&btc_chainparams_main.netmagic, BTC_MSG_GETHEADERS, getheader_msg->str, getheader_msg->len);
+    dogecoin_p2p_msg_getheaders(blocklocators, NULL, getheader_msg);
+    p2p_msg = dogecoin_p2p_message_new((unsigned const char *)&dogecoin_chainparams_main.netmagic, DOGECOIN_MSG_GETHEADERS, getheader_msg->str, getheader_msg->len);
 
 
     buf.p = p2p_msg->str;
     buf.len = p2p_msg->len;
-    btc_p2p_deser_msghdr(&hdr, &buf);
-    u_assert_str_eq(hdr.command, BTC_MSG_GETHEADERS);
+    dogecoin_p2p_deser_msghdr(&hdr, &buf);
+    u_assert_str_eq(hdr.command, DOGECOIN_MSG_GETHEADERS);
     u_assert_int_eq(hdr.data_len, getheader_msg->len);
 
 
     uint256 hashstop_check;
     vector *blocklocators_check = vector_new(1, free);
-    btc_p2p_deser_msg_getheaders(blocklocators_check, hashstop_check, &buf);
+    dogecoin_p2p_deser_msg_getheaders(blocklocators_check, hashstop_check, &buf);
     u_assert_mem_eq(NULLHASH, hashstop_check, sizeof(hashstop_check));
     uint8_t *hash_loc_0 = vector_idx(blocklocators_check, 0);
     u_assert_mem_eq(genesis_hash, hash_loc_0, sizeof(genesis_hash));

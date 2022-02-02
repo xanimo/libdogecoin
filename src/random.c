@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2015 Douglas J. Bakkum
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -24,9 +26,9 @@
 
 */
 
-#include <btc/random.h>
+#include <dogecoin/random.h>
 #ifdef HAVE_CONFIG_H
-#  include "libbtc-config.h"
+#  include "libdogecoin-config.h"
 #endif
 
 #include <assert.h>
@@ -39,40 +41,40 @@
 #include <wincrypt.h>
 #endif
 
-void btc_random_init_internal(void);
-btc_bool btc_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed);
+void dogecoin_random_init_internal(void);
+dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed);
 
-static const btc_rnd_mapper default_rnd_mapper = {btc_random_init_internal, btc_random_bytes_internal};
-static btc_rnd_mapper current_rnd_mapper = {btc_random_init_internal, btc_random_bytes_internal};
+static const dogecoin_rnd_mapper default_rnd_mapper = {dogecoin_random_init_internal, dogecoin_random_bytes_internal};
+static dogecoin_rnd_mapper current_rnd_mapper = {dogecoin_random_init_internal, dogecoin_random_bytes_internal};
 
-void btc_rnd_set_mapper_default()
+void dogecoin_rnd_set_mapper_default()
 {
     current_rnd_mapper = default_rnd_mapper;
 }
 
-void btc_rnd_set_mapper(const btc_rnd_mapper mapper)
+void dogecoin_rnd_set_mapper(const dogecoin_rnd_mapper mapper)
 {
     current_rnd_mapper = mapper;
 }
 
-void btc_random_init(void)
+void dogecoin_random_init(void)
 {
-    current_rnd_mapper.btc_random_init();
+    current_rnd_mapper.dogecoin_random_init();
 }
 
-btc_bool btc_random_bytes(uint8_t* buf, uint32_t len, const uint8_t update_seed)
+dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t update_seed)
 {
-    return current_rnd_mapper.btc_random_bytes(buf, len, update_seed);
+    return current_rnd_mapper.dogecoin_random_bytes(buf, len, update_seed);
 }
 
 #ifdef TESTING
-void btc_random_init_internal(void)
+void dogecoin_random_init_internal(void)
 {
     srand(time(NULL));
 }
 
 
-btc_bool btc_random_bytes_internal(uint8_t* buf, uint32_t len, uint8_t update_seed)
+dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, uint8_t update_seed)
 {
     (void)update_seed;
     for (uint32_t i = 0; i < len; i++) {
@@ -82,8 +84,8 @@ btc_bool btc_random_bytes_internal(uint8_t* buf, uint32_t len, uint8_t update_se
     return true;
 }
 #else
-void btc_random_init_internal(void) {}
-btc_bool btc_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed)
+void dogecoin_random_init_internal(void) {}
+dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed)
 {
 #ifdef WIN32
     HCRYPTPROV hProvider;

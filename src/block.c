@@ -3,7 +3,9 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Thomas Kerin
- Copyright (c) 2016 libbtc developers
+ Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -30,35 +32,35 @@
 #include <string.h>
 
 
-#include <btc/block.h>
+#include <dogecoin/block.h>
 
-#include <btc/serialize.h>
-#include <btc/sha2.h>
-#include <btc/utils.h>
+#include <dogecoin/serialize.h>
+#include <dogecoin/sha2.h>
+#include <dogecoin/utils.h>
 
-btc_block_header* btc_block_header_new()
+dogecoin_block_header* dogecoin_block_header_new()
 {
-    btc_block_header* header;
-    header = btc_calloc(1, sizeof(*header));
+    dogecoin_block_header* header;
+    header = dogecoin_calloc(1, sizeof(*header));
 
     return header;
 }
 
-void btc_block_header_free(btc_block_header* header)
+void dogecoin_block_header_free(dogecoin_block_header* header)
 {
     if (!header)
         return;
 
     header->version = 1;
-    memset(&header->prev_block, 0, BTC_HASH_LENGTH);
-    memset(&header->merkle_root, 0, BTC_HASH_LENGTH);
+    memset(&header->prev_block, 0, DOGECOIN_HASH_LENGTH);
+    memset(&header->merkle_root, 0, DOGECOIN_HASH_LENGTH);
     header->bits = 0;
     header->timestamp = 0;
     header->nonce = 0;
-    btc_free(header);
+    dogecoin_free(header);
 }
 
-int btc_block_header_deserialize(btc_block_header* header, struct const_buffer* buf)
+int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf)
 {
     if (!deser_s32(&header->version, buf))
         return false;
@@ -76,7 +78,7 @@ int btc_block_header_deserialize(btc_block_header* header, struct const_buffer* 
     return true;
 }
 
-void btc_block_header_serialize(cstring* s, const btc_block_header* header)
+void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header)
 {
     ser_s32(s, header->version);
     ser_u256(s, header->prev_block);
@@ -86,7 +88,7 @@ void btc_block_header_serialize(cstring* s, const btc_block_header* header)
     ser_u32(s, header->nonce);
 }
 
-void btc_block_header_copy(btc_block_header* dest, const btc_block_header* src)
+void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_block_header* src)
 {
     dest->version = src->version;
     memcpy(&dest->prev_block, &src->prev_block, sizeof(src->prev_block));
@@ -96,15 +98,15 @@ void btc_block_header_copy(btc_block_header* dest, const btc_block_header* src)
     dest->nonce = src->nonce;
 }
 
-btc_bool btc_block_header_hash(btc_block_header* header, uint256 hash)
+dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256 hash)
 {
     cstring* s = cstr_new_sz(80);
-    btc_block_header_serialize(s, header);
+    dogecoin_block_header_serialize(s, header);
 
     sha256_Raw((const uint8_t*)s->str, s->len, hash);
     sha256_Raw(hash, SHA256_DIGEST_LENGTH, hash);
     cstr_free(s, true);
 
-    btc_bool ret = true;
+    dogecoin_bool ret = true;
     return ret;
 }

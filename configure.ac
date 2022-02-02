@@ -1,14 +1,14 @@
 dnl require autoconf 2.68 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.68])
-AC_INIT([libbtc],[0.1],[https://github.com/jonasschnelli/libbtc/issues],[libbtc])
-AC_CONFIG_HEADERS([src/libbtc-config.h])
+AC_INIT([libdogecoin],[0.1],[https://github.com/dogecoinfoundation/libdogecoin/issues],[libdogecoin])
+AC_CONFIG_HEADERS([src/libdogecoin-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 AC_CANONICAL_HOST
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
-AH_TOP([#ifndef LIBBTC_CONFIG_H])
-AH_TOP([#define LIBBTC_CONFIG_H])
-AH_BOTTOM([#endif /*LIBBTC_CONFIG_H*/])
+AH_TOP([#ifndef LIBDOGECOIN_CONFIG_H])
+AH_TOP([#define LIBDOGECOIN_CONFIG_H])
+AH_BOTTOM([#endif /*LIBDOGECOIN_CONFIG_H*/])
 AM_INIT_AUTOMAKE([no-define subdir-objects foreign])
 AC_HEADER_STDBOOL
 LT_INIT
@@ -47,7 +47,7 @@ AC_ARG_ENABLE([wallet],
 
 AC_ARG_ENABLE([tools],
   [AS_HELP_STRING([--disable-tools],
-  [disable bitcoin tool cli application])],
+  [disable dogecoin tool cli application])],
   [with_tools=$enableval],
   [with_tools=yes])
 
@@ -123,7 +123,7 @@ if test x$with_net = "xyes"; then
   fi
 fi
 
-AC_CONFIG_FILES([Makefile libbtc.pc])
+AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(BUILD_EXEEXT)
 AC_SUBST(EVENT_LIBS)

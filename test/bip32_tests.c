@@ -1,24 +1,26 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
-#include <btc/bip32.h>
+#include <dogecoin/bip32.h>
 
 #include "utest.h"
-#include <btc/utils.h>
+#include <dogecoin/utils.h>
 
 void test_bip32()
 {
-    btc_hdnode node, node2, node3, node4;
+    dogecoin_hdnode node, node2, node3, node4;
     char str[112];
     int r;
     uint8_t private_key_master[32];
     uint8_t chain_code_master[32];
 
     /* init m */
-    btc_hdnode_from_seed(utils_hex_to_uint8("000102030405060708090a0b0c0d0e0f"), 16, &node);
+    dogecoin_hdnode_from_seed(utils_hex_to_uint8("000102030405060708090a0b0c0d0e0f"), 16, &node);
 
     /* [Chain m] */
     memcpy(private_key_master,
@@ -33,29 +35,29 @@ void test_bip32()
     u_assert_mem_eq(node.public_key,
                     utils_hex_to_uint8("0339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2"),
                     33);
-    btc_hdnode_serialize_private(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgpv51eADS3spNJh9Gjth94XcPwAczvQaDJs9rqx11kvxKs6r3Ek8AgERHhjLs6mzXQFHRzQqGwqdeoDkZmr8jQMBfi43b7sT3sx3cCSk5fGeUR");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    u_assert_mem_eq(&node, &node2, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
 
-    btc_hdnode_get_p2pkh_address(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "15mKKb2eos1hWa6tisdPwwDC1a5J1y9nma");
+    dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "D9uQrqyJ7Guz3aHVTTcxVhNnthobME3o4w");
 
-    btc_hdnode_serialize_public(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgub8kXBZ7ymNWy2S8Q3jNgVjFUm5ZJ3QLLaSTdAA89ukSv7Q6MSXwE14b7Nv6eDpE9JJXinTKc8LeLVu19uDPrm5uJuhpKNzV2kAgncwo6bNpP");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    memcpy(&node3, &node, sizeof(btc_hdnode));
+    memcpy(&node3, &node, sizeof(dogecoin_hdnode));
     memset(&node3.private_key, 0, 32);
-    u_assert_mem_eq(&node2, &node3, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node2, &node3, sizeof(dogecoin_hdnode));
 
 
     /* [Chain m/0'] */
     char path0[] = "m/0'";
-    btc_hd_generate_key(&node, path0, private_key_master, chain_code_master, false);
+    dogecoin_hd_generate_key(&node, path0, private_key_master, chain_code_master, false);
     u_assert_int_eq(node.fingerprint, 0x3442193e);
     u_assert_mem_eq(node.chain_code,
                     utils_hex_to_uint8("47fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141"),
@@ -66,29 +68,29 @@ void test_bip32()
     u_assert_mem_eq(node.public_key,
                     utils_hex_to_uint8("035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56"),
                     33);
-    btc_hdnode_serialize_private(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xprv9uHRZZhk6KAJC1avXpDAp4MDc3sQKNxDiPvvkX8Br5ngLNv1TxvUxt4cV1rGL5hj6KCesnDYUhd7oWgT11eZG7XnxHrnYeSvkzY7d2bhkJ7");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgpv53uaD9MLudRgHssbttwAVS3GwpUkxHnsqUGqy793vX4PDKXvYQDKYS4988T7QEnCzUt7CaGi21e6UKoZnKgXyjna7To1h1aqkcqJBDM65ur");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    u_assert_mem_eq(&node, &node2, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
 
-    btc_hdnode_get_p2pkh_address(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "19Q2WoS5hSS6T8GjhK8KZLMgmWaq4neXrh");
+    dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "DDY844NizrLNz8TLRu7t76XHeeK8MwFJ9Z");
 
-    btc_hdnode_serialize_public(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgub8nnbYqHETn61ajXkw8Z8cHasQNrPnQpb85448DY2ie7PmNecxAm6BjTnhNCvZY3qJk1MKZ9Z5HQasQ83ARb99nmduT7dunvxgcvBFVHuvrq");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    memcpy(&node3, &node, sizeof(btc_hdnode));
+    memcpy(&node3, &node, sizeof(dogecoin_hdnode));
     memset(&node3.private_key, 0, 32);
-    u_assert_mem_eq(&node2, &node3, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node2, &node3, sizeof(dogecoin_hdnode));
 
 
     /* [Chain m/0'/1] */
     char path1[] = "m/0'/1";
-    btc_hd_generate_key(&node, path1, private_key_master, chain_code_master, false);
+    dogecoin_hd_generate_key(&node, path1, private_key_master, chain_code_master, false);
     u_assert_int_eq(node.fingerprint, 0x5c1bd648);
     u_assert_mem_eq(node.chain_code,
                     utils_hex_to_uint8("2a7857631386ba23dacac34180dd1983734e444fdbf774041578e9b6adb37c19"),
@@ -99,26 +101,26 @@ void test_bip32()
     u_assert_mem_eq(node.public_key,
                     utils_hex_to_uint8("03501e454bf00751f24b1b489aa925215d66af2234e3891c3b21a52bedb3cd711c"),
                     33);
-    btc_hdnode_serialize_private(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgpv565hQvuEJLJk8Kv3d9q36Avw1CTrxKXAmnwgZNurs9rbSs34GCddVzxNYBeB1AZFSZdo1Ps96ibWcGKnufUWkuH1dEkjkmMhRR9fi7Po6B2");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    u_assert_mem_eq(&node, &node2, sizeof(btc_hdnode));
-    btc_hdnode_get_p2pkh_address(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "1JQheacLPdM5ySCkrZkV66G2ApAXe1mqLj");
-    btc_hdnode_serialize_public(&node, &btc_chainparams_main, str, sizeof(str));
+    u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
+    dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "DNYoBqYyh3FNWSPMb9k3drRd3wtpwEwrV2");
+    dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgub8pxikcq7rUy5RBaCfPT1D2UXTkqVnSYt4PitiVJqfGubzv9kfyBQ9JN27SfVyUmBGTdQ6ybfBsu4Thrrdkm2qSbaCexVPRwEKMSxYLP2A41");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    memcpy(&node3, &node, sizeof(btc_hdnode));
+    memcpy(&node3, &node, sizeof(dogecoin_hdnode));
     memset(&node3.private_key, 0, 32);
-    u_assert_mem_eq(&node2, &node3, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node2, &node3, sizeof(dogecoin_hdnode));
 
     /* [Chain m/0'/1/2'] */
     char path2[] = "m/0'/1/2'";
-    btc_hd_generate_key(&node, path2, private_key_master, chain_code_master, false);
+    dogecoin_hd_generate_key(&node, path2, private_key_master, chain_code_master, false);
     u_assert_int_eq(node.fingerprint, 0xbef5a2f9);
     u_assert_mem_eq(node.chain_code,
                     utils_hex_to_uint8("04466b9cc8e161e966409ca52986c584f07e9dc81f735db683c3ff6ec7b1503f"),
@@ -129,26 +131,26 @@ void test_bip32()
     u_assert_mem_eq(node.public_key,
                     utils_hex_to_uint8("0357bfe1e341d01c69fe5654309956cbea516822fba8a601743a012a7896ee8dc2"),
                     33);
-    btc_hdnode_serialize_private(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xprv9z4pot5VBttmtdRTWfWQmoH1taj2axGVzFqSb8C9xaxKymcFzXBDptWmT7FwuEzG3ryjH4ktypQSAewRiNMjANTtpgP4mLTj34bhnZX7UiM");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgpv58gyTTj61DA9zVi8skEQTAy5EMLPDs7A7LBMoiD232E2riEB4xU4QSWJ6DrnyQ4jx2fBbrp4X8RQqU4YVgPhszifyrKHuhbe2gttLnRB4a6");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    u_assert_mem_eq(&node, &node2, sizeof(btc_hdnode));
-    btc_hdnode_get_p2pkh_address(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "1NjxqbA9aZWnh17q1UW3rB4EPu79wDXj7x");
-    btc_hdnode_serialize_public(&node, &btc_chainparams_main, str, sizeof(str));
+    u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
+    dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "DSt4Nr6nsyR5E1JRk4VcPwDqH2qTGw9N6h");
+    dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xpub6D4BDPcP2GT577Vvch3R8wDkScZWzQzMMUm3PWbmWvVJrZwQY4VUNgqFJPMM3No2dFDFGTsxxpG5uJh7n7epu4trkrX7x7DogT5Uv6fcLW5");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgub8sZzo9eyZMpVHMNHuyrNa2Wfgui23z8sPvxZxpbzq9H3QmLsUj1q3juwfTrLRMCVcyj8iMaGZpU2v319LrJZttkQnYvdUNzv33N6dcqeZ8X");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    memcpy(&node3, &node, sizeof(btc_hdnode));
+    memcpy(&node3, &node, sizeof(dogecoin_hdnode));
     memset(&node3.private_key, 0, 32);
-    u_assert_mem_eq(&node2, &node3, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node2, &node3, sizeof(dogecoin_hdnode));
 
     /* [Chain m/0'/1/2'/2] */
     char path3[] = "m/0'/1/2'/2";
-    btc_hd_generate_key(&node, path3, private_key_master, chain_code_master, false);
+    dogecoin_hd_generate_key(&node, path3, private_key_master, chain_code_master, false);
     u_assert_int_eq(node.fingerprint, 0xee7ab90c);
     u_assert_mem_eq(node.chain_code,
                     utils_hex_to_uint8("cfb71883f01676f587d023cc53a35bc7f88f724b1f8c2892ac1275ac822a3edd"),
@@ -159,26 +161,26 @@ void test_bip32()
     u_assert_mem_eq(node.public_key,
                     utils_hex_to_uint8("02e8445082a72f29b75ca48748a914df60622a609cacfce8ed0e35804560741d29"),
                     33);
-    btc_hdnode_serialize_private(&node, &btc_chainparams_main, str, sizeof(str));
+    dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgpv5AvNHtr3Bgq94yBra1SVLg8PKAd7rTRMYp4f4fjVMTneDorY8jARc1yDmYGFS4UB1pntDn3dRwsaJexzh6w45PJiP6QPTnRMBfN3rDUiyyH");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    u_assert_mem_eq(&node, &node2, sizeof(btc_hdnode));
-    btc_hdnode_get_p2pkh_address(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "1LjmJcdPnDHhNTUgrWyhLGnRDKxQjoxAgt");
-    btc_hdnode_serialize_public(&node, &btc_chainparams_main, str, sizeof(str));
+    u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
+    dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "DQsrqsa35dByuTfHb6yFt2x26TghzUvKno");
+    dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgub8uoPdamvjqVUMpr1cF4TTXfymizkgaT4qQqsDn8U9aqemryEYViCFKNsLnqiq9ME6HrJrN4DcZN9UTM9S9jmcVDfhLUpJZtk3jGwnGkhd8u");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    memcpy(&node3, &node, sizeof(btc_hdnode));
+    memcpy(&node3, &node, sizeof(dogecoin_hdnode));
     memset(&node3.private_key, 0, 32);
-    u_assert_mem_eq(&node2, &node3, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node2, &node3, sizeof(dogecoin_hdnode));
 
     /* [Chain m/0'/1/2'/2/1000000000] */
     char path4[] = "m/0'/1/2'/2/1000000000";
-    btc_hd_generate_key(&node, path4, private_key_master, chain_code_master, false);
+    dogecoin_hd_generate_key(&node, path4, private_key_master, chain_code_master, false);
     u_assert_int_eq(node.fingerprint, 0xd880d7d8);
     u_assert_mem_eq(node.chain_code,
                     utils_hex_to_uint8("c783e67b921d2beb8f6b389cc646d7263b4145701dadd2161548a8b078e65e9e"),
@@ -189,61 +191,61 @@ void test_bip32()
     u_assert_mem_eq(node.public_key,
                     utils_hex_to_uint8("022a471424da5e657499d1ff51cb43c47481a03b1e77f951fe64cec9f5a48f7011"),
                     33);
-    btc_hdnode_serialize_private(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+    dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "dgpv5Ce8maTHJpDLbJyJgZ1DeP8P7QCRfxEPM4TDJx7dZYB8vwFvf9R5s88HQQ3TLybFdEC9192aGzQhJpyNEAwnCLxFibAcahB4TzvQbJyp2im");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    u_assert_mem_eq(&node, &node2, sizeof(btc_hdnode));
-    btc_hdnode_get_p2pkh_address(&node, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "1LZiqrop2HGR4qrH1ULZPyBpU6AUP49Uam");
-    btc_hdnode_serialize_public(&node, &btc_chainparams_main, str, sizeof(str));
+    u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
+    dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "DQhpP7kTKhAhbr2sk4L7wjMRMDtmhtKA7G");
+    dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy");
-    r = btc_hdnode_deserialize(str, &btc_chainparams_main, &node2);
+                    "dgub8wXA7GPArxsftAdTindBmEfyZxa4W5G6dfERU4WcMfE9UzNd4uxrWRXvyckfgQRwZz8rMhz29m4k4skAY1EcTkNnZstu73UNrgts2MA5evC");
+    r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
-    memcpy(&node3, &node, sizeof(btc_hdnode));
+    memcpy(&node3, &node, sizeof(dogecoin_hdnode));
     memset(&node3.private_key, 0, 32);
-    u_assert_mem_eq(&node2, &node3, sizeof(btc_hdnode));
+    u_assert_mem_eq(&node2, &node3, sizeof(dogecoin_hdnode));
 
 
-    char str_pub_ckd[] = "xpub6LTiQPFh8tFrK56BQXuYcyam39cTXsBvudjQ7NM4EyRABPKapbm9dNe7aYQ6VNDzYHmhZYde5Pv8a6vTeQcfG3g1s7S8g1otXsK8d4qGyLs";
+    char str_pub_ckd[] = "dgub8ni9FJceneQCtAfhezgYfKrYfo1P959gmrhEiD2xxuEZYxhUNxm1f19Gg2EsiZG33ywfxcahMBvAe69gj9h4xad7b7eMWrXZniiB9PBXEdb";
 
-    r = btc_hdnode_deserialize(str_pub_ckd, &btc_chainparams_main, &node4);
-    r = btc_hdnode_public_ckd(&node4, 123);
+    r = dogecoin_hdnode_deserialize(str_pub_ckd, &dogecoin_chainparams_main, &node4);
+    r = dogecoin_hdnode_public_ckd(&node4, 123);
     u_assert_int_eq(r, true);
-    btc_hdnode_serialize_public(&node4, &btc_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "xpub6Mf5jT2qB3v8YP8frMBbgQ9L79UF6zXzdYbUSAwzezhEQep8w3GfBrbFGquW7T4PQXvmRh8DFEJFbm6qgsJXmT4FjNgrJL2m6YuKJRbsgUa");
+    dogecoin_hdnode_serialize_public(&node4, &dogecoin_chainparams_main, str, sizeof(str));
+    u_assert_str_eq(str, "dgub8pbH768fzx5CkM6iJdDqTfrr53Df8wBa7H6jV5N7A4fLjnrhakh99VwCFkXiHLP8sj5jhnn9AfuzFCxecGo8uaigfUjtUJtcHgo9NAWN9yT");
 
 
-    r = btc_hdnode_public_ckd(&node4, 0x80000000 + 1); //try deriving a hardened key (= must fail)
+    r = dogecoin_hdnode_public_ckd(&node4, 0x80000000 + 1); //try deriving a hardened key (= must fail)
     u_assert_int_eq(r, false);
 
 
     char str_pub_ckd_tn[] = "tprv8ZgxMBicQKsPd7Uf69XL1XwhmjHopUGep8GuEiJDZmbQz6o58LninorQAfcKZWARbtRtfnLcJ5MQ2AtHcQJCCRUcMRvmDUjyEmNUWwx8UbK";
 
-    r = btc_hdnode_deserialize(str_pub_ckd_tn, &btc_chainparams_test, &node4);
-    r = btc_hdnode_public_ckd(&node4, 123);
+    r = dogecoin_hdnode_deserialize(str_pub_ckd_tn, &dogecoin_chainparams_test, &node4);
+    r = dogecoin_hdnode_public_ckd(&node4, 123);
     u_assert_int_eq(r, true);
-    btc_hdnode_get_p2pkh_address(&node4, &btc_chainparams_test, str, sizeof(str));
-    u_assert_str_eq(str, "mp4VkLBrnetj5LkhyNqtgkBzJwRBqhTbaa");
+    dogecoin_hdnode_get_p2pkh_address(&node4, &dogecoin_chainparams_test, str, sizeof(str));
+    u_assert_str_eq(str, "ncjhiYnSD1pUiD2t2DWXezjZZww5H76n3P");
     size_t size = sizeof(str);
     size_t sizeSmall = 55;
-    r = btc_hdnode_get_pub_hex(&node4, str, &sizeSmall);
+    r = dogecoin_hdnode_get_pub_hex(&node4, str, &sizeSmall);
     u_assert_int_eq(r, false);
-    r = btc_hdnode_get_pub_hex(&node4, str, &size);
+    r = dogecoin_hdnode_get_pub_hex(&node4, str, &size);
     u_assert_int_eq(size, 66);
     u_assert_int_eq(r, true);
     u_assert_str_eq(str, "0391a9964e79f39cebf9b59eb2151b500bd462e589682d6ceebe8e15970bfebf8b");
-    btc_hdnode_serialize_public(&node4, &btc_chainparams_test, str, sizeof(str));
+    dogecoin_hdnode_serialize_public(&node4, &dogecoin_chainparams_test, str, sizeof(str));
     u_assert_str_eq(str, "tpubD8MQJFN9LVzG8pktwoQ7ApWWKLfUUhonQkeXe8gqi9tFMtMdC34g6Ntj5K6V1hdzR3to2z7dGnQbXaoZSsFkVky7TFWZjmC9Ez4Gog6ujaD");
 
-    btc_hdnode *nodeheap;
-    nodeheap = btc_hdnode_new();
-    btc_hdnode *nodeheap_copy = btc_hdnode_copy(nodeheap);
+    dogecoin_hdnode *nodeheap;
+    nodeheap = dogecoin_hdnode_new();
+    dogecoin_hdnode *nodeheap_copy = dogecoin_hdnode_copy(nodeheap);
 
     u_assert_int_eq(memcmp(nodeheap->private_key, nodeheap_copy->private_key, 32), 0);
     u_assert_int_eq(memcmp(nodeheap->public_key, nodeheap_copy->public_key, 33), 0)
 
-    btc_hdnode_free(nodeheap);
-    btc_hdnode_free(nodeheap_copy);
+    dogecoin_hdnode_free(nodeheap);
+    dogecoin_hdnode_free(nodeheap_copy);
 }

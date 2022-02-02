@@ -1,6 +1,6 @@
 
-#include <btc/aes256_cbc.h>
-#include <btc/ctaes.h>
+#include <dogecoin/aes256_cbc.h>
+#include <dogecoin/ctaes.h>
 
 #include <string.h>
 

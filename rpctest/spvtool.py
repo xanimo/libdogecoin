@@ -47,7 +47,7 @@ class SPVToolTest (BitcoinTestFramework):
         log_stderr = tempfile.SpooledTemporaryFile(max_size=2**16)
         
         #sync with no headers database (-f 0) and debug (-d) only against localhost
-        cmd = "./bitcoin-spv --regtest -f 0 -d -i 127.0.0.1:"+str(p2p_port(0))+" scan"
+        cmd = "./dogecoin-spv --regtest -f 0 -d -i 127.0.0.1:"+str(p2p_port(0))+" scan"
         data = self.execute_and_get_response(cmd)
         assert("parsing 1 tx(s) from block at height: 100" in data)
         
@@ -56,7 +56,7 @@ class SPVToolTest (BitcoinTestFramework):
             os.remove("headers.db")
         except OSError:
             pass
-        cmd = "./bitcoin-spv --regtest -d -i 127.0.0.1:"+str(p2p_port(0))+" scan"
+        cmd = "./dogecoin-spv --regtest -d -i 127.0.0.1:"+str(p2p_port(0))+" scan"
         data = self.execute_and_get_response(cmd)
         assert("parsing 1 tx(s) from block at height: 100" in data)
         try:

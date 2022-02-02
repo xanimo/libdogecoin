@@ -28,23 +28,23 @@ copy_headers()
 {
     # set single parameter
     SRCDIR="src/$1"
-    DSTDIR="include/btc"
+    DSTDIR="include/dogecoin"
     shift 1
 
-    # for each header, mutate it to be like libbtc, and copy it in with a commit
+    # for each header, mutate it to be like libdogecoin, and copy it in with a commit
     for HEADER in "$@"
     do
         HEADERNAME=$(basename "$HEADER")
         { sed -f /dev/stdin "$SRCDIR"/"$HEADER" > "$DSTDIR"/"$HEADERNAME" <<HEADER_MUTATION_END
-            # prefix ifndef/define guard symbols with LIBBTC_ and add LIBBTCL_BEGIN_DECL
-            s/^\(#ifndef _\)_*\([^_]*.*[^_]\)_*_$/\1_LIBBTC_\2__/
-            s/^\(#define _\)_*\([^_]*.*[^_]\)_*_\(\s.*$\|$\)/\1_LIBBTC_\2__\n&\n\n#include "btc.h"\n\nLIBBTC_BEGIN_DECL/
+            # prefix ifndef/define guard symbols with LIBDOGECOIN_ and add LIBDOGECOINL_BEGIN_DECL
+            s/^\(#ifndef _\)_*\([^_]*.*[^_]\)_*_$/\1_LIBDOGECOIN_\2__/
+            s/^\(#define _\)_*\([^_]*.*[^_]\)_*_\(\s.*$\|$\)/\1_LIBDOGECOIN_\2__\n&\n\n#include "dogecoin.h"\n\nLIBDOGECOIN_BEGIN_DECL/
 
-            # prefix functions with LIBBTC_API
-            s/^\(int\|void\|char\|bool\)/LIBBTC_API \1/
+            # prefix functions with LIBDOGECOIN_API
+            s/^\(int\|void\|char\|bool\)/LIBDOGECOIN_API \1/
 
-            # add LIBBTC_END_DECL before end
-            $ s/^\(#endif\)$/LIBBTC_END_DECL\n\n\1/
+            # add LIBDOGECOIN_END_DECL before end
+            $ s/^\(#endif\)$/LIBDOGECOIN_END_DECL\n\n\1/
 HEADER_MUTATION_END
         } &&
         git add "$DSTDIR"/"$HEADERNAME" &&
@@ -53,7 +53,7 @@ HEADER_MUTATION_END
 }
 
 # subtrees
-update_subtree https://github.com/bitcoin-core/secp256k1 secp256k1
+update_subtree https://github.com/dogecoin/secp256k1 secp256k1
 update_subtree https://github.com/trezor/trezor-firmware trezor-crypto crypto
 
 # headers copied from subtrees

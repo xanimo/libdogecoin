@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,9 +11,9 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/ctaes.h>
-#include <btc/aes256_cbc.h>
-#include <btc/utils.h>
+#include <dogecoin/ctaes.h>
+#include <dogecoin/aes256_cbc.h>
+#include <dogecoin/utils.h>
 #include "utest.h"
 
 struct nist_aes_test_vector
