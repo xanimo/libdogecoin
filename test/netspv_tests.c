@@ -32,6 +32,6 @@ void test_netspv()
     dogecoin_spv_client_discover_peers(client, NULL);
     printf("done\n");
     printf("Start interacting with the p2p network...\n");
-    // dogecoin_spv_client_runloop(client);
+    dogecoin_spv_client_runloop(client);
     dogecoin_spv_client_free(client);
 }
