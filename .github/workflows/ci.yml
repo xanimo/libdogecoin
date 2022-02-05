@@ -4,9 +4,9 @@ name: ci for multiarch
 
 on:
   push:
-    branches: [ "spvnode" ]
+    branches: [ main, "spvnode", "0.1-dev" ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, "0.1-dev" ]
 
 jobs:
   build:
