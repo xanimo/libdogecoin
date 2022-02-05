@@ -37,7 +37,7 @@
 
 enum {
     DOGECOIN_ADDR_TIME_VERSION = 31402,
-    DOGECOIN_MIN_PROTO_VERSION = 70003,
+    DOGECOIN_MIN_PROTO_VERSION = 70000,
 };
 
 /* IPv4 addresses are mapped to 16bytes with a prefix of 10 x 0x00 + 2 x 0xff */
@@ -213,7 +213,7 @@ dogecoin_bool dogecoin_p2p_msg_version_deser(dogecoin_p2p_version_msg* msg, stru
 
     if (!deser_s32(&msg->start_height, buf))
         return false;
-    if (msg->version > 70003)
+    if (msg->version > 70001)
         if (!deser_bytes(&msg->relay, buf, 1))
             return false;
 
@@ -245,7 +245,6 @@ dogecoin_bool dogecoin_p2p_msg_inv_deser(dogecoin_p2p_inv_msg* msg, struct const
 void dogecoin_p2p_msg_getheaders(vector* blocklocators, uint256 hashstop, cstring* s)
 {
     unsigned int i;
-
     ser_u32(s, DOGECOIN_PROTOCOL_VERSION);
     ser_varlen(s, blocklocators->len);
     for (i = 0; i < blocklocators->len; i++) {

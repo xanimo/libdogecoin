@@ -160,6 +160,10 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                 uint32_t height;
                 deser_u256(hash, &cbuf_all);
                 deser_u32(&height, &cbuf_all);
+                printf("headersdb file=====\n");
+                printf("hash: %s\n", hash);
+                printf("hash: %d\n", height);
+                printf("end headersdb======\n");
                 if (height >= 1120874) {
                     //TODO: test hack, remove me
                     continue;
@@ -286,7 +290,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
         //TODO, add to orphans
         char hex[65] = {0};
         utils_bin_to_hex(blockindex->hash, DOGECOIN_HASH_LENGTH, hex);
-        printf("Failed connecting header at height %d (%s)\n", db->chaintip->height, hex);
+        // printf("Failed connecting header at height %d (%s)\n", db->chaintip->height, hex);
     }
 
     return blockindex;
