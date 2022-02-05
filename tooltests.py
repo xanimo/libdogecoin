@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) 2016 Jonas Schnelli
-<<<<<<< HEAD
-=======
 # Copyright (c) 2022 bluezr
 # Copyright (c) 2022 The Dogecoin Foundation
->>>>>>> 1977966... clean up attributions/licensing
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
