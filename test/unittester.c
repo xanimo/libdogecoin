@@ -37,6 +37,10 @@
 
 extern void test_utils();
 extern void test_aes();
+extern void test_base58check();
+extern void test_sha_256();
+extern void test_sha_512();
+extern void test_sha_hmac();
 
 int U_TESTS_RUN = 0;
 int U_TESTS_FAIL = 0;
@@ -45,6 +49,10 @@ int main()
 {
     u_run_test(test_utils);
     u_run_test(test_aes);
+    u_run_test(test_base58check);
+    u_run_test(test_sha_256);
+    u_run_test(test_sha_512);
+    u_run_test(test_sha_hmac);
 
     return U_TESTS_FAIL;
 }
