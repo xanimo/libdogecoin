@@ -5,6 +5,7 @@ ACLOCAL_AMFLAGS = -I build-aux/m4
 lib_LTLIBRARIES = libdogecoin.la
 include_HEADERS = \
     include/dogecoin/crypto/aes.h \
+    include/dogecoin/crypto/base58.h \
     include/dogecoin/dogecoin.h \
     include/dogecoin/crypto/rmd160.h \
     include/dogecoin/crypto/sha2.h \
