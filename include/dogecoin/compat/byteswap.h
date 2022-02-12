@@ -1,4 +1,3 @@
-// Copyright (c) 2014-2016 The Bitcoin Core developers
 // Copyright (c) 2022 bluezr
 // Copyright (c) 2022 The Dogecoin Foundation
 //
@@ -8,15 +7,17 @@
 #ifndef __LIBDOGECOIN_COMPAT_BYTESWAP_H__
 #define __LIBDOGECOIN_COMPAT_BYTESWAP_H__
 
-#if defined(HAVE_BYTESWAP_H)
-#include <byteswap.h>
-#endif
+LIBDOGECOIN_BEGIN_DECL
 
 #if defined(HAVE_CONFIG_H)
 #include <src/libdogecoin-config.h>
 #endif
 
 #include <stdint.h>
+
+#if defined(HAVE_BYTESWAP_H)
+#include <byteswap.h>
+#endif
 
 #if defined(__APPLE__)
 
@@ -88,5 +89,7 @@ LIBDOGECOIN_API inline uint64_t bswap_64(uint64_t x)
 #endif // HAVE_DECL_BSWAP64
 
 #endif // defined(__APPLE__)
+
+LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_COMPAT_BYTESWAP_H__

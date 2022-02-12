@@ -22,6 +22,7 @@ libdogecoininclude_HEADERS = \
     include/dogecoin/buffer.h \
     include/dogecoin/compat/byteswap.h \
     include/dogecoin/chainparams.h \
+    include/dogecoin/crypto/common.h \
     include/dogecoin/cstr.h \
     include/dogecoin/crypto/ctaes/ctaes.h \
     include/dogecoin/dogecoin.h \

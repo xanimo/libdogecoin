@@ -32,6 +32,7 @@
 
 #include <dogecoin/bip32.h>
 #include <dogecoin/crypto/base58.h>
+#include <dogecoin/crypto/common.h>
 #include <dogecoin/crypto/ecc.h>
 #include <dogecoin/crypto/hash.h>
 #include <dogecoin/crypto/key.h>
@@ -39,25 +40,6 @@
 #include <dogecoin/crypto/sha2.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
-
-// write 4 big endian bytes
-static void write_be(uint8_t* data, uint32_t x)
-{
-    data[0] = x >> 24;
-    data[1] = x >> 16;
-    data[2] = x >> 8;
-    data[3] = x;
-}
-
-
-// read 4 big endian bytes
-static uint32_t read_be(const uint8_t* data)
-{
-    return (((uint32_t)data[0]) << 24) |
-           (((uint32_t)data[1]) << 16) |
-           (((uint32_t)data[2]) << 8) |
-           (((uint32_t)data[3]));
-}
 
 /**
  * It allocates memory for a dogecoin_hdnode and returns a pointer to it
@@ -157,7 +139,7 @@ dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i)
     } else { // public derivation
         memcpy(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
     }
-    write_be(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
+    write_be32(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
 
     sha256_raw(inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH, fingerprint);
     rmd160(fingerprint, 32, fingerprint);
@@ -208,7 +190,7 @@ dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i)
     } else { // public derivation
         memcpy(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
     }
-    write_be(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
+    write_be32(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
 
     sha256_raw(inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH, fingerprint);
     rmd160(fingerprint, 32, fingerprint);
@@ -273,10 +255,10 @@ void dogecoin_hdnode_fill_public_key(dogecoin_hdnode* node)
 static void dogecoin_hdnode_serialize(const dogecoin_hdnode* node, uint32_t version, char use_public, char* str, int strsize)
 {
     uint8_t node_data[78];
-    write_be(node_data, version);
+    write_be32(node_data, version);
     node_data[4] = node->depth;
-    write_be(node_data + 5, node->fingerprint);
-    write_be(node_data + 9, node->child_num);
+    write_be32(node_data + 5, node->fingerprint);
+    write_be32(node_data + 9, node->child_num);
     memcpy(node_data + 13, node->chain_code, DOGECOIN_BIP32_CHAINCODE_SIZE);
     if (use_public) {
         memcpy(node_data + 45, node->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
@@ -390,7 +372,7 @@ dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainp
         dogecoin_free(node_data);
         return false;
     }
-    uint32_t version = read_be(node_data);
+    uint32_t version = read_be32(node_data);
     if (version == chain->b58prefix_bip32_pubkey) { // public node
         memcpy(node->public_key, node_data + 45, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
     } else if (version == chain->b58prefix_bip32_privkey) { // private node
@@ -405,8 +387,8 @@ dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainp
         return false; // invalid version
     }
     node->depth = node_data[4];
-    node->fingerprint = read_be(node_data + 5);
-    node->child_num = read_be(node_data + 9);
+    node->fingerprint = read_be32(node_data + 5);
+    node->child_num = read_be32(node_data + 9);
     memcpy(node->chain_code, node_data + 13, DOGECOIN_BIP32_CHAINCODE_SIZE);
     dogecoin_free(node_data);
     return true;

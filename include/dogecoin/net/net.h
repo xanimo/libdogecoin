@@ -38,6 +38,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+#include <event2/event.h>
+
 static const unsigned int DOGECOIN_P2P_MESSAGE_CHUNK_SIZE = 4096;
 
 enum NODE_STATE {

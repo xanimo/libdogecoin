@@ -282,56 +282,6 @@ rb_red_blk_node *RBTreeInsert(rb_red_blk_tree *tree, void *key, void *info) {
 #endif
 }
 
-// rb_red_blk_node * RBTreeInsert(rb_red_blk_tree* tree, void* key, void* info) {
-//   rb_red_blk_node * y;
-//   rb_red_blk_node * x;
-//   rb_red_blk_node * newNode;
-
-//   x=(rb_red_blk_node*) safe_malloc(sizeof(rb_red_blk_node));
-//   x->key=key;
-//   x->info=info;
-
-//   TreeInsertHelp(tree,x);
-//   newNode=x;
-//   x->red=1;
-//   while(x->parent->red) { /* use sentinel instead of checking for root */
-//     if (x->parent == x->parent->parent->left) {
-//       y=x->parent->parent->right;
-//       if (y->red) {
-// 	x->parent->red=0;
-// 	y->red=0;
-// 	x->parent->parent->red=1;
-// 	x=x->parent->parent;
-//       } else {
-// 	if (x == x->parent->right) {
-// 	  x=x->parent;
-// 	  LeftRotate(tree,x);
-// 	}
-// 	x->parent->red=0;
-// 	x->parent->parent->red=1;
-// 	RightRotate(tree,x->parent->parent);
-//       } 
-//     } else { /* case for x->parent == x->parent->parent->right */
-//       y=x->parent->parent->left;
-//       if (y->red) {
-// 	x->parent->red=0;
-// 	y->red=0;
-// 	x->parent->parent->red=1;
-// 	x=x->parent->parent;
-//       } else {
-// 	if (x == x->parent->left) {
-// 	  x=x->parent;
-// 	  RightRotate(tree,x);
-// 	}
-// 	x->parent->red=0;
-// 	x->parent->parent->red=1;
-// 	LeftRotate(tree,x->parent->parent);
-//       } 
-//     }
-//   }
-//   tree->root->left->red=0;
-//   return(newNode);
-
 /***********************************************************************/
 /*  FUNCTION:  TreeSuccessor  */
 /**/
