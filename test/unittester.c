@@ -46,9 +46,11 @@ extern void test_key();
 extern void test_memory();
 extern void test_random();
 extern void test_rmd160();
+extern void test_serialize();
 extern void test_sha_256();
 extern void test_sha_512();
 extern void test_sha_hmac();
+extern void test_tool();
 extern void test_utils();
 extern void test_vector();
 
@@ -72,9 +74,11 @@ int main() {
     u_run_test(test_memory);
     u_run_test(test_random);
     u_run_test(test_rmd160);
+    u_run_test(test_serialize);
     u_run_test(test_sha_256);
     u_run_test(test_sha_512);
     u_run_test(test_sha_hmac);
+    u_run_test(test_tool);
     u_run_test(test_utils);
     u_run_test(test_vector);
 
