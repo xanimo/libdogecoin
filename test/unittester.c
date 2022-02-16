@@ -36,6 +36,7 @@
     } while (0)
 
 extern void test_aes();
+extern void test_address();
 extern void test_base58();
 extern void test_bip32();
 extern void test_buffer();
@@ -51,6 +52,15 @@ extern void test_sha_256();
 extern void test_sha_512();
 extern void test_sha_hmac();
 extern void test_tool();
+extern void test_tx_serialization();
+extern void test_tx_sighash();
+extern void test_tx_sighash_ext();
+extern void test_tx_negative_version();
+extern void test_script_parse();
+extern void test_script_op_codeseperator();
+extern void test_invalid_tx_deser();
+extern void test_tx_sign();
+extern void test_scripts();
 extern void test_utils();
 extern void test_vector();
 
@@ -63,6 +73,7 @@ int U_TESTS_FAIL = 0;
 int main() {
     dogecoin_ecc_start();
 
+    u_run_test(test_address);
     u_run_test(test_aes);
     u_run_test(test_base58);
     u_run_test(test_bip32);
@@ -79,6 +90,15 @@ int main() {
     u_run_test(test_sha_512);
     u_run_test(test_sha_hmac);
     u_run_test(test_tool);
+    u_run_test(test_tx_serialization);
+    u_run_test(test_invalid_tx_deser);
+    u_run_test(test_tx_sign);
+    u_run_test(test_tx_sighash);
+    u_run_test(test_tx_sighash_ext);
+    u_run_test(test_tx_negative_version);
+    u_run_test(test_scripts);
+    u_run_test(test_script_parse);
+    u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
     u_run_test(test_vector);
 

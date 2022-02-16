@@ -58,27 +58,27 @@ void test_bip32() {
     dogecoin_hd_generate_key(&node, path0, private_key_master, chain_code_master, false);
     u_assert_int_eq(node.fingerprint, 0xD2700AA0);
     u_assert_mem_eq(node.chain_code,
-                    utils_hex_to_uint8("1513fccd7575b5f7fa7dcd00364ca4960eb4f0ddfbbab765cae03fe0e152a6c6"),
+                    utils_hex_to_uint8("ce0b2fcd904a6d31577926feba13d0794482d1216fb082306c768cffbfb8a8ba"),
                     32);
     u_assert_mem_eq(node.private_key,
-                    utils_hex_to_uint8("f5f4a1a26afeacb5886b04bae6407b1eed955960509c15e91ea6b0dc9aed42da"),
+                    utils_hex_to_uint8("9a890ef773091cbd474a3be0a90b04f3925fa2a4f39b9e0bcadfb90926b30657"),
                     32);
     u_assert_mem_eq(node.public_key,
-                    utils_hex_to_uint8("0231228bb67dd68651088f54977903bb7ab478e0af0c2434aa38f640908ba34b53"),
+                    utils_hex_to_uint8("03e0e0e17e610cd45a711a73d2c3149c7475ea3bde422dc70b88427d53773b5854"),
                     33);
     dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgpv5551MfWQawkQSWkvgCy47pgawVD7pWsNtmqU7Vsy4Qe9m8pNgBCUinLzJBjZqUgY89ogQz15nkBZWqcEF8Xnur15HvVwc6Ni4aaxjwsWdLA");
+                    "dgpv5551MfWQawkQLi5tQZ4Fr1baCKMyE3FSJHBiv9VA27KEJWx3VHYhVQuZZyNjRk3jewTP7Bv33L27hngKMzTzPBwhM1tqjmYadC24PWukcmD");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
 
     dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "D7KA2XbodJxksgtvFeY5FdG9XdzcdnwaMP");
+    u_assert_str_eq(str, "DFVFuPWwf4gjNWGDUcr3tnmG4ZybmiePNb");
 
     dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgub8ox2hMSJ96QjjNR5iSb2EgEBQ3akedu6BNcgGcGwrXhAKBw55wkFN5kdsPAo4pF6TeC69Hu9RgjKiUhZe2GE5Q1dWDWB9RLwLSsDR3RuDfm");
+                    "dgub8ox2hMSJ96QjdZk3SngDxs9Aesjc4AH9asxw5Ft8pENEra4ju46U8iKD9EnNAvr5NLgNX847FoiNGrhHj1dXQyAaNTo8WXxk69U2kjojQvL");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     memcpy(&node3, &node, sizeof(dogecoin_hdnode));
@@ -89,27 +89,27 @@ void test_bip32() {
     /* [Chain m/0'/3] */
     char path1[] = "m/0'/3";
     dogecoin_hd_generate_key(&node, path1, private_key_master, chain_code_master, false);
-    u_assert_int_eq(node.fingerprint, 0x17D75284);
+    u_assert_int_eq(node.fingerprint, 0x718164DE);
     u_assert_mem_eq(node.chain_code,
-                    utils_hex_to_uint8("4d95bf7a4a3593c18a46723db822e406d6358df458261a72eacb0009f2da3398"),
+                    utils_hex_to_uint8("7895d53ee9a390823afb79e063d5e1782840e891bccd0f74b3fb5ba548e1c782"),
                     32);
     u_assert_mem_eq(node.private_key,
-                    utils_hex_to_uint8("00f6c28b63f3a6b680d1f84baa3ecd87e72c01dcbf2a527d9d1976cef656e5a7"),
+                    utils_hex_to_uint8("110cb805a25d6570a256da0104b2de72b2e396ea95174597f82d29f60a4ed404"),
                     32);
     u_assert_mem_eq(node.public_key,
-                    utils_hex_to_uint8("02035917563dc21c91544159571c68f779cbc0608eab9bd166a3b1cbdd2dcf73e1"),
+                    utils_hex_to_uint8("02ae81bfefb4329140b8243f1551b2337432251e80d5b7bd65a420353f97054ea7"),
                     33);
     dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgpv55abRjNSKfzULe5xd9onNWNacWnPF5fp38LnixtRKyNJyzpn651yG65Qo3wELkFyZRiy8ianHZ4LqzaAgCs6yHb3xiRyBsFJvG5FrWyrQAx");
+                    "dgpv56EpU8W81bdsoh8AztdZLFx9SfV8Po3XmoVcv7m7RwvNDYQdh8fzzGZHiYTGfNig54zAXuyweJjPuHqrYUvRyu5Yr2RBwvEdQ6wrZLi79Ub");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
     dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "DNr4yi1woUwiXRxnPTtzRUTtqwTjV2b2tG");
+    u_assert_str_eq(str, "DGhvKQMX2QkeNPhUVc5dkAy2BoET25PMZv");
     dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgub8pTcmRJKspeodVk7fPRkVMvB55A25ChXKj7zt5HQ86RKY3wUVqZjuPV4NGtBzLBaH8C2nyRrKUbvNQEeibf63HaS5tUQRPsvC2hQ9qP94T2");
+                    "dgub8q7qopS1ZkJD6YnL38FXT7VjuDrmDv5F4QGq5EA6E4yNmbXL6uDmdZxwHnaXSfTRxCgCfsnGA6io3fMp2VfoWjBj3i4qRf4HT8WeNjin6tp");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     memcpy(&node3, &node, sizeof(dogecoin_hdnode));
@@ -119,27 +119,27 @@ void test_bip32() {
     /* [Chain m/0'/3/2'] */
     char path2[] = "m/0'/3/2'";
     dogecoin_hd_generate_key(&node, path2, private_key_master, chain_code_master, false);
-    u_assert_int_eq(node.fingerprint, 0xC239E3B7);
+    u_assert_int_eq(node.fingerprint, 0x7EDE93E8);
     u_assert_mem_eq(node.chain_code,
-                    utils_hex_to_uint8("c7e15bb328b40fa6fb92bf00019ab0bd0d9a5b12cdfa46c0762d4abf4916b413"),
+                    utils_hex_to_uint8("17a607f55523ce2957571e14a6839b3f68e4e521588223f9fa24cee15be1b014"),
                     32);
     u_assert_mem_eq(node.private_key,
-                    utils_hex_to_uint8("283a9279e19f94bdbf5ab89764f543c3dca0839d9287ac9e26bdcb31092ba2e5"),
+                    utils_hex_to_uint8("1870cb7b973718cd9ef29a7317fd5ce6f9c2d1dfa95ac74e02f27ac1ca70e8b7"),
                     32);
     u_assert_mem_eq(node.public_key,
-                    utils_hex_to_uint8("03e9102440edf7cf95eadca8df769b9638b9e62797065601a84ca4718d1e9eba3a"),
+                    utils_hex_to_uint8("03c865a25a9424ef611bcaaf56783d9b7b723c5f06f72c3c0859c37737b080a36f"),
                     33);
     dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgpv58iNE91voH327713eXyS6e6L8smWf8P9A5un4Cn8hRdLLh375dYk8a9TvMPuWuyA93vV8RP3TNX9VEgdo4Wzg7rX69Q3gTQ81ydHsoyYqT3");
+                    "dgpv58DemLg6LcinHnvT3PkzEci3J2RBE9ZUBQUm76ikJ9fF5MjwF9YeCYZwy3chm5FYrFQVkXB5w7mZHDoAcxUMog2X32JKSfKmTZXgRQgMdn6");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
     dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "DL9VFWxsNA9u5FvUncimTPNieqoxcuPTbE");
+    u_assert_str_eq(str, "DDXT63uLGA4QhQCb3m65DumohfqqDpg25h");
     dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgub8sbPZpwpMRhMPxfCgmbQDVdvbS99VFQrSggzDKB7VYgLtk9oVQ6WmsZ7VdjV8kWz8wU3yNFu8iXnmyXtyUKiCMkrQ8bKLrXZ9YMWfc5qbc3");
+                    "dgub8s6g72bytmP7aeac5dNxMUFdkanp4GbBU1FyGD7j6GiFdQrdev6QqqybYKprFq8t7qFsj8XNEptADqps6MXeHLBNraU5T3rMVmY1TNQQtka");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     memcpy(&node3, &node, sizeof(dogecoin_hdnode));
@@ -149,27 +149,27 @@ void test_bip32() {
     /* [Chain m/0'/3/2'/2] */
     char path3[] = "m/0'/3/2'/2";
     dogecoin_hd_generate_key(&node, path3, private_key_master, chain_code_master, false);
-    u_assert_int_eq(node.fingerprint, 0xA49CD862);
+    u_assert_int_eq(node.fingerprint, 0x5BFB4F66);
     u_assert_mem_eq(node.chain_code,
-                    utils_hex_to_uint8("1233c742f888bf3308674e7fb3d82b1c2ef8ca77a1fdd08f80f8cafd4a56722e"),
+                    utils_hex_to_uint8("7f6b54729291ca94ef3eb2bf4b8db40d33e790a14704e0979d7a7e6f1f5041a7"),
                     32);
     u_assert_mem_eq(node.private_key,
-                    utils_hex_to_uint8("9450c6c592de7c5efcf1e7b168d20135523dc61107ac350626d66edd3c49bb37"),
+                    utils_hex_to_uint8("9b82184573f68191ff9bb964f1e81bbed98eb3ff73d9c2770d996e721df76dd2"),
                     32);
     u_assert_mem_eq(node.public_key,
-                    utils_hex_to_uint8("03091459c74d06068e97781e425b0d4dbbab6fe5074d7c88fa86ea16411883561d"),
+                    utils_hex_to_uint8("031a3a7cb1631b6d0a370572fb98831af33b4c089fd85688015c6fdec3a7aeaf2d"),
                     33);
     dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgpv5ANss1uVaasc1nbP8uKFtv4sGDHy1nYS1PDNq5zPtLkXEVVY3aba4rP9kbuyyRaspqe54pRxEnDbGk63BoyvsGKSUAxizMB3je3HAVhZLg7");
+                    "dgpv59quzHTRWT9s24AfcyhZ334JJSFdandiYZezWoPY5sHp1ZXeFKtriERQ2jQiqS4vo99KR8dFbjdN7mArSd1NrC32cYojs4dNpjkHqz1H5WB");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
     dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "D7yUdhctLK3KyKQdW7THQiNxiRvUj4KHXa");
+    u_assert_str_eq(str, "DB6tpGujCj5k9qqjfD9JtouPwxaDCd5pF2");
     dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgub8uFuChqP8jXwJeFYB8wE1mcTimfbqua9HyzazCPNgToXnYcETM9Li9noKqjKJSgRjMGo8mD6RkTG2USQMLr4iuwPBsq57swZ6jsqmstxvZW");
+                    "dgub8tiwKyPK4bpCJuppfDKX9tbtkzdGQufRqASCfunWszLpZceLf6SdMXq3byJSV4UevEfz2Edbz7HfdtahBg28xW68KLa1Bjm4cv9vFX5NVs5");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     memcpy(&node3, &node, sizeof(dogecoin_hdnode));
@@ -179,26 +179,26 @@ void test_bip32() {
     /* [Chain m/0'/3/2'/2/1000000000] */
     char path4[] = "m/0'/3/2'/2/1000000000";
     dogecoin_hd_generate_key(&node, path4, private_key_master, chain_code_master, false);
-    u_assert_int_eq(node.fingerprint, 0x1F16A926);
+    u_assert_int_eq(node.fingerprint, 0x416622DE);
     u_assert_mem_eq(node.chain_code,
-                    utils_hex_to_uint8("fab81e2e015d055e1077d1f0f236be2c09f55392b7af13a8217dd25c3d656e27"),
+                    utils_hex_to_uint8("8e8c0d0f85dc3e9161ccadd9038a111add340dcc6d3dcfdd287803d0f63a69e3"),
                     32);
     u_assert_mem_eq(node.private_key,
-                    utils_hex_to_uint8("97a1af59b27d93fe673ead0b542a03a077fb20f37218340430bbc9e17a21549b"),
+                    utils_hex_to_uint8("2c2baa6f87ae9f76d3107251a28921938435718305bc44b57ea7d8fa84e7e1e5"),
                     32);
     u_assert_mem_eq(node.public_key,
-                    utils_hex_to_uint8("03d584ce7a0c6289a944fdad5c354384e85c90e75016aa812979a1c1615989adf1"),
+                    utils_hex_to_uint8("028088f0790134b82c55b91be40390445b8dcbd6ece4c2797b8973008e15cfef98"),
                     33);
     dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "dgpv5BH6Cfbt67y2GjLFKf8QHrFz36eScKxDuLw4cgthLrb7uYdFbdDyZH5U5XxvHRrF2VSSrjBVnStysJkAt9DRJoQgutoXPVpojC93VrLTNyw");
+    u_assert_str_eq(str, "dgpv5BXiZaRGoK7z4izJycDj77vQMXoDAanWwnZgzBfMb6Fwu2xwzxPM8MSw2MJht1iLbjLbHUhnQ1JiP895gAV9wGSDhYN2eayt9GepTapZf8p");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     u_assert_mem_eq(&node, &node2, sizeof(dogecoin_hdnode));
     dogecoin_hdnode_get_p2pkh_address(&node, &dogecoin_chainparams_main, str, sizeof(str));
-    u_assert_str_eq(str, "DSGJCw4NJGbJ9SYe7mR1W6wbMjGoko6n8u");
+    u_assert_str_eq(str, "DAPP7ux2W7Sog1bZEcR1Rv8hdLY3CzJ88v");
     dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str,
-                    "dgub8vA7YMXmeGdMZazQMtkNQhoaVf25SSywBwiGmoHg8ye8Tbjx1PmkCaV7eoJq2yzBKfEZmDk2m7dWmHhNX4bh6W5JgakgPoEqboJHdafi4vw");
+                    "dgub8vQjuGMAMTnKMaeU1qqhDyTzp6AqzhpEEPLu9J4LPDJxT65eQiw7merabasmbxvdiMJmWh9ppamwqY2Uy3z1prBKfVJAQmhBo2a9kdYGmuU");
     r = dogecoin_hdnode_deserialize(str, &dogecoin_chainparams_main, &node2);
     u_assert_int_eq(r, true);
     memcpy(&node3, &node, sizeof(dogecoin_hdnode));
@@ -209,18 +209,18 @@ void test_bip32() {
     char str_pub_ckd[] = "dgub8kXBZ7ymNWy2SDyf2FW3u9Y29xNHSqXEAdJer8Zh4pXKS61eCFPLByJeX2NyGaNVNXBjMHE9NpXfH4u9JUJKbrRCNFPeJ54gQN9RQTzUNDx";
 
     r = dogecoin_hdnode_deserialize(str_pub_ckd, &dogecoin_chainparams_main, &node4);
-    r = dogecoin_hdnode_public_ckd(&node4, 124); // double check i >= 2 to the 31st power + 3 = 0x80000003 dogecoin coin_type bip44
+    r = dogecoin_hdnode_public_ckd(&node4, 124); // double check i >= 2 to the 31st power + 3 = 0x80000000 dogecoin coin_type bip44
     u_assert_int_eq(r, true);
     dogecoin_hdnode_serialize_public(&node4, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str, "dgub8o73HfBFaVpyuR1D8qzAAmqerNH17DaJTY9afFenUKWKhgiP6eo2DbiUqYS4mMqsnwBMbAyJMbH2acX1H778iUcTUphzR38Ck2rSRgV12Fz");
 
-    r = dogecoin_hdnode_public_ckd(&node4, 0x80000003 + 1); //try deriving a hardened key (= must fail)
+    r = dogecoin_hdnode_public_ckd(&node4, 0x80000000 + 1); //try deriving a hardened key (= must fail)
     u_assert_int_eq(r, false);
 
     char str_pub_ckd_tn[] = "tprv8ZgxMBicQKsPd7Uf69XL1XwhmjHopUGep8GuEiJDZmbQz6o58LninorQAfcKZWARbtRtfnLcJ5MQ2AtHcQJCCRUcMRvmDUjyEmNUWwx8UbK";
 
     r = dogecoin_hdnode_deserialize(str_pub_ckd_tn, &dogecoin_chainparams_test, &node4);
-    r = dogecoin_hdnode_public_ckd(&node4, 124); // double check i >= 2 to the 31st power + 3 = 0x80000003 dogecoin coin_type bip44
+    r = dogecoin_hdnode_public_ckd(&node4, 124); // double check i >= 2 to the 31st power + 3 = 0x80000000 dogecoin coin_type bip44
     u_assert_int_eq(r, true);
     dogecoin_hdnode_get_p2pkh_address(&node4, &dogecoin_chainparams_test, str, sizeof(str));
     u_assert_str_eq(str, "nbsFtuY3Yxxe1SqcuFCxZc9GXqHERoxTmp");

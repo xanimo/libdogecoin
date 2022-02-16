@@ -13,6 +13,7 @@ $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/includ
 lib_LTLIBRARIES = libdogecoin.la
 includedir = $(includedir)/dogecoin
 include_HEADERS = \
+    include/dogecoin/address.h \
     include/dogecoin/crypto/aes.h \
     include/dogecoin/crypto/base58.h \
     include/dogecoin/bip32.h \
@@ -28,9 +29,12 @@ include_HEADERS = \
     include/dogecoin/compat/portable_endian.h \
     include/dogecoin/crypto/random.h \
     include/dogecoin/crypto/rmd160.h \
+    include/dogecoin/script.h \
+    include/dogecoin/segwit_addr.h \
     include/dogecoin/serialize.h \
     include/dogecoin/crypto/sha2.h \
     include/dogecoin/tool.h \
+    include/dogecoin/tx.h \
     include/dogecoin/utils.h \
     include/dogecoin/vector.h
 
@@ -38,6 +42,7 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdogecoin.pc
 
 libdogecoin_la_SOURCES = \
+    src/address.c \
     src/crypto/aes.c \
     src/crypto/base58.c \
     src/bip32.c \
@@ -49,10 +54,13 @@ libdogecoin_la_SOURCES = \
     src/mem.c \
     src/crypto/random.c \
     src/crypto/rmd160.c \
+    src/script.c \
+    src/segwit_addr.c \
     src/serialize.c \
     src/crypto/sha2.c \
     src/cli/such.c \
-    src/cli/tool.c \
+    src/tool.c \
+    src/tx.c \
     src/utils.c \
     src/vector.c
 
@@ -63,6 +71,7 @@ if USE_TESTS
 noinst_PROGRAMS = tests
 tests_LDADD = libdogecoin.la
 tests_SOURCES = \
+    test/address_tests.c \
     test/aes_tests.c \
     test/base58_tests.c \
     test/bip32_tests.c \
@@ -77,6 +86,7 @@ tests_SOURCES = \
     test/serialize_tests.c \
     test/sha2_tests.c \
     test/tool_tests.c \
+    test/tx_tests.c \
     test/utest.h \
     test/unittester.c \
     test/utils_tests.c \

@@ -103,7 +103,7 @@ dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i) {
     uint8_t data[1 + 32 + 4];
     uint8_t I[32 + DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t fingerprint[32];
-    if (i & 0x80000003) return false; // private derivation
+    if (i & 0x80000000) return false; // private derivation
     else { memcpy(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH); } // public derivation
     write_be(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
     sha256_raw(inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH, fingerprint);
@@ -131,7 +131,7 @@ dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i) {
     uint8_t I[DOGECOIN_ECKEY_PKEY_LENGTH + DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t fingerprint[DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t p[DOGECOIN_ECKEY_PKEY_LENGTH], z[DOGECOIN_ECKEY_PKEY_LENGTH];
-    if (i & 0x80000003) { // private derivation
+    if (i & 0x80000000) { // private derivation
         data[0] = 0;
         memcpy(data + 1, inout->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
     } else { // public derivation
@@ -274,7 +274,7 @@ dogecoin_bool dogecoin_hd_generate_key(dogecoin_hdnode* node, const char* keypat
     while (pch != NULL) {
         size_t i = 0;
         int prm = 0;
-        for (; i < strlens(pch); ++i) {
+        for (; i < strlens(pch); i++) {
             if (strchr(prime, pch[i])) {
                 if ((i != strlens(pch) - 1) || usepubckd == true) goto err;
                 prm = 1;

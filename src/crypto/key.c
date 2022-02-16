@@ -39,6 +39,8 @@
 #include <dogecoin/crypto/hash.h>
 #include <dogecoin/crypto/random.h>
 #include <dogecoin/crypto/rmd160.h>
+#include <dogecoin/script.h>
+#include <dogecoin/segwit_addr.h>
 #include <dogecoin/utils.h>
 
 void dogecoin_privkey_init(dogecoin_key* privkey) {
@@ -84,12 +86,15 @@ void dogecoin_privkey_encode_wif(const dogecoin_key* privkey, const dogecoin_cha
 }
 
 dogecoin_bool dogecoin_privkey_decode_wif(const char *privkey_wif, const dogecoin_chainparams* chain, dogecoin_key* privkey) {
-    if (!privkey_wif || strlen(privkey_wif) < 50) return false;
+    if (!privkey_wif || strlen(privkey_wif) < 50) {
+        return false;
+    }
     const size_t privkey_len = strlen(privkey_wif);
     uint8_t *privkey_data = (uint8_t *)dogecoin_malloc(privkey_len);
     memset(privkey_data, 0, privkey_len);
     size_t outlen = 0;
     outlen = dogecoin_base58_decode_check(privkey_wif, privkey_data, privkey_len);
+    
     if (!outlen) {
         dogecoin_free(privkey_data);
         return false;
@@ -169,4 +174,34 @@ dogecoin_bool dogecoin_key_sign_recover_pubkey(const unsigned char* sig, const u
 
 dogecoin_bool dogecoin_pubkey_verify_sig(const dogecoin_pubkey* pubkey, const uint256 hash, unsigned char* sigder, int len) {
     return dogecoin_ecc_verify_sig(pubkey->pubkey, pubkey->compressed, hash, sigder, len);
+}
+
+dogecoin_bool dogecoin_pubkey_getaddr_p2sh_p2wpkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char *addrout) {
+    cstring *p2wphk_script = cstr_new_sz(22);
+    uint160 keyhash;
+    dogecoin_pubkey_get_hash160(pubkey, keyhash);
+    dogecoin_script_build_p2wpkh(p2wphk_script, keyhash);
+
+    uint8_t hash160[sizeof(uint160)+1];
+    hash160[0] = chain->b58prefix_script_address;
+    dogecoin_script_get_scripthash(p2wphk_script, hash160+1);
+    cstr_free(p2wphk_script, true);
+
+    dogecoin_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
+    return true;
+}
+
+dogecoin_bool dogecoin_pubkey_getaddr_p2pkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char *addrout) {
+    uint8_t hash160[sizeof(uint160)+1];
+    hash160[0] = chain->b58prefix_pubkey_address;
+    dogecoin_pubkey_get_hash160(pubkey, hash160 + 1);
+    dogecoin_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
+    return true;
+}
+
+dogecoin_bool dogecoin_pubkey_getaddr_p2wpkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char *addrout) {
+    uint160 hash160;
+    dogecoin_pubkey_get_hash160(pubkey, hash160);
+    segwit_addr_encode(addrout, chain->bech32_hrp, 0, hash160, sizeof(hash160));
+    return true;
 }

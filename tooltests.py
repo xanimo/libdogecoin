@@ -17,25 +17,25 @@ commands.append(["-c generate_private_key --testnet", 0])
 commands.append(["-c generate_private_key --regtest", 0])
 commands.append(["", 1])
 commands.append(["-c print_keys", 1])
-commands.append(["-c print_keys -p dgub8kXBZ7ymNWy2TFvsWoQu5qGuFZk1zVAS69bD8pif6QYcnHMP2VotzLragqavGQkkpaGSwt1EqTr5A6JqKviXTnJdKp7vJ62nFyn246GjuHj", 0])
-commands.append(["-c print_keys -p dgpv51eADS3spNJhAQGiUZnvxyjJo1NPAN8ioYozyiKgJHVcEEEgcjG8M3Sw7bAhvMPyCyHVj1zcu3tbfpu2wEoAyvkxyRyFvKHWjp9m2PUEDAr", 0])
-commands.append(["-c print_keys -p dgpv51eADS3spNJhAQGiUZnvxyjJo1NPAN8ioYozyiKgJHVcEEEgcjG8M3Sw7bAhvMPyCyHVj1zcu3tbfpu2wEoAyvkxyRyFvKHWjp9m2PUEDAr --testnet", 1])
-commands.append(["-c generate_public_key -p QUaohmokNWroj71dRtmPSses5eRw5SGLKsYSRSVisJHyZdxhdDCZ", 0]) #successfull WIF to pub
+commands.append(["-c print_keys -p dgub8kXBZ7ymNWy2SYQeuwTf2wG8KT6asvgAFBqX4qeg4SzgiK7QvwcXQ9StrWCjFeWovX1tVrEikxcci2XQsZSbkgnispVsfgYpEBdLoPTv7W9", 0])
+commands.append(["-c print_keys -p dgpv51eADS3spNJh9gkVshqgv5iXrtix3oeSxb4JujFhGKwgAFziXB4kkr3FHH5Lcb9oF1hogYNeuVrP7JcE6wmoVgqwC21s8hQrTVMKN895etg", 0])
+commands.append(["-c print_keys -p dgpv51eADS3spNJh9gkVshqgv5iXrtix3oeSxb4JujFhGKwgAFziXB4kkr3FHH5Lcb9oF1hogYNeuVrP7JcE6wmoVgqwC21s8hQrTVMKN895etg --testnet", 1])
+commands.append(["-c generate_public_key -p QQR1EyvwHNuo1aqBmRinDbsZ93WrVzfdK18Z7G8P9tEmsUQE185k", 0]) #successfull WIF to pub
 commands.append(["-c generate_public_key", 1]) #missing required argument
-commands.append(["-c generate_public_key -p QUaohmokNWroj71dRtmPSses5eRw5SGLKsY", 1]) #invalid WIF key
-commands.append(["-c p2pkh -p 039ca1fdedbe160cb7b14df2a798c8fed41ad4ed30b06a85ad23e03abe43c413b2", 1])
-commands.append(["-c p2pkh -k 039ca1fdedbe160cb7b14df2a798c8fed41ad4ed30b06a85ad23e03abe43c413b2", 0])
+commands.append(["-c generate_public_key -p QQR1EyvwHNuo1aqBmRinDbsZ93WrVzfdK18", 1]) #invalid WIF key
+commands.append(["-c p2pkh -p 024fc3b764ce26da9b06f36c68503309d3e5baf5c4d6754e1deac1a53a81a7700c", 1])
+commands.append(["-c p2pkh -k 024fc3b764ce26da9b06f36c68503309d3e5baf5c4d6754e1deac1a53a81a7700c", 0])
 commands.append(["-c bip32_extended_master_key", 0])
-commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2TFvsWoQu5qGuFZk1zVAS69bD8pif6QYcnHMP2VotzLragqavGQkkpaGSwt1EqTr5A6JqKviXTnJdKp7vJ62nFyn246GjuHj -m m/100h/10h/100/10", 1]) #hardened keypath with pubkey
-commands.append(["-c derive_child_keys -p dgpv51eADS3spNJhAQGiUZnvxyjJo1NPAN8ioYozyiKgJHVcEEEgcjG8M3Sw7bAhvMPyCyHVj1zcu3tbfpu2wEoAyvkxyRyFvKHWjp9m2PUEDAr -m m/100h/10h/100/10", 0])
-commands.append(["-c derive_child_keys -p dgpv51eADS3spNJhAQGiUZnvxyjJo1NPAN8ioYozyiKgJHVcEEEgcjG8M3Sw7bAhvMPyCyHVj1zcu3tbfpu2wEoAyvkxyRyFvKHWjp9m2PUEDAr -m n/100h/10h/100/10", 1]) #wrong keypath prefix
-commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2TFvsWoQu5qGuFZk1zVAS69bD8pif6QYcnHMP2VotzLragqavGQkkpaGSwt1EqTr5A6JqKviXTnJdKp7vJ62nFyn246GjuHj -m m/100/10/100/10", 0])
+commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2SHeQsQZMqDyXBEGquxHY8JNQ5ir4DNgB79VveeGMGLDbAgpG2ma3kaRGhpozZW5pAPSPrLJxsEAkLaTsGfcHgEMiXEtTCL2 -m m/100h/10h/100/10", 1]) #hardened keypath with pubkey
+commands.append(["-c derive_child_keys -p dgpv51eADS3spNJh9RzFqAwPiNRvifuD5qFpqhbBvcT5RFdAZ6PEEsiad2owbSP2S9rUGs3RXw9q7hr6BPyX1hhvgQMVPL45nP2v3hx5GoPttaG -m m/100h/10h/100/10", 0])
+commands.append(["-c derive_child_keys -p dgpv51eADS3spNJh9RzFqAwPiNRvifuD5qFpqhbBvcT5RFdAZ6PEEsiad2owbSP2S9rUGs3RXw9q7hr6BPyX1hhvgQMVPL45nP2v3hx5GoPttaG -m n/100h/10h/100/10", 1]) #wrong keypath prefix
+commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2SHeQsQZMqDyXBEGquxHY8JNQ5ir4DNgB79VveeGMGLDbAgpG2ma3kaRGhpozZW5pAPSPrLJxsEAkLaTsGfcHgEMiXEtTCL2 -m m/100/10/100/10", 0])
 commands.append(["-c derive_child_keys", 1]) #missing key
-commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2TFvsWoQu5qGuFZk1zVAS69bD8pif6QYcnHMP2VotzLragqavGQkkpaGSwt1EqTr5A6JqKviXTnJdKp7vJ62nFyn246GjuHj", 1]) #missing keypath
+commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2SHeQsQZMqDyXBEGquxHY8JNQ5ir4DNgB79VveeGMGLDbAgpG2ma3kaRGhpozZW5pAPSPrLJxsEAkLaTsGfcHgEMiXEtTCL2", 1]) #missing keypath
 
 baseCommand = "./such"
 if valgrind == True:
-    baseCommand = "valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes  --error-exitcode=1 "+baseCommand
+    baseCommand = "valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes  "+baseCommand
 
 errored = False
 for cmd in commands:
