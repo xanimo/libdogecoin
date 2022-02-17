@@ -5,6 +5,9 @@ import helpers as h
 # CALL C FUNCTIONS FROM SHARED LIBRARY
 def py_gen_privkey(lib, chain_code):
 
+    #start context
+    lib.dogecoin_ecc_start()
+
     #init constants from chain.h... 0=main, 1=testnet, 2=regtest
     chain = h.get_chain(chain_code)
 
@@ -17,12 +20,17 @@ def py_gen_privkey(lib, chain_code):
     lib.gen_privatekey.restype = c_bool
     lib.gen_privatekey(byref(chain), newprivkey_wif, sizeout, newprivkey_hex)
     
-    #print result of function
-    print("private key wif", str(bytes(newprivkey_wif).decode('utf-8')))
-    print("private key hex:", str(bytes(newprivkey_hex).decode('utf-8')))
+    #stop context
+    lib.dogecoin_ecc_stop()
+
+    #return (wif-encoded private key, private key hex)
+    return (str(bytes(newprivkey_wif).decode('utf-8')), str(bytes(newprivkey_hex).decode('utf-8')))
 
 
 def py_pubkey_from_privatekey(lib, pkey_wif):
+
+    #start context
+    lib.dogecoin_ecc_start()
 
     #identify chain - is this method safe?
     if pkey_wif[0]=='Q':
@@ -45,12 +53,18 @@ def py_pubkey_from_privatekey(lib, pkey_wif):
     lib.pubkey_from_privatekey.restype = c_bool
     lib.pubkey_from_privatekey(byref(chain), pkey, byref(pubkey_hex), byref(sizeout))
     
-    #print result of function
-    print("public key hex:", str(bytes(pubkey_hex).decode('utf-8')))
+    #stop context
+    lib.dogecoin_ecc_stop()
+
+    #return pubkey hex
+    return str(bytes(pubkey_hex).decode('utf-8'))
 
 
 def py_address_from_pubkey(lib, chain_code, pubkey_hex):
     
+    #start context
+    lib.dogecoin_ecc_start()
+
     #init constants from chain.h (0=main, 1=testnet, 2=regtest)
     chain = h.get_chain(chain_code)
 
@@ -62,11 +76,17 @@ def py_address_from_pubkey(lib, chain_code, pubkey_hex):
     lib.address_from_pubkey.restype = c_bool
     lib.address_from_pubkey(byref(chain), pubkey, byref(address))
 
-    #print result from function
-    print("dogecoin address:", str(bytes(address).decode('utf-8')))
+    #stop context
+    lib.dogecoin_ecc_stop()
+
+    #return dogecoin address
+    return str(bytes(address).decode('utf-8'))
 
 
 def py_hd_gen_master(lib, chain_code):
+
+    #start context
+    lib.dogecoin_ecc_start()
 
     #init constants from chain.h (0=main, 1=testnet, 2=regtest)
     chain = h.get_chain(chain_code)
@@ -79,16 +99,18 @@ def py_hd_gen_master(lib, chain_code):
     #call hd_gen_master
     lib.hd_gen_master(byref(chain), byref(masterkey), sizeout)
 
-    #print output
-    print("master key:", bytes(masterkey).decode('utf-8'))
-    print("master key hex:", bytes(masterkey).hex())
-    # w = open("masterkey.bin", "wb")
-    # w.write(bytes(masterkey))
-    # w.close()
+    #stop context
+    lib.dogecoin_ecc_stop()
+
+    #return (extended private master key, extended private master key hex)
+    return (bytes(masterkey).decode('utf-8'), bytes(masterkey).hex())
 
 
 def py_hd_derive(lib, chain_code, master_key, derived_path):
     
+    #start context
+    lib.dogecoin_ecc_start()
+
     #init constants from chain.h (0=main, 1=testnet, 2=regtest)
     chain = h.get_chain(chain_code)
 
@@ -107,9 +129,11 @@ def py_hd_derive(lib, chain_code, master_key, derived_path):
     lib.dogecoin_hdnode_deserialize(byref(newextkey), byref(chain), byref(node))
     lib.dogecoin_hdnode_serialize_public(byref(node), byref(chain), child_pubkey, sizeout)
 
-    #print output
-    print("new extended private key:", bytes(newextkey).decode('utf-8'))
-    print("new derived child public key: ", bytes(child_pubkey).decode('utf-8'))
+    #stop context
+    lib.dogecoin_ecc_stop()
+
+    #return (new extended private key, new child public key)
+    return (bytes(newextkey).decode('utf-8'), bytes(child_pubkey).decode('utf-8'))
 
 
 
@@ -120,10 +144,11 @@ if __name__ == "__main__":
 
     #print option menu
     cmd_lst = ["gen_privkey <which_chain>",
-               "gen_bip32_extended_key <which_chain>",
                "gen_pubkey <privkey_wif>",
-               "derive_child_pubkey <which_chain> <bip32_master_key> <derived_path>",
-               "gen_address <which_chain> <pubkey_hex>"]
+               "gen_address <which_chain> <pubkey_hex>",
+               "",
+               "gen_bip32_extended_key <which_chain>",
+               "derive_child_pubkey <which_chain> <bip32_master_key> <derived_path>"]
     print("======================================================================")
     print("Press [q] to quit CLI")
     print("Press [w] to repeat previous command\n")
@@ -131,9 +156,6 @@ if __name__ == "__main__":
     for c in cmd_lst:
         print(f'\t{c}')
     print("\n")
-
-    #start context
-    libdoge.dogecoin_ecc_start()
 
     #start shell
     inp = input("$ ").split()
@@ -151,7 +173,9 @@ if __name__ == "__main__":
             if not args or not args[0].isdigit() or int(args[0])>2:
                 print(cmd+": enter valid chain code (0:main, 1:test, 2:regtest)")
             else:
-                py_gen_privkey(libdoge, int(args[0]))
+                res = py_gen_privkey(libdoge, int(args[0]))
+                print("private key wif", res[0])
+                print("private key hex:", res[1])
         
         #public key generation from given private key
         elif cmd == "gen_pubkey":
@@ -160,14 +184,27 @@ if __name__ == "__main__":
             elif len(args[0]) < 50:
                 print(cmd+": private key must be WIF encoded")
             else:
-                py_pubkey_from_privatekey(libdoge, args[0])
+                res = py_pubkey_from_privatekey(libdoge, args[0])
+                if res: print("public key hex:", res)
         
+        #dogecoin address generation from given regular public key
+        elif cmd == "gen_address":
+            if not args or not args[0].isdigit() or int(args[0])<0 or int(args[0])>2:
+                print(cmd+": enter valid chain code (0:main, 1:test, 2:regtest)")
+            elif len(args[1])!=66:
+                print(cmd+": invalid public key, must be given in hex form")
+            else:
+                res = py_address_from_pubkey(libdoge, int(args[0]), args[1])
+                print("dogecoin address:", res)
+
         #bip32 extended master key generation
         elif cmd == "gen_bip32_extended_key":
             if not args or not args[0].isdigit() or int(args[0])>2:
                 print(cmd+": enter valid chain code (0:main, 1:test, 2:regtest)")
             else:
-                py_hd_gen_master(libdoge, int(args[0]))
+                res = py_hd_gen_master(libdoge, int(args[0]))
+                print("master key:", res[0])
+                print("master key hex:", res[1])
 
         #derive child public key from given extended master key
         elif cmd == "derive_child_pubkey":
@@ -178,16 +215,10 @@ if __name__ == "__main__":
             elif len(args)<3 or args[2][0] != 'm':
                 print(cmd+": enter valid derivation path (format: m/0h/0/<k>")
             else:
-                py_hd_derive(libdoge, args[0], args[1], args[2])
+                res = py_hd_derive(libdoge, args[0], args[1], args[2])
+                print("new extended private key:", res[0])
+                print("new derived child public key:", res[1])
 
-        #dogecoin address generation from given public key
-        elif cmd == "gen_address":
-            if not args or not args[0].isdigit() or int(args[0])<0 or int(args[0])>2:
-                print(cmd+": enter valid chain code (0:main, 1:test, 2:regtest)")
-            elif len(args[1])!=66:
-                print(cmd+": invalid public key, must be given in hex form")
-            else:
-                py_address_from_pubkey(libdoge, int(args[0]), args[1])
                 
         else:
             print(cmd+": not a valid command")
@@ -195,7 +226,5 @@ if __name__ == "__main__":
         #accept next command
         print()
         inp = input("$ ").split()
-    
-    #stop context
-    libdoge.dogecoin_ecc_stop()
+
 

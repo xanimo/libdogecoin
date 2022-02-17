@@ -14,7 +14,7 @@ def py_dogecoin_block_header_deserialize(lib, header_ser, ilen, header_ptr):
     #puts information from buf into header
     lib.dogecoin_block_header_new.restype = c_int32
     if not lib.dogecoin_block_header_deserialize(header_ser, ilen, header_ptr):
-        print("wrappers.py: deserialization failed!\n")
+        print("py_dogecoin_block_header_deserialize: deserialization failed!\n")
 
 def py_dogecoin_block_header_serialize(lib, cstr_ptr, header_ptr):
     #given non-empty block header, translate info into cstring pointer
