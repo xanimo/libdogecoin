@@ -52,25 +52,25 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58) {
     uint64_t t = 0;
     unsigned zerocount = 0;
     memset(outi, 0, outisz * sizeof(*outi));
-    for (i = 0; i < b58sz && !b58digits_map[b58u[i]]; ++i) ++zerocount; // leading zeros, just count
+    for (i = 0; i < b58sz && !b58digits_map[b58u[i]]; ++i) ++zerocount; /* leading zeros, just count */
     for (; i < b58sz; ++i) {
-        if (b58u[i] & 0x80) return false; // high-bit set on invalid digit
-        if (b58digits_map[b58u[i]] == -1) return false; // invalid base58 digit
+        if (b58u[i] & 0x80) return false; /* high-bit set on invalid digit */
+        if (b58digits_map[b58u[i]] == -1) return false; /* invalid base58 digit */
         c = (unsigned)b58digits_map[b58u[i]];
         for (j = outisz; --j;) {
             t = ((uint64_t)outi[j]) * 58 + c;
             c = (t & 0x3f00000000) >> 32;
             outi[j] = t & 0xffffffff;
         }
-        if (c) return false; // output number too big (carry to the next int32)
-        if (outi[0] & zeromask) return false; // output number too big (last int32 filled too far)
+        if (c) return false; /* output number too big (carry to the next int32) */
+        if (outi[0] & zeromask) return false; /* output number too big (last int32 filled too far) */
     }
     j = 0;
     if (bytesleft) { for (i = bytesleft; i > 0; --i) *(binu++) = (outi[0] >> (8 * (i - 1))) & 0xff; ++j; }
     for (; j < outisz; ++j) { for (i = sizeof(*outi); i > 0; --i) *(binu++) = (outi[j] >> (8 * (i - 1))) & 0xff; }
-    binu = bin; // locate the most significant byte
+    binu = bin; /* locate the most significant byte */
     for (i = 0; i < binsz; ++i) { if (binu[i]) break; }
-    // prepend the correct number of null-bytes
+    /* prepend the correct number of null-bytes */
     if (zerocount > i) return false; /* result too large */
     *binszp = binsz - i + zerocount;
     return true;
@@ -84,8 +84,8 @@ int dogecoin_b58check(const void* bin, size_t binsz, const char* base58str) {
     sha256_raw(bin, binsz - 4, buf);
     sha256_raw(buf, 32, buf);
     if (memcmp(&binc[binsz - 4], buf, 4)) return -1;
-    // check number of zeros is correct AFTER verifying checksum (to avoid possibility of accessing base58str beyond the end)
-    for (i = 0; binc[i] == '\0' && base58str[i] == '1'; ++i) {} // just finding the end of zeros, nothing to do in loop
+    /* check number of zeros is correct AFTER verifying checksum (to avoid possibility of accessing base58str beyond the end) */
+    for (i = 0; binc[i] == '\0' && base58str[i] == '1'; ++i) {} /* just finding the end of zeros, nothing to do in loop */
     if (binc[i] == '\0' || base58str[i] == '1') return -3;
     return binc[0];
 }

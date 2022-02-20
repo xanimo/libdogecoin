@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
+typedef uint8_t dogecoin_bool; /* !serialize, c/c++ save bool */
 
 #ifndef __cplusplus
 # ifndef true
@@ -43,7 +43,7 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 # ifndef false
 #  define false 0
 # endif
-#endif //__cplusplus
+#endif /* __cplusplus */
 
 #ifdef __cplusplus
 # define LIBDOGECOIN_BEGIN_DECL extern "C" {
@@ -88,4 +88,4 @@ typedef uint8_t uint160[20];
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_DOGECOIN_H__
+#endif /* __LIBDOGECOIN_DOGECOIN_H__ */

@@ -303,7 +303,7 @@ void rmd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash) {
         }
         compress(digest, chunk);
     }
-    // Last chunk
+    /* Last chunk */
     {
         uint32_t chunk[16] = {0};
         for (i = 0; i < (msg_len & 63); ++i) {

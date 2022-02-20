@@ -38,4 +38,4 @@ LIBDOGECOIN_API int dogecoin_base58_decode(void* bin, size_t* binszp, const char
 
 LIBDOGECOIN_END_DECL
 
-#endif //__LIBDOGECOIN_CRYPTO_BASE58_H__
+#endif /* __LIBDOGECOIN_CRYPTO_BASE58_H__ */

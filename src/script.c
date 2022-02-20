@@ -77,7 +77,7 @@ dogecoin_bool dogecoin_script_copy_without_op_codeseperator(const cstring* scrip
             continue;
 
         if (data_len > 0) {
-            assert(data_len < 16777215); //limit max push to 0xFFFFFF
+            assert(data_len < 16777215); /* limit max push to 0xFFFFFF */
             unsigned char *bufpush = (unsigned char *)dogecoin_malloc(data_len);
             deser_bytes(bufpush, &buf, data_len);
             cstr_append_buf(script_out, bufpush, data_len);
@@ -155,7 +155,7 @@ dogecoin_bool dogecoin_script_get_ops(const cstring* script_in, vector* ops_out)
             continue;
         }
 
-        // don't alloc a push buffer if there is no more data available
+        /* don't alloc a push buffer if there is no more data available */
         if (buf.len == 0 || data_len > buf.len) {
             goto err_out;
         }
@@ -203,13 +203,13 @@ static dogecoin_bool dogecoin_script_is_op_pubkeyhash(const dogecoin_script_op* 
     return true;
 }
 
-// OP_PUBKEY, OP_CHECKSIG
+/* OP_PUBKEY, OP_CHECKSIG */
 dogecoin_bool dogecoin_script_is_pubkey(const vector* ops, vector* data_out) {
     if ((ops->len == 2) &&
             dogecoin_script_is_op(vector_idx(ops, 1), OP_CHECKSIG) &&
             dogecoin_script_is_op_pubkey(vector_idx(ops, 0))) {
         if (data_out) {
-            //copy the full pubkey (33 or 65) in case of a non empty vector
+            /* copy the full pubkey (33 or 65) in case of a non empty vector */
             const dogecoin_script_op* op = vector_idx(ops, 0);
             uint8_t* buffer = dogecoin_calloc(1, op->datalen);
             memcpy(buffer, op->data, op->datalen);
@@ -220,7 +220,7 @@ dogecoin_bool dogecoin_script_is_pubkey(const vector* ops, vector* data_out) {
     return false;
 }
 
-// OP_DUP, OP_HASH160, OP_PUBKEYHASH, OP_EQUALVERIFY, OP_CHECKSIG,
+/* OP_DUP, OP_HASH160, OP_PUBKEYHASH, OP_EQUALVERIFY, OP_CHECKSIG, */
 dogecoin_bool dogecoin_script_is_pubkeyhash(const vector* ops, vector* data_out) {
     if ((ops->len == 5) &&
         dogecoin_script_is_op(vector_idx(ops, 0), OP_DUP) &&
@@ -229,7 +229,7 @@ dogecoin_bool dogecoin_script_is_pubkeyhash(const vector* ops, vector* data_out)
         dogecoin_script_is_op(vector_idx(ops, 3), OP_EQUALVERIFY) &&
         dogecoin_script_is_op(vector_idx(ops, 4), OP_CHECKSIG)) {
         if (data_out) {
-            //copy the data (hash160) in case of a non empty vector
+            /* copy the data (hash160) in case of a non empty vector */
             const dogecoin_script_op* op = vector_idx(ops, 2);
             uint8_t* buffer = dogecoin_calloc(1, sizeof(uint160));
             memcpy(buffer, op->data, sizeof(uint160));
@@ -240,7 +240,7 @@ dogecoin_bool dogecoin_script_is_pubkeyhash(const vector* ops, vector* data_out)
     return false;
 }
 
-// OP_HASH160, OP_PUBKEYHASH, OP_EQUAL
+/* OP_HASH160, OP_PUBKEYHASH, OP_EQUAL */
 dogecoin_bool dogecoin_script_is_scripthash(const vector* ops, vector* data_out) {
     if ((ops->len == 3) &&
             dogecoin_script_is_op(vector_idx(ops, 0), OP_HASH160) &&
@@ -248,7 +248,7 @@ dogecoin_bool dogecoin_script_is_scripthash(const vector* ops, vector* data_out)
             dogecoin_script_is_op(vector_idx(ops, 2), OP_EQUAL)) {
 
         if (data_out) {
-            //copy the data (hash160) in case of a non empty vector
+            /* copy the data (hash160) in case of a non empty vector */
             const dogecoin_script_op* op = vector_idx(ops, 1);
             uint8_t* buffer = dogecoin_calloc(1, sizeof(uint160));
             memcpy(buffer, op->data, sizeof(uint160));
@@ -294,8 +294,8 @@ enum dogecoin_tx_out_type dogecoin_script_classify_ops(const vector* ops) {
 }
 
 enum dogecoin_tx_out_type dogecoin_script_classify(const cstring* script, vector* data_out) {
-    //INFO: could be speed up by not forming a vector
-    //      and directly parse the script cstring
+    /* INFO: could be speed up by not forming a vector */
+    /* and directly parse the script cstring */
 
     enum dogecoin_tx_out_type tx_out_type = DOGECOIN_TX_NONSTANDARD;
     vector* ops = vector_new(10, dogecoin_script_op_free_cb);
@@ -364,7 +364,7 @@ void dogecoin_script_append_pushdata(cstring* script_in, const unsigned char* da
 }
 
 dogecoin_bool dogecoin_script_build_multisig(cstring* script_in, const unsigned int required_signatures, const vector* pubkeys_chars) {
-    cstr_resize(script_in, 0); //clear script
+    cstr_resize(script_in, 0); /* clear script */
 
     if (required_signatures > 16 || pubkeys_chars->len > 16)
         return false;
@@ -387,11 +387,10 @@ dogecoin_bool dogecoin_script_build_multisig(cstring* script_in, const unsigned 
 }
 
 dogecoin_bool dogecoin_script_build_p2pkh(cstring* script_in, const uint160 hash160) {
-    cstr_resize(script_in, 0); //clear script
+    cstr_resize(script_in, 0); /* clear script */
 
     dogecoin_script_append_op(script_in, OP_DUP);
     dogecoin_script_append_op(script_in, OP_HASH160);
-
 
     dogecoin_script_append_pushdata(script_in, (unsigned char*)hash160, sizeof(uint160));
     dogecoin_script_append_op(script_in, OP_EQUALVERIFY);
@@ -401,7 +400,7 @@ dogecoin_bool dogecoin_script_build_p2pkh(cstring* script_in, const uint160 hash
 }
 
 dogecoin_bool dogecoin_script_build_p2wpkh(cstring* script_in, const uint160 hash160) {
-    cstr_resize(script_in, 0); //clear script
+    cstr_resize(script_in, 0); /* clear script */
 
     dogecoin_script_append_op(script_in, OP_0);
     dogecoin_script_append_pushdata(script_in, (unsigned char*)hash160, sizeof(uint160));
@@ -410,7 +409,7 @@ dogecoin_bool dogecoin_script_build_p2wpkh(cstring* script_in, const uint160 has
 }
 
 dogecoin_bool dogecoin_script_build_p2sh(cstring* script_in, const uint160 hash160) {
-    cstr_resize(script_in, 0); //clear script
+    cstr_resize(script_in, 0); /* clear script */
     dogecoin_script_append_op(script_in, OP_HASH160);
     dogecoin_script_append_pushdata(script_in, (unsigned char*)hash160, sizeof(uint160));
     dogecoin_script_append_op(script_in, OP_EQUAL);
@@ -455,8 +454,8 @@ static uint8_t dogecoin_decode_op_n(enum opcodetype op) {
     return (uint8_t)op - (uint8_t)(OP_1 - 1);
 }
 
-// A witness program is any valid script that consists of a 1-byte push opcode
-// followed by a data push between 2 and 40 bytes.
+/* A witness program is any valid script that consists of a 1-byte push opcode */
+/* followed by a data push between 2 and 40 bytes. */
 dogecoin_bool dogecoin_script_is_witnessprogram(const cstring* script, uint8_t* version_out, uint8_t *program_out, int *programm_len_out) {
     if (!version_out || !program_out) {
         return false;

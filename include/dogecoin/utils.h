@@ -73,4 +73,4 @@ static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) 
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_UTILS_H__
+#endif /* __LIBDOGECOIN_UTILS_H__ */

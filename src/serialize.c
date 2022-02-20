@@ -8,46 +8,38 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/serialize.h>
 
-void ser_bytes(cstring* s, const void* p, size_t len)
-{
+void ser_bytes(cstring* s, const void* p, size_t len) {
     cstr_append_buf(s, p, len);
 }
 
-void ser_u16(cstring* s, uint16_t v_)
-{
+void ser_u16(cstring* s, uint16_t v_) {
     uint16_t v = htole16(v_);
     cstr_append_buf(s, &v, sizeof(v));
 }
 
-void ser_u32(cstring* s, uint32_t v_)
-{
+void ser_u32(cstring* s, uint32_t v_) {
     uint32_t v = htole32(v_);
     cstr_append_buf(s, &v, sizeof(v));
 }
 
-void ser_s32(cstring* s, int32_t v_)
-{
+void ser_s32(cstring* s, int32_t v_) {
     ser_u32(s, (uint32_t)v_);
 }
 
-void ser_u64(cstring* s, uint64_t v_)
-{
+void ser_u64(cstring* s, uint64_t v_) {
     uint64_t v = htole64(v_);
     cstr_append_buf(s, &v, sizeof(v));
 }
 
-void ser_s64(cstring* s, int64_t v_)
-{
+void ser_s64(cstring* s, int64_t v_) {
     ser_u64(s, (uint64_t)v_);
 }
 
-void ser_u256(cstring* s, const unsigned char* v_)
-{
+void ser_u256(cstring* s, const unsigned char* v_) {
     ser_bytes(s, v_, 32);
 }
 
-void ser_varlen(cstring* s, uint32_t vlen)
-{
+void ser_varlen(cstring* s, uint32_t vlen) {
     unsigned char c;
 
     if (vlen < 253) {
@@ -70,16 +62,14 @@ void ser_varlen(cstring* s, uint32_t vlen)
     /* u64 case intentionally not implemented */
 }
 
-void ser_str(cstring* s, const char* s_in, size_t maxlen)
-{
+void ser_str(cstring* s, const char* s_in, size_t maxlen) {
     size_t slen = strnlen(s_in, maxlen);
 
     ser_varlen(s, slen);
     ser_bytes(s, s_in, slen);
 }
 
-void ser_varstr(cstring* s, cstring* s_in)
-{
+void ser_varstr(cstring* s, cstring* s_in) {
     if (!s_in || !s_in->len) {
         ser_varlen(s, 0);
         return;
@@ -89,8 +79,7 @@ void ser_varstr(cstring* s, cstring* s_in)
     ser_bytes(s, s_in->str, s_in->len);
 }
 
-int deser_skip(struct const_buffer* buf, size_t len)
-{
+int deser_skip(struct const_buffer* buf, size_t len) {
     char *p;
     if (buf->len < len)
         return false;
@@ -103,8 +92,7 @@ int deser_skip(struct const_buffer* buf, size_t len)
     return true;
 }
 
-int deser_bytes(void* po, struct const_buffer* buf, size_t len)
-{
+int deser_bytes(void* po, struct const_buffer* buf, size_t len) {
     char *p;
     if (buf->len < len)
         return false;
@@ -118,8 +106,7 @@ int deser_bytes(void* po, struct const_buffer* buf, size_t len)
     return true;
 }
 
-int deser_u16(uint16_t* vo, struct const_buffer* buf)
-{
+int deser_u16(uint16_t* vo, struct const_buffer* buf) {
     uint16_t v;
 
     if (!deser_bytes(&v, buf, sizeof(v)))
@@ -129,8 +116,7 @@ int deser_u16(uint16_t* vo, struct const_buffer* buf)
     return true;
 }
 
-int deser_s32(int32_t* vo, struct const_buffer* buf)
-{
+int deser_s32(int32_t* vo, struct const_buffer* buf) {
     int32_t v;
 
     if (!deser_bytes(&v, buf, sizeof(v)))
@@ -140,8 +126,7 @@ int deser_s32(int32_t* vo, struct const_buffer* buf)
     return true;
 }
 
-int deser_u32(uint32_t* vo, struct const_buffer* buf)
-{
+int deser_u32(uint32_t* vo, struct const_buffer* buf) {
     uint32_t v;
 
     if (!deser_bytes(&v, buf, sizeof(v)))
@@ -151,8 +136,7 @@ int deser_u32(uint32_t* vo, struct const_buffer* buf)
     return true;
 }
 
-int deser_u64(uint64_t* vo, struct const_buffer* buf)
-{
+int deser_u64(uint64_t* vo, struct const_buffer* buf) {
     uint64_t v;
 
     if (!deser_bytes(&v, buf, sizeof(v)))
@@ -162,13 +146,11 @@ int deser_u64(uint64_t* vo, struct const_buffer* buf)
     return true;
 }
 
-int deser_u256(uint8_t* vo, struct const_buffer* buf)
-{
+int deser_u256(uint8_t* vo, struct const_buffer* buf) {
     return deser_bytes(vo, buf, 32);
 }
 
-int deser_varlen(uint32_t* lo, struct const_buffer* buf)
-{
+int deser_varlen(uint32_t* lo, struct const_buffer* buf) {
     uint32_t len;
 
     unsigned char c;
@@ -197,8 +179,7 @@ int deser_varlen(uint32_t* lo, struct const_buffer* buf)
     return true;
 }
 
-int deser_varlen_file(uint32_t* lo, FILE *file, uint8_t *rawdata, size_t *buflen_inout)
-{
+int deser_varlen_file(uint32_t* lo, FILE *file, uint8_t *rawdata, size_t *buflen_inout) {
     uint32_t len;
     struct const_buffer buf;
     unsigned char c;
@@ -251,9 +232,7 @@ int deser_varlen_file(uint32_t* lo, FILE *file, uint8_t *rawdata, size_t *buflen
     return true;
 }
 
-
-int deser_str(char* so, struct const_buffer* buf, size_t maxlen)
-{
+int deser_str(char* so, struct const_buffer* buf, size_t maxlen) {
     uint32_t len;
     uint32_t skip_len = 0;
     if (!deser_varlen(&len, buf))
@@ -279,8 +258,7 @@ int deser_str(char* so, struct const_buffer* buf, size_t maxlen)
     return true;
 }
 
-int deser_varstr(cstring** so, struct const_buffer* buf)
-{
+int deser_varstr(cstring** so, struct const_buffer* buf) {
     uint32_t len;
     cstring* s;
     char *p;
@@ -309,7 +287,6 @@ int deser_varstr(cstring** so, struct const_buffer* buf)
     return true;
 }
 
-int deser_s64(int64_t* vo, struct const_buffer* buf)
-{
+int deser_s64(int64_t* vo, struct const_buffer* buf) {
     return deser_u64((uint64_t*)vo, buf);
 }

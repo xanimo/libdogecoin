@@ -41,8 +41,8 @@ LIBDOGECOIN_BEGIN_DECL
 
 typedef struct dogecoin_script_ {
     int* data;
-    size_t limit;   // Total size of the vector
-    size_t current; //Number of vectors in it at present
+    size_t limit;   /* Total size of the vector */
+    size_t current; /* Number of vectors in it at present */
 } dogecoin_script;
 
 typedef struct dogecoin_tx_outpoint_ {
@@ -69,25 +69,25 @@ typedef struct dogecoin_tx_ {
     uint32_t locktime;
 } dogecoin_tx;
 
-//!create a new tx input
+/* !create a new tx input */
 LIBDOGECOIN_API dogecoin_tx_in* dogecoin_tx_in_new();
 LIBDOGECOIN_API void dogecoin_tx_in_free(dogecoin_tx_in* tx_in);
 LIBDOGECOIN_API void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src);
 
-//!create a new tx output
+/* !create a new tx output */
 LIBDOGECOIN_API dogecoin_tx_out* dogecoin_tx_out_new();
 LIBDOGECOIN_API void dogecoin_tx_out_free(dogecoin_tx_out* tx_out);
 LIBDOGECOIN_API void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_tx_out* src);
 
-//!create a new tx input
+/* !create a new tx input */
 LIBDOGECOIN_API dogecoin_tx* dogecoin_tx_new();
 LIBDOGECOIN_API void dogecoin_tx_free(dogecoin_tx* tx);
 LIBDOGECOIN_API void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src);
 
-//!deserialize/parse a p2p serialized dogecoin transaction
+/* !deserialize/parse a p2p serialized dogecoin transaction */
 LIBDOGECOIN_API int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length, dogecoin_bool allow_witness);
 
-//!serialize a lbc dogecoin data structure into a p2p serialized buffer
+/* !serialize a lbc dogecoin data structure into a p2p serialized buffer */
 LIBDOGECOIN_API void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx, dogecoin_bool allow_witness);
 
 LIBDOGECOIN_API void dogecoin_tx_hash(const dogecoin_tx* tx, uint8_t* hashout);
@@ -110,7 +110,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_has_witness(const dogecoin_tx *tx);
 enum dogecoin_tx_sign_result {
     DOGECOIN_SIGN_UNKNOWN = 0,
     DOGECOIN_SIGN_INVALID_KEY = -2,
-    DOGECOIN_SIGN_NO_KEY_MATCH = -3, //if the key found in the script doesn't match the given key, will sign anyways
+    DOGECOIN_SIGN_NO_KEY_MATCH = -3, /* if the key found in the script doesn't match the given key, will sign anyways */
     DOGECOIN_SIGN_SIGHASH_FAILED = -4,
     DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE = -5,
     DOGECOIN_SIGN_INVALID_TX_OR_SCRIPT = -6,
@@ -122,4 +122,4 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx *tx_in_out, cons
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_TX_H__
+#endif /* __LIBDOGECOIN_TX_H__ */

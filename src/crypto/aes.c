@@ -70,7 +70,8 @@
 #include <dogecoin/crypto/aes.h>
 
 #if defined(HAVE_UINT_32T)
-//typedef unsigned long uint_32t;
+/* typedef unsigned long uint_32t;
+ */
 typedef uint32_t uint_32t;
 #endif
 
@@ -136,8 +137,7 @@ static const uint_8t gfmul_e[256] = mm_data(fe);
 /* 9 bits (0x11b), this right shift keeps the   */
 /* values of all top bits within a byte         */
 
-static uint_8t hibit(const uint_8t x)
-{
+static uint_8t hibit(const uint_8t x) {
     uint_8t r = (uint_8t)((x >> 1) | (x >> 2));
 
     r |= (r >> 2);
@@ -147,8 +147,7 @@ static uint_8t hibit(const uint_8t x)
 
 /* return the inverse of the finite field element x */
 
-static uint_8t gf_inv(const uint_8t x)
-{
+static uint_8t gf_inv(const uint_8t x) {
     uint_8t p1 = x, p2 = BPOLY, n1 = hibit(x), n2 = 0x80, v1 = 1, v2 = 0;
 
     if (x < 2) {
@@ -181,8 +180,7 @@ static uint_8t gf_inv(const uint_8t x)
 }
 
 /* The forward and inverse affine transformations used in the S-box */
-uint_8t fwd_affine(const uint_8t x)
-{
+uint_8t fwd_affine(const uint_8t x) {
 #if defined(HAVE_UINT_32T)
     uint_32t w = x;
     w ^= (w << 1) ^ (w << 2) ^ (w << 3) ^ (w << 4);
@@ -192,8 +190,7 @@ uint_8t fwd_affine(const uint_8t x)
 #endif
 }
 
-uint_8t inv_affine(const uint_8t x)
-{
+uint_8t inv_affine(const uint_8t x) {
 #if defined(HAVE_UINT_32T)
     uint_32t w = x;
     w = (w << 1) ^ (w << 3) ^ (w << 6);
@@ -222,11 +219,9 @@ uint_8t inv_affine(const uint_8t x)
 #define block_copy(d, s) copy_block(d, s)
 #endif
 
-
 #if defined(HAVE_MEMCPY)
 #else
-static void copy_block(void* d, const void* s)
-{
+static void copy_block(void* d, const void* s) {
 #if defined(HAVE_UINT_32T)
     ((uint_32t*)d)[0] = ((uint_32t*)s)[0];
     ((uint_32t*)d)[1] = ((uint_32t*)s)[1];
@@ -252,8 +247,7 @@ static void copy_block(void* d, const void* s)
 #endif
 }
 
-static void copy_block_nn(void* d, const void* s, uint_8t nn)
-{
+static void copy_block_nn(void* d, const void* s, uint_8t nn) {
     while (nn--) {
         *((uint_8t*)d)++ = *((uint_8t*)s)++;
     }
@@ -261,8 +255,7 @@ static void copy_block_nn(void* d, const void* s, uint_8t nn)
 #endif
 
 
-static void xor_block(void* d, const void* s)
-{
+static void xor_block(void* d, const void* s) {
 #if defined(HAVE_UINT_32T)
     ((uint_32t*)d)[0] ^= ((const uint_32t*)s)[0];
     ((uint_32t*)d)[1] ^= ((const uint_32t*)s)[1];
@@ -288,8 +281,7 @@ static void xor_block(void* d, const void* s)
 #endif
 }
 
-static void copy_and_key(void* d, const void* s, const void* k)
-{
+static void copy_and_key(void* d, const void* s, const void* k) {
 #if defined(HAVE_UINT_32T)
     ((uint_32t*)d)[0] = ((const uint_32t*)s)[0] ^ ((const uint_32t*)k)[0];
     ((uint_32t*)d)[1] = ((const uint_32t*)s)[1] ^ ((const uint_32t*)k)[1];
@@ -318,13 +310,11 @@ static void copy_and_key(void* d, const void* s, const void* k)
 #endif
 }
 
-static void add_round_key(uint_8t d[N_BLOCK], const uint_8t k[N_BLOCK])
-{
+static void add_round_key(uint_8t d[N_BLOCK], const uint_8t k[N_BLOCK]) {
     xor_block(d, k);
 }
 
-static void shift_sub_rows(uint_8t st[N_BLOCK])
-{
+static void shift_sub_rows(uint_8t st[N_BLOCK]) {
     uint_8t tt;
 
     st[0] = s_box(st[0]);
@@ -352,8 +342,7 @@ static void shift_sub_rows(uint_8t st[N_BLOCK])
     st[3] = s_box(tt);
 }
 
-static void inv_shift_sub_rows(uint_8t st[N_BLOCK])
-{
+static void inv_shift_sub_rows(uint_8t st[N_BLOCK]) {
     uint_8t tt;
 
     st[0] = is_box(st[0]);
@@ -382,13 +371,11 @@ static void inv_shift_sub_rows(uint_8t st[N_BLOCK])
 }
 
 #if defined(VERSION_1)
-static void mix_sub_columns(uint_8t dt[N_BLOCK])
-{
+static void mix_sub_columns(uint_8t dt[N_BLOCK]) {
     uint_8t st[N_BLOCK];
     block_copy(st, dt);
 #else
-static void mix_sub_columns(uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK])
-{
+static void mix_sub_columns(uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK]) {
 #endif
     dt[0] = gfm2_sb(st[0]) ^ gfm3_sb(st[5]) ^ s_box(st[10]) ^ s_box(st[15]);
     dt[1] = s_box(st[0]) ^ gfm2_sb(st[5]) ^ gfm3_sb(st[10]) ^ s_box(st[15]);
@@ -412,13 +399,11 @@ static void mix_sub_columns(uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK])
 }
 
 #if defined(VERSION_1)
-static void inv_mix_sub_columns(uint_8t dt[N_BLOCK])
-{
+static void inv_mix_sub_columns(uint_8t dt[N_BLOCK]) {
     uint_8t st[N_BLOCK];
     block_copy(st, dt);
 #else
-static void inv_mix_sub_columns(uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK])
-{
+static void inv_mix_sub_columns(uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK]) {
 #endif
     dt[0] = is_box(gfm_e(st[0]) ^ gfm_b(st[1]) ^ gfm_d(st[2]) ^ gfm_9(st[3]));
     dt[5] = is_box(gfm_9(st[0]) ^ gfm_e(st[1]) ^ gfm_b(st[2]) ^ gfm_d(st[3]));
@@ -445,8 +430,7 @@ static void inv_mix_sub_columns(uint_8t dt[N_BLOCK], uint_8t st[N_BLOCK])
 
 /*  Set the cipher key for the pre-keyed version */
 
-return_type aes_set_key(const unsigned char key[], length_type keylen, aes_context ctx[1])
-{
+return_type aes_set_key(const unsigned char key[], length_type keylen, aes_context ctx[1]) {
     uint_8t cc, rc, hi;
 
     switch (keylen) {
@@ -459,7 +443,7 @@ return_type aes_set_key(const unsigned char key[], length_type keylen, aes_conte
         keylen = 24;
         break;
     case 32:
-        //case 256:
+        /* case 256: */
         keylen = 32;
         break;
     default:
@@ -504,8 +488,7 @@ return_type aes_set_key(const unsigned char key[], length_type keylen, aes_conte
 
 /*  Encrypt a single block of 16 bytes */
 
-return_type aes_encrypt(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const aes_context ctx[1])
-{
+return_type aes_encrypt(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const aes_context ctx[1]) {
     if (ctx->rnd) {
         uint_8t s1[N_BLOCK], r;
         copy_and_key(s1, in, ctx->ksch);
@@ -533,8 +516,7 @@ return_type aes_encrypt(const unsigned char in[N_BLOCK], unsigned char out[N_BLO
 
 /* CBC encrypt a number of blocks (input and return an IV) */
 
-return_type aes_cbc_encrypt(const unsigned char* in, unsigned char* out, int n_block, unsigned char iv[N_BLOCK], const aes_context ctx[1])
-{
+return_type aes_cbc_encrypt(const unsigned char* in, unsigned char* out, int n_block, unsigned char iv[N_BLOCK], const aes_context ctx[1]) {
     while (n_block--) {
         xor_block(iv, in);
         if (aes_encrypt(iv, iv, ctx) != EXIT_SUCCESS) {
@@ -553,8 +535,7 @@ return_type aes_cbc_encrypt(const unsigned char* in, unsigned char* out, int n_b
 
 /*  Decrypt a single block of 16 bytes */
 
-return_type aes_decrypt(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const aes_context ctx[1])
-{
+return_type aes_decrypt(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const aes_context ctx[1]) {
     if (ctx->rnd) {
         uint_8t s1[N_BLOCK], r;
         copy_and_key(s1, in, ctx->ksch + ctx->rnd * N_BLOCK);
@@ -582,8 +563,7 @@ return_type aes_decrypt(const unsigned char in[N_BLOCK], unsigned char out[N_BLO
 
 /* CBC decrypt a number of blocks (input and return an IV) */
 
-return_type aes_cbc_decrypt(const unsigned char* in, unsigned char* out, int n_block, unsigned char iv[N_BLOCK], const aes_context ctx[1])
-{
+return_type aes_cbc_decrypt(const unsigned char* in, unsigned char* out, int n_block, unsigned char iv[N_BLOCK], const aes_context ctx[1]) {
     while (n_block--) {
         uint_8t tmp[N_BLOCK];
 
@@ -605,8 +585,7 @@ return_type aes_cbc_decrypt(const unsigned char* in, unsigned char* out, int n_b
 
 /*  The 'on the fly' encryption key update for for 128 bit keys */
 
-static void update_encrypt_key_128(uint_8t k[N_BLOCK], uint_8t* rc)
-{
+static void update_encrypt_key_128(uint_8t k[N_BLOCK], uint_8t* rc) {
     uint_8t cc;
 
     k[0] ^= s_box(k[13]) ^ *rc;
@@ -625,8 +604,7 @@ static void update_encrypt_key_128(uint_8t k[N_BLOCK], uint_8t* rc)
 
 /*  Encrypt a single block of 16 bytes with 'on the fly' 128 bit keying */
 
-void aes_encrypt_128(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[N_BLOCK], unsigned char o_key[N_BLOCK])
-{
+void aes_encrypt_128(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[N_BLOCK], unsigned char o_key[N_BLOCK]) {
     uint_8t s1[N_BLOCK], r, rc = 1;
 
     if (o_key != key) {
@@ -661,8 +639,7 @@ void aes_encrypt_128(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK]
 
 /*  The 'on the fly' decryption key update for for 128 bit keys */
 
-static void update_decrypt_key_128(uint_8t k[N_BLOCK], uint_8t* rc)
-{
+static void update_decrypt_key_128(uint_8t k[N_BLOCK], uint_8t* rc) {
     uint_8t cc;
 
     for (cc = 12; cc > 0; cc -= 4) {
@@ -680,8 +657,7 @@ static void update_decrypt_key_128(uint_8t k[N_BLOCK], uint_8t* rc)
 
 /*  Decrypt a single block of 16 bytes with 'on the fly' 128 bit keying */
 
-void aes_decrypt_128(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[N_BLOCK], unsigned char o_key[N_BLOCK])
-{
+void aes_decrypt_128(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[N_BLOCK], unsigned char o_key[N_BLOCK]) {
     uint_8t s1[N_BLOCK], r, rc = 0x6c;
     if (o_key != key) {
         block_copy(o_key, key);
@@ -715,8 +691,7 @@ void aes_decrypt_128(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK]
 
 /*  The 'on the fly' encryption key update for for 256 bit keys */
 
-static void update_encrypt_key_256(uint_8t k[2 * N_BLOCK], uint_8t* rc)
-{
+static void update_encrypt_key_256(uint_8t k[2 * N_BLOCK], uint_8t* rc) {
     uint_8t cc;
 
     k[0] ^= s_box(k[29]) ^ *rc;
@@ -747,8 +722,7 @@ static void update_encrypt_key_256(uint_8t k[2 * N_BLOCK], uint_8t* rc)
 
 /*  Encrypt a single block of 16 bytes with 'on the fly' 256 bit keying */
 
-void aes_encrypt_256(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[2 * N_BLOCK], unsigned char o_key[2 * N_BLOCK])
-{
+void aes_encrypt_256(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[2 * N_BLOCK], unsigned char o_key[2 * N_BLOCK]) {
     uint_8t s1[N_BLOCK], r, rc = 1;
     if (o_key != key) {
         block_copy(o_key, key);
@@ -791,8 +765,7 @@ void aes_encrypt_256(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK]
 
 /*  The 'on the fly' encryption key update for for 256 bit keys */
 
-static void update_decrypt_key_256(uint_8t k[2 * N_BLOCK], uint_8t* rc)
-{
+static void update_decrypt_key_256(uint_8t k[2 * N_BLOCK], uint_8t* rc) {
     uint_8t cc;
 
     for (cc = 28; cc > 16; cc -= 4) {
@@ -824,8 +797,7 @@ static void update_decrypt_key_256(uint_8t k[2 * N_BLOCK], uint_8t* rc)
 /*  Decrypt a single block of 16 bytes with 'on the fly'
     256 bit keying
 */
-void aes_decrypt_256(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[2 * N_BLOCK], unsigned char o_key[2 * N_BLOCK])
-{
+void aes_decrypt_256(const unsigned char in[N_BLOCK], unsigned char out[N_BLOCK], const unsigned char key[2 * N_BLOCK], unsigned char o_key[2 * N_BLOCK]) {
     uint_8t s1[N_BLOCK], r, rc = 0x80;
 
     if (o_key != key) {

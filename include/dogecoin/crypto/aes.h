@@ -171,4 +171,4 @@ LIBDOGECOIN_API void aes_decrypt_256(const unsigned char in[N_BLOCK],
 
 LIBDOGECOIN_END_DECL
 
-#endif //__LIBDOGECOIN_CRYPTO_AES_H__
+#endif /* __LIBDOGECOIN_CRYPTO_AES_H__ */

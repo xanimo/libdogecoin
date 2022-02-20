@@ -80,17 +80,11 @@ int generatePrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testne
     if (wif_privkey) memcpy(wif_privkey, wif_privkey_internal, sizeout);
     if (p2pkh_pubkey) memcpy(p2pkh_pubkey, p2pkh_pubkey_internal, sizeout);
 
-    // printf("wif_privkey:  %s\n", wif_privkey);
-    // printf("p2pkh_pubkey: %s\n\n", p2pkh_pubkey);
-
     /* reset internal variables */
     memset(wif_privkey_internal, 0, strlen(wif_privkey_internal));
     memset(p2pkh_pubkey_internal, 0, strlen(p2pkh_pubkey_internal));
 
-    // TODO: evaluate how we're going to deal with key storage and cleansing memory
-    // /* cleanup memory */
-    // dogecoin_pubkey_cleanse(&pubkey);
-    // dogecoin_privkey_cleanse(&key);
+    /* TODO: evaluate how we're going to deal with key storage and cleansing memory */
     return true;
 }
 
@@ -119,12 +113,7 @@ int generateHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_mast
     memset(hd_privkey_master, 0, strlen(hd_privkey_master));
     memset(hd_privkey_master, 0, strlen(hd_privkey_master));
 
-    // printf("wif_privkey_master:   %s\n", wif_privkey_master);
-    // printf("p2pkh_pubkey_master:  %s\n", p2pkh_pubkey_master);
-
-    // TODO: evaluate how we're going to deal with key storage and cleansing memory
-    // memset(wif_privkey_master, 0, strlen(wif_privkey_master));
-    // memset(p2pkh_pubkey_master, 0, strlen(p2pkh_pubkey_master));
+    /* TODO: evaluate how we're going to deal with key storage and cleansing memory */
     return true;
 }
 

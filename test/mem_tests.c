@@ -1,6 +1,7 @@
 /**********************************************************************
-* Copyright (c) 2015 Jonas Schnelli                                  *
-* Distributed under the MIT software license, see the accompanying   *
+* Copyright (c) 2015 Jonas Schnelli                                   *
+* Copyright (c) 2022 bluezr                                           *
+* Distributed under the MIT software license, see the accompanying    *
 * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
 **********************************************************************/
 
@@ -46,6 +47,6 @@ void test_memory() {
     ptr = dogecoin_realloc(buf, 1000);
     u_assert_int_eq((ptr == NULL), 1);
     free(obuf);
-    // switch back to the default memory callback mapper
+    /* switch back to the default memory callback mapper */
     dogecoin_mem_set_mapper_default();
 }

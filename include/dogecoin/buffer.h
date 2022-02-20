@@ -50,4 +50,4 @@ LIBDOGECOIN_API struct buffer* buffer_copy(const void* data, size_t data_len);
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_BUFFER_H__
+#endif /* __LIBDOGECOIN_BUFFER_H__ */

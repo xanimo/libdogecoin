@@ -60,4 +60,4 @@ LIBDOGECOIN_API int cstr_alloc_minsize(cstring* s, size_t sz);
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_CSTR_H__
+#endif /* __LIBDOGECOIN_CSTR_H__ */

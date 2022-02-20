@@ -54,7 +54,7 @@ enum {
 
 /** Script opcodes */
 enum opcodetype {
-    // push value
+    /* push value */
     OP_0 = 0x00,
     OP_FALSE = OP_0,
     OP_PUSHDATA1 = 0x4c,
@@ -80,7 +80,7 @@ enum opcodetype {
     OP_15 = 0x5f,
     OP_16 = 0x60,
 
-    // control
+    /* control */
     OP_NOP = 0x61,
     OP_VER = 0x62,
     OP_IF = 0x63,
@@ -92,7 +92,7 @@ enum opcodetype {
     OP_VERIFY = 0x69,
     OP_RETURN = 0x6a,
 
-    // stack ops
+    /* stack ops */
     OP_TOALTSTACK = 0x6b,
     OP_FROMALTSTACK = 0x6c,
     OP_2DROP = 0x6d,
@@ -113,14 +113,14 @@ enum opcodetype {
     OP_SWAP = 0x7c,
     OP_TUCK = 0x7d,
 
-    // splice ops
+    /* splice ops */
     OP_CAT = 0x7e,
     OP_SUBSTR = 0x7f,
     OP_LEFT = 0x80,
     OP_RIGHT = 0x81,
     OP_SIZE = 0x82,
 
-    // bit logic
+    /* bit logic */
     OP_INVERT = 0x83,
     OP_AND = 0x84,
     OP_OR = 0x85,
@@ -130,7 +130,7 @@ enum opcodetype {
     OP_RESERVED1 = 0x89,
     OP_RESERVED2 = 0x8a,
 
-    // numeric
+    /* numeric */
     OP_1ADD = 0x8b,
     OP_1SUB = 0x8c,
     OP_2MUL = 0x8d,
@@ -162,7 +162,7 @@ enum opcodetype {
 
     OP_WITHIN = 0xa5,
 
-    // crypto
+    /* crypto */
     OP_RIPEMD160 = 0xa6,
     OP_SHA1 = 0xa7,
     OP_SHA256 = 0xa8,
@@ -174,7 +174,7 @@ enum opcodetype {
     OP_CHECKMULTISIG = 0xae,
     OP_CHECKMULTISIGVERIFY = 0xaf,
 
-    // expansion
+    /* expansion */
     OP_NOP1 = 0xb0,
     OP_NOP2 = 0xb1,
     OP_CHECKLOCKTIMEVERIFY = OP_NOP2,
@@ -188,7 +188,7 @@ enum opcodetype {
     OP_NOP10 = 0xb9,
 
 
-    // template matching params
+    /* template matching params */
     OP_SMALLINTEGER = 0xfa,
     OP_PUBKEYS = 0xfb,
     OP_PUBKEYHASH = 0xfd,
@@ -200,7 +200,7 @@ enum opcodetype {
 enum dogecoin_tx_out_type {
     DOGECOIN_TX_INVALID = -1,
     DOGECOIN_TX_NONSTANDARD,
-    // 'standard' transaction types:
+    /* 'standard' transaction types: */
     DOGECOIN_TX_PUBKEY,
     DOGECOIN_TX_PUBKEYHASH,
     DOGECOIN_TX_SCRIPTHASH,
@@ -215,10 +215,10 @@ typedef struct dogecoin_script_op_ {
     size_t datalen;
 } dogecoin_script_op;
 
-// Maximum script length in bytes
+/* Maximum script length in bytes */
 static const int MAX_SCRIPT_SIZE = 10000;
 
-//copy a script without the codeseperator ops
+/* copy a script without the codeseperator ops */
 dogecoin_bool dogecoin_script_copy_without_op_codeseperator(const cstring* scriptin, cstring* scriptout);
 
 LIBDOGECOIN_API dogecoin_script_op* dogecoin_script_op_new();
@@ -245,4 +245,4 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_script_is_witnessprogram(const cstring* s
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_SCRIPT_H__
+#endif /* __LIBDOGECOIN_SCRIPT_H__ */

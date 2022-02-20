@@ -48,4 +48,4 @@ LIBDOGECOIN_API dogecoin_bool hd_derive(const dogecoin_chainparams* chain, const
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_TOOL_H__
+#endif /* __LIBDOGECOIN_TOOL_H__ */

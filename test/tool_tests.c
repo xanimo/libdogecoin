@@ -13,8 +13,7 @@
 #include <dogecoin/tool.h>
 #include <dogecoin/utils.h>
 
-void test_tool()
-{
+void test_tool() {
     char addr[100];
     char addr_p2sh_p2wpkh[100];
     char addr_p2wpkh[100];
@@ -54,6 +53,5 @@ void test_tool()
     u_assert_int_eq(hd_derive(&dogecoin_chainparams_main, privkey, "m/0", extout, extoutsize), true);
     u_assert_str_eq(extout, "dgpv544MJMFeoz5LXkwbZTWwouwFje2Yp9c1A8ReNaapDFjW44jEcLXv3B3KQg3fjWXWVC9FGRyxLaCHjN1DUeGgoYJxMYM723wrLN6BArKUxe3");
 
-    u_assert_int_eq(hd_derive(&dogecoin_chainparams_main, "dgpv51eADS3spNJh9gCpE1AyQ9NpMGkGh6MJKxM84Tf87KVLNeodEW76V2nJJRPorYLGnvZGJKTgEgvqGCtf9VS9RqhfJaTxV7iqm86VpMUNi5G", "m/3", extout, extoutsize), true);
-    
+    u_assert_int_eq(hd_derive(&dogecoin_chainparams_main, "dgpv51eADS3spNJh9gCpE1AyQ9NpMGkGh6MJKxM84Tf87KVLNeodEW76V2nJJRPorYLGnvZGJKTgEgvqGCtf9VS9RqhfJaTxV7iqm86VpMUNi5G", "m/3", extout, extoutsize), true); 
 }

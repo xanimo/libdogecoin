@@ -1,6 +1,6 @@
 /* Copyright 2015 BitPay, Inc.
-/* Copyright 2022 bluezr
-/* Copyright 2022 The Dogecoin Foundation
+ * Copyright 2022 bluezr
+ * Copyright 2022 The Dogecoin Foundation
  * Distributed under the MIT/X11 software license, see the accompanying
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.
  */
@@ -94,7 +94,6 @@ int cstr_append_buf(cstring* s, const void* buf, size_t sz) {
 int cstr_append_cstr(cstring* s, cstring* append) {
     return cstr_append_buf(s, append->str, append->len);
 }
-
 
 int cstr_append_c(cstring* s, char ch) {
     return cstr_append_buf(s, &ch, 1);

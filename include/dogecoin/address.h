@@ -42,4 +42,4 @@ LIBDOGECOIN_API int generateDerivedHDPubkey(const char* wif_privkey_master, char
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_ADDRESS_H__
+#endif /* __LIBDOGECOIN_ADDRESS_H__ */

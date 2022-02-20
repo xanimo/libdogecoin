@@ -40,7 +40,7 @@
 #include <dogecoin/crypto/sha2.h>
 #include <dogecoin/utils.h>
 
-// write 4 big endian bytes
+/* write 4 big endian bytes */
 static void write_be(uint8_t* data, uint32_t x) {
     data[0] = x >> 24;
     data[1] = x >> 16;
@@ -48,7 +48,7 @@ static void write_be(uint8_t* data, uint32_t x) {
     data[3] = x;
 }
 
-// read 4 big endian bytes
+/* read 4 big endian bytes */
 static uint32_t read_be(const uint8_t* data) {
     return (((uint32_t)data[0]) << 24) |
            (((uint32_t)data[1]) << 16) |
@@ -102,8 +102,8 @@ dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i) {
     uint8_t data[1 + 32 + 4];
     uint8_t I[32 + DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t fingerprint[32];
-    if (i & 0x80000000) return false; // private derivation
-    else { memcpy(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH); } // public derivation
+    if (i & 0x80000000) return false; /* private derivation */
+    else { memcpy(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH); } /* public derivation */
     write_be(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
     sha256_raw(inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH, fingerprint);
     rmd160(fingerprint, 32, fingerprint);
@@ -117,23 +117,22 @@ dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i) {
         inout->depth++;
         inout->child_num = i;
     }
-    // Wipe all stack data.
+    /* Wipe all stack data. */
     memset(data, 0, sizeof(data));
     memset(I, 0, sizeof(I));
     memset(fingerprint, 0, sizeof(fingerprint));
     return failed ? false : true;
 }
 
-
 dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i) {
     uint8_t data[1 + DOGECOIN_ECKEY_PKEY_LENGTH + 4];
     uint8_t I[DOGECOIN_ECKEY_PKEY_LENGTH + DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t fingerprint[DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t p[DOGECOIN_ECKEY_PKEY_LENGTH], z[DOGECOIN_ECKEY_PKEY_LENGTH];
-    if (i & 0x80000000) { // private derivation
+    if (i & 0x80000000) { /* private derivation */
         data[0] = 0;
         memcpy(data + 1, inout->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    } else { // public derivation
+    } else { /* public derivation */
         memcpy(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
     }
     write_be(data + DOGECOIN_ECKEY_COMPRESSED_LENGTH, i);
@@ -215,7 +214,7 @@ dogecoin_bool dogecoin_hdnode_get_pub_hex(const dogecoin_hdnode* node, char* str
     return dogecoin_pubkey_get_hex(&pubkey, str, strsize);
 }
 
-// check for validity of curve point in case of public data not performed
+/* check for validity of curve point in case of public data not performed */
 dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainparams* chain, dogecoin_hdnode* node) {
     const size_t ndlen = sizeof(uint8_t) * strlen(str);
     uint8_t *node_data = (uint8_t *)dogecoin_malloc(ndlen);
@@ -227,10 +226,10 @@ dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainp
         return false;
     }
     uint32_t version = read_be(node_data);
-    if (version == chain->b58prefix_bip32_pubkey) { // public node
+    if (version == chain->b58prefix_bip32_pubkey) { /* public node */
         memcpy(node->public_key, node_data + 45, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
-    } else if (version == chain->b58prefix_bip32_privkey) { // private node
-        if (node_data[45]) {                                // invalid data
+    } else if (version == chain->b58prefix_bip32_privkey) { /* private node */
+        if (node_data[45]) {                                /* invalid data */
             dogecoin_free(node_data);
             return false;
         }
@@ -238,7 +237,7 @@ dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainp
         dogecoin_hdnode_fill_public_key(node);
     } else {
         dogecoin_free(node_data);
-        return false; // invalid version
+        return false; /* invalid version */
     }
     node->depth = node_data[4];
     node->fingerprint = read_be(node_data + 5);

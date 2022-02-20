@@ -83,8 +83,8 @@ dogecoin_bool gen_privatekey(const dogecoin_chainparams* chain, char *privkey_wi
     dogecoin_privkey_gen(&key);
     memcpy(&pkeybase58c[1], key.privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
     assert(dogecoin_base58_encode_check(pkeybase58c, 34, privkey_wif, strsize_wif) != 0);
-    // also export the hex privkey if use had passed in a valid pointer
-    // will always export 32 bytes
+    /* also export the hex privkey if use had passed in a valid pointer */
+    /* will always export 32 bytes */
     if (privkey_hex_or_null != NULL) utils_bin_to_hex(key.privkey, DOGECOIN_ECKEY_PKEY_LENGTH, privkey_hex_or_null);
     dogecoin_privkey_cleanse(&key);
     return true;
@@ -104,17 +104,26 @@ dogecoin_bool hd_gen_master(const dogecoin_chainparams* chain, char *masterkeyhe
 dogecoin_bool hd_print_node(const dogecoin_chainparams* chain, const char *nodeser) {
     dogecoin_hdnode node;
     if (!dogecoin_hdnode_deserialize(nodeser, chain, &node)) return false;
-    size_t strsize = 128;
-    char str[strsize];
+    char str[128];
+    size_t strsize = sizeof(str);
     dogecoin_hdnode_get_p2pkh_address(&node, chain, str, strsize);
+    printf("ext key:         %s\n", nodeser);
+    uint8_t pkeybase58c[34];
+    pkeybase58c[0] = chain->b58prefix_secret_address;
+    pkeybase58c[33] = 1; /* always use compressed keys */
+    char privkey_wif[128];
+    memcpy(&pkeybase58c[1], node.private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
+    assert(dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), privkey_wif, sizeof(privkey_wif)) != 0);
+    if (dogecoin_hdnode_has_privkey(&node)) printf("privatekey WIF:  %s\n", privkey_wif);
+    printf("depth:           %d\n", node.depth);
+    printf("child index:     %d\n", node.child_num);
+    printf("p2pkh address:   %s\n", str);
+    printf("p2wpkh address:  %s\n", str);
     if (!dogecoin_hdnode_get_pub_hex(&node, str, &strsize)) return false;
-    strsize = 128;
+    printf("pubkey hex:      %s\n", str);
+    strsize = sizeof(str);
     dogecoin_hdnode_serialize_public(&node, chain, str, strsize);
-    // printf("ext key: %s\n", nodeser);
-    // printf("depth: %d\n", node.depth);
-    // printf("p2pkh address: %s\n", str);
-    // printf("pubkey hex: %s\n", str);
-    // printf("extended pubkey: %s\n", str);
+    printf("extended pubkey: %s\n", str);
     return true;
 }
 
@@ -122,9 +131,9 @@ dogecoin_bool hd_derive(const dogecoin_chainparams* chain, const char *masterkey
     if (!derived_path || !masterkey || !extkeyout) return false;
     dogecoin_hdnode node, nodenew;
     if (!dogecoin_hdnode_deserialize(masterkey, chain, &node)) return false;
-    //check if we only have the publickey
+    /* check if we only have the publickey */
     bool pubckd = !dogecoin_hdnode_has_privkey(&node);
-    //derive child key, use pubckd or privckd
+    /* derive child key, use pubckd or privckd */
     if (!dogecoin_hd_generate_key(&nodenew, derived_path, pubckd ? node.public_key : node.private_key, node.chain_code, pubckd)) return false;
     if (pubckd) dogecoin_hdnode_serialize_public(&nodenew, chain, extkeyout, extkeyout_size);
     else dogecoin_hdnode_serialize_private(&nodenew, chain, extkeyout, extkeyout_size);

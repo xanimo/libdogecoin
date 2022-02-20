@@ -40,8 +40,8 @@ typedef struct dogecoin_mem_mapper_ {
     void (*dogecoin_free)(void* ptr);
 } dogecoin_mem_mapper;
 
-// set's a custom memory mapper
-// this function is _not_ thread safe and must be called before anything else
+/* set's a custom memory mapper */
+/* this function is _not_ thread safe and must be called before anything else */
 LIBDOGECOIN_API void dogecoin_mem_set_mapper(const dogecoin_mem_mapper mapper);
 LIBDOGECOIN_API void dogecoin_mem_set_mapper_default();
 
@@ -54,4 +54,4 @@ LIBDOGECOIN_API volatile void *dogecoin_mem_zero(volatile void *dst, size_t len)
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_MEM_H__
+#endif /* __LIBDOGECOIN_MEM_H__ */

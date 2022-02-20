@@ -1,8 +1,8 @@
 /**********************************************************************
- * Copyright (c) 2015 Jonas Schnelli                                  *
- * Copyright (c) 2022 bluezr                                          *
- * Copyright (c) 2022 The Dogecoin Foundation                         *
- * Distributed under the MIT software license, see the accompanying   *
+ * Copyright (c) 2015 Jonas Schnelli                                   *
+ * Copyright (c) 2022 bluezr                                           *
+ * Copyright (c) 2022 The Dogecoin Foundation                          *
+ * Distributed under the MIT software license, see the accompanying    *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
@@ -210,18 +210,18 @@ void test_bip32() {
     char str_pub_ckd[] = "dgub8kXBZ7ymNWy2SDyf2FW3u9Y29xNHSqXEAdJer8Zh4pXKS61eCFPLByJeX2NyGaNVNXBjMHE9NpXfH4u9JUJKbrRCNFPeJ54gQN9RQTzUNDx";
 
     r = dogecoin_hdnode_deserialize(str_pub_ckd, &dogecoin_chainparams_main, &node4);
-    r = dogecoin_hdnode_public_ckd(&node4, 124); // double check i >= 2 to the 31st power + 3 = 0x80000000 dogecoin coin_type bip44
+    r = dogecoin_hdnode_public_ckd(&node4, 124); /* double check i >= 2 to the 31st power + 3 = 0x80000000 dogecoin coin_type bip44 */
     u_assert_int_eq(r, true);
     dogecoin_hdnode_serialize_public(&node4, &dogecoin_chainparams_main, str, sizeof(str));
     u_assert_str_eq(str, "dgub8o73HfBFaVpyuR1D8qzAAmqerNH17DaJTY9afFenUKWKhgiP6eo2DbiUqYS4mMqsnwBMbAyJMbH2acX1H778iUcTUphzR38Ck2rSRgV12Fz");
 
-    r = dogecoin_hdnode_public_ckd(&node4, 0x80000000 + 1); //try deriving a hardened key (= must fail)
+    r = dogecoin_hdnode_public_ckd(&node4, 0x80000000 + 1); /* try deriving a hardened key (= must fail) */
     u_assert_int_eq(r, false);
 
     char str_pub_ckd_tn[] = "tprv8ZgxMBicQKsPd7Uf69XL1XwhmjHopUGep8GuEiJDZmbQz6o58LninorQAfcKZWARbtRtfnLcJ5MQ2AtHcQJCCRUcMRvmDUjyEmNUWwx8UbK";
 
     r = dogecoin_hdnode_deserialize(str_pub_ckd_tn, &dogecoin_chainparams_test, &node4);
-    r = dogecoin_hdnode_public_ckd(&node4, 124); // double check i >= 2 to the 31st power + 3 = 0x80000000 dogecoin coin_type bip44
+    r = dogecoin_hdnode_public_ckd(&node4, 124); /* double check i >= 2 to the 31st power + 3 = 0x80000000 dogecoin coin_type bip44 */
     u_assert_int_eq(r, true);
     dogecoin_hdnode_get_p2pkh_address(&node4, &dogecoin_chainparams_test, str, sizeof(str));
     u_assert_str_eq(str, "nbsFtuY3Yxxe1SqcuFCxZc9GXqHERoxTmp");

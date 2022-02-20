@@ -15,8 +15,7 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/utils.h>
 
-void test_serialize()
-{
+void test_serialize() {
     cstring* s3 = cstr_new("foo");
     cstring* s2 = cstr_new_sz(200);
     struct const_buffer buf2;

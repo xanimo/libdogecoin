@@ -55,13 +55,13 @@ LIBDOGECOIN_API static inline void dogecoin_hash_set(uint256 hash_dest, const ui
 
 LIBDOGECOIN_API static inline void dogecoin_hash(const unsigned char* datain, size_t length, uint256 hashout) {
     sha256_raw(datain, length, hashout);
-    sha256_raw(hashout, SHA256_DIGEST_LENGTH, hashout); // dogecoin double sha256 hash
+    sha256_raw(hashout, SHA256_DIGEST_LENGTH, hashout); /* dogecoin double sha256 hash */
 }
 
 LIBDOGECOIN_API static inline void dogecoin_hash_sngl_sha256(const unsigned char* datain, size_t length, uint256 hashout) {
-    sha256_raw(datain, length, hashout); // single sha256 hash
+    sha256_raw(datain, length, hashout); /* single sha256 hash */
 }
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_CRYPTO_HASH_H__
+#endif /* __LIBDOGECOIN_CRYPTO_HASH_H__ */

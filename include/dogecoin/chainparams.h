@@ -42,7 +42,7 @@ typedef struct dogecoin_chainparams_ {
     uint8_t b58prefix_pubkey_address;
     uint8_t b58prefix_script_address;
     const char bech32_hrp[5];
-    uint8_t b58prefix_secret_address; //!private key
+    uint8_t b58prefix_secret_address; /* !private key */
     uint32_t b58prefix_bip32_privkey;
     uint32_t b58prefix_bip32_pubkey;
     const unsigned char netmagic[4];
@@ -62,10 +62,10 @@ extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 
-// the mainnet checkpoints, needs a fix size
+/* the mainnet checkpoints, needs a fix size */
 extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[21];
 extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[17];
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_CHAINPARAMS_H__
+#endif /* __LIBDOGECOIN_CHAINPARAMS_H__ */

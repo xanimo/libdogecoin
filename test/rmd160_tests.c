@@ -14,8 +14,7 @@
 
 #define TESTS 8
 
-static const unsigned char ripemd160_test_str[TESTS][81] =
-{
+static const unsigned char ripemd160_test_str[TESTS][81] = {
     { "" },
     { "a" },
     { "abc" },
@@ -26,13 +25,11 @@ static const unsigned char ripemd160_test_str[TESTS][81] =
     { "12345678901234567890123456789012345678901234567890123456789012345678901234567890" },
 };
 
-static const size_t ripemd160_test_strlen[TESTS] =
-{
+static const size_t ripemd160_test_strlen[TESTS] = {
     0, 1, 3, 14, 26, 56, 62, 80
 };
 
-static const unsigned char ripemd160_test_md[TESTS][20] =
-{
+static const unsigned char ripemd160_test_md[TESTS][20] = {
     { 0x9c, 0x11, 0x85, 0xa5, 0xc5, 0xe9, 0xfc, 0x54, 0x61, 0x28,
       0x08, 0x97, 0x7e, 0xe8, 0xf5, 0x48, 0xb2, 0x25, 0x8d, 0x31 },
     { 0x0b, 0xdc, 0x9d, 0x2d, 0x25, 0x6b, 0x3e, 0xe9, 0xda, 0xae,
@@ -51,8 +48,7 @@ static const unsigned char ripemd160_test_md[TESTS][20] =
       0xd3, 0x32, 0x3c, 0xab, 0x82, 0xbf, 0x63, 0x32, 0x6b, 0xfb },
 };
 
-void test_rmd160()
-{
+void test_rmd160() {
     unsigned char* output[20];
     unsigned int i;
     memset(output, 0, sizeof output);

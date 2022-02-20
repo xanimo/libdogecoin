@@ -38,8 +38,8 @@ typedef struct dogecoin_rnd_mapper_ {
     dogecoin_bool (*dogecoin_random_bytes)(uint8_t* buf, uint32_t len, const uint8_t update_seed);
 } dogecoin_rnd_mapper;
 
-// sets a custom random callback mapper
-// this function is NOT thread safe and should be called before anything else
+/* sets a custom random callback mapper */
+/* this function is NOT thread safe and should be called before anything else */
 LIBDOGECOIN_API void dogecoin_rnd_set_mapper(const dogecoin_rnd_mapper mapper);
 LIBDOGECOIN_API void dogecoin_rnd_set_mapper_default();
 
@@ -48,4 +48,4 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, 
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_CRYPTO_RANDOM_H__
+#endif /* __LIBDOGECOIN_CRYPTO_RANDOM_H__ */

@@ -73,7 +73,6 @@
 static uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
 static char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
 
-
 void utils_clear_buffers(void) {
     memset(buffer_hex_to_uint8, 0, TO_UINT8_HEX_BUF_LEN);
     memset(buffer_uint8_to_hex, 0, TO_UINT8_HEX_BUF_LEN);
@@ -114,7 +113,6 @@ uint8_t* utils_hex_to_uint8(const char* str) {
     return buffer_hex_to_uint8;
 }
 
-
 void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out) {
     static char digits[] = "0123456789abcdef";
     size_t i;
@@ -124,7 +122,6 @@ void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out) {
     }
     hex_out[inlen * 2] = '\0';
 }
-
 
 char* utils_uint8_to_hex(const uint8_t* bin, size_t l) {
     static char digits[] = "0123456789abcdef";
@@ -175,9 +172,9 @@ signed char utils_hex_digit(char c) {
 
 void utils_uint256_sethex(char* psz, uint8_t* out) {
     memset(out, 0, sizeof(uint256));
-    while (isspace(*psz)) ++psz; // skip leading spaces
-    if (psz[0] == '0' && tolower(psz[1]) == 'x') psz += 2; // skip 0x
-    const char* pbegin = psz; // hex string to uint
+    while (isspace(*psz)) ++psz; /* skip leading spaces */
+    if (psz[0] == '0' && tolower(psz[1]) == 'x') psz += 2; /* skip 0x */
+    const char* pbegin = psz; /* hex string to uint */
     while (utils_hex_digit(*psz) != -1) ++psz;  
     --psz;
     unsigned char* p1 = (unsigned char*)out;
@@ -205,12 +202,12 @@ void dogecoin_cheap_random_bytes(uint8_t* buf, uint32_t len) {
 }
 
 void dogecoin_get_default_datadir(cstring *path_out) {
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Bitcoin
-    // Mac: ~/Library/Application Support/Bitcoin
-    // Unix: ~/.dogecoin
+    /* Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin */
+    /* Windows >= Vista: C:\Users\Username\AppData\Roaming\Bitcoin */
+    /* Mac: ~/Library/Application Support/Bitcoin */
+    /* Unix: ~/.dogecoin */
 #ifdef WIN32
-    // Windows
+    /* Windows */
     char* homedrive = getenv("HOMEDRIVE");
     char* homepath = getenv("HOMEDRIVE");
     cstr_append_buf(path_out, homedrive, strlen(homedrive));
@@ -220,11 +217,11 @@ void dogecoin_get_default_datadir(cstring *path_out) {
     if (home == NULL || strlen(home) == 0) cstr_append_c(path_out, '/');
     else cstr_append_buf(path_out, home, strlen(home));
 #ifdef __APPLE__
-    // Mac
+    /* Mac */
     char *osx_home = "/Library/Application Support/Bitcoin";
     cstr_append_buf(path_out, osx_home, strlen(osx_home));
 #else
-    // Unix
+    /* Unix */
     char *posix_home = "/.dogecoin";
     cstr_append_buf(path_out, posix_home, strlen(posix_home));
 #endif
@@ -232,7 +229,7 @@ void dogecoin_get_default_datadir(cstring *path_out) {
 }
 
 void dogecoin_file_commit(FILE *file) {
-    fflush(file); // harmless if redundantly called
+    fflush(file); /* harmless if redundantly called */
 #ifdef WIN32
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     FlushFileBuffers(hFile);

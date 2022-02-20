@@ -1,8 +1,8 @@
 /**********************************************************************
- * Copyright (c) 2015 Jonas Schnelli                                  *
- * Copyright (c) 2022 bluezr                                          *
- * Copyright (c) 2022 The Dogecoin Foundation                         *
- * Distributed under the MIT software license, see the accompanying   *
+ * Copyright (c) 2015 Jonas Schnelli                                   *
+ * Copyright (c) 2022 bluezr                                           *
+ * Copyright (c) 2022 The Dogecoin Foundation                          *
+ * Distributed under the MIT software license, see the accompanying    *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
@@ -22,13 +22,13 @@
 #include <dogecoin/bip32.h>
 
 struct txtest_sighash {
-    char sighash_sertx[10048]; // serialized transaction during sighash (debug)
-    char sertx[10048]; // serialized transaction
-    char script[1024]; // scriptPubKey
-    int i; // input index
-    uint64_t amount; // amount (SegWit)
-    char sighash[32 * 2 + 1]; // the expected sighash
-    int witness; // bool; used witness transaction digest algorithm (SIGVERSION_WITNESS_V0)
+    char sighash_sertx[10048]; /* serialized transaction during sighash (debug) */
+    char sertx[10048]; /* serialized transaction */
+    char script[1024]; /* scriptPubKey */
+    int i; /* input index */
+    uint64_t amount; /* amount (SegWit) */
+    char sighash[32 * 2 + 1]; /* the expected sighash */
+    int witness; /* bool; used witness transaction digest algorithm (SIGVERSION_WITNESS_V0) */
 };
 
 struct txtest_input {
@@ -219,11 +219,10 @@ static const struct txtest_sighash txvalid_sighash[] = {
     { "010000000169c12106097dc2e0526493ef67f21269fe888ef05c7a3a5dacab38e1ac8387f1581b000017a9140c746489e2d83cdbb5b90b432773342ba809c13487ffffffff010100000000000000000000000001000000", "010000000169c12106097dc2e0526493ef67f21269fe888ef05c7a3a5dacab38e1ac8387f1581b0000b64830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0121037a3fb04bcdb09eba90f69961ba1692a3528e45e67c85b200df820212d7594d334aad4830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e01ffffffff0101000000000000000000000000", "a9140c746489e2d83cdbb5b90b432773342ba809c13487", 0, 200000, "7807ff331d93240d9f48629f6b5ab45a7dd9f4e5bd5d038be14893f590893bd2", 0},
     { "01000000b67c76d200c6ce72962d919dc107884b9d5d0e26f2aea7474b46a1904c53359f3bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e7066504469c12106097dc2e0526493ef67f21269fe888ef05c7a3a5dacab38e1ac8387f14c1d00002200209e1be07558ea5cc8e02ed1d80c0911048afad949affa36d5c3951e3159dbea19400d030000000000ffffffff0000000001000000", "0100000000010169c12106097dc2e0526493ef67f21269fe888ef05c7a3a5dacab38e1ac8387f14c1d000000ffffffff01010000000000000000034830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e012102a9781d66b61fb5a7ef00ac5ad5bc6ffc78be7b44a566e3c87870e1079368df4c4aad4830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0100000000", "00209e1be07558ea5cc8e02ed1d80c0911048afad949affa36d5c3951e3159dbea19", 0, 200000, "eb9db740ca641347aca552f086bb0c3d3a61541a35bbf1bddd1e46ef8de3bdcf", 1},
     { "01000000019275cb8d4a485ce95741c013f7c0d28722160008021bb469a11982d47a662896581b000017a9145748407f5ca5cdca53ba30b79040260770c9ee1b87ffffffff010100000000000000000000000001000000", "01000000019275cb8d4a485ce95741c013f7c0d28722160008021bb469a11982d47a662896581b0000fd6f01004830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0148304502205286f726690b2e9b0207f0345711e63fa7012045b9eb0f19c2458ce1db90cf43022100e89f17f86abc5b149eba4115d4f128bcf45d77fb3ecdd34f594091340c03959601522102cd74a2809ffeeed0092bc124fd79836706e41f048db3f6ae9df8708cefb83a1c2102e615999372426e46fd107b76eaf007156a507584aa2cc21de9eee3bdbd26d36c4c9552af4830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0148304502205286f726690b2e9b0207f0345711e63fa7012045b9eb0f19c2458ce1db90cf43022100e89f17f86abc5b149eba4115d4f128bcf45d77fb3ecdd34f594091340c0395960175ffffffff0101000000000000000000000000", "a9145748407f5ca5cdca53ba30b79040260770c9ee1b87", 0, 200000, "373cffc5f4b7707e1c8b463b18c9c95aae192677ad3618b9f958aa269e749b2b", 0},
-{ "0100000039283953eb1e26994dde57b7f9362a79a8c523e2f8deba943c27e826a005f1e63bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e706650449275cb8d4a485ce95741c013f7c0d28722160008021bb469a11982d47a6628964c1d00002200209b66c15b4e0b4eb49fa877982cafded24859fe5b0e2dbfbe4f0df1de7743fd52400d030000000000ffffffff0000000001000000", "010000000001019275cb8d4a485ce95741c013f7c0d28722160008021bb469a11982d47a6628964c1d000000ffffffff0101000000000000000007004830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0148304502205286f726690b2e9b0207f0345711e63fa7012045b9eb0f19c2458ce1db90cf43022100e89f17f86abc5b149eba4115d4f128bcf45d77fb3ecdd34f594091340c0395960101022102966f109c54e85d3aee8321301136cedeb9fc710fdef58a9de8a73942f8e567c021034ffc99dd9a79dd3cb31e2ab3e0b09e0e67db41ac068c625cd1f491576016c84e9552af4830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0148304502205286f726690b2e9b0207f0345711e63fa7012045b9eb0f19c2458ce1db90cf43022100e89f17f86abc5b149eba4115d4f128bcf45d77fb3ecdd34f594091340c039596017500000000", "00209b66c15b4e0b4eb49fa877982cafded24859fe5b0e2dbfbe4f0df1de7743fd52", 0, 200000, "77753c03a5aa29406c9beb35d845caf94e79c997d5e7f2557a89de0a7223e39d", 1},
+    { "0100000039283953eb1e26994dde57b7f9362a79a8c523e2f8deba943c27e826a005f1e63bb13029ce7b1f559ef5e747fcac439f1455a2ec7c5f09b72290795e706650449275cb8d4a485ce95741c013f7c0d28722160008021bb469a11982d47a6628964c1d00002200209b66c15b4e0b4eb49fa877982cafded24859fe5b0e2dbfbe4f0df1de7743fd52400d030000000000ffffffff0000000001000000", "010000000001019275cb8d4a485ce95741c013f7c0d28722160008021bb469a11982d47a6628964c1d000000ffffffff0101000000000000000007004830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0148304502205286f726690b2e9b0207f0345711e63fa7012045b9eb0f19c2458ce1db90cf43022100e89f17f86abc5b149eba4115d4f128bcf45d77fb3ecdd34f594091340c0395960101022102966f109c54e85d3aee8321301136cedeb9fc710fdef58a9de8a73942f8e567c021034ffc99dd9a79dd3cb31e2ab3e0b09e0e67db41ac068c625cd1f491576016c84e9552af4830450220487fb382c4974de3f7d834c1b617fe15860828c7f96454490edd6d891556dcc9022100baf95feb48f845d5bfc9882eb6aeefa1bc3790e39f59eaa46ff7f15ae626c53e0148304502205286f726690b2e9b0207f0345711e63fa7012045b9eb0f19c2458ce1db90cf43022100e89f17f86abc5b149eba4115d4f128bcf45d77fb3ecdd34f594091340c039596017500000000", "00209b66c15b4e0b4eb49fa877982cafded24859fe5b0e2dbfbe4f0df1de7743fd52", 0, 200000, "77753c03a5aa29406c9beb35d845caf94e79c997d5e7f2557a89de0a7223e39d", 1},
 };
 
-static const struct txtest txvalid[] =
-    {
+static const struct txtest txvalid[] = {
         {1, {{"60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1", 0, "1 0x41 0x04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4 0x41 0x0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af 2 OP_CHECKMULTISIG"}}, "0100000001b14bdcbc3e01bdaad36cc08e81e69c82e1060bc14e518db2b49aa43ad90ba26000000000490047304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01ffffffff0140420f00000000001976a914660d4ef3a743e3e696ad990364e555c271ad504b88ac00000000", "P2SH"},
 
         {1, {{"60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1", 0, "1 0x41 0x04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4 0x41 0x0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af 2 OP_CHECKMULTISIG"}}, "0100000001b14bdcbc3e01bdaad36cc08e81e69c82e1060bc14e518db2b49aa43ad90ba260000000004a0048304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2bab01ffffffff0140420f00000000001976a914660d4ef3a743e3e696ad990364e555c271ad504b88ac00000000", "P2SH,NULLDUMMY"},
@@ -305,7 +304,6 @@ static const struct txtest txvalid[] =
 
 };
 
-
 struct sighashtest {
     char txhex[1024];
     char script[1024];
@@ -317,8 +315,7 @@ struct sighashtest {
 /* sighash tests from dogecoin core 0.11
    added some standard transactions on the top
 */
-static const struct sighashtest sighash_tests[] =
-    {
+static const struct sighashtest sighash_tests[] = {
         /*{"raw_transaction, script, input_index, hashType, signature_hash (result)"},*/
         {"907c2bc503ade11cc3b04eb2918b6f547b0630ab569273824748c87ea14b0696526c66ba740200000004ab65ababfd1f9bdd4ef073c7afc4ae00da8a66f429c917a0081ad1e1dabce28d373eab81d8628de802000000096aab5253ab52000052ad042b5f25efb33beec9f3364e8a9139e8439d9d7e26529c3c30b6c3fd89f8684cfd68ea0200000009ab53526500636a52ab599ac2fe02a526ed040000000008535300516352515164370e010000000003006300ab2ec229", "", 2, 1864164639, "31af167a6cf3f9d5f6875caa4d31704ceb0eba078d132b78dab52c3b8997317e"},
         {"a0aa3126041621a6dea5b800141aa696daf28408959dfb2df96095db9fa425ad3f427f2f6103000000015360290e9c6063fa26912c2e7fb6a0ad80f1c5fea1771d42f12976092e7a85a4229fdb6e890000000001abc109f6e47688ac0e4682988785744602b8c87228fcef0695085edf19088af1a9db126e93000000000665516aac536affffffff8fe53e0806e12dfd05d67ac68f4768fdbe23fc48ace22a5aa8ba04c96d58e2750300000009ac51abac63ab5153650524aa680455ce7b000000000000499e50030000000008636a00ac526563ac5051ee030000000003abacabd2b6fe000000000003516563910fb6b5", "65", 0, -1391424484, "48d6a1bd2cd9eec54eb866fc71209418a950402b5d7e52363bfb75c98e141175"},
@@ -821,16 +818,13 @@ static const struct sighashtest sighash_tests[] =
         {"cf781855040a755f5ba85eef93837236b34a5d3daeb2dbbdcf58bb811828d806ed05754ab8010000000351ac53ffffffffda1e264727cf55c67f06ebcc56dfe7fa12ac2a994fecd0180ce09ee15c480f7d00000000096351516a51acac00ab53dd49ff9f334befd6d6f87f1a832cddfd826a90b78fd8cf19a52cb8287788af94e939d6020000000700525251ac526310d54a7e8900ed633f0f6f0841145aae7ee0cbbb1e2a0cae724ee4558dbabfdc58ba6855010000000552536a53abfd1b101102c51f910500000000096300656a525252656a300bee010000000009ac52005263635151abe19235c9", "53005365", 2, 1422854188, "d5981bd4467817c1330da72ddb8760d6c2556cd809264b2d85e6d274609fc3a3"},
         {"fea256ce01272d125e577c0a09570a71366898280dda279b021000db1325f27edda41a53460100000002ab53c752c21c013c2b3a01000000000000000000", "65", 0, 1145543262, "076b9f844f6ae429de228a2c337c704df1652c292b6c6494882190638dad9efd"}};
 
-
 struct txoptest {
     char scripthex[1024];
     int opcodes;
     int type;
 };
 
-
-const struct txoptest txoptests[] =
-    {
+const struct txoptest txoptests[] = {
         {"76a914aab76ba4877d696590d94ea3e02948b55294815188ac", 5, DOGECOIN_TX_PUBKEYHASH},
 
         {"522102004525da5546e7603eefad5ef971e82f7dad2272b34e6b3036ab1fe3d299c22f21037d7f2227e6c646707d1c61ecceb821794124363a2cf2c1d2a6f28cf01e5d6abe52ae", 5, DOGECOIN_TX_MULTISIG},
@@ -838,12 +832,9 @@ const struct txoptest txoptests[] =
         {"a9146262b64aec1f4a4c1d21b32e9c2811dd2171fd7587", 3, DOGECOIN_TX_SCRIPTHASH},
 
         {"4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac", 2, DOGECOIN_TX_PUBKEY}
-
 };
 
-
-void test_tx_serialization()
-{
+void test_tx_serialization() {
     unsigned int i;
     for (i = 0; i < (sizeof(txvalid) / sizeof(txvalid[0])); i++) {
         const struct txtest* one_test = &txvalid[i];
@@ -856,7 +847,6 @@ void test_tx_serialization()
 
         dogecoin_tx* tx_copy = dogecoin_tx_new();
         dogecoin_tx_copy(tx_copy, tx);
-
 
         assert(tx->vin->len == (size_t)one_test->num_ins);
         size_t victx;
@@ -889,9 +879,8 @@ void test_tx_serialization()
     int tstd = 1;
 }
 
-void test_tx_sighash_ext()
-{
-    //extended sighash tests
+void test_tx_sighash_ext() {
+    /* extended sighash tests */
     int arrylen = (sizeof(txvalid_sighash) / sizeof(txvalid_sighash[0]));
     for (unsigned int i = 0; i < (sizeof(txvalid_sighash) / sizeof(txvalid_sighash[0])); i++) {
         int outlen_sighash = 0;
@@ -917,8 +906,7 @@ void test_tx_sighash_ext()
     }
 }
 
-void test_tx_sighash()
-{
+void test_tx_sighash() {
     unsigned int i;
 
     int fails, success;
@@ -960,9 +948,7 @@ void test_tx_sighash()
     }
 }
 
-
-void test_tx_negative_version()
-{
+void test_tx_negative_version() {
     char txhex[] =   "ffffffff0100000000000000000000000000000000000000000000000000000000000000000000000000ffffffff0100e1f505000000000000000000";
     int32_t versionGoal = -1;
 
@@ -977,19 +963,16 @@ void test_tx_negative_version()
     dogecoin_tx_free(tx);
 }
 
-
 struct script_test {
     char script[32];
 };
 
-const struct script_test script_tests[] =
-    {
+const struct script_test script_tests[] = {
         {"0x4c01"},
         {"0x4d0200ff"},
         {"0x4e03000000ffff"}};
 
-void test_script_parse()
-{
+void test_script_parse() {
     unsigned int i;
     for (i = 0; i < (sizeof(txoptests) / sizeof(txoptests[0])); i++) {
         const struct txoptest* test = &txoptests[i];
@@ -1044,19 +1027,18 @@ void test_script_parse()
     cstring* new_script = cstr_new_sz(1024);
     dogecoin_script_build_multisig(new_script, 2, pubkeys);
 
-    u_assert_int_eq(new_script->str[0], 0x52);                   //2
-    u_assert_int_eq(new_script->str[new_script->len - 2], 0x53); //3
+    u_assert_int_eq(new_script->str[0], 0x52);                   /* 2 */
+    u_assert_int_eq(new_script->str[new_script->len - 2], 0x53); /* 3 */
     u_assert_int_eq(((char)new_script->str[new_script->len - 1] == (char)OP_CHECKMULTISIG), 1);
     cstr_free(new_script, true);
 
     dogecoin_pubkey* pubkey = pubkeys->data[0];
     cstring* p2pkh = cstr_new_sz(1024);
     dogecoin_script_build_p2pkh(p2pkh, pubkey->pubkey);
-    u_assert_int_eq(p2pkh->str[0], (char)OP_DUP);     //2
-    u_assert_int_eq(p2pkh->str[1], (char)OP_HASH160); //2
+    u_assert_int_eq(p2pkh->str[0], (char)OP_DUP);     /* 2 */
+    u_assert_int_eq(p2pkh->str[1], (char)OP_HASH160); /* 2 */
     u_assert_int_eq(((char)p2pkh->str[p2pkh->len - 1] == (char)OP_CHECKSIG), 1);
     cstr_free(p2pkh, true);
-
 
     uint8_t pubkeydat[33] = {0x02,0xd0,0x03,0xdf,0xea,0xf0,0x76,0x2e,0xd1,0xcd,0xbb,0x1d,0x54,0x2b,0x0a,0x26,0x17,0x49,0xe3,0xff,0x81,0x09,0x64,0xef,0x90,0x64,0xd7,0x97,0xd5,0x78,0xa1,0x21,0x94};
 
@@ -1085,9 +1067,7 @@ void test_script_parse()
 
     u_assert_str_eq(txhashhex, "41a86af25423391b1d9d78df1143e3a237f20db27511d8b72e25f2dec7a81d80");
 
-
     dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_regtest, 12345678, "n1e4M744gKSL269jozPwc8edjxxdwn6THc");
-
 
     txser = cstr_new_sz(1024);
     dogecoin_tx_serialize(txser, tx, false);
@@ -1102,7 +1082,6 @@ void test_script_parse()
     u_assert_str_eq(txhashhex, "6a56c7415dc6e3695b4b6b27bdfec5124ed70e0a615d5aa0d8cf0b5e8b72fd76");
 
     cstr_free(txser, true);
-
 
     dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_regtest, 876543210, "2NFoJeWNrABZQ3YCWdbX9wGEnRge7kDeGzQ");
     txser = cstr_new_sz(1024);
@@ -1124,7 +1103,7 @@ void test_script_parse()
     vector_free(pubkeys, true);
     dogecoin_tx_free(tx);
 
-    // op_return test
+    /* op_return test */
     size_t masterkeysize = 200;
     char masterkey[masterkeysize];
     u_assert_int_eq(hd_gen_master(&dogecoin_chainparams_main, masterkey, masterkeysize), true);
@@ -1154,21 +1133,20 @@ void test_script_parse()
     dogecoin_pubkey_from_key(&key, &pubkeytx_rev);
 
     tx = dogecoin_tx_new();
-    dogecoin_tx_add_data_out(tx, 100000, sigcmp, outlencmp); //0.001 DOGECOIN
+    dogecoin_tx_add_data_out(tx, 100000, sigcmp, outlencmp); /* 0.001 DOGECOIN */
     dogecoin_tx_add_p2pkh_out(tx, 10000, &pubkeytx_rev);
 
     txser = cstr_new_sz(1024);
     dogecoin_tx_serialize(txser, tx, false);
     char hexbuf5[txser->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)txser->str, txser->len, hexbuf5);
-    // TODO: test
+    /* TODO: test */
     cstr_free(txser, true);
 
     dogecoin_tx_free(tx);
 }
 
-void test_script_op_codeseperator()
-{
+void test_script_op_codeseperator() {
     char scripthex[] =   "ab00270025512102e485fdaa062387c0bbb5ab711a093b6635299ec155b7b852fce6b992d5adbfec51ae";
     char scripthexGoal[] = "00270025512102e485fdaa062387c0bbb5ab711a093b6635299ec155b7b852fce6b992d5adbfec51ae";
     uint8_t script_data[sizeof(scripthex) / 2];
@@ -1187,8 +1165,7 @@ void test_script_op_codeseperator()
     cstr_free(script, true);
 }
 
-void test_invalid_tx_deser()
-{
+void test_invalid_tx_deser() {
     char txstr[] =   "asadasdadad";
     uint8_t tx_data_txstr[sizeof(txstr) / 2+1];
     int outlen;
@@ -1239,7 +1216,6 @@ void test_tx_sign_p2sh_p2wpkh() {
     dogecoin_tx* tx = dogecoin_tx_new();
     dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
 
-
     uint8_t sigcomp[64] = {0};
     uint8_t sigder[76] = {0};
     int sigder_len = 0;
@@ -1287,7 +1263,6 @@ void test_tx_sign_p2pkh(dogecoin_tx *tx) {
 
     dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
 
-
     uint8_t sigcomp[64] = {0};
     uint8_t sigder[76] = {0};
     int sigder_len = 0;
@@ -1304,6 +1279,7 @@ void test_tx_sign_p2pkh(dogecoin_tx *tx) {
     cstr_free(tx_ser, true);
     cstr_free(script, true);
 }
+
 void test_tx_sign_p2pkh_i2(dogecoin_tx *tx) {
     const char *tx_hex = "02000000027409797c31feecc4e69b51c58b477b72c53355743a6f6124f9d78221672df3700100000000ffffffff6e1709c1e2bdd85aed24dccfd48293993617f249d4d4381296a9c914be3e85e60100000000ffffffff01c07fdc0b0000000017a914ba277fd56b69177464fcb6a27a530f03740345ed8700000000";
     const char *script_hex_wrong = "76a9149b47fd7adc7a671ed059c9dcbf2eee2e882ea56b88ac";
@@ -1342,7 +1318,7 @@ void test_tx_sign_p2pkh_i2(dogecoin_tx *tx) {
     cstr_resize(in->script_sig, 0);
     res = dogecoin_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
     u_assert_int_eq(res, DOGECOIN_SIGN_OK);
-    //u_assert_mem_eq(sigcomp, expected_sigcomp_data, 64);
+    /* u_assert_mem_eq(sigcomp, expected_sigcomp_data, 64); */
     u_assert_mem_eq(sigder, expected_sigder_data, sigder_len);
 
     cstring* tx_ser = cstr_new_sz(1024);

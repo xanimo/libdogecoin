@@ -84,7 +84,7 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     CryptReleaseContext(hProvider, 0);
     return ret;
 #else
-    (void)update_seed; //unused
+    (void)update_seed; /* unused */
     FILE* frand = fopen(RANDOM_DEVICE, "r");
     if (!frand) return false;
     size_t len_read = fread(buf, 1, len, frand);

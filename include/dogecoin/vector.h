@@ -56,4 +56,4 @@ LIBDOGECOIN_API ssize_t vector_find(vector* vec, void* data);
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_VECTOR_H__
+#endif /* __LIBDOGECOIN_VECTOR_H__ */

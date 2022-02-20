@@ -65,13 +65,13 @@ LIBDOGECOIN_API void dogecoin_hdnode_get_p2pkh_address(const dogecoin_hdnode* no
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_get_pub_hex(const dogecoin_hdnode* node, char* str, size_t* strsize);
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainparams* chain, dogecoin_hdnode* node);
 
-//!derive dogecoin_hdnode from extended private or extended public key orkey
-//if you use pub child key derivation, pass usepubckd=true
+/* !derive dogecoin_hdnode from extended private or extended public key orkey */
+/* if you use pub child key derivation, pass usepubckd=true */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hd_generate_key(dogecoin_hdnode* node, const char* keypath, const uint8_t* keymaster, const uint8_t* chaincode, dogecoin_bool usepubckd);
 
-//!checks if a node has the according private key (or if its a pubkey only node)
+/* !checks if a node has the according private key (or if its a pubkey only node) */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_has_privkey(dogecoin_hdnode* node);
 
 LIBDOGECOIN_END_DECL
 
-#endif // __LIBDOGECOIN_BIP32_H__
+#endif /* __LIBDOGECOIN_BIP32_H__ */

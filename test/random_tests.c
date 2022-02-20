@@ -1,8 +1,8 @@
 /**********************************************************************
- * Copyright (c) 2015 Jonas Schnelli                                  *
- * Copyright (c) 2022 bluezr                                          *
- * Copyright (c) 2022 The Dogecoin Foundation                         *
- * Distributed under the MIT software license, see the accompanying   *
+ * Copyright (c) 2015 Jonas Schnelli                                   *
+ * Copyright (c) 2022 bluezr                                           *
+ * Copyright (c) 2022 The Dogecoin Foundation                          *
+ * Distributed under the MIT software license, see the accompanying    *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
@@ -34,6 +34,6 @@ void test_random() {
     dogecoin_rnd_set_mapper(mymapper);
     u_assert_int_eq(dogecoin_random_bytes(r_buf, 32, 0), false);
     for (uint8_t i = 0; i < 32; ++i) u_assert_int_eq(r_buf[i], 0);
-    // switch back to the default random callback mapper
+    /* switch back to the default random callback mapper */
     dogecoin_rnd_set_mapper_default();
 }

@@ -1,8 +1,8 @@
 /**********************************************************************
- * Copyright (c) 2015 Jonas Schnelli                                  *
- * Copyright (c) 2022 bluezr                                          *
- * Copyright (c) 2022 The Dogecoin Foundation                         *
- * Distributed under the MIT software license, see the accompanying   *
+ * Copyright (c) 2015 Jonas Schnelli                                   *
+ * Copyright (c) 2022 bluezr                                           *
+ * Copyright (c) 2022 The Dogecoin Foundation                          *
+ * Distributed under the MIT software license, see the accompanying    *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
@@ -24,7 +24,7 @@ void test_ecc() {
     dogecoin_random_init();
     while (dogecoin_ecc_verify_privatekey(r_buf) == 0) dogecoin_random_bytes(r_buf, 32, 0);
     memset(r_buf, 0xFF, 32);
-    u_assert_int_eq(dogecoin_ecc_verify_privatekey(r_buf), 0); //secp256k1 overflow
+    u_assert_int_eq(dogecoin_ecc_verify_privatekey(r_buf), 0); /* secp256k1 overflow */
     uint8_t pub_key33[33], pub_key33_invalid[33], pub_key65[65], pub_key65_invalid[65];
     memcpy(pub_key33, utils_hex_to_uint8("02fcba7ecf41bc7e1be4ee122d9d22e3333671eb0a3a87b5cdf099d59874e1940f"), 33);
     memcpy(pub_key33_invalid, utils_hex_to_uint8("999999999941bc7e1be4ee122d9d22e3333671eb0a3a87b5cdf099d59874e1940f"), 33);

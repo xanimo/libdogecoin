@@ -354,7 +354,6 @@ static const sha2_word64 sha512_initial_hash_value[8] = {
     0x1f83d9abfb41bd6bULL,
     0x5be0cd19137e2179ULL};
 
-
 /*** SHA-256: *********************************************************/
 void sha256_init(sha256_context* context) {
     if (context == (sha256_context*)0) return;
@@ -375,7 +374,6 @@ void sha256_init(sha256_context* context) {
     (d) += T1;                                                        \
     (h) = T1 + Sigma0_256(a) + majority((a), (b), (c));                    \
     j++
-
 
 #else /* BYTE_ORDER == LITTLE_ENDIAN */
 
@@ -735,8 +733,7 @@ static void sha512_transform(sha512_context* context, const sha2_word64* data) {
 
 #else /* SHA2_UNROLL_TRANSFORM */
 
-static void sha512_transform(sha512_context* context, const sha2_word64* data)
-{
+static void sha512_transform(sha512_context* context, const sha2_word64* data) {
     sha2_word64 a, b, c, d, e, f, g, h, s0, s1;
     sha2_word64 T1, T2, *W512 = (sha2_word64 *)context->buffer;
     int j;
