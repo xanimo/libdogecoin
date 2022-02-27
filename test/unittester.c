@@ -1,11 +1,13 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
 #if defined HAVE_CONFIG_H
-#include "libbtc-config.h"
+#include "libdogecoin-config.h"
 #endif
 
 #include <stdio.h>
@@ -43,7 +45,7 @@ extern void test_utils();
 extern void test_serialize();
 extern void test_memory();
 extern void test_random();
-extern void test_bitcoin_hash();
+extern void test_dogecoin_hash();
 extern void test_base58check();
 extern void test_block_header();
 extern void test_bip32();
@@ -75,15 +77,15 @@ extern void test_protocol();
 extern void test_netspv();
 #endif
 
-extern void btc_ecc_start();
-extern void btc_ecc_stop();
+extern void dogecoin_ecc_start();
+extern void dogecoin_ecc_stop();
 
 int U_TESTS_RUN = 0;
 int U_TESTS_FAIL = 0;
 
 int main()
 {
-    btc_ecc_start();
+    dogecoin_ecc_start();
 
     u_run_test(test_sha_256);
     u_run_test(test_sha_512);
@@ -95,7 +97,7 @@ int main()
 
     u_run_test(test_memory);
     u_run_test(test_random);
-    u_run_test(test_bitcoin_hash);
+    u_run_test(test_dogecoin_hash);
     u_run_test(test_base58check);
     u_run_test(test_aes);
 
@@ -116,7 +118,7 @@ int main()
     u_run_test(test_eckey);
 
 #ifdef WITH_WALLET
-    //u_run_test(test_wallet);
+    // u_run_test(test_wallet);
 #endif
 
 #ifdef WITH_TOOLS
@@ -130,6 +132,6 @@ int main()
     u_run_test(test_net_basics_plus_download_block);
 #endif
 
-    btc_ecc_stop();
+    dogecoin_ecc_stop();
     return U_TESTS_FAIL;
 }

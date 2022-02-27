@@ -31,7 +31,7 @@
 #ifndef __LIBLOGDB_RBTREE_H__
 #define __LIBLOGDB_RBTREE_H__
 
-#include <btc/cstr.h>
+#include <dogecoin/cstr.h>
 #include <logdb/logdb_base.h>
 #include <logdb/logdb_rec.h>
 #include <logdb/logdb_core.h>

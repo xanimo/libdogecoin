@@ -3,8 +3,8 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.
  */
 
-#include <btc/buffer.h>
-#include <btc/memory.h>
+#include <dogecoin/buffer.h>
+#include <dogecoin/memory.h>
 
 int buffer_equal(const void* a_, const void* b_)
 {
@@ -22,18 +22,18 @@ void buffer_free(void* struct_buffer)
     if (!buf)
         return;
 
-    btc_free(buf->p);
-    btc_free(buf);
+    dogecoin_free(buf->p);
+    dogecoin_free(buf);
 }
 
 struct buffer* buffer_copy(const void* data, size_t data_len)
 {
     struct buffer* buf;
-    buf = btc_malloc(sizeof(*buf));
+    buf = dogecoin_malloc(sizeof(*buf));
     if (!buf)
         goto err_out;
 
-    buf->p = btc_malloc(data_len);
+    buf->p = dogecoin_malloc(data_len);
     if (!buf->p)
         goto err_out_free;
 
@@ -43,7 +43,7 @@ struct buffer* buffer_copy(const void* data, size_t data_len)
     return buf;
 
 err_out_free:
-    btc_free(buf);
+    dogecoin_free(buf);
 err_out:
     return NULL;
 }

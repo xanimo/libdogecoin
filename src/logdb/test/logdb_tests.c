@@ -5,7 +5,7 @@
  **********************************************************************/
 
 #include <logdb/logdb.h>
-#include <btc/utils.h>
+#include <dogecoin/utils.h>
 
 #include "../../../test/utest.h"
 
@@ -148,8 +148,9 @@ void test_logdb(logdb_log_db* (*new_func)())
     fsize = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    buf = malloc(fsize + 1);
-    fread(buf, fsize, 1, f);
+    buf = calloc(1, fsize + 1);
+    size_t dmp;
+    dmp = fread(buf, fsize, 1, f);
     fclose(f);
 
     /* ---------------------------------------------------- */
@@ -197,7 +198,6 @@ void test_logdb(logdb_log_db* (*new_func)())
 
     free(buf);
     free(wrk_buf);
-
 
     /* --- large db test */
     unlink(dbtmpfile);

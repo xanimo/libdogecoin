@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,9 +11,9 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/hmac.h>
-#include <btc/sha2.h>
-#include <btc/utils.h>
+#include <dogecoin/hmac.h>
+#include <dogecoin/sha2.h>
+#include <dogecoin/utils.h>
 
 struct sha256_test_v_short {
     int len;

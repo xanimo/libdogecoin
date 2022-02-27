@@ -2,7 +2,7 @@
 
  The MIT License (MIT)
 
- Copyright (c) 2021 libbtc
+ Copyright (c) 2021 libdogecoin
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -24,11 +24,11 @@
 
  */
 
-#include <btc/ripemd160.h>
+#include <dogecoin/ripemd160.h>
 
 #include "trezor-crypto/ripemd160.h"
 
-void btc_ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash)
+void dogecoin_ripemd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash)
 {
     ripemd160(msg, msg_len, hash);
 }

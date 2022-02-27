@@ -5,14 +5,14 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <btc/btc.h>
-#include <btc/random.h>
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/random.h>
 
 static secp256k1_context* secp256k1_ctx = NULL;
 
-btc_bool btc_ecc_start(void)
+dogecoin_bool dogecoin_ecc_start(void)
 {
-    btc_random_init();
+    dogecoin_random_init();
 
     secp256k1_ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
     if (secp256k1_ctx == NULL)
@@ -20,7 +20,7 @@ btc_bool btc_ecc_start(void)
 
     uint8_t seed[32];
     int ret;
-    ret = btc_random_bytes(seed, 32, 0);
+    ret = dogecoin_random_bytes(seed, 32, 0);
     if (!ret)
         return false;
     ret = secp256k1_context_randomize(secp256k1_ctx, seed);
@@ -30,7 +30,7 @@ btc_bool btc_ecc_start(void)
 }
 
 
-void btc_ecc_stop(void)
+void dogecoin_ecc_stop(void)
 {
     secp256k1_context* ctx = secp256k1_ctx;
     secp256k1_ctx = NULL;
@@ -41,7 +41,7 @@ void btc_ecc_stop(void)
 }
 
 
-void btc_ecc_get_pubkey(const uint8_t* private_key, uint8_t* public_key, size_t* in_outlen, btc_bool compressed)
+void dogecoin_ecc_get_pubkey(const uint8_t* private_key, uint8_t* public_key, size_t* in_outlen, dogecoin_bool compressed)
 {
     secp256k1_pubkey pubkey;
     assert(secp256k1_ctx);
@@ -59,15 +59,15 @@ void btc_ecc_get_pubkey(const uint8_t* private_key, uint8_t* public_key, size_t*
     return;
 }
 
-btc_bool btc_ecc_private_key_tweak_add(uint8_t* private_key, const uint8_t* tweak)
+dogecoin_bool dogecoin_ecc_private_key_tweak_add(uint8_t* private_key, const uint8_t* tweak)
 {
     assert(secp256k1_ctx);
     return secp256k1_ec_privkey_tweak_add(secp256k1_ctx, (unsigned char*)private_key, (const unsigned char*)tweak);
 }
 
-btc_bool btc_ecc_public_key_tweak_add(uint8_t* public_key_inout, const uint8_t* tweak)
+dogecoin_bool dogecoin_ecc_public_key_tweak_add(uint8_t* public_key_inout, const uint8_t* tweak)
 {
-    size_t out = BTC_ECKEY_COMPRESSED_LENGTH;
+    size_t out = DOGECOIN_ECKEY_COMPRESSED_LENGTH;
     secp256k1_pubkey pubkey;
 
     assert(secp256k1_ctx);
@@ -84,13 +84,13 @@ btc_bool btc_ecc_public_key_tweak_add(uint8_t* public_key_inout, const uint8_t* 
 }
 
 
-btc_bool btc_ecc_verify_privatekey(const uint8_t* private_key)
+dogecoin_bool dogecoin_ecc_verify_privatekey(const uint8_t* private_key)
 {
     assert(secp256k1_ctx);
     return secp256k1_ec_seckey_verify(secp256k1_ctx, (const unsigned char*)private_key);
 }
 
-btc_bool btc_ecc_verify_pubkey(const uint8_t* public_key, btc_bool compressed)
+dogecoin_bool dogecoin_ecc_verify_pubkey(const uint8_t* public_key, dogecoin_bool compressed)
 {
     secp256k1_pubkey pubkey;
 
@@ -104,7 +104,7 @@ btc_bool btc_ecc_verify_pubkey(const uint8_t* public_key, btc_bool compressed)
     return true;
 }
 
-btc_bool btc_ecc_sign(const uint8_t* private_key, const uint256 hash, unsigned char* sigder, size_t* outlen)
+dogecoin_bool dogecoin_ecc_sign(const uint8_t* private_key, const uint256 hash, unsigned char* sigder, size_t* outlen)
 {
     assert(secp256k1_ctx);
 
@@ -118,7 +118,7 @@ btc_bool btc_ecc_sign(const uint8_t* private_key, const uint256 hash, unsigned c
     return 1;
 }
 
-btc_bool btc_ecc_sign_compact(const uint8_t* private_key, const uint256 hash, unsigned char* sigcomp, size_t* outlen)
+dogecoin_bool dogecoin_ecc_sign_compact(const uint8_t* private_key, const uint256 hash, unsigned char* sigcomp, size_t* outlen)
 {
     assert(secp256k1_ctx);
 
@@ -133,7 +133,7 @@ btc_bool btc_ecc_sign_compact(const uint8_t* private_key, const uint256 hash, un
     return 1;
 }
 
-btc_bool btc_ecc_sign_compact_recoverable(const uint8_t* private_key, const uint256 hash, unsigned char* sigrec, size_t* outlen, int *recid)
+dogecoin_bool dogecoin_ecc_sign_compact_recoverable(const uint8_t* private_key, const uint256 hash, unsigned char* sigrec, size_t* outlen, int *recid)
 {
     assert(secp256k1_ctx);
 
@@ -148,7 +148,7 @@ btc_bool btc_ecc_sign_compact_recoverable(const uint8_t* private_key, const uint
     return 1;
 }
 
-btc_bool btc_ecc_recover_pubkey(const unsigned char* sigrec, const uint256 hash, const int recid, uint8_t* public_key, size_t *outlen)
+dogecoin_bool dogecoin_ecc_recover_pubkey(const unsigned char* sigrec, const uint256 hash, const int recid, uint8_t* public_key, size_t *outlen)
 {
     assert(secp256k1_ctx);
 
@@ -167,7 +167,7 @@ btc_bool btc_ecc_recover_pubkey(const unsigned char* sigrec, const uint256 hash,
     return 1;
 }
 
-btc_bool btc_ecc_verify_sig(const uint8_t* public_key, btc_bool compressed, const uint256 hash, unsigned char* sigder, size_t siglen)
+dogecoin_bool dogecoin_ecc_verify_sig(const uint8_t* public_key, dogecoin_bool compressed, const uint256 hash, unsigned char* sigder, size_t siglen)
 {
     assert(secp256k1_ctx);
 
@@ -183,7 +183,7 @@ btc_bool btc_ecc_verify_sig(const uint8_t* public_key, btc_bool compressed, cons
     return secp256k1_ecdsa_verify(secp256k1_ctx, &sig, hash, &pubkey);
 }
 
-btc_bool btc_ecc_compact_to_der_normalized(unsigned char* sigcomp_in, unsigned char* sigder_out, size_t* sigder_len_out)
+dogecoin_bool dogecoin_ecc_compact_to_der_normalized(unsigned char* sigcomp_in, unsigned char* sigder_out, size_t* sigder_len_out)
 {
     assert(secp256k1_ctx);
 
@@ -197,7 +197,7 @@ btc_bool btc_ecc_compact_to_der_normalized(unsigned char* sigcomp_in, unsigned c
     return secp256k1_ecdsa_signature_serialize_der(secp256k1_ctx, sigder_out, sigder_len_out, &sigNorm);
 }
 
-btc_bool btc_ecc_der_to_compact(unsigned char* sigder_in, size_t sigder_len, unsigned char* sigcomp_out)
+dogecoin_bool dogecoin_ecc_der_to_compact(unsigned char* sigder_in, size_t sigder_len, unsigned char* sigcomp_out)
 {
     assert(secp256k1_ctx);
 

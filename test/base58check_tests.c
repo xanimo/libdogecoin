@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli / Douglas J. Bakkum              *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,10 +11,10 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/base58.h>
-#include <btc/utils.h>
+#include <dogecoin/base58.h>
+#include <dogecoin/utils.h>
 
-/* test vectors from bitcoin core */
+/* test vectors from dogecoin core */
 static const char* base58_vector[] = {
     "0065a16059864a2fdbc7c99a4723a8395bc6f188eb",
     "1AGNa15ZQXAZUgFiqJ2i7Z2DPU2J6hW62i",
@@ -140,11 +142,11 @@ void test_base58check()
         size_t len = strlen(*raw) / 2;
 
         memcpy(rawn, utils_hex_to_uint8(*raw), len);
-        int r = btc_base58_encode_check(rawn, len, strn, sizeof(strn));
+        int r = dogecoin_base58_encode_check(rawn, len, strn, sizeof(strn));
         assert(r == (int)strlen(*str) + 1);
         assert(strcmp(strn, *str) == 0);
 
-        r = btc_base58_decode_check(strn, rawn, sizeof(rawn));
+        r = dogecoin_base58_decode_check(strn, rawn, sizeof(rawn));
         assert(r == (int)len + 4);
 
         raw += 2;
@@ -163,9 +165,9 @@ void test_base58check()
 
         int r = 0;
         if (strncmp(*i_cmd, "ec", 2) == 0)
-            r = btc_base58_encode_check(i_rawn, len, strn, sizeof(strn));
+            r = dogecoin_base58_encode_check(i_rawn, len, strn, sizeof(strn));
         else
-            r = btc_base58_decode_check(*i_raw, outbuf, sizeof(outbuf));
+            r = dogecoin_base58_decode_check(*i_raw, outbuf, sizeof(outbuf));
 
         assert(r == 0);
         i_raw += 2;

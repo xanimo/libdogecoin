@@ -1,5 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -9,16 +11,16 @@
 #include <string.h>
 #include <assert.h>
 
-#include <btc/tx.h>
+#include <dogecoin/tx.h>
 
-#include <btc/cstr.h>
-#include <btc/ecc_key.h>
-#include <btc/script.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/ecc_key.h>
+#include <dogecoin/script.h>
 #include "utest.h"
-#include <btc/utils.h>
+#include <dogecoin/utils.h>
 
-#include <btc/tool.h>
-#include <btc/bip32.h>
+#include <dogecoin/tool.h>
+#include <dogecoin/bip32.h>
 
 struct txtest_sighash {
     char sighash_sertx[10048]; // serialized transaction during sighash (debug)
@@ -313,7 +315,7 @@ struct sighashtest {
     char hashhex[32 * 2 + 1];
 };
 
-/* sighash tests from bitcoin core 0.11
+/* sighash tests from dogecoin core 0.11
    added some standard transactions on the top
 */
 static const struct sighashtest sighash_tests[] =
@@ -830,13 +832,13 @@ struct txoptest {
 
 const struct txoptest txoptests[] =
     {
-        {"76a914aab76ba4877d696590d94ea3e02948b55294815188ac", 5, BTC_TX_PUBKEYHASH},
+        {"76a914aab76ba4877d696590d94ea3e02948b55294815188ac", 5, DOGECOIN_TX_PUBKEYHASH},
 
-        {"522102004525da5546e7603eefad5ef971e82f7dad2272b34e6b3036ab1fe3d299c22f21037d7f2227e6c646707d1c61ecceb821794124363a2cf2c1d2a6f28cf01e5d6abe52ae", 5, BTC_TX_MULTISIG},
+        {"522102004525da5546e7603eefad5ef971e82f7dad2272b34e6b3036ab1fe3d299c22f21037d7f2227e6c646707d1c61ecceb821794124363a2cf2c1d2a6f28cf01e5d6abe52ae", 5, DOGECOIN_TX_MULTISIG},
 
-        {"a9146262b64aec1f4a4c1d21b32e9c2811dd2171fd7587", 3, BTC_TX_SCRIPTHASH},
+        {"a9146262b64aec1f4a4c1d21b32e9c2811dd2171fd7587", 3, DOGECOIN_TX_SCRIPTHASH},
 
-        {"4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac", 2, BTC_TX_PUBKEY}
+        {"4104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac", 2, DOGECOIN_TX_PUBKEY}
 
 };
 
@@ -850,28 +852,28 @@ void test_tx_serialization()
         int outlen;
         utils_hex_to_bin(one_test->hextx, tx_data, strlen(one_test->hextx), &outlen);
 
-        btc_tx* tx = btc_tx_new();
-        btc_tx_deserialize(tx_data, outlen, tx, NULL, true);
+        dogecoin_tx* tx = dogecoin_tx_new();
+        dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
 
-        btc_tx* tx_copy = btc_tx_new();
-        btc_tx_copy(tx_copy, tx);
+        dogecoin_tx* tx_copy = dogecoin_tx_new();
+        dogecoin_tx_copy(tx_copy, tx);
 
 
         assert(tx->vin->len == (size_t)one_test->num_ins);
         size_t victx;
         for (victx = 0; victx < tx->vin->len; victx++) {
             /* hex prevout hash */
-            btc_tx_in* tx_in = vector_idx(tx->vin, victx);
+            dogecoin_tx_in* tx_in = vector_idx(tx->vin, victx);
             char* hex_txin = utils_uint8_to_hex(tx_in->prevout.hash, 32);
             utils_reverse_hex(hex_txin, strlen(hex_txin));
             assert(strcmp(one_test->inputs[victx].hash, hex_txin) == 0);
         }
 
         cstring* str = cstr_new_sz(strlen(one_test->hextx) + 100);
-        btc_tx_serialize(str, tx, true);
+        dogecoin_tx_serialize(str, tx, true);
 
         cstring* str2 = cstr_new_sz(strlen(one_test->hextx) + 100);
-        btc_tx_serialize(str2, tx_copy, true);
+        dogecoin_tx_serialize(str2, tx_copy, true);
 
         assert(memcmp(str->str, str2->str, str->len) == 0);
 
@@ -881,8 +883,8 @@ void test_tx_serialization()
         cstr_free(str2, true);
 
         assert(memcmp(one_test->hextx, hexbuf, strlen(hexbuf)) == 0);
-        btc_tx_free(tx);
-        btc_tx_free(tx_copy);
+        dogecoin_tx_free(tx);
+        dogecoin_tx_free(tx_copy);
     }
 
     int tstd = 1;
@@ -896,16 +898,16 @@ void test_tx_sighash_ext()
         int outlen_sighash = 0;
         uint8_t tx_data_sighash[sizeof(txvalid_sighash[i].sertx) / 2];
         utils_hex_to_bin(txvalid_sighash[i].sertx, tx_data_sighash, strlen(txvalid_sighash[i].sertx), &outlen_sighash);
-        btc_tx* tx_sighash = btc_tx_new();
-        btc_tx_deserialize(tx_data_sighash, outlen_sighash, tx_sighash, NULL, true);
+        dogecoin_tx* tx_sighash = dogecoin_tx_new();
+        dogecoin_tx_deserialize(tx_data_sighash, outlen_sighash, tx_sighash, NULL, true);
 
         uint8_t script_data[strlen(txvalid_sighash[i].script)];
         utils_hex_to_bin(txvalid_sighash[i].script, script_data, strlen(txvalid_sighash[i].script), &outlen_sighash);
         cstring *str = cstr_new_buf(script_data, outlen_sighash);
         uint256 hash;
-        btc_tx_sighash(tx_sighash, str, txvalid_sighash[i].i, SIGHASH_ALL, txvalid_sighash[i].amount, txvalid_sighash[i].witness ? SIGVERSION_WITNESS_V0 : SIGVERSION_BASE, hash);
+        dogecoin_tx_sighash(tx_sighash, str, txvalid_sighash[i].i, SIGHASH_ALL, txvalid_sighash[i].amount, txvalid_sighash[i].witness ? SIGVERSION_WITNESS_V0 : SIGVERSION_BASE, hash);
 
-        btc_tx_free(tx_sighash);
+        dogecoin_tx_free(tx_sighash);
         cstr_free(str, true);
 
         char sighash_hex[65];
@@ -929,22 +931,22 @@ void test_tx_sighash()
         int outlen;
         utils_hex_to_bin(test->txhex, tx_data, strlen(test->txhex), &outlen);
 
-        btc_tx* tx = btc_tx_new();
-        btc_tx_deserialize(tx_data, outlen, tx, NULL, true);
+        dogecoin_tx* tx = dogecoin_tx_new();
+        dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
 
         uint8_t script_data[strlen(test->script) / 2];
         utils_hex_to_bin(test->script, script_data, strlen(test->script), &outlen);
         cstring* script = cstr_new_buf(script_data, outlen);
         uint256 sighash;
         memset(sighash, 0, sizeof(sighash));
-        btc_tx_sighash(tx, script, test->inputindex, test->hashtype, 0, SIGVERSION_BASE, sighash);
+        dogecoin_tx_sighash(tx, script, test->inputindex, test->hashtype, 0, SIGVERSION_BASE, sighash);
 
-        vector* vec = vector_new(10, btc_script_op_free_cb);
-        btc_script_get_ops(script, vec);
-        enum btc_tx_out_type type = btc_script_classify_ops(vec);
+        vector* vec = vector_new(10, dogecoin_script_op_free_cb);
+        dogecoin_script_get_ops(script, vec);
+        enum dogecoin_tx_out_type type = dogecoin_script_classify_ops(vec);
         vector_free(vec, true);
 
-        enum btc_tx_out_type type2 = btc_script_classify(script, NULL);
+        enum dogecoin_tx_out_type type2 = dogecoin_script_classify(script, NULL);
         assert(type == type2);
 
         cstr_free(script, true);
@@ -955,7 +957,7 @@ void test_tx_sighash()
 
         assert(strcmp(hexbuf, test->hashhex) == 0);
 
-        btc_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
 }
 
@@ -969,11 +971,11 @@ void test_tx_negative_version()
     int outlen;
     utils_hex_to_bin(txhex, tx_data, strlen(txhex), &outlen);
 
-    btc_tx* tx = btc_tx_new();
-    btc_tx_deserialize(tx_data, outlen, tx, NULL, true);
+    dogecoin_tx* tx = dogecoin_tx_new();
+    dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
     u_assert_int_eq(versionGoal, tx->version);
 
-    btc_tx_free(tx);
+    dogecoin_tx_free(tx);
 }
 
 
@@ -997,9 +999,9 @@ void test_script_parse()
         utils_hex_to_bin(test->scripthex, script_data, strlen(test->scripthex), &outlen);
 
         cstring* script = cstr_new_buf(script_data, outlen);
-        vector* vec = vector_new(10, btc_script_op_free_cb);
-        btc_script_get_ops(script, vec);
-        enum btc_tx_out_type type = btc_script_classify_ops(vec);
+        vector* vec = vector_new(10, dogecoin_script_op_free_cb);
+        dogecoin_script_get_ops(script, vec);
+        enum dogecoin_tx_out_type type = dogecoin_script_classify_ops(vec);
 
         assert((int)type == test->type);
         assert(vec->len == (size_t)test->opcodes);
@@ -1015,12 +1017,12 @@ void test_script_parse()
         utils_hex_to_bin(test->script, script_data, strlen(test->script), &outlen);
 
         cstring* script = cstr_new_buf(script_data, outlen);
-        vector* vec = vector_new(10, btc_script_op_free_cb);
-        btc_script_get_ops(script, vec);
-        enum btc_tx_out_type type = btc_script_classify_ops(vec);
+        vector* vec = vector_new(10, dogecoin_script_op_free_cb);
+        dogecoin_script_get_ops(script, vec);
+        enum dogecoin_tx_out_type type = dogecoin_script_classify_ops(vec);
 
         cstring* new_script = cstr_new_sz(script->len);
-        btc_script_copy_without_op_codeseperator(script, new_script);
+        dogecoin_script_copy_without_op_codeseperator(script, new_script);
         cstr_free(new_script, true);
         cstr_free(script, true);
         vector_free(vec, true);
@@ -1028,29 +1030,29 @@ void test_script_parse()
 
     vector* pubkeys = vector_new(3, free);
     for (i = 0; i < 3; i++) {
-        btc_key key;
-        btc_privkey_init(&key);
-        btc_privkey_gen(&key);
+        dogecoin_key key;
+        dogecoin_privkey_init(&key);
+        dogecoin_privkey_gen(&key);
 
-        btc_pubkey* pubkey = btc_malloc(sizeof(btc_pubkey));
-        btc_pubkey_init(pubkey);
-        btc_pubkey_from_key(&key, pubkey);
-        assert(btc_pubkey_is_valid(pubkey) == 1);
+        dogecoin_pubkey* pubkey = dogecoin_malloc(sizeof(dogecoin_pubkey));
+        dogecoin_pubkey_init(pubkey);
+        dogecoin_pubkey_from_key(&key, pubkey);
+        assert(dogecoin_pubkey_is_valid(pubkey) == 1);
 
         vector_add(pubkeys, pubkey);
     }
 
     cstring* new_script = cstr_new_sz(1024);
-    btc_script_build_multisig(new_script, 2, pubkeys);
+    dogecoin_script_build_multisig(new_script, 2, pubkeys);
 
     u_assert_int_eq(new_script->str[0], 0x52);                   //2
     u_assert_int_eq(new_script->str[new_script->len - 2], 0x53); //3
     u_assert_int_eq(((char)new_script->str[new_script->len - 1] == (char)OP_CHECKMULTISIG), 1);
     cstr_free(new_script, true);
 
-    btc_pubkey* pubkey = pubkeys->data[0];
+    dogecoin_pubkey* pubkey = pubkeys->data[0];
     cstring* p2pkh = cstr_new_sz(1024);
-    btc_script_build_p2pkh(p2pkh, pubkey->pubkey);
+    dogecoin_script_build_p2pkh(p2pkh, pubkey->pubkey);
     u_assert_int_eq(p2pkh->str[0], (char)OP_DUP);     //2
     u_assert_int_eq(p2pkh->str[1], (char)OP_HASH160); //2
     u_assert_int_eq(((char)p2pkh->str[p2pkh->len - 1] == (char)OP_CHECKSIG), 1);
@@ -1059,16 +1061,16 @@ void test_script_parse()
 
     uint8_t pubkeydat[33] = {0x02,0xd0,0x03,0xdf,0xea,0xf0,0x76,0x2e,0xd1,0xcd,0xbb,0x1d,0x54,0x2b,0x0a,0x26,0x17,0x49,0xe3,0xff,0x81,0x09,0x64,0xef,0x90,0x64,0xd7,0x97,0xd5,0x78,0xa1,0x21,0x94};
 
-    btc_pubkey pubkeytx;
-    btc_pubkey_init(&pubkeytx);
+    dogecoin_pubkey pubkeytx;
+    dogecoin_pubkey_init(&pubkeytx);
     memcpy(&pubkeytx.pubkey, pubkeydat, 33);
     pubkeytx.compressed = true;
 
-    btc_tx* tx = btc_tx_new();
-    btc_tx_add_p2pkh_out(tx, 1000000000, &pubkeytx);
+    dogecoin_tx* tx = dogecoin_tx_new();
+    dogecoin_tx_add_p2pkh_out(tx, 1000000000, &pubkeytx);
 
     cstring* txser = cstr_new_sz(1024);
-    btc_tx_serialize(txser, tx, false);
+    dogecoin_tx_serialize(txser, tx, false);
 
     char hexbuf[txser->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)txser->str, txser->len, hexbuf);
@@ -1077,7 +1079,7 @@ void test_script_parse()
     cstr_free(txser, true);
 
     uint256 txhash;
-    btc_tx_hash(tx, txhash);
+    dogecoin_tx_hash(tx, txhash);
     char txhashhex[sizeof(txhash)*2];
     utils_bin_to_hex((unsigned char*)txhash, sizeof(txhash), txhashhex);
     utils_reverse_hex(txhashhex, sizeof(txhashhex));
@@ -1085,16 +1087,16 @@ void test_script_parse()
     u_assert_str_eq(txhashhex, "41a86af25423391b1d9d78df1143e3a237f20db27511d8b72e25f2dec7a81d80");
 
 
-    btc_tx_add_address_out(tx, &btc_chainparams_regtest, 12345678, "n1e4M744gKSL269jozPwc8edjxxdwn6THc");
+    dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_regtest, 12345678, "n1e4M744gKSL269jozPwc8edjxxdwn6THc");
 
 
     txser = cstr_new_sz(1024);
-    btc_tx_serialize(txser, tx, false);
+    dogecoin_tx_serialize(txser, tx, false);
     char hexbuf2[txser->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)txser->str, txser->len, hexbuf2);
     u_assert_str_eq(hexbuf2, "01000000000200ca9a3b000000001976a91457b78cc8347175aee968eaa91846e840ef36ff9288ac4e61bc00000000001976a914dcba7ad8b58f35ea9a7ffa2102dcfb2612b6ba9088ac00000000");
 
-    btc_tx_hash(tx, txhash);
+    dogecoin_tx_hash(tx, txhash);
     utils_bin_to_hex((unsigned char*)txhash, 32, txhashhex);
     utils_reverse_hex(txhashhex, 64);
 
@@ -1103,67 +1105,67 @@ void test_script_parse()
     cstr_free(txser, true);
 
 
-    btc_tx_add_address_out(tx, &btc_chainparams_regtest, 876543210, "2NFoJeWNrABZQ3YCWdbX9wGEnRge7kDeGzQ");
+    dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_regtest, 876543210, "2NFoJeWNrABZQ3YCWdbX9wGEnRge7kDeGzQ");
     txser = cstr_new_sz(1024);
-    btc_tx_serialize(txser, tx, false);
+    dogecoin_tx_serialize(txser, tx, false);
     char hexbuf3[txser->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)txser->str, txser->len, hexbuf3);
     u_assert_str_eq(hexbuf3, "01000000000300ca9a3b000000001976a91457b78cc8347175aee968eaa91846e840ef36ff9288ac4e61bc00000000001976a914dcba7ad8b58f35ea9a7ffa2102dcfb2612b6ba9088aceafc3e340000000017a914f763f798ede75a6ebf4e061b9e68ddb6df0442928700000000");
 
     cstr_free(txser, true);
 
-    btc_tx_add_address_out(tx, &btc_chainparams_regtest, 100000000, "bcrt1qfupfj4yx83dz8vhcpcahhxyg4sfqr8pvx8l6l2");
+    dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_regtest, 100000000, "dcrt1qfupfj4yx83dz8vhcpcahhxyg4sfqr8pvx8l6l2");
     txser = cstr_new_sz(1024);
-    btc_tx_serialize(txser, tx, false);
+    dogecoin_tx_serialize(txser, tx, false);
     char hexbuf4[txser->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)txser->str, txser->len, hexbuf4);
-    u_assert_str_eq(hexbuf4, "01000000000400ca9a3b000000001976a91457b78cc8347175aee968eaa91846e840ef36ff9288ac4e61bc00000000001976a914dcba7ad8b58f35ea9a7ffa2102dcfb2612b6ba9088aceafc3e340000000017a914f763f798ede75a6ebf4e061b9e68ddb6df0442928700e1f505000000001600144f029954863c5a23b2f80e3b7b9888ac12019c2c00000000");
+    u_assert_str_eq(hexbuf4, "01000000000300ca9a3b000000001976a91457b78cc8347175aee968eaa91846e840ef36ff9288ac4e61bc00000000001976a914dcba7ad8b58f35ea9a7ffa2102dcfb2612b6ba9088aceafc3e340000000017a914f763f798ede75a6ebf4e061b9e68ddb6df0442928700000000");
     cstr_free(txser, true);
 
     vector_free(pubkeys, true);
-    btc_tx_free(tx);
+    dogecoin_tx_free(tx);
 
     // op_return test
     size_t masterkeysize = 200;
     char masterkey[masterkeysize];
-    u_assert_int_eq(hd_gen_master(&btc_chainparams_main, masterkey, masterkeysize), true);
+    u_assert_int_eq(hd_gen_master(&dogecoin_chainparams_main, masterkey, masterkeysize), true);
 
-    btc_hdnode node;
-    u_assert_int_eq(btc_hdnode_deserialize(masterkey, &btc_chainparams_main, &node), true);
+    dogecoin_hdnode node;
+    u_assert_int_eq(dogecoin_hdnode_deserialize(masterkey, &dogecoin_chainparams_main, &node), true);
 
     uint256 rev_code;
     uint256 sig_hash;
-    btc_hash(node.private_key, BTC_ECKEY_PKEY_LENGTH, rev_code);
+    dogecoin_hash(node.private_key, DOGECOIN_ECKEY_PKEY_LENGTH, rev_code);
 
     uint8_t sigdata[38] = {0x42, 0x49, 0x50, 0x00, 0x00, 0x00, 0x00 };
-    btc_hash(rev_code, BTC_HASH_LENGTH, &sigdata[7]);
+    dogecoin_hash(rev_code, DOGECOIN_HASH_LENGTH, &sigdata[7]);
 
-    btc_hash(sigdata, sizeof(sigdata), sig_hash);
+    dogecoin_hash(sigdata, sizeof(sigdata), sig_hash);
 
-    btc_key key;
-    btc_privkey_init(&key);
+    dogecoin_key key;
+    dogecoin_privkey_init(&key);
 
-    memcpy(key.privkey, node.private_key, BTC_ECKEY_PKEY_LENGTH);
+    memcpy(key.privkey, node.private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
     unsigned char sigcmp[64];
     size_t outlencmp = 64;
-    btc_key_sign_hash_compact(&key, sig_hash, sigcmp, &outlencmp);
+    dogecoin_key_sign_hash_compact(&key, sig_hash, sigcmp, &outlencmp);
 
-    btc_pubkey pubkeytx_rev;
-    btc_pubkey_init(&pubkeytx_rev);
-    btc_pubkey_from_key(&key, &pubkeytx_rev);
+    dogecoin_pubkey pubkeytx_rev;
+    dogecoin_pubkey_init(&pubkeytx_rev);
+    dogecoin_pubkey_from_key(&key, &pubkeytx_rev);
 
-    tx = btc_tx_new();
-    btc_tx_add_data_out(tx, 100000, sigcmp, outlencmp); //0.001 BTC
-    btc_tx_add_p2pkh_out(tx, 10000, &pubkeytx_rev);
+    tx = dogecoin_tx_new();
+    dogecoin_tx_add_data_out(tx, 100000, sigcmp, outlencmp); //0.001 DOGECOIN
+    dogecoin_tx_add_p2pkh_out(tx, 10000, &pubkeytx_rev);
 
     txser = cstr_new_sz(1024);
-    btc_tx_serialize(txser, tx, false);
+    dogecoin_tx_serialize(txser, tx, false);
     char hexbuf5[txser->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)txser->str, txser->len, hexbuf5);
     // TODO: test
     cstr_free(txser, true);
 
-    btc_tx_free(tx);
+    dogecoin_tx_free(tx);
 }
 
 void test_script_op_codeseperator()
@@ -1177,7 +1179,7 @@ void test_script_op_codeseperator()
     cstring* script = cstr_new_buf(script_data, outlen);
 
     cstring* new_script = cstr_new_sz(script->len);
-    btc_script_copy_without_op_codeseperator(script, new_script);
+    dogecoin_script_copy_without_op_codeseperator(script, new_script);
 
     char hexbuf[new_script->len * 2 + 1];
     utils_bin_to_hex((unsigned char*)new_script->str, new_script->len, hexbuf);
@@ -1193,17 +1195,17 @@ void test_invalid_tx_deser()
     int outlen;
     utils_hex_to_bin(txstr, tx_data_txstr, strlen(txstr), &outlen);
 
-    btc_tx* tx = btc_tx_new();
-    u_assert_int_eq(btc_tx_deserialize(tx_data_txstr, outlen, tx, NULL, true), false);
-    btc_tx_free(tx);
+    dogecoin_tx* tx = dogecoin_tx_new();
+    u_assert_int_eq(dogecoin_tx_deserialize(tx_data_txstr, outlen, tx, NULL, true), false);
+    dogecoin_tx_free(tx);
 
     char failed_output[] =   "02000000000101bb3ee7f13f00b58a65f3789ff9917ae2eb2f360957ca86d4ec8068deae16f94c0000000017160014d7d7d2e56512a14b41f2b412eb33f9a2c464e407ffffffff01c0878b3b0000000017a914b1";
     uint8_t tx_data_fo[sizeof(failed_output) / 2+1];
     utils_hex_to_bin(failed_output, tx_data_fo, strlen(failed_output), &outlen);
 
-    btc_tx* tx_o = btc_tx_new();
-    u_assert_int_eq(btc_tx_deserialize(tx_data_fo, outlen, tx_o, NULL, true), false);
-    btc_tx_free(tx_o);
+    dogecoin_tx* tx_o = dogecoin_tx_new();
+    u_assert_int_eq(dogecoin_tx_deserialize(tx_data_fo, outlen, tx_o, NULL, true), false);
+    dogecoin_tx_free(tx_o);
 
 }
 
@@ -1231,34 +1233,34 @@ void test_tx_sign_p2sh_p2wpkh() {
     uint8_t expected_tx_signed_data[strlen(expected_tx_signed) / 2];
     utils_hex_to_bin(expected_tx_signed, expected_tx_signed_data, strlen(expected_tx_signed), &outlen);
 
-    btc_key pkey;
-    btc_privkey_init(&pkey);
-    btc_privkey_decode_wif(pkey_wif, &btc_chainparams_regtest, &pkey);
+    dogecoin_key pkey;
+    dogecoin_privkey_init(&pkey);
+    dogecoin_privkey_decode_wif(pkey_wif, &dogecoin_chainparams_regtest, &pkey);
 
-    btc_tx* tx = btc_tx_new();
-    btc_tx_deserialize(tx_data, outlen, tx, NULL, true);
+    dogecoin_tx* tx = dogecoin_tx_new();
+    dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
 
 
     uint8_t sigcomp[64] = {0};
     uint8_t sigder[76] = {0};
     int sigder_len = 0;
-    enum btc_tx_sign_result res = btc_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
+    enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
     u_assert_mem_eq(sigcomp, expected_sigcomp_data, 64);
     u_assert_mem_eq(sigder, expected_sigder_data, sigder_len);
 
     cstring* tx_ser = cstr_new_sz(1024);
-    btc_tx_serialize(tx_ser, tx, true);
+    dogecoin_tx_serialize(tx_ser, tx, true);
 
     char hexbuf[tx_ser->len*2+1];
     utils_bin_to_hex((unsigned char*)tx_ser->str, tx_ser->len, hexbuf);
     u_assert_str_eq(hexbuf, expected_tx_signed);
 
-    btc_tx_free(tx);
+    dogecoin_tx_free(tx);
     cstr_free(tx_ser, true);
     cstr_free(script, true);
 }
 
-void test_tx_sign_p2pkh(btc_tx *tx) {
+void test_tx_sign_p2pkh(dogecoin_tx *tx) {
     const char *tx_hex = "02000000027409797c31feecc4e69b51c58b477b72c53355743a6f6124f9d78221672df3700100000000ffffffff6e1709c1e2bdd85aed24dccfd48293993617f249d4d4381296a9c914be3e85e60100000000ffffffff01c07fdc0b0000000017a914ba277fd56b69177464fcb6a27a530f03740345ed8700000000";
     const char *script_hex = "76a9149b47fd7adc7a671ed059c9dcbf2eee2e882ea56b88ac";
     const char *pkey_wif = "cRpSdivawavdAPgEYGXusWt64cJG9zLcgDPsEvnhHWtizVtmGk5b";
@@ -1280,21 +1282,21 @@ void test_tx_sign_p2pkh(btc_tx *tx) {
     uint8_t expected_tx_signed_data[strlen(expected_tx_signed) / 2];
     utils_hex_to_bin(expected_tx_signed, expected_tx_signed_data, strlen(expected_tx_signed), &outlen);
 
-    btc_key pkey;
-    btc_privkey_init(&pkey);
-    btc_privkey_decode_wif(pkey_wif, &btc_chainparams_regtest, &pkey);
+    dogecoin_key pkey;
+    dogecoin_privkey_init(&pkey);
+    dogecoin_privkey_decode_wif(pkey_wif, &dogecoin_chainparams_regtest, &pkey);
 
-    btc_tx_deserialize(tx_data, outlen, tx, NULL, true);
+    dogecoin_tx_deserialize(tx_data, outlen, tx, NULL, true);
 
 
     uint8_t sigcomp[64] = {0};
     uint8_t sigder[76] = {0};
     int sigder_len = 0;
-    enum btc_tx_sign_result res = btc_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
+    enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
     u_assert_mem_eq(sigder, expected_sigder_data, sigder_len);
 
     cstring* tx_ser = cstr_new_sz(1024);
-    btc_tx_serialize(tx_ser, tx, true);
+    dogecoin_tx_serialize(tx_ser, tx, true);
 
     char hexbuf[tx_ser->len*2+1];
     utils_bin_to_hex((unsigned char*)tx_ser->str, tx_ser->len, hexbuf);
@@ -1303,7 +1305,7 @@ void test_tx_sign_p2pkh(btc_tx *tx) {
     cstr_free(tx_ser, true);
     cstr_free(script, true);
 }
-void test_tx_sign_p2pkh_i2(btc_tx *tx) {
+void test_tx_sign_p2pkh_i2(dogecoin_tx *tx) {
     const char *tx_hex = "02000000027409797c31feecc4e69b51c58b477b72c53355743a6f6124f9d78221672df3700100000000ffffffff6e1709c1e2bdd85aed24dccfd48293993617f249d4d4381296a9c914be3e85e60100000000ffffffff01c07fdc0b0000000017a914ba277fd56b69177464fcb6a27a530f03740345ed8700000000";
     const char *script_hex_wrong = "76a9149b47fd7adc7a671ed059c9dcbf2eee2e882ea56b88ac";
     const char *script_hex_correct = "76a91481edb497b5ba6eb9e67b7ed50fb220395f76f95088ac";
@@ -1328,24 +1330,24 @@ void test_tx_sign_p2pkh_i2(btc_tx *tx) {
     uint8_t expected_tx_signed_data[strlen(expected_tx_signed) / 2];
     utils_hex_to_bin(expected_tx_signed, expected_tx_signed_data, strlen(expected_tx_signed), &outlen);
 
-    btc_key pkey;
-    btc_privkey_init(&pkey);
-    btc_privkey_decode_wif(pkey_wif, &btc_chainparams_regtest, &pkey);
+    dogecoin_key pkey;
+    dogecoin_privkey_init(&pkey);
+    dogecoin_privkey_decode_wif(pkey_wif, &dogecoin_chainparams_regtest, &pkey);
 
     uint8_t sigcomp[64] = {0};
     uint8_t sigder[76] = {0};
     int sigder_len = 0;
-    enum btc_tx_sign_result res = btc_tx_sign_input(tx, script_wrong, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
-    u_assert_int_eq(res, BTC_SIGN_NO_KEY_MATCH);
-    btc_tx_in *in = vector_idx(tx->vin, 1);
+    enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(tx, script_wrong, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
+    u_assert_int_eq(res, DOGECOIN_SIGN_NO_KEY_MATCH);
+    dogecoin_tx_in *in = vector_idx(tx->vin, 1);
     cstr_resize(in->script_sig, 0);
-    res = btc_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
-    u_assert_int_eq(res, BTC_SIGN_OK);
+    res = dogecoin_tx_sign_input(tx, script, amount, &pkey, inputindex, sighashtype, sigcomp, sigder, &sigder_len);
+    u_assert_int_eq(res, DOGECOIN_SIGN_OK);
     //u_assert_mem_eq(sigcomp, expected_sigcomp_data, 64);
     u_assert_mem_eq(sigder, expected_sigder_data, sigder_len);
 
     cstring* tx_ser = cstr_new_sz(1024);
-    btc_tx_serialize(tx_ser, tx, true);
+    dogecoin_tx_serialize(tx_ser, tx, true);
 
     char hexbuf[tx_ser->len*2+1];
     utils_bin_to_hex((unsigned char*)tx_ser->str, tx_ser->len, hexbuf);
@@ -1358,10 +1360,10 @@ void test_tx_sign_p2pkh_i2(btc_tx *tx) {
 
 void test_tx_sign() {
     test_tx_sign_p2sh_p2wpkh();
-    btc_tx* tx = btc_tx_new();
+    dogecoin_tx* tx = dogecoin_tx_new();
     test_tx_sign_p2pkh(tx);
     test_tx_sign_p2pkh_i2(tx);
-    btc_tx_free(tx);
+    dogecoin_tx_free(tx);
 }
 
 void test_scripts() {
@@ -1377,10 +1379,10 @@ void test_scripts() {
     script_data_p2pkh->len = outlen;
 
     vector* vec = vector_new(16, free);
-    enum btc_tx_out_type type = btc_script_classify(script_data_p2pk, vec);
-    u_assert_int_eq(type, BTC_TX_PUBKEY);
-    type = btc_script_classify(script_data_p2pkh, vec);
-    u_assert_int_eq(type, BTC_TX_PUBKEYHASH);
+    enum dogecoin_tx_out_type type = dogecoin_script_classify(script_data_p2pk, vec);
+    u_assert_int_eq(type, DOGECOIN_TX_PUBKEY);
+    type = dogecoin_script_classify(script_data_p2pkh, vec);
+    u_assert_int_eq(type, DOGECOIN_TX_PUBKEYHASH);
 
     cstr_free(script_data_p2pk, true);
     cstr_free(script_data_p2pkh, true);

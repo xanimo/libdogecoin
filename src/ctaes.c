@@ -12,7 +12,7 @@
  * integers representing 8 AES states.
  */
 
-#include <btc/ctaes.h>
+#include <dogecoin/ctaes.h>
 
 /* Slice variable slice_i contains the i'th bit of the 16 state variables in this order:
  *  0  1  2  3

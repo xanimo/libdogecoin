@@ -1,16 +1,16 @@
-#include <btc/net.h>
+#include <dogecoin/net.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <event2/event.h>
 
-#include <btc/buffer.h>
-#include <btc/chainparams.h>
-#include <btc/cstr.h>
-#include <btc/hash.h>
-#include <btc/protocol.h>
-#include <btc/serialize.h>
-#include <btc/utils.h>
+#include <dogecoin/buffer.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/hash.h>
+#include <dogecoin/protocol.h>
+#include <dogecoin/serialize.h>
+#include <dogecoin/utils.h>
 
 #ifdef _WIN32
 #include <getopt.h>
@@ -31,15 +31,15 @@
 
 #define UNUSED(x) (void)(x)
 
-static const int BTC_PERIODICAL_NODE_TIMER_S = 3;
-static const int BTC_PING_INTERVAL_S = 180;
-static const int BTC_CONNECT_TIMEOUT_S = 10;
+static const int DOGECOIN_PERIODICAL_NODE_TIMER_S = 3;
+static const int DOGECOIN_PING_INTERVAL_S = 120;
+static const int DOGECOIN_CONNECT_TIMEOUT_S = 10;
 
 int net_write_log_printf(const char* format, ...)
 {
     va_list args;
     va_start(args, format);
-    printf("DEBUG :");
+    printf("DEBUG: ");
     vprintf(format, args);
     va_end(args);
     return 1;
@@ -59,7 +59,7 @@ void read_cb(struct bufferevent* bev, void* ctx)
 
     size_t length = evbuffer_get_length(input);
 
-    btc_node* node = (btc_node*)ctx;
+    dogecoin_node* node = (dogecoin_node*)ctx;
 
     if ((node->state & NODE_CONNECTED) != NODE_CONNECTED) {
         // ignore messages from disconnected peers
@@ -76,19 +76,19 @@ void read_cb(struct bufferevent* bev, void* ctx)
     evbuffer_drain(input, length);
 
     struct const_buffer buf = {node->recvBuffer->str, node->recvBuffer->len};
-    btc_p2p_msg_hdr hdr;
+    dogecoin_p2p_msg_hdr hdr;
     char* read_upto = NULL;
 
     do {
         //check if message is complete
-        if (buf.len < BTC_P2P_HDRSZ) {
+        if (buf.len < DOGECOIN_P2P_HDRSZ) {
             break;
         }
 
-        btc_p2p_deser_msghdr(&hdr, &buf);
-        if (hdr.data_len > BTC_MAX_P2P_MSG_SIZE) {
+        dogecoin_p2p_deser_msghdr(&hdr, &buf);
+        if (hdr.data_len > DOGECOIN_MAX_P2P_MSG_SIZE) {
             // check for invalid message lengths
-            btc_node_missbehave(node);
+            dogecoin_node_missbehave(node);
             return;
         }
         if (buf.len < hdr.data_len) {
@@ -103,7 +103,7 @@ void read_cb(struct bufferevent* bev, void* ctx)
                 // ignore messages from disconnected peers
                 return;
             }
-            btc_node_parse_message(node, &hdr, &cmd_data_buf);
+            dogecoin_node_parse_message(node, &hdr, &cmd_data_buf);
 
             //skip the size of the whole message
             buf.p = (const unsigned char*)buf.p + hdr.data_len;
@@ -138,7 +138,7 @@ void node_periodical_timer(int fd, short event, void* ctx)
 {
     UNUSED(fd);
     UNUSED(event);
-    btc_node* node = (btc_node*)ctx;
+    dogecoin_node* node = (dogecoin_node*)ctx;
     uint64_t now = time(NULL);
 
     /* pass data to the callback and give it a chance to cancle the call */
@@ -146,20 +146,20 @@ void node_periodical_timer(int fd, short event, void* ctx)
         if (!node->nodegroup->periodic_timer_cb(node, &now))
             return;
 
-    if (node->time_started_con + BTC_CONNECT_TIMEOUT_S < now && ((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
+    if (node->time_started_con + DOGECOIN_CONNECT_TIMEOUT_S < now && ((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
         node->state = 0;
         node->time_started_con = 0;
         node->state |= NODE_ERRORED;
         node->state |= NODE_TIMEOUT;
-        btc_node_connection_state_changed(node);
+        dogecoin_node_connection_state_changed(node);
     }
 
-    if (((node->state & NODE_CONNECTED) == NODE_CONNECTED) && node->lastping + BTC_PING_INTERVAL_S < now) {
+    if (((node->state & NODE_CONNECTED) == NODE_CONNECTED) && node->lastping + DOGECOIN_PING_INTERVAL_S < now) {
         //time for a ping
         uint64_t nonce;
-        btc_cheap_random_bytes((uint8_t*)&nonce, sizeof(nonce));
-        cstring* pingmsg = btc_p2p_message_new(node->nodegroup->chainparams->netmagic, BTC_MSG_PING, &nonce, sizeof(nonce));
-        btc_node_send(node, pingmsg);
+        dogecoin_cheap_random_bytes((uint8_t*)&nonce, sizeof(nonce));
+        cstring* pingmsg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_PING, &nonce, sizeof(nonce));
+        dogecoin_node_send(node, pingmsg);
         cstr_free(pingmsg, true);
         node->lastping = now;
     }
@@ -168,7 +168,7 @@ void node_periodical_timer(int fd, short event, void* ctx)
 void event_cb(struct bufferevent* ev, short type, void* ctx)
 {
     UNUSED(ev);
-    btc_node* node = (btc_node*)ctx;
+    dogecoin_node* node = (dogecoin_node*)ctx;
     node->nodegroup->log_write_cb("Event callback on node %d\n", node->nodeid);
 
     if (((type & BEV_EVENT_TIMEOUT) != 0) && ((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
@@ -176,7 +176,7 @@ void event_cb(struct bufferevent* ev, short type, void* ctx)
         node->state = 0;
         node->state |= NODE_ERRORED;
         node->state |= NODE_TIMEOUT;
-        btc_node_connection_state_changed(node);
+        dogecoin_node_connection_state_changed(node);
     } else if (((type & BEV_EVENT_EOF) != 0) ||
                ((type & BEV_EVENT_ERROR) != 0)) {
         node->state = 0;
@@ -189,22 +189,22 @@ void event_cb(struct bufferevent* ev, short type, void* ctx)
         else {
             node->nodegroup->log_write_cb("Error connecting to node %d.\n", node->nodeid);
         }
-        btc_node_connection_state_changed(node);
+        dogecoin_node_connection_state_changed(node);
     } else if (type & BEV_EVENT_CONNECTED) {
-        node->nodegroup->log_write_cb("Successfull connected to node %d.\n", node->nodeid);
+        node->nodegroup->log_write_cb("Successful connected to node %d.\n", node->nodeid);
         node->state |= NODE_CONNECTED;
         node->state &= ~NODE_CONNECTING;
         node->state &= ~NODE_ERRORED;
-        btc_node_connection_state_changed(node);
+        dogecoin_node_connection_state_changed(node);
         /* if callback is set, fire */
     }
-    node->nodegroup->log_write_cb("Connected nodes: %d\n", btc_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTED));
+    node->nodegroup->log_write_cb("Connected nodes: %d\n", dogecoin_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTED));
 }
 
-btc_node* btc_node_new()
+dogecoin_node* dogecoin_node_new()
 {
-    btc_node* node;
-    node = btc_calloc(1, sizeof(*node));
+    dogecoin_node* node;
+    node = dogecoin_calloc(1, sizeof(*node));
     node->version_handshake = false;
     node->state = 0;
     node->nonce = 0;
@@ -212,14 +212,14 @@ btc_node* btc_node_new()
     node->lastping = 0;
     node->time_started_con = 0;
     node->time_last_request = 0;
-    btc_hash_clear(node->last_requested_inv);
+    dogecoin_hash_clear(node->last_requested_inv);
 
-    node->recvBuffer = cstr_new_sz(BTC_P2P_MESSAGE_CHUNK_SIZE);
+    node->recvBuffer = cstr_new_sz(DOGECOIN_P2P_MESSAGE_CHUNK_SIZE);
     node->hints = 0;
     return node;
 }
 
-btc_bool btc_node_set_ipport(btc_node* node, const char* ipport)
+dogecoin_bool dogecoin_node_set_ipport(dogecoin_node* node, const char* ipport)
 {
     int outlen = (int)sizeof(node->addr);
 
@@ -227,7 +227,7 @@ btc_bool btc_node_set_ipport(btc_node* node, const char* ipport)
     return (evutil_parse_sockaddr_port(ipport, &node->addr, &outlen) == 0);
 }
 
-void btc_node_release_events(btc_node* node)
+void dogecoin_node_release_events(dogecoin_node* node)
 {
     if (node->event_bev) {
         bufferevent_free(node->event_bev);
@@ -241,21 +241,21 @@ void btc_node_release_events(btc_node* node)
     }
 }
 
-btc_bool btc_node_missbehave(btc_node* node)
+dogecoin_bool dogecoin_node_missbehave(dogecoin_node* node)
 {
     node->nodegroup->log_write_cb("Mark node %d as missbehaved\n", node->nodeid);
     node->state |= NODE_MISSBEHAVED;
-    btc_node_connection_state_changed(node);
+    dogecoin_node_connection_state_changed(node);
     return 0;
 }
 
-void btc_node_disconnect(btc_node* node)
+void dogecoin_node_disconnect(dogecoin_node* node)
 {
     if ((node->state & NODE_CONNECTED) == NODE_CONNECTED || (node->state & NODE_CONNECTING) == NODE_CONNECTING) {
         node->nodegroup->log_write_cb("Disconnect node %d\n", node->nodeid);
     }
     /* release buffer and timer event */
-    btc_node_release_events(node);
+    dogecoin_node_release_events(node);
 
     node->state &= ~NODE_CONNECTING;
     node->state &= ~NODE_CONNECTED;
@@ -264,33 +264,33 @@ void btc_node_disconnect(btc_node* node)
     node->time_started_con = 0;
 }
 
-void btc_node_free(btc_node* node)
+void dogecoin_node_free(dogecoin_node* node)
 {
-    btc_node_disconnect(node);
+    dogecoin_node_disconnect(node);
     cstr_free(node->recvBuffer, true);
-    btc_free(node);
+    dogecoin_free(node);
 }
 
-void btc_node_free_cb(void* obj)
+void dogecoin_node_free_cb(void* obj)
 {
-    btc_node* node = (btc_node*)obj;
-    btc_node_free(node);
+    dogecoin_node* node = (dogecoin_node*)obj;
+    dogecoin_node_free(node);
 }
 
-btc_node_group* btc_node_group_new(const btc_chainparams* chainparams)
+dogecoin_node_group* dogecoin_node_group_new(const dogecoin_chainparams* chainparams)
 {
-    btc_node_group* node_group;
-    node_group = btc_calloc(1, sizeof(*node_group));
+    dogecoin_node_group* node_group;
+    node_group = dogecoin_calloc(1, sizeof(*node_group));
     node_group->event_base = event_base_new();
     if (!node_group->event_base) {
-        btc_free(node_group);
+        dogecoin_free(node_group);
         return NULL;
     };
 
-    node_group->nodes = vector_new(1, btc_node_free_cb);
-    node_group->chainparams = (chainparams ? chainparams : &btc_chainparams_main);
+    node_group->nodes = vector_new(1, dogecoin_node_free_cb);
+    node_group->chainparams = (chainparams ? chainparams : &dogecoin_chainparams_main);
     node_group->parse_cmd_cb = NULL;
-    strcpy(node_group->clientstr, "libbtc 0.1");
+    strcpy(node_group->clientstr, "libdogecoin 0.1");
 
     /* nullify callbacks */
     node_group->postcmd_cb = NULL;
@@ -303,14 +303,14 @@ btc_node_group* btc_node_group_new(const btc_chainparams* chainparams)
     return node_group;
 }
 
-void btc_node_group_shutdown(btc_node_group *group) {
+void dogecoin_node_group_shutdown(dogecoin_node_group *group) {
     for (size_t i = 0; i < group->nodes->len; i++) {
-        btc_node* node = vector_idx(group->nodes, i);
-        btc_node_disconnect(node);
+        dogecoin_node* node = vector_idx(group->nodes, i);
+        dogecoin_node_disconnect(node);
     }
 }
 
-void btc_node_group_free(btc_node_group* group)
+void dogecoin_node_group_free(dogecoin_node_group* group)
 {
     if (!group)
         return;
@@ -322,43 +322,43 @@ void btc_node_group_free(btc_node_group* group)
     if (group->nodes) {
         vector_free(group->nodes, true);
     }
-    btc_free(group);
+    dogecoin_free(group);
 }
 
-void btc_node_group_event_loop(btc_node_group* group)
+void dogecoin_node_group_event_loop(dogecoin_node_group* group)
 {
     event_base_dispatch(group->event_base);
 }
 
-void btc_node_group_add_node(btc_node_group* group, btc_node* node)
+void dogecoin_node_group_add_node(dogecoin_node_group* group, dogecoin_node* node)
 {
     vector_add(group->nodes, node);
     node->nodegroup = group;
     node->nodeid = group->nodes->len;
 }
 
-int btc_node_group_amount_of_connected_nodes(btc_node_group* group, enum NODE_STATE state)
+int dogecoin_node_group_amount_of_connected_nodes(dogecoin_node_group* group, enum NODE_STATE state)
 {
     int cnt = 0;
     for (size_t i = 0; i < group->nodes->len; i++) {
-        btc_node* node = vector_idx(group->nodes, i);
+        dogecoin_node* node = vector_idx(group->nodes, i);
         if ((node->state & state) == state)
             cnt++;
     }
     return cnt;
 }
 
-btc_bool btc_node_group_connect_next_nodes(btc_node_group* group)
+dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group)
 {
-    btc_bool connected_at_least_to_one_node = false;
-    int connect_amount = group->desired_amount_connected_nodes - btc_node_group_amount_of_connected_nodes(group, NODE_CONNECTED);
+    dogecoin_bool connected_at_least_to_one_node = false;
+    int connect_amount = group->desired_amount_connected_nodes - dogecoin_node_group_amount_of_connected_nodes(group, NODE_CONNECTED);
     if (connect_amount <= 0)
         return true;
 
     connect_amount = connect_amount*3;
     /* search for a potential node that has not errored and is not connected or in connecting state */
     for (size_t i = 0; i < group->nodes->len; i++) {
-        btc_node* node = vector_idx(group->nodes, i);
+        dogecoin_node* node = vector_idx(group->nodes, i);
         if (
             !((node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
             !((node->state & NODE_CONNECTING) == NODE_CONNECTING) &&
@@ -380,7 +380,7 @@ btc_bool btc_node_group_connect_next_nodes(btc_node_group* group)
             /* setup periodic timer */
             node->time_started_con = time(NULL);
             struct timeval tv;
-            tv.tv_sec = BTC_PERIODICAL_NODE_TIMER_S;
+            tv.tv_sec = DOGECOIN_PERIODICAL_NODE_TIMER_S;
             tv.tv_usec = 0;
             node->timer_event = event_new(group->event_base, 0, EV_TIMEOUT | EV_PERSIST, node_periodical_timer,
                                           (void*)node);
@@ -399,31 +399,31 @@ btc_bool btc_node_group_connect_next_nodes(btc_node_group* group)
     return connected_at_least_to_one_node;
 }
 
-void btc_node_connection_state_changed(btc_node* node)
+void dogecoin_node_connection_state_changed(dogecoin_node* node)
 {
     if (node->nodegroup->node_connection_state_changed_cb)
         node->nodegroup->node_connection_state_changed_cb(node);
 
     if ((node->state & NODE_ERRORED) == NODE_ERRORED) {
-        btc_node_release_events(node);
+        dogecoin_node_release_events(node);
 
         /* connect to more nodes are required */
-        btc_bool should_connect_to_more_nodes = true;
+        dogecoin_bool should_connect_to_more_nodes = true;
         if (node->nodegroup->should_connect_to_more_nodes_cb)
             should_connect_to_more_nodes = node->nodegroup->should_connect_to_more_nodes_cb(node);
 
-        if (should_connect_to_more_nodes && (btc_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTED) + btc_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTING) < node->nodegroup->desired_amount_connected_nodes))
-            btc_node_group_connect_next_nodes(node->nodegroup);
+        if (should_connect_to_more_nodes && (dogecoin_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTED) + dogecoin_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTING) < node->nodegroup->desired_amount_connected_nodes))
+            dogecoin_node_group_connect_next_nodes(node->nodegroup);
     }
     if ((node->state & NODE_MISSBEHAVED) == NODE_MISSBEHAVED) {
         if ((node->state & NODE_CONNECTED) == NODE_CONNECTED || (node->state & NODE_CONNECTING) == NODE_CONNECTING) {
-            btc_node_disconnect(node);
+            dogecoin_node_disconnect(node);
         }
     } else
-        btc_node_send_version(node);
+        dogecoin_node_send_version(node);
 }
 
-void btc_node_send(btc_node* node, cstring* data)
+void dogecoin_node_send(dogecoin_node* node, cstring* data)
 {
     if ((node->state & NODE_CONNECTED) != NODE_CONNECTED)
         return;
@@ -433,7 +433,7 @@ void btc_node_send(btc_node* node, cstring* data)
     node->nodegroup->log_write_cb("sending message to node %d: %s\n", node->nodeid, dummy);
 }
 
-void btc_node_send_version(btc_node* node)
+void dogecoin_node_send_version(dogecoin_node* node)
 {
     if (!node)
         return;
@@ -442,70 +442,70 @@ void btc_node_send_version(btc_node* node)
     cstring* version_msg_cstr = cstr_new_sz(256);
 
     /* copy socket_addr to p2p addr */
-    btc_p2p_address fromAddr;
-    btc_p2p_address_init(&fromAddr);
-    btc_p2p_address toAddr;
-    btc_p2p_address_init(&toAddr);
-    btc_addr_to_p2paddr(&node->addr, &toAddr);
+    dogecoin_p2p_address fromAddr;
+    dogecoin_p2p_address_init(&fromAddr);
+    dogecoin_p2p_address toAddr;
+    dogecoin_p2p_address_init(&toAddr);
+    dogecoin_addr_to_p2paddr(&node->addr, &toAddr);
 
     /* create a version message struct */
-    btc_p2p_version_msg version_msg;
+    dogecoin_p2p_version_msg version_msg;
     memset(&version_msg, 0, sizeof(version_msg));
 
     /* create a serialized version message */
-    btc_p2p_msg_version_init(&version_msg, &fromAddr, &toAddr, node->nodegroup->clientstr, true);
-    btc_p2p_msg_version_ser(&version_msg, version_msg_cstr);
+    dogecoin_p2p_msg_version_init(&version_msg, &fromAddr, &toAddr, node->nodegroup->clientstr, true);
+    dogecoin_p2p_msg_version_ser(&version_msg, version_msg_cstr);
 
     /* create p2p message */
-    cstring* p2p_msg = btc_p2p_message_new(node->nodegroup->chainparams->netmagic, BTC_MSG_VERSION, version_msg_cstr->str, version_msg_cstr->len);
+    cstring* p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_VERSION, version_msg_cstr->str, version_msg_cstr->len);
 
     /* send message */
-    btc_node_send(node, p2p_msg);
+    dogecoin_node_send(node, p2p_msg);
 
     /* cleanup */
     cstr_free(version_msg_cstr, true);
     cstr_free(p2p_msg, true);
 }
 
-int btc_node_parse_message(btc_node* node, btc_p2p_msg_hdr* hdr, struct const_buffer* buf)
+int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, struct const_buffer* buf)
 {
     node->nodegroup->log_write_cb("received command from node %d: %s\n", node->nodeid, hdr->command);
     if (memcmp(hdr->netmagic, node->nodegroup->chainparams->netmagic, sizeof(node->nodegroup->chainparams->netmagic)) != 0) {
-        return btc_node_missbehave(node);
+        return dogecoin_node_missbehave(node);
     }
 
     /* send the header and buffer to the possible callback */
     /* callback can decide to run the internal base message logic */
     if (!node->nodegroup->parse_cmd_cb || node->nodegroup->parse_cmd_cb(node, hdr, buf)) {
-        if (strcmp(hdr->command, BTC_MSG_VERSION) == 0) {
-            btc_p2p_version_msg v_msg_check;
-            if (!btc_p2p_msg_version_deser(&v_msg_check, buf)) {
-                return btc_node_missbehave(node);
+        if (strcmp(hdr->command, DOGECOIN_MSG_VERSION) == 0) {
+            dogecoin_p2p_version_msg v_msg_check;
+            if (!dogecoin_p2p_msg_version_deser(&v_msg_check, buf)) {
+                return dogecoin_node_missbehave(node);
             }
-            if ((v_msg_check.services & BTC_NODE_NETWORK) != BTC_NODE_NETWORK) {
-                btc_node_disconnect(node);
+            if ((v_msg_check.services & DOGECOIN_NODE_NETWORK) != DOGECOIN_NODE_NETWORK) {
+                dogecoin_node_disconnect(node);
             }
             node->bestknownheight = v_msg_check.start_height;
             node->nodegroup->log_write_cb("Connected to node %d: %s (%d)\n", node->nodeid, v_msg_check.useragent, v_msg_check.start_height);
             /* confirm version via verack */
-            cstring* verack = btc_p2p_message_new(node->nodegroup->chainparams->netmagic, BTC_MSG_VERACK, NULL, 0);
-            btc_node_send(node, verack);
+            cstring* verack = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_VERACK, NULL, 0);
+            dogecoin_node_send(node, verack);
             cstr_free(verack, true);
-        } else if (strcmp(hdr->command, BTC_MSG_VERACK) == 0) {
+        } else if (strcmp(hdr->command, DOGECOIN_MSG_VERACK) == 0) {
             /* complete handshake if verack has been received */
             node->version_handshake = true;
 
             /* execute callback and inform that the node is ready for custom message logic */
             if (node->nodegroup->handshake_done_cb)
                 node->nodegroup->handshake_done_cb(node);
-        } else if (strcmp(hdr->command, BTC_MSG_PING) == 0) {
+        } else if (strcmp(hdr->command, DOGECOIN_MSG_PING) == 0) {
             /* response pings */
             uint64_t nonce = 0;
             if (!deser_u64(&nonce, buf)) {
-                return btc_node_missbehave(node);
+                return dogecoin_node_missbehave(node);
             }
-            cstring* pongmsg = btc_p2p_message_new(node->nodegroup->chainparams->netmagic, BTC_MSG_PONG, &nonce, 8);
-            btc_node_send(node, pongmsg);
+            cstring* pongmsg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_PONG, &nonce, 8);
+            dogecoin_node_send(node, pongmsg);
             cstr_free(pongmsg, true);
         }
     }
@@ -518,12 +518,12 @@ int btc_node_parse_message(btc_node* node, btc_p2p_msg_hdr* hdr, struct const_bu
 }
 
 /* utility function to get peers (ips/port as char*) from a seed */
-int btc_get_peers_from_dns(const char* seed, vector* ips_out, int port, int family)
+int dogecoin_get_peers_from_dns(const char* seed, vector* ips_out, int port, int family)
 {
     if (!seed || !ips_out || (family != AF_INET && family != AF_INET6) || port > 99999) {
         return 0;
     }
-    char def_port[6] = {0};
+    char def_port[12] = {0};
     sprintf(def_port, "%d", port);
     struct evutil_addrinfo hints, *aiTrav = NULL, *aiRes = NULL;
     memset(&hints, 0, sizeof(hints));
@@ -538,7 +538,7 @@ int btc_get_peers_from_dns(const char* seed, vector* ips_out, int port, int fami
     aiTrav = aiRes;
     while (aiTrav != NULL) {
         int maxlen = 256;
-        char* ipaddr = btc_calloc(1, maxlen);
+        char* ipaddr = dogecoin_calloc(1, maxlen);
         if (aiTrav->ai_family == AF_INET) {
             assert(aiTrav->ai_addrlen >= sizeof(struct sockaddr_in));
             evutil_inet_ntop(aiTrav->ai_family, &((struct sockaddr_in*)(aiTrav->ai_addr))->sin_addr, ipaddr, maxlen);
@@ -560,26 +560,26 @@ int btc_get_peers_from_dns(const char* seed, vector* ips_out, int port, int fami
     return ips_out->len;
 }
 
-btc_bool btc_node_group_add_peers_by_ip_or_seed(btc_node_group *group, const char *ips) {
+dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *group, const char *ips) {
     if (ips == NULL) {
         /* === DNS QUERY === */
         /* get a couple of peers from a seed */
         vector* ips_dns = vector_new(10, free);
-        const btc_dns_seed seed = group->chainparams->dnsseeds[0];
+        const dogecoin_dns_seed seed = group->chainparams->dnsseeds[0];
         if (strlen(seed.domain) == 0) {
             return false;
         }
         /* todo: make sure we have enought peers, eventually */
         /* call another seeder */
-        btc_get_peers_from_dns(seed.domain, ips_dns, group->chainparams->default_port, AF_INET);
+        dogecoin_get_peers_from_dns(seed.domain, ips_dns, group->chainparams->default_port, AF_INET);
         for (unsigned int i = 0; i < ips_dns->len; i++) {
             char* ip = (char*)vector_idx(ips_dns, i);
 
             /* create a node */
-            btc_node* node = btc_node_new();
-            if (btc_node_set_ipport(node, ip) > 0) {
+            dogecoin_node* node = dogecoin_node_new();
+            if (dogecoin_node_set_ipport(node, ip) > 0) {
                 /* add the node to the group */
-                btc_node_group_add_node(group, node);
+                dogecoin_node_group_add_node(group, node);
             }
         }
         vector_free(ips_dns, true);
@@ -590,9 +590,9 @@ btc_bool btc_node_group_add_peers_by_ip_or_seed(btc_node_group *group, const cha
         size_t offset = 0;
         for (unsigned int i = 0; i <= strlen(ips); i++) {
             if (i == strlen(ips) || ips[i] == ',') {
-                btc_node* node = btc_node_new();
-                if (btc_node_set_ipport(node, working_str) > 0) {
-                    btc_node_group_add_node(group, node);
+                dogecoin_node* node = dogecoin_node_new();
+                if (dogecoin_node_set_ipport(node, working_str) > 0) {
+                    dogecoin_node_group_add_node(group, node);
                 }
                 offset = 0;
                 memset(working_str, 0, sizeof(working_str));
