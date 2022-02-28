@@ -62,11 +62,15 @@ struct dogecoin_btree_node {
     struct dogecoin_btree_node *right;
 };
 
-static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) {
+static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *))
+{
     struct dogecoin_btree_node *r = (struct dogecoin_btree_node*)root;
-    if (r == 0) return;
+
+    if (r == 0)
+        return;
     dogecoin_btree_tdestroy(r->left, freekey);
     dogecoin_btree_tdestroy(r->right, freekey);
+
     if (freekey) freekey(r->key);
     dogecoin_free(r);
 }

@@ -114,7 +114,7 @@ int main() {
     u_run_test(test_vector);
 
 #ifdef WITH_WALLET
-    // u_run_test(test_wallet);
+    u_run_test(test_wallet);
 #endif
 
 #ifdef WITH_TOOLS

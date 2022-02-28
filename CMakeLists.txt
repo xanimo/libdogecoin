@@ -68,6 +68,7 @@ INSTALL(FILES
         include/dogecoin/compat/byteswap.h \
         include/dogecoin/chainparams.h \
         include/dogecoin/cstr.h \
+        include/dogecoin/crypto/ctaes/ctaes.h \
         include/dogecoin/dogecoin.h \
         include/dogecoin/crypto/ecc.h \
         include/dogecoin/crypto/hash.h \
@@ -97,6 +98,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/chainparams.c \
     src/commontools.c \
     src/cstr.c \
+    src/crypto/ctaes/ctaes.c \
     src/crypto/ecc.c \
     src/crypto/key.c \
     src/mem.c \

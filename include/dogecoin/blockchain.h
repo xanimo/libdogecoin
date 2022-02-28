@@ -29,8 +29,8 @@
 #ifndef __LIBDOGECOIN_BLOCKCHAIN_H__
 #define __LIBDOGECOIN_BLOCKCHAIN_H__
 
-#include "dogecoin.h"
-#include "block.h"
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/block.h>
 
 LIBDOGECOIN_BEGIN_DECL
 

@@ -30,10 +30,10 @@
 #ifndef __LIBDOGECOIN_BLOCK_H__
 #define __LIBDOGECOIN_BLOCK_H__
 
-#include "dogecoin.h"
-#include "buffer.h"
-#include "cstr.h"
-#include "crypto/hash.h"
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/buffer.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/crypto/hash.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
