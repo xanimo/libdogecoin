@@ -38,6 +38,7 @@
 extern void test_aes();
 extern void test_base58();
 extern void test_bip32();
+extern void test_block_header();
 extern void test_buffer();
 extern void test_cstr();
 extern void test_ecc();
@@ -50,7 +51,6 @@ extern void test_serialize();
 extern void test_sha_256();
 extern void test_sha_512();
 extern void test_sha_hmac();
-extern void test_tool();
 extern void test_tx_serialization();
 extern void test_tx_sighash();
 extern void test_tx_sighash_ext();
@@ -115,6 +115,10 @@ int main() {
 
 #ifdef WITH_WALLET
     u_run_test(test_wallet);
+
+    u_run_test(test_red_black_tree);
+    u_run_test(test_logdb_memdb);
+    u_run_test(test_logdb_rbtree);
 #endif
 
 #ifdef WITH_TOOLS
@@ -122,8 +126,7 @@ int main() {
 #endif
 
 #ifdef WITH_NET
-    // u_run_test(test_netspv);
-
+    u_run_test(test_netspv);
     u_run_test(test_protocol);
     u_run_test(test_net_basics_plus_download_block);
 #endif

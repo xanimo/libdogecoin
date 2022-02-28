@@ -29,10 +29,10 @@
 #ifndef __LIBDOGECOIN_HEADERSDB_H__
 #define __LIBDOGECOIN_HEADERSDB_H__
 
-#include "dogecoin.h"
-#include "blockchain.h"
-#include "buffer.h"
-#include "chainparams.h"
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/blockchain.h>
+#include <dogecoin/buffer.h>
+#include <dogecoin/chainparams.h>
 
 LIBDOGECOIN_BEGIN_DECL
 

@@ -41,7 +41,6 @@
 static const unsigned char file_hdr_magic[4] = {0xF9, 0xAA, 0x03, 0xBA}; /* header magic */
 static const unsigned char record_magic[8] = {0x88, 0x61, 0xAD, 0xFC, 0x5A, 0x11, 0x22, 0xF8}; /* record magic */
 
-
 logdb_log_db* logdb_new_internal()
 {
     logdb_log_db* db;

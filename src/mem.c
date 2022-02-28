@@ -96,7 +96,7 @@ void* dogecoin_realloc_internal(void *ptr, size_t size) {
     }
 }
 
-void dogecoin_free_internal(void* ptr) {
+void dogecoin_free_internal(void* ptr) { 
     free(ptr);
 }
 

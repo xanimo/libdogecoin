@@ -1,7 +1,7 @@
 #include "utest.h"
 #include <stdarg.h>
 #include <dogecoin/block.h>
-#include <dogecoin/net.h>
+#include <dogecoin/net/net.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/tx.h>

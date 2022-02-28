@@ -42,7 +42,6 @@ typedef struct rb_red_blk_node {
   struct rb_red_blk_node* parent;
 } rb_red_blk_node;
 
-
 /* Compare(a,b) should return 1 if *a > *b, -1 if *a < *b, and 0 otherwise */
 /* Destroy(a) takes a pointer to whatever key might be and frees it accordingly */
 typedef struct rb_red_blk_tree {
@@ -89,6 +88,5 @@ void StackDestroy(stk_stack * theStack,void DestFunc(void * a));
 
 void rbtree_it_reset(rb_red_blk_tree* tree);
 rb_red_blk_node* rbtree_enumerate_next(rb_red_blk_tree* tree);
-
 
 #endif /* __LIBLOGDB_RED_BLACK_TREE_H__ */

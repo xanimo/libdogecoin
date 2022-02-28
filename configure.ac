@@ -1,6 +1,6 @@
 dnl require autoconf 2.68 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.68])
-AC_INIT([LIBDOGECOIN],[0.1],[https://github.com/dogecoinfoundation/libdogecoin/issues],[LIBDOGECOIN])
+AC_INIT([libdogecoin],[0.1],[https://github.com/dogecoinfoundation/libdogecoin/issues],[libdogecoin])
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])

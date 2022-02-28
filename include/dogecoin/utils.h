@@ -30,6 +30,10 @@
 #ifndef __LIBDOGECOIN_UTILS_H__
 #define __LIBDOGECOIN_UTILS_H__
 
+#define _SEARCH_PRIVATE
+#include <search.h>
+#include <stdlib.h>
+
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
@@ -62,18 +66,28 @@ struct dogecoin_btree_node {
     struct dogecoin_btree_node *right;
 };
 
-static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *))
-{
+// Destroy a tree and free all allocated resources.
+// This is a GNU extension, not available from NetBSD.
+static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) {
+    if (!root) return;
     struct dogecoin_btree_node *r = (struct dogecoin_btree_node*)root;
 
     if (r == 0)
         return;
-    dogecoin_btree_tdestroy(r->left, freekey);
-    dogecoin_btree_tdestroy(r->right, freekey);
+    if ((!r->left) && (!r->right)) return;
+    if (r->left) { 
+        if (!r->right) goto out;}
+        dogecoin_btree_tdestroy(r->left, freekey);
 
-    if (freekey) freekey(r->key);
+    if (r->right) { 
+        if (!r->left) goto out;}
+        dogecoin_btree_tdestroy(r->right,freekey);
+
+    out:
+    freekey(r->key);
     dogecoin_free(r);
 }
+
 
 LIBDOGECOIN_END_DECL
 

@@ -29,11 +29,11 @@
 #ifndef __LIBDOGECOIN_HEADERSDB_FILE_H__
 #define __LIBDOGECOIN_HEADERSDB_FILE_H__
 
-#include "dogecoin.h"
-#include "blockchain.h"
-#include "buffer.h"
-#include "chainparams.h"
-#include "headersdb.h"
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/blockchain.h>
+#include <dogecoin/buffer.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/headersdb.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -68,7 +68,6 @@ dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db);
 void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256 hash, uint32_t height);
 
-
 // interface function pointer bindings
 static const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = {
     (void* (*)(const dogecoin_chainparams*, dogecoin_bool))dogecoin_headers_db_new,
@@ -84,8 +83,6 @@ static const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = 
     (void (*)(void *, uint256, uint32_t))dogecoin_headersdb_set_checkpoint_start
 };
 
-#ifdef __cplusplus
-}
-#endif
+LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_HEADERSDB_FILE_H__

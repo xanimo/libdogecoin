@@ -52,7 +52,7 @@ libdogecoin_la_SOURCES = \
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
-    src/commontools.c \
+    src/cli/tool.c \
     src/cstr.c \
     src/crypto/ctaes/ctaes.c \
     src/crypto/ecc.c \
@@ -68,7 +68,7 @@ libdogecoin_la_SOURCES = \
     src/utils.c \
     src/vector.c
 
-libdogecoin_la_CFLAGS = -I$(top_srcdir)/include  -I$(top_srcdir)/src/logdb/include
+libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
 libdogecoin_la_LIBADD = $(LIBSECP256K1)
 
 if USE_TESTS
@@ -79,6 +79,7 @@ tests_SOURCES = \
     test/aes_tests.c \
     test/base58_tests.c \
     test/bip32_tests.c \
+    test/block_tests.c \
     test/buffer_tests.c \
     test/cstr_tests.c \
     test/ecc_tests.c \
@@ -144,15 +145,15 @@ if WITH_NET
 libdogecoininclude_HEADERS += \
     include/dogecoin/headersdb.h \
     include/dogecoin/headersdb_file.h \
-    include/dogecoin/protocol.h \
-    include/dogecoin/net.h \
-    include/dogecoin/netspv.h
+    include/dogecoin/net/protocol.h \
+    include/dogecoin/net/net.h \
+    include/dogecoin/net/spv.h
 
 libdogecoin_la_SOURCES += \
     src/headersdb_file.c \
-    src/net.c \
-    src/netspv.c \
-    src/protocol.c
+    src/net/net.c \
+    src/net/protocol.c \
+    src/net/spv.c
 
 libdogecoin_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
 libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
@@ -197,6 +198,26 @@ dogecoin_spv_CFLAGS = $(libdogecoin_la_CFLAGS)
 dogecoin_spv_CPPFLAGS = -I$(top_srcdir)/src
 dogecoin_spv_LDFLAGS = -static
 endif
+endif
+
+if WITH_NET
+inst_PROGRAMS += sendtx
+sendtx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+sendtx_SOURCES = \
+    src/cli/sendtx.c
+sendtx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+sendtx_CPPFLAGS = -I$(top_srcdir)/src
+sendtx_LDFLAGS = -static
+
+inst_PROGRAMS += spvnode
+spvnode_LDADD = libdogecoin.la
+spvnode_SOURCES = \
+    src/cli/spvnode.c
+spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
+spvnode_CPPFLAGS = -I$(top_srcdir)/src
+spvnode_LDFLAGS = -static
+endif
+
 endif
 
 clean-local:

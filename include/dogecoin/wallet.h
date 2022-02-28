@@ -29,11 +29,11 @@
 #ifndef __LIBDOGECOIN_WALLET_H__
 #define __LIBDOGECOIN_WALLET_H__
 
-#include "dogecoin.h"
-#include "blockchain.h"
-#include "bip32.h"
-#include "buffer.h"
-#include "tx.h"
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/blockchain.h>
+#include <dogecoin/bip32.h>
+#include <dogecoin/buffer.h>
+#include <dogecoin/tx.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -45,7 +45,6 @@ typedef struct dogecoin_wallet {
     const dogecoin_chainparams* chain;
     uint32_t bestblockheight;
     vector* spends;
-
     /* use binary trees for in-memory mapping for wtxs, keys */
     void* wtxes_rbtree;
     void* hdkeys_rbtree;

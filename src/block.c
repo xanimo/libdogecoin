@@ -31,26 +31,20 @@
 #include <stdint.h>
 #include <string.h>
 
-
 #include <dogecoin/block.h>
 
 #include <dogecoin/serialize.h>
 #include <dogecoin/crypto/sha2.h>
 #include <dogecoin/utils.h>
 
-dogecoin_block_header* dogecoin_block_header_new()
-{
+dogecoin_block_header* dogecoin_block_header_new() {
     dogecoin_block_header* header;
     header = dogecoin_calloc(1, sizeof(*header));
-
     return header;
 }
 
-void dogecoin_block_header_free(dogecoin_block_header* header)
-{
-    if (!header)
-        return;
-
+void dogecoin_block_header_free(dogecoin_block_header* header) {
+    if (!header) return;
     header->version = 1;
     memset(&header->prev_block, 0, DOGECOIN_HASH_LENGTH);
     memset(&header->merkle_root, 0, DOGECOIN_HASH_LENGTH);
@@ -60,8 +54,7 @@ void dogecoin_block_header_free(dogecoin_block_header* header)
     dogecoin_free(header);
 }
 
-int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf)
-{
+int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf) {
     if (!deser_s32(&header->version, buf))
         return false;
     if (!deser_u256(header->prev_block, buf))
@@ -78,8 +71,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     return true;
 }
 
-void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header)
-{
+void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header) {
     ser_s32(s, header->version);
     ser_u256(s, header->prev_block);
     ser_u256(s, header->merkle_root);
@@ -88,8 +80,7 @@ void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* he
     ser_u32(s, header->nonce);
 }
 
-void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_block_header* src)
-{
+void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_block_header* src) {
     dest->version = src->version;
     memcpy(&dest->prev_block, &src->prev_block, sizeof(src->prev_block));
     memcpy(&dest->merkle_root, &src->merkle_root, sizeof(src->merkle_root));
@@ -98,8 +89,7 @@ void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_bloc
     dest->nonce = src->nonce;
 }
 
-dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256 hash)
-{
+dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256 hash) {
     cstring* s = cstr_new_sz(80);
     dogecoin_block_header_serialize(s, header);
 

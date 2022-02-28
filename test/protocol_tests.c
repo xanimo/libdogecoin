@@ -11,7 +11,7 @@
 
 #include <dogecoin/chainparams.h>
 #include <dogecoin/utils.h>
-#include <dogecoin/protocol.h>
+#include <dogecoin/net/protocol.h>
 #include "utest.h"
 
 #include <event2/util.h>
@@ -130,4 +130,3 @@ void test_protocol()
     vector_free(blocklocators_check, true);
     cstr_free(p2p_msg, true);
 }
-
