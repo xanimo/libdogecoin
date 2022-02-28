@@ -22,7 +22,7 @@ dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *cli
 void test_netspv()
 {
     unlink("headers.db");
-    dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_test, true, false);
+    dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_test, false, false);
     client->header_message_processed = test_spv_header_message_processed;
     client->sync_completed = test_spv_sync_completed;
 

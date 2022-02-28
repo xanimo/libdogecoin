@@ -96,7 +96,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
-    src/commontools.c \
+    src/cli/tool.c \
     src/cstr.c \
     src/crypto/ctaes/ctaes.c \
     src/crypto/ecc.c \
@@ -151,6 +151,7 @@ IF(USE_TESTS)
         test/aes_tests.c \
         test/base58_tests.c \
         test/bip32_tests.c \
+        test/block_tests.c \
         test/buffer_tests.c \
         test/cstr_tests.c \
         test/ecc_tests.c \
@@ -161,7 +162,6 @@ IF(USE_TESTS)
         test/rmd160_tests.c \
         test/serialize_tests.c \
         test/sha2_tests.c \
-        test/tool_tests.c \
         test/tx_tests.c \
         test/utest.h \
         test/unittester.c \
@@ -247,20 +247,20 @@ IF(WITH_TOOLS)
         )
     ENDIF()
 
-    ADD_EXECUTABLE(dogecointool src/tools/dogecointool.c)
-    INSTALL(TARGETS dogecointool RUNTIME)
-    TARGET_LINK_LIBRARIES(dogecointool ${LIBDOGECOIN_NAME})
-    TARGET_INCLUDE_DIRECTORIES(dogecointool PRIVATE src)
+    ADD_EXECUTABLE(such src/cli/such.c)
+    INSTALL(TARGETS such RUNTIME)
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME})
+    TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
     IF(WITH_NET)
-        ADD_EXECUTABLE(dogecoin-send-tx src/tools/dogecoin-send-tx.c)
-        INSTALL(TARGETS dogecoin-send-tx RUNTIME)
-        TARGET_LINK_LIBRARIES(dogecoin-send-tx ${LIBDOGECOIN_NAME})
-        TARGET_INCLUDE_DIRECTORIES(dogecoin-send-tx PRIVATE src)
-        ADD_EXECUTABLE(dogecoin-spv src/tools/dogecoin-spv.c)
-        INSTALL(TARGETS dogecoin-spv RUNTIME)
-        TARGET_LINK_LIBRARIES(dogecoin-spv ${LIBDOGECOIN_NAME})
-        TARGET_INCLUDE_DIRECTORIES(dogecoin-spv PRIVATE src)
+        ADD_EXECUTABLE(sendtx src/cli/sendtx.c)
+        INSTALL(TARGETS sendtx RUNTIME)
+        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME})
+        TARGET_INCLUDE_DIRECTORIES(sendtx PRIVATE src)
+        ADD_EXECUTABLE(spvnode src/cli/spv.c)
+        INSTALL(TARGETS spvnode RUNTIME)
+        TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME})
+        TARGET_INCLUDE_DIRECTORIES(spvnode PRIVATE src)
     ENDIF()
 ENDIF()
 

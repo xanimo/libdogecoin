@@ -174,17 +174,18 @@ signed char utils_hex_digit(char c) {
 }
 
 void utils_uint256_sethex(char* psz, uint8_t* out) {
+    if (!psz) return;
     memset(out, 0, sizeof(uint256));
-    while (isspace(*psz)) ++psz; // skip leading spaces
+    while (isspace(*psz)) psz++; // skip leading spaces
     if (psz[0] == '0' && tolower(psz[1]) == 'x') psz += 2; // skip 0x
     const char* pbegin = psz; // hex string to uint
-    while (utils_hex_digit(*psz) != -1) ++psz;  
-    --psz;
+    while (utils_hex_digit(*psz) != -1) psz++;  
+    psz--;
     unsigned char* p1 = (unsigned char*)out;
     unsigned char* pend = p1 + sizeof(uint256);
     while (psz >= pbegin && p1 < pend) { 
-        *p1 = utils_hex_digit(--*psz);
-        if (psz >= pbegin) *p1 |= ((unsigned char)utils_hex_digit(*psz--) << 4); ++p1;
+        *p1 = utils_hex_digit(*psz--);
+        if (psz >= pbegin) *p1 |= ((unsigned char)utils_hex_digit(*psz--) << 4); p1++;
     }
 }
 
@@ -221,7 +222,7 @@ void dogecoin_get_default_datadir(cstring *path_out) {
     else cstr_append_buf(path_out, home, strlen(home));
 #ifdef __APPLE__
     // Mac
-    char *osx_home = "/Library/Application Support/Bitcoin";
+    char *osx_home = "/Library/Application Support/Dogecoin";
     cstr_append_buf(path_out, osx_home, strlen(osx_home));
 #else
     // Unix

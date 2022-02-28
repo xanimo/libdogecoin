@@ -115,10 +115,6 @@ int main() {
 
 #ifdef WITH_WALLET
     u_run_test(test_wallet);
-
-    u_run_test(test_red_black_tree);
-    u_run_test(test_logdb_memdb);
-    u_run_test(test_logdb_rbtree);
 #endif
 
 #ifdef WITH_TOOLS

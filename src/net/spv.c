@@ -85,7 +85,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
 
     client->nodegroup = dogecoin_node_group_new(params);
     client->nodegroup->ctx = client;
-    client->nodegroup->desired_amount_connected_nodes = 16; /* TODO */
+    client->nodegroup->desired_amount_connected_nodes = 3; /* TODO */
 
     dogecoin_net_set_spv(client->nodegroup);
 

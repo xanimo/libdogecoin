@@ -80,6 +80,7 @@ static const char* DOGECOIN_MSG_CFHEADERS = "cfheaders";
 static const char* DOGECOIN_MSG_GETCFCHECKPT = "getcfcheckpt";
 static const char* DOGECOIN_MSG_CFCHECKPT = "cfcheckpt";
 
+
 enum DOGECOIN_INV_TYPE {
     DOGECOIN_INV_TYPE_ERROR = 0,
     DOGECOIN_INV_TYPE_TX = 1,

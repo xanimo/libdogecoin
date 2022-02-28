@@ -33,7 +33,6 @@
 #define _SEARCH_PRIVATE
 #include <search.h>
 #include <stdlib.h>
-
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
@@ -87,7 +86,6 @@ static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) 
     freekey(r->key);
     dogecoin_free(r);
 }
-
 
 LIBDOGECOIN_END_DECL
 

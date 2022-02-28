@@ -173,32 +173,13 @@ tests_SOURCES += \
     test/tool_tests.c
 endif
 instdir=$(prefix)/bin
-inst_PROGRAMS = dogecointool
-dogecointool_LDADD = libdogecoin.la
-dogecointool_SOURCES = \
-    src/tools/dogecointool.c
-dogecointool_CFLAGS = $(libdogecoin_la_CFLAGS)
-dogecointool_CPPFLAGS = -I$(top_srcdir)/src
-dogecointool_LDFLAGS = -static
-
-if WITH_NET
-inst_PROGRAMS += dogecoin-send-tx
-dogecoin_send_tx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
-dogecoin_send_tx_SOURCES = \
-    src/tools/dogecoin-send-tx.c
-dogecoin_send_tx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
-dogecoin_send_tx_CPPFLAGS = -I$(top_srcdir)/src
-dogecoin_send_tx_LDFLAGS = -static
-
-inst_PROGRAMS += dogecoin-spv
-dogecoin_spv_LDADD = libdogecoin.la
-dogecoin_spv_SOURCES = \
-    src/tools/dogecoin-spv.c
-dogecoin_spv_CFLAGS = $(libdogecoin_la_CFLAGS)
-dogecoin_spv_CPPFLAGS = -I$(top_srcdir)/src
-dogecoin_spv_LDFLAGS = -static
-endif
-endif
+inst_PROGRAMS = such
+such_LDADD = libdogecoin.la
+such_SOURCES = \
+    src/cli/such.c
+such_CFLAGS = $(libdogecoin_la_CFLAGS)
+such_CPPFLAGS = -I$(top_srcdir)/src
+such_LDFLAGS = -static
 
 if WITH_NET
 inst_PROGRAMS += sendtx
@@ -217,7 +198,6 @@ spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
 endif
-
 endif
 
 clean-local:

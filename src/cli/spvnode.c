@@ -24,6 +24,15 @@
  
 */
 
+#include <assert.h>
+#include <getopt.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "libdogecoin-config.h"
 
 #include <dogecoin/chainparams.h>
@@ -37,15 +46,6 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
-
-#include <assert.h>
-#include <getopt.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},

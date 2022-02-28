@@ -126,14 +126,10 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
         // write file-header-magic
         fwrite(file_hdr_magic, 4, 1, db->headers_tree_file);
         uint32_t v = htole32(current_version);
-        printf("(uint32_t)buffer.st_size < (uint32_t)(sizeof(file_hdr_magic)+sizeof(current_version)): %d\n", (uint32_t)buffer.st_size < (uint32_t)(sizeof(file_hdr_magic)+sizeof(current_version)));
         fwrite(&v, sizeof(v), 1, db->headers_tree_file); /* uint32_t, LE */
     } else {
         // check file-header-magic
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)];
-        printf("(uint32_t)buffer.st_size < (uint32_t)(sizeof(file_hdr_magic)+sizeof(current_version)): %d\n", (uint32_t)buffer.st_size < (uint32_t)(sizeof(file_hdr_magic)+sizeof(current_version)));
-        printf("fread(buf, sizeof(file_hdr_magic)+sizeof(current_version), 1, db->headers_tree_file) != 1: %d\n", fread(buf, sizeof(file_hdr_magic)+sizeof(current_version), 1, db->headers_tree_file) != 1);
-        printf("memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)): %d\n", memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)));
         if ((uint32_t)buffer.st_size < (uint32_t)(sizeof(file_hdr_magic)+sizeof(current_version)) ||
              fread(buf, sizeof(file_hdr_magic)+sizeof(current_version), 1, db->headers_tree_file) != 1 ||
              memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
@@ -285,7 +281,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
         //TODO, add to orphans
         char hex[65] = {0};
         utils_bin_to_hex(blockindex->hash, DOGECOIN_HASH_LENGTH, hex);
-        printf("Failed connecting header at height %d (%s)\n", db->chaintip->height, hex);
     }
 
     return blockindex;
