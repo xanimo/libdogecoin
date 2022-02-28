@@ -71,9 +71,11 @@ struct dogecoin_btree_node {
 // This is a GNU extension, not available from NetBSD.
 static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) {
     struct dogecoin_btree_node* r = (struct dogecoin_btree_node*)root;
-    if ((r == 0) || (r == 0x1)) return;
+    if ((r == 0) || (*r == 0x1)) return;
+
     if (r->left) dogecoin_btree_tdestroy(r->left, freekey);
     if (r->right) dogecoin_btree_tdestroy(r->right, freekey);
+
     if (freekey) (*freekey)(r->key);
     dogecoin_free(r);
 }
