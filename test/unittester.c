@@ -63,6 +63,20 @@ extern void test_scripts();
 extern void test_utils();
 extern void test_vector();
 
+#ifdef WITH_WALLET
+extern void test_wallet();
+#endif
+
+#ifdef WITH_TOOLS
+extern void test_tool();
+#endif
+
+#ifdef WITH_NET
+extern void test_net_basics_plus_download_block();
+extern void test_protocol();
+extern void test_netspv();
+#endif
+
 extern void dogecoin_ecc_start();
 extern void dogecoin_ecc_stop();
 
@@ -87,7 +101,6 @@ int main() {
     u_run_test(test_sha_256);
     u_run_test(test_sha_512);
     u_run_test(test_sha_hmac);
-    u_run_test(test_tool);
     u_run_test(test_tx_serialization);
     u_run_test(test_invalid_tx_deser);
     u_run_test(test_tx_sign);
@@ -99,6 +112,21 @@ int main() {
     u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
     u_run_test(test_vector);
+
+#ifdef WITH_WALLET
+    // u_run_test(test_wallet);
+#endif
+
+#ifdef WITH_TOOLS
+    // u_run_test(test_tool);
+#endif
+
+#ifdef WITH_NET
+    // u_run_test(test_netspv);
+
+    u_run_test(test_protocol);
+    u_run_test(test_net_basics_plus_download_block);
+#endif
 
     dogecoin_ecc_stop();
     return U_TESTS_FAIL;
