@@ -11,12 +11,14 @@ $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/includ
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
 lib_LTLIBRARIES = libdogecoin.la
-includedir = $(includedir)/dogecoin
-include_HEADERS = \
+libdogecoinincludedir = $(includedir)/dogecoin
+libdogecoininclude_HEADERS = \
     include/dogecoin/address.h \
     include/dogecoin/crypto/aes.h \
     include/dogecoin/crypto/base58.h \
     include/dogecoin/bip32.h \
+    include/dogecoin/block.h \
+    include/dogecoin/blockchain.h \
     include/dogecoin/buffer.h \
     include/dogecoin/compat/byteswap.h \
     include/dogecoin/chainparams.h \
@@ -46,8 +48,10 @@ libdogecoin_la_SOURCES = \
     src/crypto/aes.c \
     src/crypto/base58.c \
     src/bip32.c \
+    src/block.c \
     src/buffer.c \
     src/chainparams.c \
+    src/commontools.c \
     src/cstr.c \
     src/crypto/ecc.c \
     src/crypto/key.c \
@@ -58,13 +62,11 @@ libdogecoin_la_SOURCES = \
     src/crypto/segwit_addr.c \
     src/serialize.c \
     src/crypto/sha2.c \
-    src/cli/such.c \
-    src/cli/tool.c \
     src/tx.c \
     src/utils.c \
     src/vector.c
 
-libdogecoin_la_CFLAGS = -I$(top_srcdir)/include
+libdogecoin_la_CFLAGS = -I$(top_srcdir)/include  -I$(top_srcdir)/src/logdb/include
 libdogecoin_la_LIBADD = $(LIBSECP256K1)
 
 if USE_TESTS
@@ -85,7 +87,6 @@ tests_SOURCES = \
     test/rmd160_tests.c \
     test/serialize_tests.c \
     test/sha2_tests.c \
-    test/tool_tests.c \
     test/tx_tests.c \
     test/utest.h \
     test/unittester.c \
@@ -98,14 +99,103 @@ tests_LDFLAGS = -static
 TESTS = tests
 endif
 
+if WITH_LOGDB
+libdogecoin_la_SOURCES += \
+    src/logdb/logdb_core.c \
+    src/logdb/logdb_memdb_llist.c \
+    src/logdb/logdb_memdb_rbtree.c \
+    src/logdb/logdb_rec.c \
+    src/logdb/red_black_tree.c
+
+logdbincludedir = $(includedir)/logdb
+logdbinclude_HEADERS = \
+    src/logdb/include/logdb/logdb_base.h \
+    src/logdb/include/logdb/logdb_core.h \
+    src/logdb/include/logdb/logdb_memdb_llist.h \
+    src/logdb/include/logdb/logdb_memdb_rbtree.h \
+    src/logdb/include/logdb/logdb_rec.h \
+    src/logdb/include/logdb/logdb.h \
+    src/logdb/include/logdb/red_black_tree.h
+
+if USE_TESTS
+tests_SOURCES += \
+    src/logdb/test/logdb_tests.c \
+    src/logdb/test/tests_red_black_tree.c \
+    src/logdb/test/logdb_tests_sample.h
+endif
+endif
+
+if WITH_WALLET
+libdogecoininclude_HEADERS += \
+    include/dogecoin/wallet.h
+
+libdogecoin_la_SOURCES += \
+    src/wallet.c
+
+if USE_TESTS
+tests_SOURCES += \
+    test/wallet_tests.c
+endif
+endif
+
+if WITH_NET
+libdogecoininclude_HEADERS += \
+    include/dogecoin/headersdb.h \
+    include/dogecoin/headersdb_file.h \
+    include/dogecoin/protocol.h \
+    include/dogecoin/net.h \
+    include/dogecoin/netspv.h
+
+libdogecoin_la_SOURCES += \
+    src/headersdb_file.c \
+    src/net.c \
+    src/netspv.c \
+    src/protocol.c
+
+libdogecoin_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+
+if USE_TESTS
+tests_SOURCES += \
+    test/net_tests.c \
+    test/netspv_tests.c \
+    test/protocol_tests.c
+tests_LDADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+endif
+endif
+
+if WITH_TOOLS
+if USE_TESTS
+tests_SOURCES += \
+    test/tool_tests.c
+endif
 instdir=$(prefix)/bin
-inst_PROGRAMS = such
-such_LDADD = libdogecoin.la
-such_SOURCES = \
-    src/cli/such.c
-such_CFLAGS = $(libdogecoin_la_CFLAGS)
-such_CPPFLAGS = -I$(top_srcdir)/src
-such_LDFLAGS = -static
+inst_PROGRAMS = dogecointool
+dogecointool_LDADD = libdogecoin.la
+dogecointool_SOURCES = \
+    src/tools/dogecointool.c
+dogecointool_CFLAGS = $(libdogecoin_la_CFLAGS)
+dogecointool_CPPFLAGS = -I$(top_srcdir)/src
+dogecointool_LDFLAGS = -static
+
+if WITH_NET
+inst_PROGRAMS += dogecoin-send-tx
+dogecoin_send_tx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+dogecoin_send_tx_SOURCES = \
+    src/tools/dogecoin-send-tx.c
+dogecoin_send_tx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+dogecoin_send_tx_CPPFLAGS = -I$(top_srcdir)/src
+dogecoin_send_tx_LDFLAGS = -static
+
+inst_PROGRAMS += dogecoin-spv
+dogecoin_spv_LDADD = libdogecoin.la
+dogecoin_spv_SOURCES = \
+    src/tools/dogecoin-spv.c
+dogecoin_spv_CFLAGS = $(libdogecoin_la_CFLAGS)
+dogecoin_spv_CPPFLAGS = -I$(top_srcdir)/src
+dogecoin_spv_LDFLAGS = -static
+endif
+endif
 
 clean-local:
 	-$(MAKE) -C src/secp256k1 clean
