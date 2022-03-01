@@ -217,16 +217,16 @@ IF(WITH_NET)
     INSTALL(FILES
         include/dogecoin/headersdb.h
         include/dogecoin/headersdb_file.h
-        include/dogecoin/protocol.h
-        include/dogecoin/net.h
-        include/dogecoin/netspv.h
+        include/dogecoin/net/protocol.h
+        include/dogecoin/net/net.h
+        include/dogecoin/net/spv.h
         DESTINATION include/dogecoin
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
         src/headersdb_file.c
-        src/net.c
-        src/netspv.c
-        src/protocol.c
+        src/net/net.c
+        src/net/spv.c
+        src/net/protocol.c
     )
 
     TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS})
