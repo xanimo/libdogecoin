@@ -74,8 +74,8 @@ static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) 
     if (r == 0) return; // if root node we're done
     if (freekey) goto end; // if freekey jump past recursive entry and free key
     if (!r->left && !r->right) return; // if left and right nodes don't exist we've freed last key
-    if (r->left) dogecoin_btree_tdestroy(r->left, freekey); // if left destroy it
-    if (r->right) dogecoin_btree_tdestroy(r->right, freekey); // last point before segfault right will be (nil) and left will be 0x1 so avoid it recursively calling again
+    dogecoin_btree_tdestroy(r->left, freekey); // if left destroy it
+    dogecoin_btree_tdestroy(r->right, freekey); // last point before segfault right will be (nil) and left will be 0x1 so avoid it recursively calling again
 end:
     freekey(r->key);
     dogecoin_free(r);

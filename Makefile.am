@@ -108,7 +108,9 @@ libdogecoin_la_SOURCES += \
     src/logdb/logdb_memdb_llist.c \
     src/logdb/logdb_memdb_rbtree.c \
     src/logdb/logdb_rec.c \
-    src/logdb/red_black_tree.c
+    src/logdb/misc.c \
+    src/logdb/red_black_tree.c \
+    src/logdb/stack.c
 
 logdbincludedir = $(includedir)/logdb
 logdbinclude_HEADERS = \
@@ -118,7 +120,9 @@ logdbinclude_HEADERS = \
     src/logdb/include/logdb/logdb_memdb_rbtree.h \
     src/logdb/include/logdb/logdb_rec.h \
     src/logdb/include/logdb/logdb.h \
-    src/logdb/include/logdb/red_black_tree.h
+    src/logdb/include/logdb/misc.h \
+    src/logdb/include/logdb/red_black_tree.h \
+    src/logdb/include/logdb/stack.h
 
 if USE_TESTS
 tests_SOURCES += \

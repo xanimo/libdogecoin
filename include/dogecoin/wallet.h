@@ -29,13 +29,16 @@
 #ifndef __LIBDOGECOIN_WALLET_H__
 #define __LIBDOGECOIN_WALLET_H__
 
+LIBDOGECOIN_BEGIN_DECL
+
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/blockchain.h>
 #include <dogecoin/bip32.h>
 #include <dogecoin/buffer.h>
 #include <dogecoin/tx.h>
 
-LIBDOGECOIN_BEGIN_DECL
+#include <stdint.h>
+#include <stddef.h>
 
 /** single key/value record */
 typedef struct dogecoin_wallet {
