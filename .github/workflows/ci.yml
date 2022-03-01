@@ -79,9 +79,8 @@ jobs:
           - name: i686-linux
             host: i686-pc-linux-gnu
             os: ubuntu-18.04
-            packages: g++-multilib
             run-tests: true
-            config-opts: "LDFLAGS=-static-libstdc++"
+            dep-opts: "DEBUG=1"
             goal: install
 
     runs-on: ${{ matrix.os }}
