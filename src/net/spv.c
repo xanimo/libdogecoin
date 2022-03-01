@@ -93,7 +93,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
         client->nodegroup->log_write_cb = net_write_log_printf;
     }
 
-    if (params == &dogecoin_chainparams_test) {
+    if (params == &dogecoin_chainparams_main) {
         client->use_checkpoints = true;
     }
     client->headers_db = &dogecoin_headers_db_interface_file;
