@@ -36,7 +36,7 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
-#include <math.h>
+#include <logdb/logdb.h>
 
 #define TO_UINT8_HEX_BUF_LEN 2048
 #define VARINT_LEN 20
@@ -70,12 +70,13 @@ struct dogecoin_btree_node {
 // This is a GNU extension, not available from NetBSD.
 static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) {
     struct dogecoin_btree_node* r = (struct dogecoin_btree_node*)root;
-    if ((r == 0) || (*r == 0x1)) return;
-
-    if (r->left) dogecoin_btree_tdestroy(r->left, freekey);
-    if (r->right) dogecoin_btree_tdestroy(r->right, freekey);
-
-    if (freekey) (*freekey)(r->key);
+    if (r == 0) return; // if root node we're done
+    if (freekey) goto end; // if freekey jump past recursive entry and free key
+    if (!r->left && !r->right) return; // if left and right nodes don't exist we've freed last key
+    if (r->left) dogecoin_btree_tdestroy(r->left, freekey); // if left destroy it
+    if (r->right) dogecoin_btree_tdestroy(r->right, freekey); // last point before segfault right will be (nil) and left will be 0x1 so avoid it recursively calling again
+end:
+    freekey(r->key);
     dogecoin_free(r);
 }
 
