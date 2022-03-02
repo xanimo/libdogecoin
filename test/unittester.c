@@ -64,6 +64,15 @@ extern void test_scripts();
 extern void test_utils();
 extern void test_vector();
 
+#ifdef WITH_WALLET
+extern void test_red_black_tree();
+extern void test_logdb_memdb();
+extern void test_logdb_rbtree();
+
+extern void test_logdb();
+extern void test_wallet();
+#endif
+
 extern void dogecoin_ecc_start();
 extern void dogecoin_ecc_stop();
 
@@ -102,6 +111,14 @@ int main()
     u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
     u_run_test(test_vector);
+
+#ifdef WITH_WALLET
+    u_run_test(test_wallet);
+
+    u_run_test(test_red_black_tree);
+    u_run_test(test_logdb_memdb);
+    u_run_test(test_logdb_rbtree);
+#endif
 
     dogecoin_ecc_stop();
     return U_TESTS_FAIL;

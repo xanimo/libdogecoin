@@ -64,7 +64,7 @@ libdogecoin_la_SOURCES = \
     src/utils.c \
     src/vector.c
 
-libdogecoin_la_CFLAGS = -I$(top_srcdir)/include
+libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
 libdogecoin_la_LIBADD = $(LIBSECP256K1)
 
 if USE_TESTS
@@ -96,6 +96,38 @@ tests_CFLAGS = $(libdogecoin_la_CFLAGS)
 tests_CPPFLAGS = -I$(top_srcdir)/src
 tests_LDFLAGS = -static
 TESTS = tests
+endif
+
+if WITH_WALLET
+
+libdogecoin_la_SOURCES += \
+    src/logdb/logdb_core.c \
+    src/logdb/logdb_memdb_llist.c \
+    src/logdb/logdb_memdb_rbtree.c \
+    src/logdb/logdb_rec.c \
+    src/logdb/red_black_tree.c
+
+include_HEADERS += \
+    src/logdb/include/logdb/logdb_base.h \
+    src/logdb/include/logdb/logdb_core.h \
+    src/logdb/include/logdb/logdb_memdb_llist.h \
+    src/logdb/include/logdb/logdb_memdb_rbtree.h \
+    src/logdb/include/logdb/logdb_rec.h \
+    src/logdb/include/logdb/logdb.h \
+    src/logdb/include/logdb/red_black_tree.h
+
+include_HEADERS += \
+    include/dogecoin/wallet.h
+
+libdogecoin_la_SOURCES += \
+    src/wallet.c
+
+if USE_TESTS
+tests_SOURCES += \
+    test/wallet_tests.c \
+    src/logdb/test/logdb_tests.c \
+    src/logdb/test/tests_red_black_tree.c
+endif
 endif
 
 instdir=$(prefix)/bin
