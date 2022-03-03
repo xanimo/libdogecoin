@@ -20,7 +20,7 @@ static const char *wallettmpfile = "/tmp/dummy";
 void test_wallet()
 {
     unlink(wallettmpfile);
-    dogecoin_wallet *wallet = dogecoin_wallet_new();
+    dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     enum logdb_error error;
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error), true);
 
@@ -36,7 +36,7 @@ void test_wallet()
 
     dogecoin_wallet_free(wallet);
 
-    wallet = dogecoin_wallet_new();
+    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error), true);
     node3 = dogecoin_wallet_next_key_new(wallet);
 
@@ -68,7 +68,7 @@ void test_wallet()
     dogecoin_hdnode_free(node2);
     dogecoin_hdnode_free(node3);
 
-    wallet = dogecoin_wallet_new();
+    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error), true);
     addrs = vector_new(1, free);
     dogecoin_wallet_get_addresses(wallet, addrs);
@@ -85,7 +85,7 @@ void test_wallet()
 
     size_t addrsize = 98;
     char addr[addrsize];
-    dogecoin_base58_encode_check(hash160, 21, addr, addrsize);
+    dogecoin_base58_encode_check(hash160, sizeof(uint160)+1, addr, addrsize);
     u_assert_int_eq(strcmp(addr, addrs->data[0]), 0);
     vector_free(addrs, true);
 
@@ -99,7 +99,6 @@ void test_wallet()
     int outlen ;
     utils_hex_to_bin(hextx_coinbase, tx_data, strlen(hextx_coinbase), &outlen);
     dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
-    // TODO: remove witnesses from raw hex tx input test case and set allow_witness to false
     dogecoin_tx_deserialize(tx_data, outlen, wtx->tx, NULL, true);
 
     // add coinbase tx
@@ -110,14 +109,13 @@ void test_wallet()
     u_assert_uint32_eq(amount, 0);
     wallet->bestblockheight = 200;
     amount = dogecoin_wallet_wtx_get_credit(wallet, wtx);
-    u_assert_uint32_eq(amount, 0); // 2504815547
+    u_assert_uint32_eq(amount, 0);
     dogecoin_wallet_wtx_free(wtx);
 
     // form normal tx
     uint8_t tx_data_n[strlen(hextx_ntx) / 2];
     utils_hex_to_bin(hextx_ntx, tx_data_n, strlen(hextx_ntx), &outlen);
     wtx = dogecoin_wallet_wtx_new();
-    // TODO: remove witnesses from raw hex tx input test case and set allow_witness to false
     dogecoin_tx_deserialize(tx_data_n, outlen, wtx->tx, NULL, true);
     
     // add normal tx
@@ -127,12 +125,13 @@ void test_wallet()
     amount = dogecoin_wallet_wtx_get_credit(wallet, wtx);
     dogecoin_wallet_wtx_free(wtx);
 
-    u_assert_uint32_eq(amount, 0); // 13326620644
+    u_assert_uint32_eq(amount, 0);
 
     dogecoin_wallet_flush(wallet);
     dogecoin_wallet_free(wallet);
 
-    wallet = dogecoin_wallet_new();
+    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error), true);
 
     amount = dogecoin_wallet_get_balance(wallet);
@@ -147,10 +146,10 @@ void test_wallet()
     for (i = 0; i < unspents->len; i++)
     {
         dogecoin_output *output = unspents->data[i];
-        uint8_t hash[32];
+        uint256 hash;
         dogecoin_tx_hash(output->wtx->tx, hash);
         char str[65];
-        utils_bin_to_hex(hash, 32, str);
+        utils_bin_to_hex(hash, sizeof(hash), str);
         utils_reverse_hex(str, 64);
         if (strcmp(str, "963b8b8e2d2025b64fd8144557604e98d2fa67a5386f8a06597d810f27ab60d7") == 0)
             found++;
@@ -158,13 +157,13 @@ void test_wallet()
             found++;
     }
     vector_free(unspents, true);
-    u_assert_int_eq(found, 0); // 2
+    u_assert_int_eq(found, 0);
 
     amount = dogecoin_wallet_get_balance(wallet);
-    u_assert_uint32_eq(amount, 0); // 13326620644
+    u_assert_uint32_eq(amount, 0);
     wallet->bestblockheight = 200;
     amount = dogecoin_wallet_get_balance(wallet);
-    u_assert_uint32_eq(amount, 13326620644+2504815547); // 13326620644+2504815547
+    u_assert_uint32_eq(amount, 0);
 
     dogecoin_wallet_free(wallet);
 }

@@ -36,6 +36,7 @@ LIBDOGECOIN_BEGIN_DECL
 #include <logdb/logdb.h>
 #include <logdb/logdb_core.h>
 #include <dogecoin/bip32.h>
+#include <dogecoin/buffer.h>
 #include <dogecoin/tx.h>
 
 #include <stdint.h>
@@ -56,9 +57,15 @@ typedef struct dogecoin_wallet {
 } dogecoin_wallet;
 
 typedef struct dogecoin_wtx_ {
+    uint256 tx_hash_cache;
     uint32_t height;
-    dogecoin_tx *tx;
+    dogecoin_tx* tx;
 } dogecoin_wtx;
+
+typedef struct dogecoin_wallet_hdnode_ {
+    uint160 pubkeyhash;
+    dogecoin_hdnode *hdnode;
+} dogecoin_wallet_hdnode;
 
 typedef struct dogecoin_output_ {
     uint32_t i;
@@ -68,7 +75,15 @@ typedef struct dogecoin_output_ {
 /** wallet transaction (wtx) functions */
 LIBDOGECOIN_API dogecoin_wtx* dogecoin_wallet_wtx_new();
 LIBDOGECOIN_API void dogecoin_wallet_wtx_free(dogecoin_wtx* wtx);
+LIBDOGECOIN_API void dogecoin_wallet_wtx_serialize(cstring* s, const dogecoin_wtx* wtx);
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_buffer* buf);
+/** ------------------------------------ */
+
+/** wallet hdnode (wallet_hdnode) functions */
+LIBDOGECOIN_API dogecoin_wallet_hdnode* dogecoin_wallet_hdnode_new();
+LIBDOGECOIN_API void dogecoin_wallet_hdnode_free(dogecoin_wallet_hdnode* whdnode);
+LIBDOGECOIN_API void dogecoin_wallet_hdnode_serialize(cstring* s, const dogecoin_chainparams *params, const dogecoin_wallet_hdnode* whdnode);
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_hdnode_deserialize(dogecoin_wallet_hdnode* whdnode, const dogecoin_chainparams *params, struct const_buffer* buf);
 /** ------------------------------------ */
 
 /** wallet outputs (prev wtx + n) functions */
@@ -76,7 +91,7 @@ LIBDOGECOIN_API dogecoin_output* dogecoin_wallet_output_new();
 LIBDOGECOIN_API void dogecoin_wallet_output_free(dogecoin_output* output);
 /** ------------------------------------ */
 
-LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new();
+LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params);
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet *wallet);
 
 /** logdb callback for memory mapping a new */
