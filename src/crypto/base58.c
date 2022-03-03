@@ -28,6 +28,8 @@
 #include <sys/types.h>
 
 #include <dogecoin/crypto/base58.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/crypto/segwit_addr.h>
 #include <dogecoin/crypto/sha2.h>
 
 static const int8_t b58digits_map[] = {
@@ -183,4 +185,26 @@ int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
         ret = binsize;
     }
     return ret;
+}
+
+dogecoin_bool dogecoin_p2pkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout, int len) {
+    uint8_t hash160[sizeof(uint160)+1];
+    hash160[0] = chain->b58prefix_pubkey_address;
+    memcpy(hash160 + 1, hashin, sizeof(uint160));
+
+    return (dogecoin_base58_encode_check(hash160, sizeof(uint160)+1, addrout, len) > 0);
+}
+
+dogecoin_bool dogecoin_p2sh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char* addrout,
+                                    int len)
+{
+    uint8_t hash160[sizeof(uint160) + 1];
+    hash160[0] = chain->b58prefix_script_address;
+    memcpy(hash160 + 1, hashin, sizeof(uint160));
+
+    return (dogecoin_base58_encode_check(hash160, sizeof(uint160) + 1, addrout, len) > 0);
+}
+
+dogecoin_bool dogecoin_p2wpkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout) {
+    return segwit_addr_encode(addrout, chain->bech32_hrp, 0, hashin, sizeof(uint160));
 }

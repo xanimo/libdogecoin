@@ -92,7 +92,7 @@ void ser_varstr(cstring* s, cstring* s_in)
 int deser_skip(struct const_buffer* buf, size_t len)
 {
     char* p;
-    if (buf->len < len) {
+    if (buf->len < len)
         return false;
     }
 
@@ -107,7 +107,7 @@ int deser_skip(struct const_buffer* buf, size_t len)
 int deser_bytes(void* po, struct const_buffer* buf, size_t len)
 {
     char* p;
-    if (buf->len < len) {
+    if (buf->len < len)
         return false;
     }
 
@@ -166,7 +166,7 @@ int deser_u64(uint64_t* vo, struct const_buffer* buf)
     return true;
 }
 
-int deser_u256(uint8_t* vo, struct const_buffer* buf)
+int deser_u256(uint256 vo, struct const_buffer* buf)
 {
     return deser_bytes(vo, buf, 32);
 }
@@ -193,10 +193,53 @@ int deser_varlen(uint32_t* lo, struct const_buffer* buf)
         uint64_t v64;
         if (!deser_u64(&v64, buf))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L192-serialize.c\n\n", sizeof(v64));
         len = (uint32_t)v64; /* WARNING: truncate */
     } else {
         len = c;
     }
+
+    *lo = len;
+    return true;
+}
+
+int deser_varlen_from_file(uint32_t* lo, FILE* file)
+{
+    uint32_t len;
+    struct const_buffer buf;
+    unsigned char c;
+    const unsigned char bufp[sizeof(uint64_t)];
+
+    if (fread(&c, 1, 1, file) != 1)
+        return false;
+
+    buf.p = (void*)bufp;
+    buf.len = sizeof(uint64_t);
+
+    if (c == 253) {
+        uint16_t v16;
+        if (fread((void*)buf.p, 1, sizeof(v16), file) != sizeof(v16))
+            return false;
+        if (!deser_u16(&v16, &buf))
+            return false;
+        len = v16;
+    } else if (c == 254) {
+        uint32_t v32;
+        if (fread((void*)buf.p, 1, sizeof(v32), file) != sizeof(v32))
+            return false;
+        if (!deser_u32(&v32, &buf))
+            return false;
+        len = v32;
+    } else if (c == 255) {
+        uint64_t v64;
+        if (fread((void*)buf.p, 1, sizeof(v64), file) != sizeof(v64))
+            return false;
+        if (!deser_u64(&v64, &buf))
+            return false;
+        printf("\n\n***WARNING: truncate %lu; L234-serialize.c\n\n", sizeof(v64));
+        len = (uint32_t)v64; /* WARNING: truncate */
+    } else
+        len = c;
 
     *lo = len;
     return true;
@@ -244,10 +287,12 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
         uint64_t v64;
         if (fread((void*)buf.p, 1, sizeof(v64), file) != sizeof(v64))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L286-serialize.c\n\n", sizeof(v64));
         memcpy(rawdata + 1, buf.p, sizeof(uint32_t)); /* warning, truncate! */
         *buflen_inout += sizeof(uint32_t);
         if (!deser_u64(&v64, &buf))
             return false;
+        printf("\n\n***WARNING: truncate %lu; L291-serialize.c\n\n", sizeof(v64));
         len = (uint32_t)v64; /* WARNING: truncate */
     } else {
         len = c;

@@ -75,6 +75,8 @@ config.status
 configure
 libtool
 such
+sendtx
+spvnode
 src/libdogecoin-config.h
 src/libdogecoin-config.h.in
 src/libdogecoin-config.h.in~

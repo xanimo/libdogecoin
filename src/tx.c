@@ -643,11 +643,9 @@ dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromP
         ser_s32(s, hashtype);
     }
 
-    //char str[10000];
-    //memset(str, strlen(str), 0);
-    //utils_bin_to_hex((unsigned char *)s->str, s->len, str);
-    //printf("\n");
-    //printf("%s\n", str);
+    char str[10000];
+    memset(str, strlen(str), 0);
+    utils_bin_to_hex((unsigned char *)s->str, s->len, str);
 
     sha256_raw((const uint8_t*)s->str, s->len, hash);
     sha256_raw(hash, DOGECOIN_HASH_LENGTH, hash);
@@ -712,17 +710,17 @@ dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainp
         int version = 0;
         unsigned char programm[40] = {0};
         size_t programmlen = 0;
-        // if(segwit_addr_decode(&version, programm, &programmlen, chain->bech32_hrp, address) == 1) {
-        //     if (programmlen == 20) {
-        //         dogecoin_tx_out* tx_out = dogecoin_tx_out_new();
-        //         tx_out->script_pubkey = cstr_new_sz(1024);
+        if(segwit_addr_decode(&version, programm, &programmlen, chain->bech32_hrp, address) == 1) {
+            if (programmlen == 20) {
+                dogecoin_tx_out* tx_out = dogecoin_tx_out_new();
+                tx_out->script_pubkey = cstr_new_sz(1024);
 
-        //         dogecoin_script_build_p2wpkh(tx_out->script_pubkey, (const uint8_t *)programm);
+                dogecoin_script_build_p2wpkh(tx_out->script_pubkey, (const uint8_t *)programm);
 
-        //         tx_out->value = amount;
-        //         vector_add(tx->vout, tx_out);
-        //     }
-        // }
+                tx_out->value = amount;
+                vector_add(tx->vout, tx_out);
+            }
+        }
         dogecoin_free(buf);
         return false;
     }
