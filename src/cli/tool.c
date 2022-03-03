@@ -117,18 +117,38 @@ dogecoin_bool hd_print_node(const dogecoin_chainparams* chain, const char* nodes
     dogecoin_hdnode node;
     if (!dogecoin_hdnode_deserialize(nodeser, chain, &node))
         return false;
-    size_t strsize = 128;
-    char str[strsize];
-    dogecoin_hdnode_get_p2pkh_address(&node, chain, str, strsize);
+
+    char str[128];
+    size_t strsize = sizeof(str);
+    printf("ext key:             %s\n", nodeser);
+
+    uint8_t pkeybase58c[34];
+    dogecoin_hdnode_serialize_public(&node, chain, str, strsize);
+    printf("extended pubkey:     %s\n", str);
+
     if (!dogecoin_hdnode_get_pub_hex(&node, str, &strsize))
         return false;
-    strsize = 128;
-    dogecoin_hdnode_serialize_public(&node, chain, str, strsize);
-    // printf("ext key: %s\n", nodeser);
-    // printf("depth: %d\n", node.depth);
-    // printf("p2pkh address: %s\n", str);
-    // printf("pubkey hex: %s\n", str);
-    // printf("extended pubkey: %s\n", str);
+    printf("pubkey hex:          %s\n", str);
+
+    pkeybase58c[0] = chain->b58prefix_secret_address;
+    pkeybase58c[33] = 1; /* always use compressed keys */
+    char privkey_wif[128];
+    memcpy(&pkeybase58c[1], node.private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
+    assert(dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), privkey_wif, sizeof(privkey_wif)) != 0);
+    if (dogecoin_hdnode_has_privkey(&node)) {
+        printf("privatekey WIF:      %s\n", privkey_wif);
+    }
+    printf("depth:               %d\n", node.depth);
+    printf("child index:         %d\n", node.child_num);
+    char addr[100];
+    char addr_p2sh_p2wpkh[100];
+    char addr_p2wpkh[100];
+    addresses_from_pubkey(&dogecoin_chainparams_main, str, addr, addr_p2sh_p2wpkh, addr_p2wpkh);
+    printf("p2pkh address:       %s\n", addr);
+
+    printf("p2sh-p2wpkh address: %s\n", addr_p2sh_p2wpkh);
+
+    printf("p2wpkh address:      %s\n", addr_p2wpkh);
     return true;
 }
 
