@@ -337,7 +337,7 @@ void logdb_write_record(logdb_log_db* db, logdb_record *rec)
     cstr_free(serbuf, true);
 
     ctx_final = ctx;
-    sha256_finalize(hash, &ctx_final);
+    sha256_finalize(&ctx_final, hash);
     assert(fwrite(hash, db->hashlen, 1, db->file) == 1);
     db->hashctx = ctx;
 }
@@ -433,7 +433,7 @@ logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enu
 
     /* generate final checksum in a context copy */
     ctx_final = ctx;
-    sha256_finalize(hashcheck, &ctx_final);
+    sha256_finalize(&ctx_final, hashcheck);
 
     /* read checksum from file, compare */
     if (fread(check, 1, db->hashlen, db->file) != db->hashlen)

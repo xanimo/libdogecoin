@@ -129,13 +129,17 @@ void dogecoin_wallet_wtx_free(dogecoin_wtx* wtx)
 void dogecoin_wallet_wtx_serialize(cstring* s, const dogecoin_wtx* wtx)
 {
     ser_u32(s, wtx->height);
-    dogecoin_tx_serialize(s, wtx->tx);
+    /* TODO: convert mock tx data to remove witnesses and set allow_witness below to false! */
+    /* dogecoin does not support segwit but is segwit aware */
+    dogecoin_tx_serialize(s, wtx->tx, true);
 }
 
 dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_buffer* buf)
 {
     deser_u32(&wtx->height, buf);
-    return dogecoin_tx_deserialize(buf->p, buf->len, wtx->tx);
+    /* TODO: convert mock tx data to remove witnesses and set allow_witness below to false! */
+    /* dogecoin does not support segwit but is segwit aware */
+    return dogecoin_tx_deserialize(buf->p, buf->len, wtx->tx, NULL, true);
 }
 
 /*
@@ -172,7 +176,7 @@ dogecoin_wallet* dogecoin_wallet_new()
     wallet->db = logdb_new();
     logdb_set_memmapper(wallet->db, &dogecoin_wallet_db_mapper, wallet);
     wallet->masterkey = NULL;
-    wallet->chain = &dogecoin_chain_main;
+    wallet->chain = &dogecoin_chainparams_main;
     wallet->spends = vector_new(10, free);
 
     wallet->wtxes_rbtree = RBTreeCreate(dogecoin_rbtree_wtxes_compare,dogecoin_rbtree_wtxes_free_key,dogecoin_rbtree_wtxes_free_value,NULL,NULL);
