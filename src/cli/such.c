@@ -38,6 +38,7 @@
 #include <dogecoin/bip32.h>
 #include <dogecoin/chainparams.h>
 #include <dogecoin/crypto/ecc.h>
+#include <dogecoin/net/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/tool.h>
 #include <dogecoin/tx.h>
@@ -52,10 +53,15 @@ static struct option long_options[] =
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
         {"version", no_argument, NULL, 'v'},
-        {NULL, 0, NULL, 0}};
+        {"txhex", no_argument, NULL, 'x'},
+        {"scripthex", no_argument, NULL, 's'},
+        {"inputindex", no_argument, NULL, 'i'},
+        {"sighashtype", no_argument, NULL, 'h'},
+        {"amount", no_argument, NULL, 'a'},
+        {NULL, 0, NULL, 0}
+};
 
-static void print_version()
-{
+static void print_version() {
     printf("Version: %s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
 }
 
@@ -81,14 +87,19 @@ int main(int argc, char* argv[])
 {
     int long_index = 0;
     int opt = 0;
-    char* pkey = 0;
-    char* pubkey = 0;
-    char* cmd = 0;
-    char* derived_path = 0;
+    char* pkey      = 0;
+    char* pubkey    = 0;
+    char* cmd       = 0;
+    char* keypath   = 0;
+    char* txhex     = 0;
+    char* scripthex = 0;
+    int inputindex  = 0;
+    int sighashtype = 1;
+    uint64_t amount = 0;
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "p:k:m:c:trv", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:a:m:c:trv", long_options, &long_index)) != -1) {
         switch (opt) {
         case 'p':
             pkey = optarg;
@@ -99,7 +110,7 @@ int main(int argc, char* argv[])
             cmd = optarg;
             break;
         case 'm':
-            derived_path = optarg;
+            keypath = optarg;
             break;
         case 'k':
             pubkey = optarg;
@@ -113,6 +124,21 @@ int main(int argc, char* argv[])
         case 'v':
             print_version();
             exit(EXIT_SUCCESS);
+            break;
+        case 'x':
+            txhex = optarg;
+            break;
+        case 's':
+            scripthex = optarg;
+            break;
+        case 'i':
+            inputindex = (int)strtol(optarg, (char**)NULL, 10);
+            break;
+        case 'h':
+            sighashtype = (int)strtol(optarg, (char**)NULL, 10);
+            break;
+        case 'a':
+            amount = (int)strtoll(optarg, (char**)NULL, 10);
             break;
         default:
             print_usage();
@@ -203,17 +229,207 @@ int main(int argc, char* argv[])
             return showError("invalid extended key\n");
     } else if (strcmp(cmd, "derive_child_keys") == 0) {
         if (!pkey)
-            return showError("no extended key (-p)");
-        if (!derived_path)
-            return showError("no derivation path (-m)");
+            return showError(pkey_error);
+        if (!keypath)
+            return showError("Missing keypath (use -m)");
         size_t sizeout = 128;
         char newextkey[sizeout];
-        if (!hd_derive(chain, pkey, derived_path, newextkey, sizeout))
-            return showError("deriving child key failed\n");
-        else
-            hd_print_node(chain, newextkey);
-    }
 
+        //check if we derive a range of keys
+        unsigned int maxlen = 1024;
+        int posanum = -1;
+        int posbnum = -1;
+        int end = -1;
+        uint64_t from = 0;
+        uint64_t to = 0;
+
+        static char digits[] = "0123456789";
+        for (unsigned int i = 0; i<strlen(keypath); i++) {
+            if (i > maxlen) {
+                break;
+            }
+            if (posanum > -1 && posbnum == -1) {
+                if (keypath[i] == '-') {
+                    if (i-posanum >= 9) {
+                        break;
+                    }
+                    posbnum = i+1;
+                    char buf[9] = {0};
+                    memcpy (buf, &keypath[posanum], i-posanum);
+                    from = strtoull(buf, NULL, 10);
+                }
+                else if (!strchr(digits, keypath[i])) {
+                    posanum = -1;
+                    break;
+                }
+            }
+            else if (posanum > -1 && posbnum > -1) {
+                if (keypath[i] == ']' || keypath[i] == ')') {
+                    if (i-posbnum >= 9) {
+                        break;
+                    }
+                    char buf[9] = {0};
+                    memcpy (buf, &keypath[posbnum], i-posbnum);
+                    to = strtoull(buf, NULL, 10);
+                    end = i+1;
+                    break;
+                }
+                else if (!strchr(digits, keypath[i])) {
+                    posbnum = -1;
+                    posanum = -1;
+                    break;
+                }
+            }
+            if (keypath[i] == '[' || keypath[i] == '(') {
+                posanum = i+1;
+            }
+        }
+
+        if (end > -1 && from <= to) {
+            for (uint64_t i = from; i <= to; i++) {
+                char keypathnew[strlen(keypath)+16];
+                memcpy(keypathnew, keypath, posanum-1);
+                char index[9] = {0};
+                sprintf(index, "%lld", (long long)i);
+                memcpy(keypathnew+posanum-1, index, strlen(index));
+                memcpy(keypathnew+posanum-1+strlen(index), &keypath[end], strlen(keypath)-end);
+
+
+                if (!hd_derive(chain, pkey, keypathnew, newextkey, sizeout))
+                    return showError("Deriving child key failed\n");
+                else
+                    hd_print_node(chain, newextkey);
+            }
+        }
+        else {
+            if (!hd_derive(chain, pkey, keypath, newextkey, sizeout))
+                return showError("Deriving child key failed\n");
+            else
+                hd_print_node(chain, newextkey);
+        }
+    } else if (strcmp(cmd, "sign") == 0) {
+        if(!txhex || !scripthex) {
+            return showError("Missing tx-hex or script-hex (use -x, -s)\n");
+        }
+
+        if (strlen(txhex) > 1024*100) { //don't accept tx larger then 100kb
+            return showError("tx too large (max 100kb)\n");
+        }
+
+        //deserialize transaction
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        int outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL, true)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+        }
+        dogecoin_free(data_bin);
+
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+        }
+
+        dogecoin_tx_in *tx_in = vector_idx(tx->vin, inputindex);
+
+        uint8_t script_data[strlen(scripthex) / 2 + 1];
+        utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlen);
+        cstring* script = cstr_new_buf(script_data, outlen);
+
+        uint256 sighash;
+        memset(sighash, 0, sizeof(sighash));
+        dogecoin_tx_sighash(tx, script, inputindex, sighashtype, 0, SIGVERSION_BASE, sighash);
+
+        char *hex = utils_uint8_to_hex(sighash, 32);
+        utils_reverse_hex(hex, 64);
+
+        enum dogecoin_tx_out_type type = dogecoin_script_classify(script, NULL);
+        printf("script: %s\n", scripthex);
+        printf("script-type: %s\n", dogecoin_tx_out_type_to_str(type));
+        printf("inputindex: %d\n", inputindex);
+        printf("sighashtype: %d\n", sighashtype);
+        printf("hash: %s\n", hex);
+
+        // sign
+        dogecoin_bool sign = false;
+        dogecoin_key key;
+        dogecoin_privkey_init(&key);
+        if (dogecoin_privkey_decode_wif(pkey, chain, &key)) {
+            sign = true;
+        }
+        else {
+            if (strlen(pkey) > 50) {
+                dogecoin_tx_free(tx);
+                cstr_free(script, true);
+                return showError("Invalid wif privkey\n");
+            }
+            printf("No private key provided, signing will not happen\n");
+        }
+        if (sign) {
+            uint8_t sigcompact[64] = {0};
+            int sigderlen = 74+1; //&hashtype
+            uint8_t sigder_plus_hashtype[75] = {0};
+            enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(tx, script, amount, &key, inputindex, sighashtype, sigcompact, sigder_plus_hashtype, &sigderlen);
+            cstr_free(script, true);
+
+            if (res != DOGECOIN_SIGN_OK) {
+                printf("!!!Sign error:%s\n", dogecoin_tx_sign_result_to_str(res));
+            }
+
+            char sigcompacthex[64*2+1] = {0};
+            utils_bin_to_hex((unsigned char *)sigcompact, 64, sigcompacthex);
+
+            char sigderhex[74*2+2+1]; //74 der, 2 hashtype, 1 nullbyte
+            memset(sigderhex, 0, sizeof(sigderhex));
+            utils_bin_to_hex((unsigned char *)sigder_plus_hashtype, sigderlen, sigderhex);
+
+            printf("\nSignature created:\n");
+            printf("signature compact: %s\n", sigcompacthex);
+            printf("signature DER (+hashtype): %s\n", sigderhex);
+
+            cstring* signed_tx = cstr_new_sz(1024);
+            dogecoin_tx_serialize(signed_tx, tx, true);
+
+            char signed_tx_hex[signed_tx->len*2+1];
+            utils_bin_to_hex((unsigned char *)signed_tx->str, signed_tx->len, signed_tx_hex);
+            printf("signed TX: %s\n", signed_tx_hex);
+            cstr_free(signed_tx, true);
+        }
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "comp2der") == 0) {
+        if(!scripthex || strlen(scripthex) != 128) {
+            return showError("Missing signature or invalid length (use hex, 128 chars == 64 bytes)\n");
+        }
+
+        int outlen = 0;
+        uint8_t sig_comp[strlen(scripthex) / 2 + 1];
+        printf("%s\n", scripthex);
+        utils_hex_to_bin(scripthex, sig_comp, strlen(scripthex), &outlen);
+
+        unsigned char sigder[74];
+        size_t sigderlen = 74;
+
+        dogecoin_ecc_compact_to_der_normalized(sig_comp, sigder, &sigderlen);
+        char hexbuf[sigderlen*2 + 1];
+        utils_bin_to_hex(sigder, sigderlen, hexbuf);
+        printf("DER: %s\n", hexbuf);
+    }
+    else if (strcmp(cmd, "bip32maintotest") == 0) {
+        dogecoin_hdnode node;
+        if (!dogecoin_hdnode_deserialize(pkey, chain, &node))
+            return false;
+
+        char masterkeyhex[200];
+        int strsize = 200;
+        dogecoin_hdnode_serialize_private(&node, &dogecoin_chainparams_test, masterkeyhex, strsize);
+        printf("xpriv: %s\n", masterkeyhex);
+        dogecoin_hdnode_serialize_public(&node, &dogecoin_chainparams_test, masterkeyhex, strsize);
+        printf("xpub: %s\n", masterkeyhex);
+    }
 
     dogecoin_ecc_stop();
 
