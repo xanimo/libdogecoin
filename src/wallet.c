@@ -228,7 +228,9 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
 
 void dogecoin_wallet_free(dogecoin_wallet* wallet)
 {
-    if (!wallet) return;
+    if (!wallet) {
+        return;
+    }
 
     if (wallet->dbfile) {
         fclose(wallet->dbfile);
@@ -240,8 +242,10 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
         wallet->spends = NULL;
     }
 
-    if (wallet->masterkey)
+    if (wallet->masterkey) {
         dogecoin_free(wallet->masterkey);
+        wallet->masterkey = NULL;
+    }
 
     dogecoin_btree_tdestroy(wallet->wtxes_rbtree, dogecoin_free);
     dogecoin_btree_tdestroy(wallet->hdkeys_rbtree, dogecoin_free);
