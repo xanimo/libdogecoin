@@ -20,9 +20,9 @@ AC_PATH_TOOL(STRIP, strip)
 AM_PROG_CC_C_O
 AC_PROG_CC_C99
 
-CFLAGS="$CFLAGS -W"
+CFLAGS="$CFLAGS"
 
-warn_CFLAGS="-std=gnu99 -O0 -coverage -fprofile-arcs -pedantic -Wno-unused-function -Wno-long-long -Wno-overlength-strings"
+warn_CFLAGS="-std=gnu99 -O0 -coverage -fprofile-arcs -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings -lm"
 saved_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS $warn_CFLAGS"
 AC_MSG_CHECKING([if ${CC} supports ${warn_CFLAGS}])
