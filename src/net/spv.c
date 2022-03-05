@@ -93,7 +93,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
         client->nodegroup->log_write_cb = net_write_log_printf;
     }
 
-    if (params == &dogecoin_chainparams_main) {
+    if (params == &dogecoin_chainparams_main || params == &dogecoin_chainparams_test) {
         client->use_checkpoints = true;
     }
     client->headers_db = &dogecoin_headers_db_interface_file;
@@ -224,7 +224,6 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector *bl
         if (client->use_checkpoints && client->oldest_item_of_interest > BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) {
             if (memcmp(client->chainparams, &dogecoin_chainparams_main.chainname, 8) == 0) {
                 for (int i = (sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]))+1; i > 0 ; i--) {
-                    const dogecoin_checkpoint *cp = &dogecoin_mainnet_checkpoint_array[i];
                     if (dogecoin_mainnet_checkpoint_array[i].timestamp < min_timestamp) {
                         uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
                         utils_uint256_sethex((char *)dogecoin_mainnet_checkpoint_array[i].hash, (uint8_t *)hash);
@@ -236,7 +235,6 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector *bl
                 }
             } else if (memcmp(client->chainparams, &dogecoin_chainparams_test.chainname, 8) == 0) {
                 for (int i = (sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]))+1; i > 0 ; i--) {
-                    const dogecoin_checkpoint *cp = &dogecoin_testnet_checkpoint_array[i];
                     if (dogecoin_testnet_checkpoint_array[i].timestamp < min_timestamp) {
                         uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
                         utils_uint256_sethex((char *)dogecoin_testnet_checkpoint_array[i].hash, (uint8_t *)hash);
