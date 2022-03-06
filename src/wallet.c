@@ -190,6 +190,8 @@ void dogecoin_wallet_wtx_serialize(cstring* s, const dogecoin_wtx* wtx)
 {
     ser_u32(s, wtx->height);
     ser_u256(s, wtx->tx_hash_cache);
+    /* TODO: convert mock tx data to remove witnesses and set allow_witness below to false! */
+    /* dogecoin does not support segwit but is segwit aware */
     dogecoin_tx_serialize(s, wtx->tx, true); // dogecoin_tx_serialize(s, wtx->tx);
 }
 
@@ -197,6 +199,8 @@ dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_bu
 {
     deser_u32(&wtx->height, buf);
     deser_u256(wtx->tx_hash_cache, buf);
+    /* TODO: convert mock tx data to remove witnesses and set allow_witness below to false! */
+    /* dogecoin does not support segwit but is segwit aware */
     return dogecoin_tx_deserialize(buf->p, buf->len, wtx->tx, NULL, true); // return dogecoin_tx_deserialize(buf->p, buf->len, wtx->tx);
 }
 
