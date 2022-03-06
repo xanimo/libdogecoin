@@ -254,10 +254,6 @@ void test_logdb(logdb_log_db* (*new_func)())
     free(buf);
     free(wrk_buf);
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 32a4236... wallet: initial commit
     /* --- large db test */
     unlink(dbtmpfile);
 

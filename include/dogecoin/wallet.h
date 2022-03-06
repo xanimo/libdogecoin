@@ -94,8 +94,8 @@ LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams 
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet* wallet);
 
 /** logdb callback for memory mapping a new */
-// void dogecoin_wallet_logdb_append_cb(void* ctx, logdb_bool load_phase, logdb_record *rec);
-// cstring * logdb_llistdb_find_cb(logdb_log_db* db, struct buffer *key);
+void dogecoin_wallet_logdb_append_cb(void* ctx, logdb_bool load_phase, logdb_record *rec);
+cstring * logdb_llistdb_find_cb(logdb_log_db* db, struct buffer *key);
 
 /** load the wallet, sets masterkey, sets next_childindex */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_path, int *error, dogecoin_bool *created); // dogecoin_wallet_load(dogecoin_wallet *wallet, const char *file_path, enum logdb_error *error);
