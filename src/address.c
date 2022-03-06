@@ -195,6 +195,8 @@ int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet)
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     size_t sizeout = 100;
 
+    printf("wif_privkey_master:   %s\n", wif_privkey);
+    printf("p2pkh_pubkey_master:  %s\n", p2pkh_pubkey);
     /* verify private key */
     dogecoin_key key;
     dogecoin_privkey_decode_wif(wif_privkey, chain, &key);
@@ -202,18 +204,18 @@ int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet)
     char new_wif_privkey[sizeout];
     dogecoin_privkey_encode_wif(&key, chain, new_wif_privkey, &sizeout);
 
-    /* verify public key */
-    dogecoin_pubkey pubkey;
-    dogecoin_pubkey_init(&pubkey);
-    dogecoin_pubkey_from_key(&key, &pubkey);
-    if (!dogecoin_pubkey_is_valid(&pubkey)) return 0;
+    // /* verify public key */
+    // dogecoin_pubkey pubkey;
+    // dogecoin_pubkey_init(&pubkey);
+    // dogecoin_pubkey_from_key(&key, &pubkey);
+    // if (!dogecoin_pubkey_is_valid(&pubkey)) return 0;
 
-    /* verify address derived matches provided address */
-    char new_p2pkh_pubkey[sizeout];
-    dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, new_p2pkh_pubkey);
-    if (strcmp(p2pkh_pubkey, new_p2pkh_pubkey)) return 0;
+    // /* verify address derived matches provided address */
+    // char new_p2pkh_pubkey[sizeout];
+    // dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, new_p2pkh_pubkey);
+    // if (strcmp(p2pkh_pubkey, new_p2pkh_pubkey)) return 0;
 
-    return 1;
+    // return 1;
 }
 
 int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet) {

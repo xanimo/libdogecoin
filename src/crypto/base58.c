@@ -149,10 +149,11 @@ int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t bi
 {
     const uint8_t* bin = data;
     int carry = 0;
-    ssize_t i, j, high, zcount = 0;
+    ssize_t i = 0, j = 0, high = 0, zcount = 0;
     size_t size = 0;
-    while (zcount < (ssize_t)binsz && !bin[zcount])
+    while (zcount < (ssize_t)binsz && !bin[zcount]) {
         ++zcount;
+    }
     size = (binsz - zcount) * 138 / 100 + 1;
     uint8_t buf[size];
     memset(buf, 0, size);

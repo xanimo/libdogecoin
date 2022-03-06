@@ -643,12 +643,7 @@ dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromP
         ser_s32(s, hashtype);
     }
 
-    char str[10000];
-    memset(str, strlen(str), 0);
-    utils_bin_to_hex((unsigned char *)s->str, s->len, str);
-
-    sha256_raw((const uint8_t*)s->str, s->len, hash);
-    sha256_raw(hash, DOGECOIN_HASH_LENGTH, hash);
+    dogecoin_hash((const uint8_t*)s->str, s->len, hash);
 
     cstr_free(s, true);
 
@@ -699,7 +694,7 @@ dogecoin_bool dogecoin_tx_add_puzzle_out(dogecoin_tx* tx, const int64_t amount, 
 dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainparams* chain, int64_t amount, const char* address)
 {
     const size_t buflen = sizeof(uint8_t) * strlen(address) * 2;
-    uint8_t* buf = (uint8_t*)dogecoin_malloc(buflen);
+    uint8_t* buf = (uint8_t*)dogecoin_calloc(1, buflen);
     int r = dogecoin_base58_decode_check(address, buf, buflen);
     if (r > 0 && buf[0] == chain->b58prefix_pubkey_address) {
         dogecoin_tx_add_p2pkh_hash160_out(tx, amount, &buf[1]);
