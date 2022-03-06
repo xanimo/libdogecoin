@@ -22,22 +22,17 @@ void test_wallet()
 {
     unlink(wallettmpfile);
     dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
-    int error;
+    // int error;
+    enum logdb_error error;
     dogecoin_bool created;
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
 
     char *xpriv = "dgpv544MJMFeoz5Lgu2bdBKxrRkSitdCZDnZyF6ruAmhW8VbVeHHn7y6dGagmry6anPrqbkNjKHAs2zuGoRw63wF4k1nezZtMuxzaFdAHZHJiHy";
 
     dogecoin_hdnode node;
-<<<<<<< HEAD
     dogecoin_wallet_hdnode *node2, *node3;
     dogecoin_bool suc = dogecoin_hdnode_deserialize(xpriv, &dogecoin_chainparams_main, &node);
-    u_assert_int_eq(suc, 1);
-=======
-    dogecoin_hdnode *node2, *node3;
-    dogecoin_bool suc = dogecoin_hdnode_deserialize(xpriv, &dogecoin_chainparams_main, &node);
     u_assert_int_eq(suc, 1); // should be 1
->>>>>>> 2d93958... sha2: swap context and digest in finalize functions
     dogecoin_wallet_set_master_key_copy(wallet, &node);
     node2 = dogecoin_wallet_next_key(wallet);
 
@@ -106,10 +101,7 @@ void test_wallet()
     int outlen ;
     utils_hex_to_bin(hextx_coinbase, tx_data, strlen(hextx_coinbase), &outlen);
     dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
-<<<<<<< HEAD
-=======
     // TODO: remove witnesses from raw hex tx input test case and set allow_witness to false
->>>>>>> 2d93958... sha2: swap context and digest in finalize functions
     dogecoin_tx_deserialize(tx_data, outlen, wtx->tx, NULL, true);
 
     // add coinbase tx
@@ -128,10 +120,7 @@ void test_wallet()
     uint8_t tx_data_n[strlen(hextx_ntx) / 2];
     utils_hex_to_bin(hextx_ntx, tx_data_n, strlen(hextx_ntx), &outlen);
     wtx = dogecoin_wallet_wtx_new();
-<<<<<<< HEAD
-=======
     // TODO: remove witnesses from raw hex tx input test case and set allow_witness to false
->>>>>>> 2d93958... sha2: swap context and digest in finalize functions
     dogecoin_tx_deserialize(tx_data_n, outlen, wtx->tx, NULL, true);
     
     // add normal tx
