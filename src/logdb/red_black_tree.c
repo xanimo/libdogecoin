@@ -24,27 +24,28 @@
 /***********************************************************************/
 
 rb_red_blk_tree *RBTreeCreate(int (*CompFunc)(const void *, const void *),
-                              void (*DestFunc)(void *),
-                              void (*InfoDestFunc)(void *),
+                              void (*DestFunc)(void *), // void (*destroy_key_callback) (void*),
+                              void (*InfoDestFunc)(void *), // void (*info_destroy_callback) (void*),
                               void (*PrintFunc)(const void *),
                               void (*PrintInfo)(void *)) {
   rb_red_blk_tree *newTree;
   rb_red_blk_node *temp;
 
-  newTree = (rb_red_blk_tree *)SafeMalloc(sizeof(rb_red_blk_tree));
+  newTree = (rb_red_blk_tree *)SafeMalloc(sizeof(rb_red_blk_tree)); // newTree=(rb_red_blk_tree*) safe_malloc(sizeof(rb_red_blk_tree));
   newTree->Compare = CompFunc;
-  newTree->DestroyKey = DestFunc;
+  newTree->DestroyKey = DestFunc; // destroy_key_callback= destroy_key_callback;
   newTree->PrintKey = PrintFunc;
   newTree->PrintInfo = PrintInfo;
-  newTree->DestroyInfo = InfoDestFunc;
+  newTree->DestroyInfo = InfoDestFunc; // info_destroy_callback = info_destroy_callback;
+  newTree->it = NULL;
 
   /*  see the comment in the rb_red_blk_tree structure in red_black_tree.h */
   /*  for information on nil and root */
-  temp = newTree->nil = (rb_red_blk_node *)SafeMalloc(sizeof(rb_red_blk_node));
+  temp = newTree->nil = (rb_red_blk_node *)SafeMalloc(sizeof(rb_red_blk_node)); // temp=newTree->nil= (rb_red_blk_node*) safe_malloc(sizeof(rb_red_blk_node));
   temp->parent = temp->left = temp->right = temp;
   temp->red = 0;
   temp->key = 0;
-  temp = newTree->root = (rb_red_blk_node *)SafeMalloc(sizeof(rb_red_blk_node));
+  temp = newTree->root = (rb_red_blk_node *)SafeMalloc(sizeof(rb_red_blk_node)); // temp=newTree->root= (rb_red_blk_node*) safe_malloc(sizeof(rb_red_blk_node));
   temp->parent = temp->left = temp->right = newTree->nil;
   temp->key = 0;
   temp->red = 0;
@@ -230,7 +231,7 @@ rb_red_blk_node *RBTreeInsert(rb_red_blk_tree *tree, void *key, void *info) {
   rb_red_blk_node *x;
   rb_red_blk_node *newNode;
 
-  x = (rb_red_blk_node *)SafeMalloc(sizeof(rb_red_blk_node));
+  x = (rb_red_blk_node *)SafeMalloc(sizeof(rb_red_blk_node)); // x=(rb_red_blk_node*) safe_malloc(sizeof(rb_red_blk_node));
   x->key = key;
   x->info = info;
 
@@ -280,6 +281,56 @@ rb_red_blk_node *RBTreeInsert(rb_red_blk_tree *tree, void *key, void *info) {
   Assert(!tree->root->red, "root not red in RBTreeInsert");
 #endif
 }
+
+// rb_red_blk_node * RBTreeInsert(rb_red_blk_tree* tree, void* key, void* info) {
+//   rb_red_blk_node * y;
+//   rb_red_blk_node * x;
+//   rb_red_blk_node * newNode;
+
+//   x=(rb_red_blk_node*) safe_malloc(sizeof(rb_red_blk_node));
+//   x->key=key;
+//   x->info=info;
+
+//   TreeInsertHelp(tree,x);
+//   newNode=x;
+//   x->red=1;
+//   while(x->parent->red) { /* use sentinel instead of checking for root */
+//     if (x->parent == x->parent->parent->left) {
+//       y=x->parent->parent->right;
+//       if (y->red) {
+// 	x->parent->red=0;
+// 	y->red=0;
+// 	x->parent->parent->red=1;
+// 	x=x->parent->parent;
+//       } else {
+// 	if (x == x->parent->right) {
+// 	  x=x->parent;
+// 	  LeftRotate(tree,x);
+// 	}
+// 	x->parent->red=0;
+// 	x->parent->parent->red=1;
+// 	RightRotate(tree,x->parent->parent);
+//       } 
+//     } else { /* case for x->parent == x->parent->parent->right */
+//       y=x->parent->parent->left;
+//       if (y->red) {
+// 	x->parent->red=0;
+// 	y->red=0;
+// 	x->parent->parent->red=1;
+// 	x=x->parent->parent;
+//       } else {
+// 	if (x == x->parent->left) {
+// 	  x=x->parent;
+// 	  RightRotate(tree,x);
+// 	}
+// 	x->parent->red=0;
+// 	x->parent->parent->red=1;
+// 	LeftRotate(tree,x->parent->parent);
+//       } 
+//     }
+//   }
+//   tree->root->left->red=0;
+//   return(newNode);
 
 /***********************************************************************/
 /*  FUNCTION:  TreeSuccessor  */
@@ -417,8 +468,8 @@ void TreeDestHelper(rb_red_blk_tree *tree, rb_red_blk_node *x) {
   if (x != nil) {
     TreeDestHelper(tree, x->left);
     TreeDestHelper(tree, x->right);
-    tree->DestroyKey(x->key);
-    tree->DestroyInfo(x->info);
+    tree->DestroyKey(x->key); // tree->destroy_key_callback(x->key);
+    tree->DestroyInfo(x->info); // tree->info_destroy_callback(x->info);
     free(x);
   }
 }
@@ -597,8 +648,7 @@ void RBDelete(rb_red_blk_tree *tree, rb_red_blk_node *z) {
 
   y = ((z->left == nil) || (z->right == nil)) ? z : TreeSuccessor(tree, z);
   x = (y->left == nil) ? y->right : y->left;
-  if (root ==
-      (x->parent = y->parent)) { /* assignment of y->p to x->p is intentional */
+  if (root == (x->parent = y->parent)) { /* assignment of y->p to x->p is intentional */
     root->left = x;
   } else {
     if (y == y->parent->left) {
@@ -617,8 +667,8 @@ void RBDelete(rb_red_blk_tree *tree, rb_red_blk_node *z) {
     if (!(y->red))
       RBDeleteFixUp(tree, x);
 
-    tree->DestroyKey(z->key);
-    tree->DestroyInfo(z->info);
+    tree->DestroyKey(z->key); // tree->destroy_key_callback(z->key);
+    tree->DestroyInfo(z->info); // tree->info_destroy_callback(z->info);
     y->left = z->left;
     y->right = z->right;
     y->parent = z->parent;
@@ -631,8 +681,8 @@ void RBDelete(rb_red_blk_tree *tree, rb_red_blk_node *z) {
     }
     free(z);
   } else {
-    tree->DestroyKey(y->key);
-    tree->DestroyInfo(y->info);
+    tree->DestroyKey(y->key); // tree->destroy_key_callback(y->key);
+    tree->DestroyInfo(y->info); // tree->info_destroy_callback(y->info);
     if (!(y->red))
       RBDeleteFixUp(tree, x);
     free(y);
@@ -665,8 +715,14 @@ void rbtree_it_reset(rb_red_blk_tree *tree)
 rb_red_blk_node* rbtree_enumerate_next(rb_red_blk_tree *tree)
 {
     rb_red_blk_node *nil=tree->nil;
-    if (tree->it == nil) tree->it = tree->root;
-    if (tree->it != nil) tree->it=TreePredecessor(tree, tree->it);
+
+    if (tree->it == NULL)
+        tree->it = tree->root;
+
+    if (tree->it != nil)
+    {
+        tree->it=TreePredecessor(tree,tree->it);
+    }
     if (tree->it == nil)
     {
         rbtree_it_reset(tree);

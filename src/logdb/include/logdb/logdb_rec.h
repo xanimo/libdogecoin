@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -33,6 +35,7 @@ extern "C" {
 
 #include <logdb/logdb_base.h>
 
+// #include <dogecoin/buffer.h>
 #include <dogecoin/cstr.h>
 
 #include <stdint.h>
@@ -62,7 +65,7 @@ LIBLOGDB_API logdb_record* logdb_record_new();
 LIBLOGDB_API void logdb_record_free(logdb_record* rec);
 
 /** sets key value (binary buffer copy) */
-LIBLOGDB_API void logdb_record_set(logdb_record* rec, cstring *key, cstring *val);
+LIBLOGDB_API void logdb_record_set(logdb_record* rec, cstring *key, cstring *val); // logdb_record_set(logdb_record* rec, struct buffer *key, struct buffer *val);
 
 /** copy database record */
 LIBLOGDB_API logdb_record* logdb_record_copy(logdb_record* b_rec);
@@ -74,7 +77,7 @@ LIBLOGDB_API void logdb_record_ser(logdb_record* rec, cstring *buf);
 LIBLOGDB_API size_t logdb_record_height(logdb_record* head);
 
 /** find the next record with key downwards the linkes list */
-LIBLOGDB_API cstring * logdb_record_find_desc(logdb_record* head, cstring *key);
+LIBLOGDB_API cstring * logdb_record_find_desc(logdb_record* head, cstring *key); // logdb_record_find_desc(logdb_record* head, struct buffer *key);
 
 /** remove records with given key (to keep memory clean) */
 LIBLOGDB_API logdb_record* logdb_record_rm_desc(logdb_record *usehead, cstring *key);

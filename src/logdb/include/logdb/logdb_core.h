@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -30,6 +32,7 @@
 #include <logdb/logdb_base.h>
 #include <logdb/logdb_rec.h>
 #include <dogecoin/crypto/sha2.h>
+#include <dogecoin/buffer.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -83,7 +86,7 @@ struct logdb_memmapper_
     void (*cleanup_cb)(void*);
 
     /* callback for finding a record with given key */
-    cstring* (*find_cb)(logdb_log_db*, cstring *);
+    cstring* (*find_cb)(logdb_log_db*, cstring *); // cstring* (*find_cb)(logdb_log_db*, struct buffer*);
 
     /* callback which expect the get back the total amount of keys in the database */
     size_t (*size_cb)(logdb_log_db*);
@@ -114,21 +117,21 @@ LIBLOGDB_API logdb_bool logdb_load(logdb_log_db* handle, const char *file_path, 
 LIBLOGDB_API logdb_bool logdb_flush(logdb_log_db* db);
 
 /** deletes record with key */
-LIBLOGDB_API void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key);
+LIBLOGDB_API void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key); // logdb_delete(logdb_log_db* db, struct buffer *key);
 
 /** appends record to the logdb */
-LIBLOGDB_API void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *value);
+LIBLOGDB_API void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *value); // logdb_append(logdb_log_db* db, struct buffer *key, struct buffer *value);
 
 /** find and get value from key */
-LIBLOGDB_API cstring * logdb_find_cache(logdb_log_db* db, cstring *key);
-LIBLOGDB_API cstring * logdb_find(logdb_log_db* db, cstring *key);
+LIBLOGDB_API cstring * logdb_find_cache(logdb_log_db* db, cstring *key); // logdb_find_cache(logdb_log_db* db, struct buffer *key);
+LIBLOGDB_API cstring * logdb_find(logdb_log_db* db, cstring *key); // logdb_find(logdb_log_db* db, struct buffer *key);
 
 /** get the amount of in-memory-records */
 LIBLOGDB_API size_t logdb_cache_size(logdb_log_db* db);
 LIBLOGDB_API size_t logdb_count_keys(logdb_log_db* db);
 
 /** writes down single record, internal */
-logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec);
+logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec); // void logdb_write_record(logdb_log_db* db, logdb_record *rec);
 
 /** deserializes next logdb record from file */
 logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enum logdb_error *error);
@@ -148,6 +151,7 @@ LIBLOGDB_API void logdb_txn_free(logdb_txn* db);
 
 /** writes transaction to the internal cache **/
 LIBLOGDB_API void logdb_txn_commit(logdb_log_db* db, logdb_txn *txn);
+
 #ifdef __cplusplus
 }
 #endif

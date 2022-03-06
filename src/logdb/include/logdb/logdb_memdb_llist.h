@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -37,6 +39,7 @@
 #ifndef __LIBLOGDB_MEMDB_H__
 #define __LIBLOGDB_MEMDB_H__
 
+// #include <dogecoin/buffer.h>
 #include <dogecoin/cstr.h>
 #include <logdb/logdb_base.h>
 #include <logdb/logdb_rec.h>
@@ -61,7 +64,7 @@ LIBLOGDB_API void logdb_llistdb_init(logdb_log_db* db);
 /** appends record to the mem db */
 LIBLOGDB_API void logdb_llistdb_append(void* ctx, logdb_bool load_phase, logdb_record *rec);
 
-LIBLOGDB_API cstring * logdb_llistdb_find(logdb_log_db* db, cstring *key);
+LIBLOGDB_API cstring * logdb_llistdb_find(logdb_log_db* db, cstring *key); // logdb_llistdb_find(logdb_log_db* db, struct buffer *key);
 
 LIBLOGDB_API size_t logdb_llistdb_size(logdb_log_db* db);
 

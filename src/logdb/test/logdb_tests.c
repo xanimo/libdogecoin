@@ -1,5 +1,7 @@
 /**********************************************************************
- * Copyright (c) 2015 Jonas Schnelli                                  *
+ * Copyright (c) 2015 Jonas Schnelli       
+ * Copyright (c) 2022 bluezr                                          *
+ * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -37,6 +39,18 @@ void test_logdb(logdb_log_db* (*new_func)())
     cstring *value2;
     cstring *smp_value;
     cstring *smp_key;
+    // struct buffer key = {"key0", 4};
+    // struct buffer value = {"val0", 4};
+    // struct buffer key1;
+    // struct buffer value1;
+    // cstring *outtest;
+    // cstring *value_test;
+    // unsigned char testbin[4] = {0x00, 0x10, 0x20, 0x30};
+    // struct buffer value0_new = {"dumb", 4};
+    // struct buffer key2 = {"pkey", 4};
+    // struct buffer value2;
+    // struct buffer smp_value;
+    // struct buffer smp_key;
     uint8_t txbin[10240];
     uint8_t txbin_rev[10240];
     char hexrev[98];
@@ -64,6 +78,13 @@ void test_logdb(logdb_log_db* (*new_func)())
     cstr_append_buf(value2, testbin, sizeof(testbin));
     cstr_append_buf(key1, key1str, strlen(key1str));
     cstr_append_buf(value1, value1str, strlen(value1str));
+    // value2.p = testbin;
+    // value2.len = 4;
+
+    // key1.p = (char *)key1str;
+    // key1.len = strlen(key1str);
+    // value1.p = (char *)value1str;
+    // value1.len = strlen(value1str);
 
     unlink(dbtmpfile);
     db = new_func();
@@ -75,6 +96,14 @@ void test_logdb(logdb_log_db* (*new_func)())
 
     u_assert_int_eq(logdb_cache_size(db), 2);
     outtest = logdb_find_cache(db, key1);
+    // logdb_append(db, &key, &value);
+
+
+
+    // logdb_append(db, &key1, &value1);
+
+    // u_assert_int_eq(logdb_cache_size(db), 2);
+    // outtest = logdb_find_cache(db, &key1);
     u_assert_int_eq(strcmp(outtest->str, value1str),0);
     logdb_flush(db);
     logdb_free(db);
@@ -87,6 +116,10 @@ void test_logdb(logdb_log_db* (*new_func)())
     u_assert_int_eq(strcmp(value_test->str, value1str), 0);
     value_test = logdb_find(db, key);
     u_assert_int_eq(memcmp(value_test->str, value->str, value->len), 0);
+    // value_test = logdb_find(db, &key1);
+    // u_assert_int_eq(strcmp(value_test->str, value1str), 0);
+    // value_test = logdb_find(db, &key);
+    // u_assert_int_eq(memcmp(value_test->str, value.p, value.len), 0);
     logdb_free(db);
 
     db = new_func();
@@ -94,7 +127,7 @@ void test_logdb(logdb_log_db* (*new_func)())
 
 
 
-    logdb_append(db, NULL, key2, value2);
+    logdb_append(db, NULL, key2, value2); // logdb_append(db, &key2, &value2);
     logdb_flush(db);
     logdb_free(db);
 
@@ -109,6 +142,13 @@ void test_logdb(logdb_log_db* (*new_func)())
 
     /* delete a record */
     logdb_delete(db, NULL, key2);
+    // value_test = logdb_find(db, &key2);
+    // u_assert_int_eq(memcmp(value_test->str, value2.p, value2.len), 0);
+    // value_test = logdb_find(db, &key);
+    // u_assert_int_eq(memcmp(value_test->str, value.p, value.len), 0);
+
+    // /* delete a record */
+    // logdb_delete(db, &key2);
     logdb_flush(db);
     logdb_free(db);
 
@@ -127,6 +167,17 @@ void test_logdb(logdb_log_db* (*new_func)())
 
     value_test = logdb_find(db, key);
     u_assert_int_eq(memcmp(value_test->str, value0->str, value0->len), 0);
+    // value_test = logdb_find(db, &key);
+    // u_assert_int_eq(memcmp(value_test->str, value.p, value.len), 0);
+
+    // value_test = logdb_find(db, &key2);
+    // u_assert_is_null(value_test); /* should be null */
+
+    // /* overwrite a key */
+    // logdb_append(db, &key, &value0_new);
+
+    // value_test = logdb_find(db, &key);
+    // u_assert_int_eq(memcmp(value_test->str, value0_new.p, value0_new.len), 0);
 
     logdb_flush(db);
     logdb_free(db);
@@ -135,6 +186,8 @@ void test_logdb(logdb_log_db* (*new_func)())
     u_assert_int_eq(logdb_load(db, dbtmpfile, false, NULL), true);
     value_test = logdb_find(db, key);
     u_assert_int_eq(memcmp(value_test->str, value0->str, value0->len), 0);
+    // value_test = logdb_find(db, &key);
+    // u_assert_int_eq(memcmp(value_test->str, value0_new.p, value0_new.len), 0);
 
     logdb_flush(db);
     logdb_free(db);
@@ -151,6 +204,8 @@ void test_logdb(logdb_log_db* (*new_func)())
     buf = calloc(1, fsize + 1);
     size_t dmp;
     dmp = fread(buf, fsize, 1, f);
+    // buf = malloc(fsize + 1);
+    // fread(buf, fsize, 1, f);
     fclose(f);
 
     /* ---------------------------------------------------- */
@@ -199,6 +254,10 @@ void test_logdb(logdb_log_db* (*new_func)())
     free(buf);
     free(wrk_buf);
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 32a4236... wallet: initial commit
     /* --- large db test */
     unlink(dbtmpfile);
 
@@ -216,7 +275,8 @@ void test_logdb(logdb_log_db* (*new_func)())
 
         cstr_erase(smp_key, 0, smp_key->len);
         cstr_append_buf(smp_key, hashbin, outlen);
-
+        // smp_key.p = hashbin;
+        // smp_key.len = outlen;
         outlen = sizeof(tx->hextx) / 2;
         utils_hex_to_bin(tx->hextx, txbin, strlen(tx->hextx), &outlen);
 
@@ -224,6 +284,10 @@ void test_logdb(logdb_log_db* (*new_func)())
         cstr_append_buf(smp_value, txbin, outlen);
 
         logdb_append(db, NULL, smp_key, smp_value);
+        // smp_value.p = txbin;
+        // smp_value.len = outlen;
+
+        // logdb_append(db, &smp_key, &smp_value);
     }
 
     u_assert_int_eq(logdb_count_keys(db), (sizeof(sampledata) / sizeof(sampledata[0])));
@@ -239,7 +303,9 @@ void test_logdb(logdb_log_db* (*new_func)())
         cstr_erase(smp_key, 0, smp_key->len);
         cstr_append_buf(smp_key, hashbin, outlen);
         outtest = logdb_find(db, smp_key);
-
+        // smp_key.p = hashbin;
+        // smp_key.len = outlen;
+        // outtest = logdb_find(db, &smp_key);
         outlen = sizeof(tx->hextx) / 2;
         utils_hex_to_bin(tx->hextx, txbin, strlen(tx->hextx), &outlen);
 
@@ -270,7 +336,9 @@ void test_logdb(logdb_log_db* (*new_func)())
         cstr_erase(smp_key, 0, smp_key->len);
         cstr_append_buf(smp_key, hashbin, outlen);
         outtest = logdb_find(db, smp_key);
-
+        // smp_key.p = hashbin;
+        // smp_key.len = outlen;
+        // outtest = logdb_find(db, &smp_key);
         outlen = strlen(tx->hextx) / 2;
         utils_hex_to_bin(tx->hextx, txbin, strlen(tx->hextx), &outlen);
         u_assert_int_eq(outlen, outtest->len);
@@ -297,6 +365,9 @@ void test_logdb(logdb_log_db* (*new_func)())
         cstr_erase(smp_key, 0, smp_key->len);
         cstr_append_buf(smp_key, hashbin, outlen);
         logdb_delete(db, NULL, smp_key);
+        // smp_key.p = hashbin;
+        // smp_key.len = outlen;
+        // logdb_delete(db, &smp_key);
     }
     u_assert_int_eq(logdb_count_keys(db), 0);
 
@@ -318,6 +389,8 @@ void test_logdb(logdb_log_db* (*new_func)())
 
         cstr_erase(smp_key, 0, smp_key->len);
         cstr_append_buf(smp_key, hashbin, outlen);
+        // smp_key.p = hashbin;
+        // smp_key.len = outlen;
 
         outlen = sizeof(tx->hextx) / 2;
         utils_hex_to_bin(tx->hextx, txbin, strlen(tx->hextx), &outlen);
@@ -326,6 +399,10 @@ void test_logdb(logdb_log_db* (*new_func)())
         cstr_append_buf(smp_value, txbin, outlen);
 
         logdb_append(db, NULL, smp_key, smp_value);
+        // smp_value.p = txbin;
+        // smp_value.len = outlen;
+
+        // logdb_append(db, &smp_key, &smp_value);
     }
 
     logdb_flush(db);
@@ -375,6 +452,8 @@ void test_logdb(logdb_log_db* (*new_func)())
 
         cstr_erase(smp_key, 0, smp_key->len);
         cstr_append_buf(smp_key, hashbin, outlen);
+        // smp_key.p = hashbin;
+        // smp_key.len = outlen;
 
         outlen = sizeof(tx->hextx) / 2;
         utils_hex_to_bin(tx->hextx, txbin, strlen(tx->hextx), &outlen);
@@ -383,6 +462,10 @@ void test_logdb(logdb_log_db* (*new_func)())
         cstr_append_buf(smp_value, txbin, outlen);
 
         logdb_append(db, NULL, smp_key, smp_value);
+        // smp_value.p = txbin;
+        // smp_value.len = outlen;
+
+        // logdb_append(db, &smp_key, &smp_value);
     }
 
     logdb_flush(db);

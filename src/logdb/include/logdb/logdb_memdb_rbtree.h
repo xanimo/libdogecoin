@@ -2,7 +2,11 @@
 
  The MIT License (MIT)
 
+<<<<<<< HEAD
  Copyright (c) 2016 Jonas Schnelli
+=======
+ Copyright (c) 2021 The Dogecoin Foundation
+>>>>>>> 32a4236... wallet: initial commit
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -31,6 +35,7 @@
 #ifndef __LIBLOGDB_RBTREE_H__
 #define __LIBLOGDB_RBTREE_H__
 
+// #include <dogecoin/buffer.h>
 #include <dogecoin/cstr.h>
 #include <logdb/logdb_base.h>
 #include <logdb/logdb_rec.h>
@@ -58,7 +63,7 @@ LIBLOGDB_API void logdb_rbtree_init(logdb_log_db* db);
 LIBLOGDB_API void logdb_rbtree_append(void* ctx, logdb_bool load_phase, logdb_record *rec);
 
 /** find a record by key */
-LIBLOGDB_API cstring * logdb_rbtree_find(logdb_log_db* db, cstring *key);
+LIBLOGDB_API cstring * logdb_rbtree_find(logdb_log_db* db, cstring *key); // logdb_rbtree_find(logdb_log_db* db, struct buffer *key);
 
 /** count all red black tree nodes */
 LIBLOGDB_API size_t logdb_rbtree_size(logdb_log_db* db);

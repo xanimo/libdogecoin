@@ -65,6 +65,11 @@ extern void test_utils();
 extern void test_vector();
 
 #ifdef WITH_WALLET
+extern void test_red_black_tree();
+extern void test_logdb_memdb();
+extern void test_logdb_rbtree();
+
+extern void test_logdb();
 extern void test_wallet();
 #endif
 
@@ -118,6 +123,9 @@ int main()
 
 #ifdef WITH_WALLET
     u_run_test(test_wallet);
+    u_run_test(test_red_black_tree);
+    u_run_test(test_logdb_memdb);
+    u_run_test(test_logdb_rbtree);
 #endif
 
 #ifdef WITH_TOOLS

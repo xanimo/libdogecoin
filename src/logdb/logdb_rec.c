@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -57,7 +59,7 @@ void logdb_record_free(logdb_record* rec)
     free(rec);
 }
 
-void logdb_record_set(logdb_record* rec, cstring *key, cstring *val)
+void logdb_record_set(logdb_record* rec, cstring *key, cstring *val) // logdb_record_set(logdb_record* rec, struct buffer *key, struct buffer *val)
 {
     if (key == NULL)
         return;
@@ -72,6 +74,10 @@ void logdb_record_set(logdb_record* rec, cstring *key, cstring *val)
         cstr_free(rec->value, true);
         rec->value = 0;
     }
+    // cstr_append_buf(rec->key, key->p, key->len);
+    // if (val)
+    // {
+    //     cstr_append_buf(rec->value, val->p, val->len);
     if (val)
     {
         rec->value = cstr_new_cstr(val);
@@ -120,7 +126,7 @@ size_t logdb_record_height(logdb_record* head)
     return cnt;
 }
 
-cstring * logdb_record_find_desc(logdb_record* head, cstring *key)
+cstring * logdb_record_find_desc(logdb_record* head, cstring *key) // logdb_record_find_desc(logdb_record* head, struct buffer *key)
 {
     cstring *found_value = NULL;
     cstring *keycstr;
@@ -128,7 +134,11 @@ cstring * logdb_record_find_desc(logdb_record* head, cstring *key)
 
     if (key == NULL)
         return NULL;
-
+    // keycstr = cstr_new_buf(key->p, key->len);
+    // rec = head;
+    // while (rec)
+    // {
+    //     if (cstr_equal(rec->key, keycstr))
     rec = head;
     while (rec)
     {
@@ -145,6 +155,7 @@ cstring * logdb_record_find_desc(logdb_record* head, cstring *key)
         }
         rec = rec->prev;
     }
+    // cstr_free(keycstr, true);
     return found_value;
 }
 

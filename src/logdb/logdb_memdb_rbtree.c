@@ -3,6 +3,7 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -108,11 +109,13 @@ void logdb_rbtree_append(void* ctx, logdb_bool load_phase, logdb_record *rec)
     RBTreeInsert(handle->tree,rec_new->key,rec_new);
 }
 
-cstring * logdb_rbtree_find(logdb_log_db* db, cstring *key)
+cstring * logdb_rbtree_find(logdb_log_db* db, cstring *key) // logdb_rbtree_find(logdb_log_db* db, struct buffer *key)
 {
     logdb_record *rec_new = 0;
+    // cstring *cstr = cstr_new_buf(key->p, key->len);
     logdb_rbtree_db* handle = (logdb_rbtree_db *)db->cb_ctx;
-    rb_red_blk_node* node = RBExactQuery(handle->tree, key);
+    rb_red_blk_node* node = RBExactQuery(handle->tree, key); // RBExactQuery(handle->tree, cstr);
+    // cstr_free(cstr, true);
 
     if (node && node->info)
         rec_new = (logdb_record *)node->info;

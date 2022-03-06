@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -99,7 +101,7 @@ void logdb_llistdb_append(void* ctx, logdb_bool load_phase, logdb_record *rec)
     logdb_record_rm_desc(current_db_head, rec_dup->key);
 }
 
-cstring * logdb_llistdb_find(logdb_log_db* db, cstring *key)
+cstring * logdb_llistdb_find(logdb_log_db* db, cstring *key) // logdb_llistdb_find(logdb_log_db* db, struct buffer *key)
 {
     logdb_llist_db *handle = (logdb_llist_db *)db->cb_ctx;
     return logdb_record_find_desc(handle->head, key);

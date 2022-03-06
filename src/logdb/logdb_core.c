@@ -3,6 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
+ Copyright (c) 2022 bluezr
+ Copyright (c) 2022 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -272,7 +274,7 @@ logdb_bool logdb_flush(logdb_log_db* db)
     return true;
 }
 
-void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key)
+void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key) // logdb_delete(logdb_log_db* db, struct buffer *key)
 {
     if (key == NULL)
         return;
@@ -281,7 +283,7 @@ void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key)
     logdb_append(db, txn, key, NULL);
 }
 
-void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *val)
+void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *val) // logdb_append(logdb_log_db* db, struct buffer *key, struct buffer *val)
 {
     logdb_record *rec;
     logdb_record *current_head;
@@ -295,6 +297,7 @@ void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *val)
         current_head = txn->txn_head;
     else
         current_head = db->cache_head;
+    // current_head = db->cache_head;
 
     /* if the list is NOT empty, link the current head */
     if (current_head != NULL)
@@ -312,6 +315,11 @@ void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *val)
     /* update mem mapped database (only non TXN) */
     if (db->mem_mapper && db->mem_mapper->append_cb &&!txn)
         db->mem_mapper->append_cb(db->cb_ctx, false, rec);
+    // db->cache_head = rec;
+
+    // /* update mem mapped database */
+    // if (db->mem_mapper && db->mem_mapper->append_cb)
+    //     db->mem_mapper->append_cb(db->cb_ctx, false, rec);
 }
 
 void logdb_txn_commit(logdb_log_db* db, logdb_txn *txn)
@@ -333,12 +341,12 @@ void logdb_txn_commit(logdb_log_db* db, logdb_txn *txn)
     }
 }
 
-cstring * logdb_find_cache(logdb_log_db* db, cstring *key)
+cstring * logdb_find_cache(logdb_log_db* db, cstring *key) // logdb_find_cache(logdb_log_db* db, struct buffer *key)
 {
     return logdb_record_find_desc(db->cache_head, key);
 }
 
-cstring * logdb_find(logdb_log_db* db, cstring *key)
+cstring * logdb_find(logdb_log_db* db, cstring *key) // logdb_find(logdb_log_db* db, struct buffer *key)
 {
     if (db->mem_mapper && db->mem_mapper->find_cb)
         return db->mem_mapper->find_cb(db, key);
@@ -359,7 +367,7 @@ size_t logdb_cache_size(logdb_log_db* db)
     return logdb_record_height(db->cache_head);
 }
 
-logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec)
+logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec) // void logdb_write_record(logdb_log_db* db, logdb_record *rec)
 {
     sha256_context ctx = db->hashctx;
     sha256_context ctx_final;
@@ -377,10 +385,12 @@ logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec)
         cstr_free(serbuf, true);
         return false;
     }
+    // assert(fwrite(record_magic, 8, 1, db->file) == 1);
+    // sha256_write(&ctx, record_magic, 8);
     sha256_write(&ctx, record_magic, 8);
 
     /* write partial hash as body checksum&indicator (body start) */
-    if (fwrite(hash, db->hashlen, 1, db->file) != 1) {
+    if (fwrite(hash, db->hashlen, 1, db->file) != 1) { // assert(fwrite(hash, db->hashlen, 1, db->file) == 1);
         cstr_free(serbuf, true);
         return false;
     }
@@ -391,7 +401,7 @@ logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec)
     sha256_write(&ctx, (uint8_t *)serbuf->str, serbuf->len);
 
     /* write partial hash as body checksum&indicator (body end) */
-    if (fwrite(hash, db->hashlen, 1, db->file) != 1) {
+    if (fwrite(hash, db->hashlen, 1, db->file) != 1) { // assert(fwrite(hash, db->hashlen, 1, db->file) == 1);
         cstr_free(serbuf, true);
         return false;
     }
@@ -400,8 +410,8 @@ logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec)
     cstr_free(serbuf, true);
 
     ctx_final = ctx;
-    sha256_finalize(&ctx_final, hash);
-    if (fwrite(hash, db->hashlen, 1, db->file) != 1)
+    sha256_finalize(&ctx_final, hash); // sha256_finalize(hash, &ctx_final);
+    if (fwrite(hash, db->hashlen, 1, db->file) != 1) // assert(fwrite(hash, db->hashlen, 1, db->file) == 1);
         return false;
     db->hashctx = ctx;
 
@@ -499,7 +509,7 @@ logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enu
 
     /* generate final checksum in a context copy */
     ctx_final = ctx;
-    sha256_finalize(&ctx_final, hashcheck);
+    sha256_finalize(&ctx_final, hashcheck); // sha256_finalize(hashcheck, &ctx_final);
 
     /* read checksum from file, compare */
     if (fread(check, 1, db->hashlen, db->file) != db->hashlen)
