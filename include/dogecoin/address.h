@@ -32,18 +32,27 @@
 LIBDOGECOIN_BEGIN_DECL
 
 /* generate a new private key (hex) */
+/* This function generates a new private key and public key pair. The private key is stored in
+`wif_privkey` and the public key is stored in `p2pkh_pubkey`. */
 LIBDOGECOIN_API int generatePrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet);
 
 /* generate HD master key and WIF public key */
+/* This function generates a new HD master key and WIF public key pair. The private key is stored in
+`wif_privkey_master` and the public key is stored in `p2pkh_pubkey_master`. */
 LIBDOGECOIN_API int generateHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet);
 
 /* generate an extended public key */
+/* This function is used to generate a derived public key from a master private key. */
 LIBDOGECOIN_API int generateDerivedHDPubkey(const char* wif_privkey_master, char* p2pkh_pubkey);
 
 /* verify private and public keys are valid and associated with each other*/
+/* This function is used to verify that a private key and public key pair are valid and associated with
+each other. */
 LIBDOGECOIN_API int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet);
 
 /* verify private and public masters keys are valid and associated with each other */
+/* This is a function that is used to verify that a private key and public key pair are valid and
+associated with each other. */
 LIBDOGECOIN_API int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet);
 
 /* verify address based on length and checksum */
