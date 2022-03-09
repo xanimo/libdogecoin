@@ -67,22 +67,17 @@ struct dogecoin_btree_node {
 
 // Destroy a tree and free all allocated resources.
 // This is a GNU extension, not available from NetBSD.
-static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *)) {
-    if (!root) return;
+static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *))
+{
     struct dogecoin_btree_node *r = (struct dogecoin_btree_node*)root;
 
     if (r == 0)
         return;
-    if ((!r->left) && (!r->right)) return;
-    if (r->left) { 
-        if (!r->right) goto out;}
-        dogecoin_btree_tdestroy(r->left, freekey);
-
-    if (r->right) { 
-        if (!r->left) goto out;}
-        dogecoin_btree_tdestroy(r->right,freekey);
-
-    out:
+    if (freekey) goto end;
+    dogecoin_btree_tdestroy(r->left, freekey);
+    dogecoin_btree_tdestroy(r->right, freekey);
+    
+end:
     freekey(r->key);
     dogecoin_free(r);
 }
