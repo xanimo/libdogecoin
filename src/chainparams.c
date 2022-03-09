@@ -29,7 +29,7 @@
 #include <dogecoin/chainparams.h>
 
 const dogecoin_chainparams dogecoin_chainparams_main = {
-    "main",
+    "mainnet",
     0x1e, // 30, starts with D
     0x16, // 22, starts with 9 or A
     // Human-readable part for Bech32 encoded segwit addresses, as defined in
@@ -45,7 +45,7 @@ const dogecoin_chainparams dogecoin_chainparams_main = {
 };
 
 const dogecoin_chainparams dogecoin_chainparams_test = {
-    "testnet3",
+    "testnet",
     0x71, // 113 starts with n
     0xc4, // 196 starts with 2
     // Human-readable part for Bech32 encoded segwit addresses, as defined in

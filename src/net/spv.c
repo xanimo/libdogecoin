@@ -123,7 +123,6 @@ void dogecoin_spv_client_runloop(dogecoin_spv_client* client)
 void dogecoin_spv_client_free(dogecoin_spv_client *client)
 {
     if (!client)
-        printf("dogecoin_spv_client_free");
         return;
 
     if (client->headers_db)
@@ -219,32 +218,24 @@ static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, u
 }
 
 void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector *blocklocators) {
-    // printf("dogecoin_net_spv_fill_block_locator\n");
     int64_t min_timestamp = client->oldest_item_of_interest - BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S; /* ensure we going back ~144 blocks */
     if (client->headers_db->getchaintip(client->headers_db_ctx)->height == 0) {
         if (client->use_checkpoints && client->oldest_item_of_interest > BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) {
-            if (memcmp(client->chainparams, &dogecoin_chainparams_main.chainname, 8) == 0) {
-                for (int i = (sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]))+1; i > 0 ; i--) {
-                    const dogecoin_checkpoint *cp = &dogecoin_mainnet_checkpoint_array[i];
-                    if (dogecoin_mainnet_checkpoint_array[i].timestamp < min_timestamp) {
-                        uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
-                        utils_uint256_sethex((char *)dogecoin_mainnet_checkpoint_array[i].hash, (uint8_t *)hash);
-                        vector_add(blocklocators, (void *)hash);
-                        if (!client->headers_db->has_checkpoint_start(client->headers_db_ctx)) {
-                            client->headers_db->set_checkpoint_start(client->headers_db_ctx, *hash, dogecoin_mainnet_checkpoint_array[i].height);
-                        }
-                    }
-                }
-            } else if (memcmp(client->chainparams, &dogecoin_chainparams_test.chainname, 8) == 0) {
-                for (int i = (sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]))+1; i > 0 ; i--) {
-                    const dogecoin_checkpoint *cp = &dogecoin_testnet_checkpoint_array[i];
-                    if (dogecoin_testnet_checkpoint_array[i].timestamp < min_timestamp) {
-                        uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
-                        utils_uint256_sethex((char *)dogecoin_testnet_checkpoint_array[i].hash, (uint8_t *)hash);
-                        vector_add(blocklocators, (void *)hash);
-                        if (!client->headers_db->has_checkpoint_start(client->headers_db_ctx)) {
-                            client->headers_db->set_checkpoint_start(client->headers_db_ctx, *hash, dogecoin_testnet_checkpoint_array[i].height);
-                        }
+            const dogecoin_checkpoint *checkpoint = memcmp(client->chainparams, &dogecoin_chainparams_main, 4) == 0 ? &dogecoin_mainnet_checkpoint_array : &dogecoin_testnet_checkpoint_array;
+            size_t mainnet_checkpoint_size = sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
+            size_t testnet_checkpoint_size = sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);
+            size_t length = memcmp(client->chainparams, &dogecoin_chainparams_main, 8) == 0 ? mainnet_checkpoint_size : testnet_checkpoint_size;
+            for (int i = length - 1; i >= 0; i--) {
+                printf("i: %d\n", i);
+                printf("hash: %s\n", checkpoint[i].hash);
+                printf("timestamp: %d\n", checkpoint[i].timestamp);
+                printf("min_timestamp: %ld\n", min_timestamp);
+                if (checkpoint[i].timestamp < min_timestamp) {
+                    uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
+                    utils_uint256_sethex((char *)checkpoint[i].hash, (uint8_t *)hash);
+                    vector_add(blocklocators, (void *)hash);
+                    if (!client->headers_db->has_checkpoint_start(client->headers_db_ctx)) {
+                        client->headers_db->set_checkpoint_start(client->headers_db_ctx, *hash, checkpoint[i].height);
                     }
                 }
             }
