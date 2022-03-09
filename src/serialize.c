@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <dogecoin/cstr.h>
+#include <dogecoin/crypto/common.h>
 #include <dogecoin/serialize.h>
 
 /**

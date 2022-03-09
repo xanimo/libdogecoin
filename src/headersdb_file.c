@@ -26,6 +26,7 @@
 
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/block.h>
+#include <dogecoin/crypto/common.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/utils.h>
 
@@ -238,8 +239,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     chainheader->prev = NULL;
                     db->chaintip = chainheader;
                     firstblock = false;
-                }
-                else {
+                } else {
                     /* The code below is connecting to the dogecoin_headers_db_connect_hdr function. */
                     dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
                     if (!connected)

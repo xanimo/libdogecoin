@@ -42,6 +42,7 @@
 
 #include <dogecoin/crypto/base58.h>
 #include <dogecoin/blockchain.h>
+#include <dogecoin/crypto/common.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/wallet.h>
 #include <dogecoin/utils.h>
@@ -307,7 +308,7 @@ dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_bu
 dogecoin_wallet_hdnode* dogecoin_wallet_hdnode_new()
 {
     dogecoin_wallet_hdnode* whdnode;
-    whdnode = dogecoin_malloc(sizeof(*whdnode));
+    whdnode = dogecoin_calloc(1, sizeof(*whdnode));
     whdnode->hdnode = dogecoin_hdnode_new();
     whdnode->pubkeyhash;
     return whdnode;
@@ -607,32 +608,31 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
 
     if (*created) {
         // write file-header-magic
-        if (fwrite(file_hdr_magic, 4, 1, wallet->dbfile ) != 1 ) return false;
+        if (fwrite(file_hdr_magic, 4, 1, wallet->dbfile) != 1) return false;
 
         // write version
         uint32_t v = htole32(current_version);
-        if (fwrite(&v, sizeof(v), 1, wallet->dbfile ) != 1) return false;
+        if (fwrite(&v, sizeof(v), 1, wallet->dbfile) != 1) return false;
 
         // write genesis
         if (fwrite(wallet->chain->genesisblockhash, sizeof(uint256), 1, wallet->dbfile ) != 1) return false;
 
         dogecoin_file_commit(wallet->dbfile);
-    }
-    else {
+    } else {
         // check file-header-magic, version and genesis
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)+sizeof(uint256)];
-        if ( (uint32_t)buffer.st_size < (uint32_t)(sizeof(buf)) ||
-             fread(buf, sizeof(buf), 1, wallet->dbfile ) != 1 ||
-             memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic))
-            )
+        printf("buffer: %d\n", (uint32_t)buffer.st_size);
+        if ((uint32_t)buffer.st_size < (uint32_t)(sizeof(buf)) || fread(buf, sizeof(buf), 1, wallet->dbfile ) != 1 || memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
         {
             fprintf(stderr, "Wallet file: error reading database file\n");
             return false;
         }
+        
         if (le32toh(*(buf+sizeof(file_hdr_magic))) > current_version) {
             fprintf(stderr, "Wallet file: unsupported file version\n");
             return false;
         }
+
         if (memcmp(buf+sizeof(file_hdr_magic)+sizeof(current_version), wallet->chain->genesisblockhash, sizeof(uint256)) != 0) {
             fprintf(stderr, "Wallet file: different network\n");
             return false;
@@ -642,7 +642,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         while (!feof(wallet->dbfile))
         {
             uint8_t rectype;
-            if (fread(&rectype, 1, 1, wallet->dbfile ) != 1) {
+            if (fread(&rectype, 1, 1, wallet->dbfile) != 1) {
                 // no more record, break
                 break;
             }
@@ -653,16 +653,16 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 memset(strbuf, 0, 196);
                 if (!deser_varlen_from_file(&len, wallet->dbfile)) return false;
                 if (len > sizeof(strbuf)) { return false; }
-                if (fread(strbuf, len, 1, wallet->dbfile ) != 1) return false;
+                if (fread(strbuf, len, 1, wallet->dbfile) != 1) return false;
                 wallet->masterkey = dogecoin_hdnode_new();
-                dogecoin_hdnode_deserialize(strbuf, wallet->chain, wallet->masterkey );
+                dogecoin_hdnode_deserialize(strbuf, wallet->chain, wallet->masterkey);
             }
 
             if (rectype == WALLET_DB_REC_TYPE_PUBKEYCACHE) {
                 uint32_t len;
 
                 dogecoin_wallet_hdnode *whdnode = dogecoin_wallet_hdnode_new();
-                if (fread(whdnode->pubkeyhash, sizeof(uint160), 1, wallet->dbfile ) != 1) {
+                if (fread(whdnode->pubkeyhash, sizeof(uint160), 1, wallet->dbfile) != 1) {
                     dogecoin_wallet_hdnode_free(whdnode);
                     return false;
                 }
@@ -674,7 +674,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                     return false;
                 }
                 if (len > sizeof(strbuf)) { return false; }
-                if (fread(strbuf, len, 1, wallet->dbfile ) != 1) {
+                if (fread(strbuf, len, 1, wallet->dbfile) != 1) {
                     dogecoin_wallet_hdnode_free(whdnode);
                     return false;
                 }
@@ -685,7 +685,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 }
 
                 // add the node to the binary tree
-                dogecoin_wallet_hdnode* checknode = tsearch(whdnode, &wallet->hdkeys_rbtree, dogecoin_wallet_hdnode_compare);
+                tsearch(whdnode, &wallet->hdkeys_rbtree, dogecoin_wallet_hdnode_compare);
 
             }
         }
@@ -746,7 +746,7 @@ void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, dogecoin_hdnod
     dogecoin_hdnode_serialize_private(wallet->masterkey, wallet->chain, strbuf, sizeof(strbuf));
     ser_str(record, strbuf, sizeof(strbuf));
 
-    if ( fwrite(record->str, record->len, 1, wallet->dbfile) != 1 ) {
+    if (fwrite(record->str, record->len, 1, wallet->dbfile) != 1) {
         fprintf(stderr, "Writing master private key record failed\n");
     }
     cstr_free(record, true);
@@ -780,7 +780,7 @@ dogecoin_wallet_hdnode* dogecoin_wallet_next_key(dogecoin_wallet* wallet)
 
     //add it to the binary tree
     // tree manages memory
-    dogecoin_wallet_hdnode* checknode = tsearch(whdnode, &wallet->hdkeys_rbtree, dogecoin_wallet_hdnode_compare);
+    tsearch(whdnode, &wallet->hdkeys_rbtree, dogecoin_wallet_hdnode_compare);
 
     //serialize and store node
     cstring* record = cstr_new_sz(256);
@@ -810,22 +810,24 @@ dogecoin_wallet_hdnode* dogecoin_wallet_next_key(dogecoin_wallet* wallet)
  */
 void dogecoin_wallet_get_addresses(dogecoin_wallet* wallet, vector* addr_out)
 {
-    rb_red_blk_node* hdkey_rbtree_node;
+    (void)(wallet);
+    (void)(addr_out);
+    // rb_red_blk_node* hdkey_rbtree_node;
 
-    if (!wallet) return;
+    // if (!wallet) return;
 
-    while((hdkey_rbtree_node = rbtree_enumerate_next(wallet->hdkeys_rbtree)))
-    {
-        cstring *key = hdkey_rbtree_node->key;
-        uint8_t hash160[21];
-        hash160[0] = wallet->chain->b58prefix_pubkey_address;
-        memcpy(hash160+1, key->str, 20);
+    // while((hdkey_rbtree_node = rbtree_enumerate_next(wallet->hdkeys_rbtree)))
+    // {
+    //     cstring *key = hdkey_rbtree_node->key;
+    //     uint8_t hash160[21];
+    //     hash160[0] = wallet->chain->b58prefix_pubkey_address;
+    //     memcpy(hash160+1, key->str, 20);
 
-        size_t addrsize = 98;
-        char *addr = calloc(1, (int)addrsize);
-        dogecoin_base58_encode_check(hash160, 21, addr, (int)addrsize);
-        vector_add(addr_out, addr);
-    }
+    //     size_t addrsize = 98;
+    //     char *addr = calloc(1, addrsize);
+    //     dogecoin_base58_encode_check(hash160, 21, addr, addrsize);
+    //     vector_add(addr_out, addr);
+    // }
 }
 
 /**
@@ -916,7 +918,6 @@ dogecoin_bool dogecoin_wallet_add_wtx_move(dogecoin_wallet* wallet, dogecoin_wtx
         // insert again
         dogecoin_wtx* checkwtx = tsearch(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
     }
-
 
     return true;
 }

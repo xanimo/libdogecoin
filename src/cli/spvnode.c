@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
         #if WITH_WALLET
         dogecoin_wallet *wallet = dogecoin_wallet_new(chain);
         int error;
-        dogecoin_bool created;
+        dogecoin_bool *created;
         dogecoin_bool res = dogecoin_wallet_load(wallet, "wallet.db", &error, &created);
         if (!res) {
             fprintf(stdout, "Loading wallet failed\n");
@@ -213,8 +213,7 @@ int main(int argc, char* argv[]) {
             }
             dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
             dogecoin_wallet_set_master_key_copy(wallet, &node);
-        }
-        else {
+        } else {
             // ensure we have a key
             // TODO
         }
@@ -239,8 +238,7 @@ int main(int argc, char* argv[]) {
         if (!dogecoin_spv_client_load(client, (dbfile ? dbfile : "headers.db"))) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
-        }
-        else {
+        } else {
             printf("Discover peers...");
             dogecoin_spv_client_discover_peers(client, ips);
             printf("done\n");
