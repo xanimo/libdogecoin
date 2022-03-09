@@ -6,6 +6,16 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/tx.h>
 
+/**
+ * The timer_cb function is called every 300 seconds (5 minutes) to check if the node has been
+ * connected for more than 5 minutes. 
+ * If it has, the node is disconnected
+ * 
+ * @param node The node that the timer is being called on.
+ * @param now The current time in seconds.
+ * 
+ * @return A boolean value.
+ */
 static dogecoin_bool timer_cb(dogecoin_node *node, uint64_t *now)
 {
     if (node->time_started_con + 300 < *now)
@@ -15,6 +25,14 @@ static dogecoin_bool timer_cb(dogecoin_node *node, uint64_t *now)
     return true;
 }
 
+/**
+ * This function is called by the
+ * logger when it needs to write to the log
+ * 
+ * @param format The format string.
+ * 
+ * @return 1
+ */
 static int default_write_log(const char *format, ...)
 {
     va_list args;
@@ -24,6 +42,15 @@ static int default_write_log(const char *format, ...)
     return 1;
 }
 
+/**
+ * It parses a command from the network
+ * 
+ * @param node The node that received the message.
+ * @param hdr The header of the message.
+ * @param buf The buffer containing the message.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool parse_cmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf)
 {
     (void)(node);
@@ -32,6 +59,15 @@ dogecoin_bool parse_cmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, 
     return true;
 }
 
+/**
+ * We send a getheaders message to the node, and then we send a getdata message to the node
+ * 
+ * @param node The node that received the message.
+ * @param hdr The header of the message.
+ * @param buf The buffer containing the message payload.
+ * 
+ * @return Nothing.
+ */
 void postcmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf)
 {
     if (strcmp(hdr->command, "block") == 0)
@@ -106,6 +142,11 @@ void postcmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, struct cons
     }
 }
 
+/**
+ * When a node's connection state changes, this function is called
+ * 
+ * @param node The node that the connection state changed for.
+ */
 void node_connection_state_changed(struct dogecoin_node_ *node)
 {
     (void)(node);
@@ -141,6 +182,9 @@ void handshake_done(struct dogecoin_node_ *node)
     cstr_free(p2p_msg, true);
 }
 
+/**
+ * It connects to a node and downloads a block.
+ */
 void test_net_basics_plus_download_block()
 {
 

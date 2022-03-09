@@ -21,17 +21,24 @@ dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *cli
 
 void test_netspv()
 {
+    /* Deleting the file `headers.db` if it exists. */
     unlink("headers.db");
+    /* It creates a new client object. */
     dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_test, false, false);
+    /* This is a callback function that is called when a new header is received. */
     client->header_message_processed = test_spv_header_message_processed;
+    /* This is a callback function that is called when the sync is completed. */
     client->sync_completed = test_spv_sync_completed;
 
+    /* It loads the headers database from the file `headers.db`. */
     dogecoin_spv_client_load(client, "headers.db");
 
     printf("Discover peers...");
+    /* Discovering peers. */
     dogecoin_spv_client_discover_peers(client, NULL);
     printf("done\n");
     printf("Start interacting with the p2p network...\n");
+    /* Starting the client. */
     dogecoin_spv_client_runloop(client);
     dogecoin_spv_client_free(client);
 }

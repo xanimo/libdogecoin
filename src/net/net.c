@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <netdb.h>
 
 #include <time.h>
 
