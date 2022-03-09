@@ -2,11 +2,8 @@
 
  The MIT License (MIT)
 
-<<<<<<< HEAD
  Copyright (c) 2016 Jonas Schnelli
-=======
  Copyright (c) 2021 The Dogecoin Foundation
->>>>>>> 32a4236... wallet: initial commit
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),

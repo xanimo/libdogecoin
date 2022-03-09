@@ -217,8 +217,6 @@ int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet)
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     size_t sizeout = 100;
 
-    printf("wif_privkey_master:   %s\n", wif_privkey);
-    printf("p2pkh_pubkey_master:  %s\n", p2pkh_pubkey);
     /* verify private key */
     dogecoin_key key;
     dogecoin_privkey_init(&key);
@@ -227,16 +225,16 @@ int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet)
     char new_wif_privkey[sizeout];
     dogecoin_privkey_encode_wif(&key, chain, new_wif_privkey, &sizeout);
 
-    // /* verify public key */
-    // dogecoin_pubkey pubkey;
-    // dogecoin_pubkey_init(&pubkey);
-    // dogecoin_pubkey_from_key(&key, &pubkey);
-    // if (!dogecoin_pubkey_is_valid(&pubkey)) return 0;
+    /* verify public key */
+    dogecoin_pubkey pubkey;
+    dogecoin_pubkey_init(&pubkey);
+    dogecoin_pubkey_from_key(&key, &pubkey);
+    if (!dogecoin_pubkey_is_valid(&pubkey)) return 0;
 
-    // /* verify address derived matches provided address */
-    // char new_p2pkh_pubkey[sizeout];
-    // dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, new_p2pkh_pubkey);
-    // if (strcmp(p2pkh_pubkey, new_p2pkh_pubkey)) return 0;
+    /* verify address derived matches provided address */
+    char new_p2pkh_pubkey[sizeout];
+    dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, new_p2pkh_pubkey);
+    if (strcmp(p2pkh_pubkey, new_p2pkh_pubkey)) return 0;
 
     dogecoin_pubkey_cleanse(&pubkey);
     dogecoin_privkey_cleanse(&key);
@@ -272,6 +270,17 @@ int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master
     return true;
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * The function verifies a P2PKH address
+ * 
+ * @param p2pkh_pubkey The public key to be verified.
+ * @param len The length of the address in bytes.
+ * 
+ * @return A boolean value.
+ */
+>>>>>>> 32695bc63... Squashed commit of the following:
 int verifyP2pkhAddress(char* p2pkh_pubkey, uint8_t len) {
     if (!p2pkh_pubkey || !len) return false;
     /* check length */

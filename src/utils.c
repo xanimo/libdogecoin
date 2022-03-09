@@ -288,6 +288,15 @@ void utils_uint256_sethex(char* psz, uint8_t* out)
     }
 }
 
+/**
+ * "Allocate memory for a block of size bytes and return a pointer to it."
+ * 
+ * The function is safe because it checks for memory overflow and exits the program if it occurs
+ * 
+ * @param size The size of the memory block to be allocated.
+ * 
+ * @return The address of the allocated memory.
+ */
 void* safe_malloc(size_t size)
 {
     void* result;

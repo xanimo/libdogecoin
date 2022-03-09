@@ -57,7 +57,7 @@ static const b58_almostmaxint_t b58_almostmaxint_mask = ((((b58_maxint_t)1) << b
  * @param b58 the base58 string to decode
  * @param b58sz The size of the base58 string.
  * 
- * @return Nothing.
+ * @return int
  */
 int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b58sz)
 {
@@ -290,7 +290,7 @@ int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
  * @param addrout The address to encode.
  * @param len The length of the output buffer.
  * 
- * @return Nothing.
+ * @return bool.
  */
 dogecoin_bool dogecoin_p2pkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout, int len) {
     uint8_t hash160[sizeof(uint160)+1];
@@ -308,7 +308,7 @@ dogecoin_bool dogecoin_p2pkh_addr_from_hash160(const uint160 hashin, const dogec
  * @param addrout The address to encode.
  * @param len The length of the output buffer.
  * 
- * @return Nothing.
+ * @return bool.
  */
 dogecoin_bool dogecoin_p2sh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char* addrout,
                                     int len)
@@ -327,7 +327,7 @@ dogecoin_bool dogecoin_p2sh_addr_from_hash160(const uint160 hashin, const dogeco
  * @param chain The chain parameters to use.
  * @param addrout The address to encode.
  * 
- * @return Nothing.
+ * @return bool.
  */
 dogecoin_bool dogecoin_p2wpkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout) {
     return segwit_addr_encode(addrout, chain->bech32_hrp, 0, hashin, sizeof(uint160));
