@@ -34,8 +34,26 @@
 #include <dogecoin/buffer.h>
 #include <dogecoin/cstr.h>
 #include <dogecoin/crypto/hash.h>
+#include <dogecoin/tx.h>
 
 LIBDOGECOIN_BEGIN_DECL
+
+typedef struct parent_block {
+    int32_t version;
+    uint256 prev_block;
+    uint256 merkle_root;
+    uint32_t timestamp;
+    uint32_t bits;
+    uint32_t nonce;
+} parent_block;
+
+typedef struct auxpow_block_header_ {
+    dogecoin_tx parent_coinbase;
+    uint256 parent_hash;
+    uint256 coinbase_branch;
+    uint256 blockchain_branch;
+    parent_block parent_block;
+} auxpow_block_header;
 
 /**
  * A dogecoin block header is a struct with 5 fields.
@@ -47,6 +65,7 @@ typedef struct dogecoin_block_header_ {
     uint32_t timestamp;
     uint32_t bits;
     uint32_t nonce;
+    auxpow_block_header aux_data;
 } dogecoin_block_header;
 
 /* Creating a new block header object. */

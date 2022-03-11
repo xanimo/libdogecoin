@@ -270,8 +270,6 @@ int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master
     return true;
 }
 
-<<<<<<< HEAD
-=======
 /**
  * The function verifies a P2PKH address
  * 
@@ -280,7 +278,6 @@ int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master
  * 
  * @return A boolean value.
  */
->>>>>>> 32695bc63... Squashed commit of the following:
 int verifyP2pkhAddress(char* p2pkh_pubkey, uint8_t len) {
     if (!p2pkh_pubkey || !len) return false;
     /* check length */

@@ -434,8 +434,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     {
         // no need to fetch headers;
 
-    }
-    else {
+    } else {
         for(size_t i = 0;i < client->nodegroup->nodes->len; i++)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
@@ -659,18 +658,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             dogecoin_bool connected;
             dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
             /* deserialize the p2p header */
+            printf("pindex: %s\n", pindex->header);
             if (!pindex)
             {
                 client->nodegroup->log_write_cb("Header deserialization failed (node %d)\n", node->nodeid);
                 return;
             }
-
+            printf("buffer : %u\n", buf);
+            printf("buffer : %u\n", buf->len);
             /* skip tx count */
             if (!deser_skip(buf, 1)) {
                 client->nodegroup->log_write_cb("Header deserialization (tx count skip) failed (node %d)\n", node->nodeid);
                 return;
             }
-
+            printf("connected: %d\n", connected);
             if (!connected)
             {
                 /* error, header sequence missmatch
@@ -681,8 +682,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
                 /* see if we can fetch headers from a different peer */
                 dogecoin_net_spv_request_headers(client);
-            }
-            else {
+            } else {
                 if (client->header_connected) { client->header_connected(client); }
                 connected_headers++;
                 /* Checking if the block timestamp is greater than the oldest item of interest minus

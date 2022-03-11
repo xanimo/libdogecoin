@@ -22,7 +22,7 @@ AC_PROG_CC_C99
 
 CFLAGS="$CFLAGS"
 
-warn_CFLAGS="-std=gnu99 -O0 -coverage -fprofile-arcs -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings -lm"
+warn_CFLAGS="-std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings -lm"
 saved_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS $warn_CFLAGS"
 AC_MSG_CHECKING([if ${CC} supports ${warn_CFLAGS}])

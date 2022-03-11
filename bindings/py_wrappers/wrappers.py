@@ -7,7 +7,7 @@ import os
 def load_libdogecoin():
     """Load the libdogecoin library from "libdogecoin.so"."""
     # TODO: change path to be more flexible
-    path = os.path.abspath(__file__+"../../../../.libs")
+    path = os.path.abspath(os.getcwd()+"/.libs")
     sys.path.insert(0, path)
     path = os.path.join(path, "libdogecoin.so")
 

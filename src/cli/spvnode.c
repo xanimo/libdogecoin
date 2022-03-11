@@ -21,7 +21,7 @@
  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  OTHER DEALINGS IN THE SOFTWARE.
- 
+
 */
 
 #include <assert.h>
@@ -56,14 +56,14 @@ static struct option long_options[] = {
         {"maxnodes", no_argument, NULL, 'm'},
         {"dbfile", no_argument, NULL, 'f'},
         {"continuous", no_argument, NULL, 'c'},
-        {NULL, 0, NULL, 0}};
+        {NULL, 0, NULL, 0} };
 
 /**
  * Print_version() prints the version of the program
  */
 static void print_version() {
     printf("Version: %s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
-}
+    }
 
 /**
  * This function prints the usage of the spvnode command
@@ -80,30 +80,30 @@ static void print_usage() {
     printf("> spvnode -d scan\n\n");
     printf("Sync up, show debug info, don't store headers in file (only in memory), wait for new blocks:\n");
     printf("> spvnode -d -f 0 -c scan\n\n");
-}
+    }
 
 /**
  * Prints an error message to the screen
- * 
+ *
  * @param er The error message to display.
- * 
+ *
  * @return Nothing.
  */
 static bool showError(const char* er) {
     printf("Error: %s\n", er);
     return 1;
-}
+    }
 
 /**
  * When a new block is added to the blockchain, this function is called
- * 
+ *
  * @param client The client object.
  * @param node The node that sent the message.
  * @param newtip The new tip of the headers chain.
- * 
+ *
  * @return A boolean value.
  */
-dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip) {
+dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, dogecoin_node* node, dogecoin_blockindex* newtip) {
     UNUSED(client);
     UNUSED(node);
     if (newtip) {
@@ -116,15 +116,14 @@ static dogecoin_bool quit_when_synced = true;
 /**
  * When the sync is complete, print a message and either exit or wait for new blocks or relevant
  * transactions
- * 
+ *
  * @param client The client object.
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
     if (quit_when_synced) {
         dogecoin_node_group_shutdown(client->nodegroup);
-    }
-    else {
+    } else {
         printf("Waiting for new blocks or relevant transactions...\n");
     }
 }
@@ -145,45 +144,45 @@ int main(int argc, char* argv[]) {
         /* exit if no command was provided */
         print_usage();
         exit(EXIT_FAILURE);
-    }
+        }
     data = argv[argc - 1];
 
     /* get arguments */
     while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:f:", long_options, &long_index)) != -1) {
         switch (opt) {
-        case 'c':
-            quit_when_synced = false;
-            break;
-        case 't':
-            chain = &dogecoin_chainparams_test;
-            break;
-        case 'r':
-            chain = &dogecoin_chainparams_regtest;
-            break;
-        case 'd':
-            debug = true;
-            break;
-        case 's':
-            timeout = (int)strtol(optarg, (char**)NULL, 10);
-            break;
-        case 'i':
-            ips = optarg;
-            break;
-        case 'm':
-            maxnodes = (int)strtol(optarg, (char**)NULL, 10);
-            break;
-        case 'f':
-            dbfile = optarg;
-            break;
-        case 'v':
-            print_version();
-            exit(EXIT_SUCCESS);
-            break;
-        default:
-            print_usage();
-            exit(EXIT_FAILURE);
+                case 'c':
+                    quit_when_synced = false;
+                    break;
+                case 't':
+                    chain = &dogecoin_chainparams_test;
+                    break;
+                case 'r':
+                    chain = &dogecoin_chainparams_regtest;
+                    break;
+                case 'd':
+                    debug = true;
+                    break;
+                case 's':
+                    timeout = (int)strtol(optarg, (char**)NULL, 10);
+                    break;
+                case 'i':
+                    ips = optarg;
+                    break;
+                case 'm':
+                    maxnodes = (int)strtol(optarg, (char**)NULL, 10);
+                    break;
+                case 'f':
+                    dbfile = optarg;
+                    break;
+                case 'v':
+                    print_version();
+                    exit(EXIT_SUCCESS);
+                    break;
+                default:
+                    print_usage();
+                    exit(EXIT_FAILURE);
+            }
         }
-    }
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
@@ -191,15 +190,15 @@ int main(int argc, char* argv[]) {
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false);
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
-        #if WITH_WALLET
-        dogecoin_wallet *wallet = dogecoin_wallet_new(chain);
+#if WITH_WALLET
+        dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
         int error;
-        dogecoin_bool *created;
+        dogecoin_bool* created;
         dogecoin_bool res = dogecoin_wallet_load(wallet, "wallet.db", &error, &created);
         if (!res) {
             fprintf(stdout, "Loading wallet failed\n");
             exit(EXIT_FAILURE);
-        }
+            }
         /* It creates a new key and sets it as the master key. */
         if (created) {
             // create a new key
@@ -210,13 +209,14 @@ int main(int argc, char* argv[]) {
             if (!res) {
                 fprintf(stdout, "Generating random bytes failed\n");
                 exit(EXIT_FAILURE);
-            }
+                }
             dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
             dogecoin_wallet_set_master_key_copy(wallet, &node);
-        } else {
+            }
+        else {
             // ensure we have a key
             // TODO
-        }
+            }
         /* Creating a new key and setting it as the master key. */
         dogecoin_wallet_hdnode* node = dogecoin_wallet_next_key(wallet);
         size_t strsize = 128;
@@ -225,20 +225,21 @@ int main(int argc, char* argv[]) {
         printf("Wallet addr: %s (child %d)\n", str, node->hdnode->child_num);
 
         /* Creating a vector of addresses and storing them in the wallet. */
-        vector *addrs = vector_new(1, free);
+        vector* addrs = vector_new(1, free);
         dogecoin_wallet_get_addresses(wallet, addrs);
         for (unsigned int i = 0; i < addrs->len; i++) {
-            char* addr= vector_idx(addrs, i);
+            char* addr = vector_idx(addrs, i);
             printf("Addr: %s\n", addr);
-        }
+            }
         vector_free(addrs, true);
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
-        #endif
+#endif
         if (!dogecoin_spv_client_load(client, (dbfile ? dbfile : "headers.db"))) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
-        } else {
+            }
+        else {
             printf("Discover peers...");
             dogecoin_spv_client_discover_peers(client, ips);
             printf("done\n");
@@ -246,12 +247,12 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_client_runloop(client);
             dogecoin_spv_client_free(client);
             ret = EXIT_SUCCESS;
-        }
+            }
         dogecoin_ecc_stop();
-    }
+        }
     else {
         printf("Invalid command (use -?)\n");
         ret = EXIT_FAILURE;
-    }
+        }
     return ret;
-}
+    }

@@ -3,9 +3,9 @@
 import unittest
 import ctypes as ct
 import sys
-sys.path.append("../")
+# sys.path.append("../")
 import wrappers as w
-lib = w.load_libdogecoin()
+# lib = w.load_libdogecoin()
 
 
 class TestGeneratePrivPubKeyPair(unittest.TestCase):

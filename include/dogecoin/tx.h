@@ -117,6 +117,7 @@ enum dogecoin_tx_sign_result {
     DOGECOIN_SIGN_INPUTINDEX_OUT_OF_RANGE = -7,
     DOGECOIN_SIGN_OK = 1,
 };
+
 const char* dogecoin_tx_sign_result_to_str(const enum dogecoin_tx_sign_result result);
 enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, const cstring* script, uint64_t amount, const dogecoin_key* privkey, int inputindex, int sighashtype, uint8_t* sigcompact_out, uint8_t* sigder_out, int* sigder_len);
 

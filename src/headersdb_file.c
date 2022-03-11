@@ -229,6 +229,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     /* Setting the height of the chain header to the height of the block. */
                     chainheader->height = height;
                     /* Deserializing the block header. */
+                    printf("cbuf_all: %d\n", sizeof(&cbuf_all));
                     if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all)) {
                         /* The code below is freeing the memory allocated to the chainheader variable. */
                         dogecoin_free(chainheader);

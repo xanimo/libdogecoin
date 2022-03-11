@@ -142,9 +142,9 @@ void dogecoin_p2p_ser_addr(unsigned int protover, const dogecoin_p2p_address* ad
 {
     if (protover >= DOGECOIN_ADDR_TIME_VERSION)
         ser_u32(s, addr->time);
-    ser_u64(s, addr->services);
-    ser_bytes(s, addr->ip, 16);
-    ser_u16(s, addr->port);
+        ser_u64(s, addr->services);
+        ser_bytes(s, addr->ip, 16);
+        ser_u16(s, addr->port);
 }
 
 

@@ -97,6 +97,7 @@ int main()
     u_run_test(test_aes);
     u_run_test(test_base58);
     u_run_test(test_bip32);
+    u_run_test(test_block_header);
     u_run_test(test_buffer);
     u_run_test(test_cstr);
     u_run_test(test_ecc);
@@ -122,20 +123,20 @@ int main()
     u_run_test(test_vector);
 
 #ifdef WITH_WALLET
-    u_run_test(test_wallet);
-    u_run_test(test_red_black_tree);
-    u_run_test(test_logdb_memdb);
-    u_run_test(test_logdb_rbtree);
+    // u_run_test(test_wallet);
+    // u_run_test(test_red_black_tree);
+    // u_run_test(test_logdb_memdb);
+    // u_run_test(test_logdb_rbtree);
 #endif
 
 #ifdef WITH_TOOLS
-    u_run_test(test_tool);
+    // u_run_test(test_tool);
 #endif
 
 #ifdef WITH_NET
-    u_run_test(test_netspv);
-    u_run_test(test_protocol);
-    u_run_test(test_net_basics_plus_download_block);
+    // u_run_test(test_netspv);
+    // u_run_test(test_protocol);
+    // u_run_test(test_net_basics_plus_download_block);
 #endif
 
     dogecoin_ecc_stop();
