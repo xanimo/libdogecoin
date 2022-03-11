@@ -267,7 +267,6 @@ dogecoin_bool dogecoin_hdnode_get_pub_hex(const dogecoin_hdnode* node, char* str
     return dogecoin_pubkey_get_hex(&pubkey, str, strsize);
 }
 
-
 // check for validity of curve point in case of public data not performed
 dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainparams* chain, dogecoin_hdnode* node)
 {
