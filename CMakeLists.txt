@@ -178,7 +178,9 @@ IF(WITH_LOGDB)
         src/logdb/logdb_memdb_llist.c
         src/logdb/logdb_memdb_rbtree.c
         src/logdb/logdb_rec.c
+        src/logdb/misc.c
         src/logdb/red_black_tree.c
+        src/logdb/stack.c
     )
     INSTALL(FILES
         src/logdb/include/logdb/logdb_base.h
@@ -187,13 +189,16 @@ IF(WITH_LOGDB)
         src/logdb/include/logdb/logdb_memdb_rbtree.h
         src/logdb/include/logdb/logdb_rec.h
         src/logdb/include/logdb/logdb.h
+        src/logdb/include/logdb/misc.h
         src/logdb/include/logdb/red_black_tree.h
+        src/logdb/include/logdb/stack.h
         DESTINATION include/logdb
     )
     IF(USE_TESTS)
         TARGET_SOURCES(tests PRIVATE
             src/logdb/test/logdb_tests.c
             src/logdb/test/tests_red_black_tree.c
+            src/logdb/test/logdb_tests_sample.h
         )
     ENDIF()
 ENDIF()

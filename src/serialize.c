@@ -92,7 +92,7 @@ void ser_varstr(cstring* s, cstring* s_in)
 int deser_skip(struct const_buffer* buf, size_t len)
 {
     char* p;
-    if (buf->len < len)
+    if (buf->len < len) {
         return false;
     }
 
@@ -107,7 +107,7 @@ int deser_skip(struct const_buffer* buf, size_t len)
 int deser_bytes(void* po, struct const_buffer* buf, size_t len)
 {
     char* p;
-    if (buf->len < len)
+    if (buf->len < len) {
         return false;
     }
 
@@ -287,7 +287,6 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
         uint64_t v64;
         if (fread((void*)buf.p, 1, sizeof(v64), file) != sizeof(v64))
             return false;
-        printf("\n\n***WARNING: truncate %lu; L286-serialize.c\n\n", sizeof(v64));
         memcpy(rawdata + 1, buf.p, sizeof(uint32_t)); /* warning, truncate! */
         *buflen_inout += sizeof(uint32_t);
         if (!deser_u64(&v64, &buf))
