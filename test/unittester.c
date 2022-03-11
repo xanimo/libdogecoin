@@ -123,7 +123,7 @@ int main()
     u_run_test(test_vector);
 
 #ifdef WITH_WALLET
-    // u_run_test(test_wallet);
+    u_run_test(test_wallet);
     // u_run_test(test_red_black_tree);
     // u_run_test(test_logdb_memdb);
     // u_run_test(test_logdb_rbtree);
@@ -134,7 +134,7 @@ int main()
 #endif
 
 #ifdef WITH_NET
-    // u_run_test(test_netspv);
+    u_run_test(test_netspv);
     // u_run_test(test_protocol);
     // u_run_test(test_net_basics_plus_download_block);
 #endif

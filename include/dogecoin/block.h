@@ -38,23 +38,6 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-typedef struct parent_block {
-    int32_t version;
-    uint256 prev_block;
-    uint256 merkle_root;
-    uint32_t timestamp;
-    uint32_t bits;
-    uint32_t nonce;
-} parent_block;
-
-typedef struct auxpow_block_header_ {
-    dogecoin_tx parent_coinbase;
-    uint256 parent_hash;
-    uint256 coinbase_branch;
-    uint256 blockchain_branch;
-    parent_block parent_block;
-} auxpow_block_header;
-
 /**
  * A dogecoin block header is a struct with 5 fields.
  */
@@ -65,13 +48,56 @@ typedef struct dogecoin_block_header_ {
     uint32_t timestamp;
     uint32_t bits;
     uint32_t nonce;
-    auxpow_block_header aux_data;
 } dogecoin_block_header;
+
+// const int vAuxPow = 0x0100;
+
+typedef struct auxpow_block_header_ {
+    dogecoin_tx parent_coinbase;
+    uint256 parent_hash;
+    uint256 coinbase_branch;
+    uint256 blockchain_branch;
+    dogecoin_block_header parent_block;
+} auxpow_block_header;
+
+typedef struct dogecoin_auxpow_block_header_ {
+    dogecoin_block_header block_header;
+    auxpow_block_header aux_data;
+} dogecoin_auxpow_block_header;
 
 /* Creating a new block header object. */
 LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
 /* A macro that is used to free the memory allocated for the `dogecoin_block_header` struct. */
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
+
+LIBDOGECOIN_API static int calcLength(char buf, int offset);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_version(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_prev_block(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_merkle_root(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_timestamp(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_bits(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_nonce(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_coinbase_txn(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_block_hash(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_coinbase_branch(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_blockchain_branch(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_parent_block(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_txn_count(struct const_buffer* buffer);
+
+LIBDOGECOIN_API int dogecoin_get_block_header_txns(struct const_buffer* buffer);
+
 /* Deserializing a block header from a buffer. */
 LIBDOGECOIN_API int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf);
 /* A function that serializes a block header into a cstring. */

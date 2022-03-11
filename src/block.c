@@ -81,6 +81,123 @@ void printBits(size_t const size, void const* ptr)
     }
     puts("");
 }
+
+int dogecoin_get_block_header_version(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+int dogecoin_get_block_header_prev_block(struct const_buffer* buffer) {
+    uint256 prev_block;
+    if (!deser_u256(prev_block, buffer))
+        return false;
+    printf("prev_block: %s\n", prev_block);
+    return true;
+}
+
+
+int dogecoin_get_block_header_merkle_root(struct const_buffer* buffer) {
+    uint256 merkle_root;
+    if (!deser_u256(merkle_root, buffer))
+        return false;
+    printf("merkle_root: %s\n", merkle_root);
+    return true;
+}
+
+
+int dogecoin_get_block_header_timestamp(struct const_buffer* buffer) {
+    uint32_t timestamp;
+    if (!deser_u32(&timestamp, buffer))
+        return false;
+    printf("timestamp: %u\n", timestamp);
+    return true;
+}
+
+
+int dogecoin_get_block_header_bits(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_nonce(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_coinbase_txn(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("dogecoin_tx_is_coinbaseversion: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_block_hash(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_coinbase_branch(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_blockchain_branch(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_parent_block(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_txn_count(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
+int dogecoin_get_block_header_txns(struct const_buffer* buffer) {
+    int32_t version;
+    if (!deser_s32(&version, buffer))
+        return false;
+    printf("version: %d\n", version);
+    return true;
+}
+
+
 /**
  * It deserializes a block header from a buffer
  * 
@@ -90,20 +207,7 @@ void printBits(size_t const size, void const* ptr)
  * @return Nothing.
  */
 int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf) {
-    printBits(buf->len, buf->p);
-    printf("buflen: %u\n", buf->len);
-    if (!deser_s32(&header->version, buf))
-        return false;
-    if (!deser_u256(header->prev_block, buf))
-        return false;
-    if (!deser_u256(header->merkle_root, buf))
-        return false;
-    if (!deser_u32(&header->timestamp, buf))
-        return false;
-    if (!deser_u32(&header->bits, buf))
-        return false;
-    if (!deser_u32(&header->nonce, buf))
-        return false;
+    
     if (header->nonce == 0 && header->version >= 6422786) {
         // if (!deser_s32(&header->aux_data.parent_coinbase, buf))
         //     return false;
@@ -125,6 +229,19 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
         // printf("header.nonce: %u\n", header->nonce);
         // printf("header.nonce: %u\n", header->aux_data);
     }
+    // printBits(buf->len, buf->p);
+    if (!deser_s32(&header->version, buf))
+        return false;
+    if (!deser_u256(header->prev_block, buf))
+        return false;
+    if (!deser_u256(header->merkle_root, buf))
+        return false;
+    if (!deser_u32(&header->timestamp, buf))
+        return false;
+    if (!deser_u32(&header->bits, buf))
+        return false;
+    if (!deser_u32(&header->nonce, buf))
+        return false;
     return true;
 }
 

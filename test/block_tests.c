@@ -50,8 +50,24 @@ void test_block_header()
         const struct blockheadertest* test = &block_header_tests[i];
         uint8_t header_data[80];
         uint256 hash_data;
-
         utils_hex_to_bin(test->hexheader, header_data, 160, &outlen);
+        struct const_buffer buf_version = {header_data, 4};
+        if (!dogecoin_get_block_header_version(&buf_version)) {
+            printf("false\n");
+        }
+        struct const_buffer buf_prev_block = {header_data, 32};
+        if (!dogecoin_get_block_header_prev_block(&buf_prev_block)) {
+            printf("false\n");
+        }
+        struct const_buffer buf_merkle_root = {header_data, 32};
+        if (!dogecoin_get_block_header_merkle_root(&buf_merkle_root)) {
+            printf("false\n");
+        }
+        struct const_buffer buf_timestamp = {header_data, 4};
+        if (!dogecoin_get_block_header_timestamp(&buf_timestamp)) {
+            printf("false\n");
+        }
+
 
         utils_hex_to_bin(test->hexhash, hash_data, sizeof(hash_data), &outlen);
 
