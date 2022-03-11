@@ -36,6 +36,15 @@
 // Non-Mac OS X / non-Darwin
 
 #if HAVE_DECL_BSWAP_16 == 0
+/**
+ * "Swap the byte order of a 16-bit unsigned integer."
+ * 
+ * The function is used to swap the byte order of a 16-bit unsigned integer
+ * 
+ * @param x The value to be converted.
+ * 
+ * @return the value of the 16-bit number x after swapping the two bytes.
+ */
 LIBDOGECOIN_API inline uint16_t bswap_16(uint16_t x)
 {
     return (x >> 8) | ((x & 0x00ff) << 8);
@@ -43,6 +52,13 @@ LIBDOGECOIN_API inline uint16_t bswap_16(uint16_t x)
 #endif // HAVE_DECL_BSWAP16
 
 #if HAVE_DECL_BSWAP_32 == 0
+/**
+ * Given a 32-bit integer, swap the bytes in the integer
+ * 
+ * @param x The input value.
+ * 
+ * @return the 32-bit value with the bytes in the reverse order.
+ */
 LIBDOGECOIN_API inline uint32_t bswap_32(uint32_t x)
 {
     return (((x & 0xff000000U) >> 24) | ((x & 0x00ff0000U) >> 8) |
@@ -51,6 +67,13 @@ LIBDOGECOIN_API inline uint32_t bswap_32(uint32_t x)
 #endif // HAVE_DECL_BSWAP32
 
 #if HAVE_DECL_BSWAP_64 == 0
+/**
+ * Swap the bytes of a 64-bit unsigned integer
+ * 
+ * @param x The value to be converted.
+ * 
+ * @return the 64-bit integer x with its bytes in reverse order.
+ */
 LIBDOGECOIN_API inline uint64_t bswap_64(uint64_t x)
 {
      return (((x & 0xff00000000000000ull) >> 56)

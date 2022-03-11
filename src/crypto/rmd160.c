@@ -27,14 +27,18 @@
 
 #include <dogecoin/crypto/rmd160.h>
 
+/* Rotating the bits of x by n places to the left. */
 #define ROL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
 
+/* A macro that defines a function F(x, y, z) that is the xor of x, y, and z. */
 #define F(x, y, z) ((x) ^ (y) ^ (z))
+/* G is a function that takes in three 32-bit words and returns a 32-bit word. */
 #define G(x, y, z) (((x) & (y)) | (~(x) & (z)))
+/* H(x, y, z) = ((x) | ~(y)) ^ (z) */
 #define H(x, y, z) (((x) | ~(y)) ^ (z))
+/* The above code is a 3-way compare of x, y, z. */
 #define IQ(x, y, z) (((x) & (z)) | ((y) & ~(z)))
 #define J(x, y, z) ((x) ^ ((y) | ~(z)))
-
 #define FF(a, b, c, d, e, x, s)        \
     {                                  \
         (a) += F((b), (c), (d)) + (x); \
@@ -290,6 +294,13 @@ static void compress(uint32_t* MDbuf, uint32_t* X)
     MDbuf[0] = ddd;
 }
 
+/**
+ * It computes the MD5 hash of the input message.
+ * 
+ * @param msg The message to be hashed.
+ * @param msg_len The length of the message in bytes.
+ * @param hash the hash of the message
+ */
 void rmd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash)
 {
     uint32_t i;

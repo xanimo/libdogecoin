@@ -49,6 +49,16 @@ typedef uint32_t b58_almostmaxint_t;
 #define b58_almostmaxint_bits (sizeof(b58_almostmaxint_t) * 8)
 static const b58_almostmaxint_t b58_almostmaxint_mask = ((((b58_maxint_t)1) << b58_almostmaxint_bits) - 1);
 
+/**
+ * Given a base58 encoded string, decode it into a binary string
+ * 
+ * @param bin the binary data to be encoded
+ * @param binszp Pointer to the size of the binary data.
+ * @param b58 the base58 string to decode
+ * @param b58sz The size of the base58 string.
+ * 
+ * @return Nothing.
+ */
 int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b58sz)
 {
     size_t binsz = *binszp;
@@ -119,6 +129,15 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b5
     return true;
 }
 
+/**
+ * Given a base58 encoded string, check if it's valid
+ * 
+ * @param bin the binary data to be converted
+ * @param binsz The size of the binary data to be encoded.
+ * @param base58str the base58 string to be checked
+ * 
+ * @return The first byte of the input binary data.
+ */
 int dogecoin_b58check(const void* bin, size_t binsz, const char* base58str)
 {
     uint256 buf[32] = {0};
@@ -142,9 +161,20 @@ int dogecoin_b58check(const void* bin, size_t binsz, const char* base58str)
     return binc[0];
 }
 
+/* This is a string array that contains the characters that are used in the base58 encoding. */
 static const char b58digits_ordered[] =
     "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
+/**
+ * Convert a byte array to a base58 string
+ * 
+ * @param b58 the base58 string to be returned
+ * @param b58sz The size of the b58 output buffer.
+ * @param data the data to be encoded
+ * @param binsz The size of the binary data to encode.
+ * 
+ * @return true if the encoding was successful and false if it was not.
+ */
 int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t binsz)
 {
     const uint8_t* bin = data;
@@ -185,6 +215,17 @@ int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t bi
     return true;
 }
 
+/**
+ * Given a data buffer, a datalength, and a string buffer, encode the data buffer into the string
+ * buffer using base58 encoding
+ * 
+ * @param data The data to be encoded.
+ * @param datalen The length of the data to be encoded.
+ * @param str The string to be encoded.
+ * @param strsize The size of the string to be returned.
+ * 
+ * @return The size of the string.
+ */
 int dogecoin_base58_encode_check(const uint8_t* data, int datalen, char* str, int strsize)
 {
     int ret;
@@ -207,6 +248,16 @@ int dogecoin_base58_encode_check(const uint8_t* data, int datalen, char* str, in
     return ret;
 }
 
+/**
+ * The function takes a string, converts it to a byte array, and then checks if the byte array is a
+ * valid Dogecoin address
+ * 
+ * @param str The string to be decoded.
+ * @param data The buffer to store the decoded data.
+ * @param datalen The length of the data to be decoded.
+ * 
+ * @return The size of the decoded data.
+ */
 int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
 {
     int ret, i;
@@ -231,6 +282,16 @@ int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
     return ret;
 }
 
+/**
+ * Given a hash160, encode it as a base58 address
+ * 
+ * @param hashin The hash160 of the public key.
+ * @param chain The chain parameters to use.
+ * @param addrout The address to encode.
+ * @param len The length of the output buffer.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_p2pkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout, int len) {
     uint8_t hash160[sizeof(uint160)+1];
     hash160[0] = chain->b58prefix_pubkey_address;
@@ -239,6 +300,16 @@ dogecoin_bool dogecoin_p2pkh_addr_from_hash160(const uint160 hashin, const dogec
     return (dogecoin_base58_encode_check(hash160, sizeof(uint160)+1, addrout, len) > 0);
 }
 
+/**
+ * Given a hash160, encode it as a p2sh address
+ * 
+ * @param hashin The hash160 of the scriptPubKey.
+ * @param chain The chain parameters.
+ * @param addrout The address to encode.
+ * @param len The length of the output buffer.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_p2sh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char* addrout,
                                     int len)
 {
@@ -249,6 +320,15 @@ dogecoin_bool dogecoin_p2sh_addr_from_hash160(const uint160 hashin, const dogeco
     return (dogecoin_base58_encode_check(hash160, sizeof(uint160) + 1, addrout, len) > 0);
 }
 
+/**
+ * Given a hash160, encode it as a bech32 address
+ * 
+ * @param hashin The hash160 of the public key.
+ * @param chain The chain parameters to use.
+ * @param addrout The address to encode.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_p2wpkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout) {
     return segwit_addr_encode(addrout, chain->bech32_hrp, 0, hashin, sizeof(uint160));
 }

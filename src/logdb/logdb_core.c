@@ -43,6 +43,11 @@
 static const unsigned char file_hdr_magic[4] = {0xF9, 0xAA, 0x03, 0xBA}; /* header magic */
 static const unsigned char record_magic[8] = {0x88, 0x61, 0xAD, 0xFC, 0x5A, 0x11, 0x22, 0xF8}; /* record magic */
 
+/**
+ * Create a new logdb_log_db object and initialize it
+ * 
+ * @return A pointer to a logdb_log_db struct.
+ */
 logdb_log_db* logdb_new_internal()
 {
     logdb_log_db* db;
@@ -57,6 +62,11 @@ logdb_log_db* logdb_new_internal()
     return db;
 }
 
+/**
+ * Create a new logdb_log_db object and return it
+ * 
+ * @return A pointer to a logdb_log_db object.
+ */
 logdb_log_db* logdb_new()
 {
     logdb_log_db* db = logdb_new_internal();
@@ -68,6 +78,11 @@ logdb_log_db* logdb_new()
     return db;
 }
 
+/**
+ * Create a new logdb_log_db object and return it.
+ * 
+ * @return A pointer to a logdb_log_db object.
+ */
 logdb_log_db* logdb_rbtree_new()
 {
     logdb_log_db* db = logdb_new_internal();
@@ -77,6 +92,11 @@ logdb_log_db* logdb_rbtree_new()
     return db;
 }
 
+/**
+ * Create a new transaction
+ * 
+ * @return A pointer to a logdb_txn struct.
+ */
 logdb_txn* logdb_txn_new()
 {
     logdb_txn* txn;
@@ -85,6 +105,11 @@ logdb_txn* logdb_txn_new()
     return txn;
 }
 
+/**
+ * Free the list of records that have not been written to disk
+ * 
+ * @param txn The transaction record.
+ */
 void logdb_free_txn_records(logdb_txn* txn)
 {
     /* free the unwritten records list */
@@ -98,6 +123,13 @@ void logdb_free_txn_records(logdb_txn* txn)
     txn->txn_head = NULL;
 }
 
+/**
+ * Free the memory allocated for the logdb_txn structure
+ * 
+ * @param txn The transaction to free.
+ * 
+ * @return Nothing.
+ */
 void logdb_txn_free(logdb_txn* txn)
 {
     if (!txn)
@@ -107,6 +139,13 @@ void logdb_txn_free(logdb_txn* txn)
     free(txn);
 }
 
+/**
+ * Set the memory mapper for the log database
+ * 
+ * @param db The logdb_log_db object.
+ * @param mapper The memory mapper to use.
+ * @param ctx The context pointer that will be passed to the callback functions.
+ */
 void logdb_set_memmapper(logdb_log_db* db, logdb_memmapper *mapper, void *ctx)
 {
     /* allow the previos memory mapper to do a cleanup */
@@ -121,6 +160,11 @@ void logdb_set_memmapper(logdb_log_db* db, logdb_memmapper *mapper, void *ctx)
         db->cb_ctx = ctx;
 }
 
+/**
+ * Free the cache list
+ * 
+ * @param db The logdb_log_db object.
+ */
 void logdb_free_cachelist(logdb_log_db* db)
 {
     /* free the unwritten records list */
@@ -134,6 +178,13 @@ void logdb_free_cachelist(logdb_log_db* db)
     db->cache_head = NULL;
 }
 
+/**
+ * Free the logdb_log_db structure
+ * 
+ * @param db The logdb_log_db object.
+ * 
+ * @return Nothing.
+ */
 void logdb_free(logdb_log_db* db)
 {
     if (!db)
@@ -154,6 +205,17 @@ void logdb_free(logdb_log_db* db)
     free(db);
 }
 
+/**
+ * Loads the log database from a file
+ * 
+ * @param handle the logdb_log_db handle
+ * @param file_path The path to the log file.
+ * @param create If true, the file will be created if it doesn't exist. If false, the file will be
+ * opened.
+ * @param error pointer to a variable that will be set to the error code if an error occurs.
+ * 
+ * @return Nothing.
+ */
 logdb_bool logdb_load(logdb_log_db* handle, const char *file_path, logdb_bool create, enum logdb_error *error)
 {
     uint32_t v;
@@ -234,6 +296,13 @@ logdb_bool logdb_load(logdb_log_db* handle, const char *file_path, logdb_bool cr
     return true;
 }
 
+/**
+ * Flush the cache list to the file
+ * 
+ * @param db The database to flush.
+ * 
+ * @return Nothing.
+ */
 logdb_bool logdb_flush(logdb_log_db* db)
 {
     logdb_record *flush_rec;
@@ -274,6 +343,15 @@ logdb_bool logdb_flush(logdb_log_db* db)
     return true;
 }
 
+/**
+ * Given a logdb_log_db and a logdb_txn, and a key, append a delete-mode record to the logdb_log_db
+ * 
+ * @param db The logdb_log_db object.
+ * @param txn The transaction that is being committed.
+ * @param key The key to delete.
+ * 
+ * @return Nothing
+ */
 void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key) // logdb_delete(logdb_log_db* db, struct buffer *key)
 {
     if (key == NULL)
@@ -283,6 +361,16 @@ void logdb_delete(logdb_log_db* db, logdb_txn *txn, cstring *key) // logdb_delet
     logdb_append(db, txn, key, NULL);
 }
 
+/**
+ * Append a record to the end of the linked list
+ * 
+ * @param db The logdb_log_db object.
+ * @param txn The transaction object.
+ * @param key The key to be added to the log.
+ * @param val the value to be appended to the log
+ * 
+ * @return Nothing.
+ */
 void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *val) // logdb_append(logdb_log_db* db, struct buffer *key, struct buffer *val)
 {
     logdb_record *rec;
@@ -322,6 +410,12 @@ void logdb_append(logdb_log_db* db, logdb_txn *txn, cstring *key, cstring *val) 
     //     db->mem_mapper->append_cb(db->cb_ctx, false, rec);
 }
 
+/**
+ * Given a transaction, write all the records in the transaction to the log
+ * 
+ * @param db The database to write to.
+ * @param txn The transaction object.
+ */
 void logdb_txn_commit(logdb_log_db* db, logdb_txn *txn)
 {
     logdb_record *work_head = txn->txn_head;
@@ -341,11 +435,28 @@ void logdb_txn_commit(logdb_log_db* db, logdb_txn *txn)
     }
 }
 
+/**
+ * Given a logdb_log_db* and a cstring*, return the cstring* of the record in the cache that matches
+ * the key
+ * 
+ * @param db The logdb_log_db object.
+ * @param key The key to search for.
+ * 
+ * @return A pointer to the record.
+ */
 cstring * logdb_find_cache(logdb_log_db* db, cstring *key) // logdb_find_cache(logdb_log_db* db, struct buffer *key)
 {
     return logdb_record_find_desc(db->cache_head, key);
 }
 
+/**
+ * Given a key, find the value in the database
+ * 
+ * @param db The logdb_log_db object.
+ * @param key The key to search for.
+ * 
+ * @return A pointer to a cstring.
+ */
 cstring * logdb_find(logdb_log_db* db, cstring *key) // logdb_find(logdb_log_db* db, struct buffer *key)
 {
     if (db->mem_mapper && db->mem_mapper->find_cb)
@@ -354,6 +465,13 @@ cstring * logdb_find(logdb_log_db* db, cstring *key) // logdb_find(logdb_log_db*
     return NULL;
 }
 
+/**
+ * Return the number of keys in the database.
+ * 
+ * @param db The logdb_log_db object.
+ * 
+ * @return The number of keys in the database.
+ */
 size_t logdb_count_keys(logdb_log_db* db)
 {
     if (db->mem_mapper && db->mem_mapper->size_cb)
@@ -362,11 +480,26 @@ size_t logdb_count_keys(logdb_log_db* db)
     return 0;
 }
 
+/**
+ * Return the height of the cache.
+ * 
+ * @param db the logdb_log_db object
+ * 
+ * @return The height of the cache.
+ */
 size_t logdb_cache_size(logdb_log_db* db)
 {
     return logdb_record_height(db->cache_head);
 }
 
+/**
+ * Write a record to the log database
+ * 
+ * @param db the log database
+ * @param rec the record to write
+ * 
+ * @return Nothing.
+ */
 logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec) // void logdb_write_record(logdb_log_db* db, logdb_record *rec)
 {
     sha256_context ctx = db->hashctx;
@@ -418,6 +551,15 @@ logdb_bool logdb_write_record(logdb_log_db* db, logdb_record *rec) // void logdb
     return true;
 }
 
+/**
+ * Reads a record from the file, and returns a pointer to the record
+ * 
+ * @param rec the record to be written
+ * @param db The logdb_log_db object that we are using to read the file.
+ * @param error pointer to an enum logdb_error.
+ * 
+ * @return Nothing.
+ */
 logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enum logdb_error *error)
 {
     uint32_t len = 0;

@@ -34,6 +34,11 @@
 #include <stddef.h>
 #include <string.h>
 
+/**
+ * Create a new logdb_llist_db handle
+ * 
+ * @return A pointer to a logdb_llist_db struct.
+ */
 logdb_llist_db* logdb_llist_db_new()
 {
     logdb_llist_db* handle = calloc(1, sizeof(logdb_llist_db));
@@ -41,6 +46,13 @@ logdb_llist_db* logdb_llist_db_new()
     return handle;
 }
 
+/**
+ * It frees the internal database.
+ * 
+ * @param ctx The context pointer.
+ * 
+ * @return The logdb_llist_db structure.
+ */
 void logdb_llist_db_free(void *ctx)
 {
     logdb_record *rec;
@@ -63,12 +75,28 @@ void logdb_llist_db_free(void *ctx)
     free(handle);
 }
 
+/**
+ * Initialize the logdb_llist_db structure
+ * 
+ * @param db The logdb_log_db object.
+ */
 void logdb_llistdb_init(logdb_log_db* db)
 {
     logdb_llist_db* handle = logdb_llist_db_new();
     db->cb_ctx = handle;
 }
 
+/**
+ * If the record is an erase record, remove the record from the linked list. Otherwise, copy the record
+ * and append it to the linked list
+ * 
+ * @param ctx The context pointer.
+ * @param load_phase This is a boolean value that indicates whether the current record is being loaded
+ * during the load phase or not.
+ * @param rec the record to be appended
+ * 
+ * @return Nothing.
+ */
 void logdb_llistdb_append(void* ctx, logdb_bool load_phase, logdb_record *rec)
 {
     logdb_llist_db *handle = (logdb_llist_db *)ctx;
@@ -101,12 +129,27 @@ void logdb_llistdb_append(void* ctx, logdb_bool load_phase, logdb_record *rec)
     logdb_record_rm_desc(current_db_head, rec_dup->key);
 }
 
+/**
+ * Given a key, find the record in the linked list that matches the key
+ * 
+ * @param db The logdb_log_db object.
+ * @param key The key to search for.
+ * 
+ * @return A pointer to the record.
+ */
 cstring * logdb_llistdb_find(logdb_log_db* db, cstring *key) // logdb_llistdb_find(logdb_log_db* db, struct buffer *key)
 {
     logdb_llist_db *handle = (logdb_llist_db *)db->cb_ctx;
     return logdb_record_find_desc(handle->head, key);
 }
 
+/**
+ * Return the height of the linked list.
+ * 
+ * @param db The database handle.
+ * 
+ * @return The height of the linked list.
+ */
 size_t logdb_llistdb_size(logdb_log_db* db)
 {
     logdb_llist_db *handle = (logdb_llist_db *)db->cb_ctx;

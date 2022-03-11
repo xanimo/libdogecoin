@@ -96,7 +96,6 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
-    src/cli/tool.c \
     src/cstr.c \
     src/crypto/ctaes/ctaes.c \
     src/crypto/ecc.c \
@@ -108,6 +107,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/crypto/segwit_addr.c \
     src/serialize.c \
     src/crypto/sha2.c \
+    src/cli/tool.c \
     src/tx.c \
     src/utils.c \
     src/vector.c

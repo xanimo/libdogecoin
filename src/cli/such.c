@@ -44,6 +44,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 
+/* This is a function that is used to parse the command line arguments. */
 static struct option long_options[] =
     {
         {"privkey", required_argument, NULL, 'p'},
@@ -61,10 +62,16 @@ static struct option long_options[] =
         {NULL, 0, NULL, 0}
 };
 
+/**
+ * Print_version() prints the version of the program
+ */
 static void print_version() {
     printf("Version: %s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
 }
 
+/**
+ * This function prints the usage information for the program
+ */
 static void print_usage()
 {
     print_version();
@@ -76,6 +83,13 @@ static void print_usage()
     printf("> such -c generate_public_key -p QRYZwxVxBFKgKP4bWPEwWBJpN3C3cTN6fads8SgJTgaPTJhEWgLH\n\n");
 }
 
+/**
+ * It prints out the error message and then stops the ecc library
+ * 
+ * @param er The error message to display.
+ * 
+ * @return Nothing.
+ */
 static bool showError(const char* er)
 {
     printf("Error: %s\n", er);
@@ -99,6 +113,7 @@ int main(int argc, char* argv[])
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
+    /* This code is parsing the command line arguments. */
     while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:a:m:c:trv", long_options, &long_index)) != -1) {
         switch (opt) {
         case 'p':
@@ -157,6 +172,7 @@ int main(int argc, char* argv[])
 
     const char* pkey_error = "missing extended key (use -p)";
 
+    /* Generating a public key from a private key. */
     if (strcmp(cmd, "generate_public_key") == 0) {
         /* output compressed hex pubkey from hex privkey */
 
@@ -185,6 +201,7 @@ int main(int argc, char* argv[])
         memset(pubkey_hex, 0, strlen(pubkey_hex));
         memset(address_p2pkh, 0, strlen(address_p2pkh));
         memset(address_p2sh_p2wpkh, 0, strlen(address_p2sh_p2wpkh));
+    /* Creating a new address from a public key. */
     } else if (strcmp(cmd, "p2pkh") == 0) {
         /* get p2pkh address from pubkey */
 
@@ -203,6 +220,7 @@ int main(int argc, char* argv[])
         memset(pubkey, 0, strlen(pubkey));
         memset(address_p2pkh, 0, strlen(address_p2pkh));
         memset(address_p2sh_p2wpkh, 0, strlen(address_p2sh_p2wpkh));
+    /* Generating a new private key and printing it out. */
     } else if (strcmp(cmd, "generate_private_key") == 0) {
         size_t sizeout = 128;
         char newprivkey_wif[sizeout];
@@ -214,6 +232,7 @@ int main(int argc, char* argv[])
         printf("private key hex: %s\n", newprivkey_hex);
         memset(newprivkey_wif, 0, strlen(newprivkey_wif));
         memset(newprivkey_hex, 0, strlen(newprivkey_hex));
+    /* Generating a new master key. */
     } else if (strcmp(cmd, "bip32_extended_master_key") == 0) {
         size_t sizeout = 128;
         char masterkey[sizeout];
@@ -222,11 +241,13 @@ int main(int argc, char* argv[])
         hd_gen_master(chain, masterkey, sizeout);
         printf("bip32 extended master key: %s\n", masterkey);
         memset(masterkey, 0, strlen(masterkey));
+    /* Printing the node keys. */
     } else if (strcmp(cmd, "print_keys") == 0) {
         if (!pkey)
             return showError("no extended key (-p)");
         if (!hd_print_node(chain, pkey))
             return showError("invalid extended key\n");
+    /* Deriving a child key from the parent key. */
     } else if (strcmp(cmd, "derive_child_keys") == 0) {
         if (!pkey)
             return showError(pkey_error);
@@ -307,6 +328,7 @@ int main(int argc, char* argv[])
             else
                 hd_print_node(chain, newextkey);
         }
+    /* The below code is a simple command line tool that allows you to sign a transaction. */
     } else if (strcmp(cmd, "sign") == 0) {
         if(!txhex || !scripthex) {
             return showError("Missing tx-hex or script-hex (use -x, -s)\n");
@@ -400,6 +422,13 @@ int main(int argc, char* argv[])
         }
         dogecoin_tx_free(tx);
     }
+    /**
+     * Convert a compact signature to a DER signature
+     * 
+     * @param scripthex The hex-encoded signature.
+     * 
+     * @return Nothing.
+     */
     else if (strcmp(cmd, "comp2der") == 0) {
         if(!scripthex || strlen(scripthex) != 128) {
             return showError("Missing signature or invalid length (use hex, 128 chars == 64 bytes)\n");
@@ -418,6 +447,7 @@ int main(int argc, char* argv[])
         utils_bin_to_hex(sigder, sigderlen, hexbuf);
         printf("DER: %s\n", hexbuf);
     }
+    /* Creating a bip32 master key from a private key. */
     else if (strcmp(cmd, "bip32maintotest") == 0) {
         dogecoin_hdnode node;
         if (!dogecoin_hdnode_deserialize(pkey, chain, &node))

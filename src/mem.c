@@ -39,36 +39,88 @@ void dogecoin_free_internal(void* ptr);
 static const dogecoin_mem_mapper default_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
 static dogecoin_mem_mapper current_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
 
+/**
+ * This function sets the current memory mapper to the default memory mapper
+ */
 void dogecoin_mem_set_mapper_default()
 {
     current_mem_mapper = default_mem_mapper;
 }
 
+/**
+ * Set the current memory mapper to the given mapper.
+ * 
+ * @param mapper The name of the mapper to use.
+ */
 void dogecoin_mem_set_mapper(const dogecoin_mem_mapper mapper)
 {
     current_mem_mapper = mapper;
 }
 
+/**
+ * "Allocate memory using the current memory mapper."
+ * 
+ * The memory mapper is a function that takes a size and returns a pointer to that size of memory
+ * 
+ * @param size The size of the memory block to be allocated.
+ * 
+ * @return A pointer to the allocated memory.
+ */
 void* dogecoin_malloc(size_t size)
 {
     return current_mem_mapper.dogecoin_malloc(size);
 }
 
+/**
+ * "Calloc is a function that allocates memory for an array of objects of the given size, and
+ * initializes all the bytes of each object to zero."
+ * 
+ * Now, let's look at the implementation of the function:
+ * 
+ * @param count The number of elements to allocate.
+ * @param size The size of the memory block to allocate.
+ * 
+ * @return A pointer to the allocated memory.
+ */
 void* dogecoin_calloc(size_t count, size_t size)
 {
     return current_mem_mapper.dogecoin_calloc(count, size);
 }
 
+/**
+ * It takes a pointer to a block of memory and a size, and returns a pointer to a block of memory of
+ * the given size
+ * 
+ * @param ptr The pointer to the memory block to be reallocated.
+ * @param size the size of the new memory block
+ * 
+ * @return The address of the new memory block.
+ */
 void* dogecoin_realloc(void* ptr, size_t size)
 {
     return current_mem_mapper.dogecoin_realloc(ptr, size);
 }
 
+/**
+ * It takes a pointer to a memory region and frees it
+ * 
+ * @param ptr The pointer to the memory to be freed.
+ */
 void dogecoin_free(void* ptr)
 {
     current_mem_mapper.dogecoin_free(ptr);
 }
 
+/**
+ * "Allocate memory for a given size, and return a pointer to it."
+ * 
+ * The function is called "dogecoin_malloc_internal" because it is an internal function.  It is called
+ * by the function "dogecoin_malloc" which is the function that you will use to allocate memory
+ * 
+ * @param size The size of the memory block to be allocated.
+ * 
+ * @return The address of the allocated memory.
+ */
 void* dogecoin_malloc_internal(size_t size)
 {
     void* result;
@@ -83,6 +135,14 @@ void* dogecoin_malloc_internal(size_t size)
     }
 }
 
+/**
+ * It allocates memory for an array of count elements of size size.
+ * 
+ * @param count The number of elements to allocate.
+ * @param size The size of the array to be allocated.
+ * 
+ * @return The address of the allocated memory.
+ */
 void* dogecoin_calloc_internal(size_t count, size_t size)
 {
     void* result;
@@ -97,6 +157,16 @@ void* dogecoin_calloc_internal(size_t count, size_t size)
     }
 }
 
+/**
+ * If the realloc function
+ * returns a non-null pointer, then return that pointer. Otherwise, print an
+ * error message and exit the program
+ * 
+ * @param ptr The pointer to the memory block to be reallocated.
+ * @param size The size of the memory block you want to allocate.
+ * 
+ * @return The result of the realloc function.
+ */
 void* dogecoin_realloc_internal(void* ptr, size_t size)
 {
     void* result;
@@ -111,17 +181,41 @@ void* dogecoin_realloc_internal(void* ptr, size_t size)
     }
 }
 
+/**
+ * It frees the memory pointed to by ptr
+ * 
+ * @param ptr The pointer to the memory to be freed.
+ */
 void dogecoin_free_internal(void* ptr)
 {
     free(ptr);
 }
 
 #ifdef HAVE_MEMSET_S
+/**
+ * "memset_s() is a secure version of memset()."
+ * 
+ * The memset_s() function is a secure version of memset() that fills the memory pointed to by dst with
+ * zeros
+ * 
+ * @param dst The destination buffer to be zeroed.
+ * @param len The length of the memory block to zero.
+ */
 volatile void* dogecoin_mem_zero(volatile void* dst, size_t len)
 {
     memset_s(dst, len, 0, len);
 }
 #else
+/**
+ * "Zero out the memory in the buffer."
+ * 
+ * The function is declared as `volatile` because it is called from a signal handler
+ * 
+ * @param dst The destination buffer to be zeroed.
+ * @param len The length of the buffer to zero.
+ * 
+ * @return Nothing
+ */
 volatile void* dogecoin_mem_zero(volatile void* dst, size_t len)
 {
     volatile char* buf;

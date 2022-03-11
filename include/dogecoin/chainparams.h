@@ -33,10 +33,23 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * A dogecoin_dns_seed is a structure that contains a domain name.
+ */
 typedef struct dogecoin_dns_seed_ {
     char domain[256];
 } dogecoin_dns_seed;
 
+/**
+ * The dogecoin_chainparams type is a struct that contains the following fields:
+ * 
+ * chainname: a string containing the name of the chain.
+ * b58prefix_pubkey_address: an integer containing the base58 prefix for the public key address.
+ * b58prefix_script_address: an integer containing the base58 prefix for the script address.
+ * bech32_hrp: a string containing the bech32 human readable prefix.
+ * b58prefix_secret_address: an integer containing the base58 prefix for the secret address.
+ * b
+ */
 typedef struct dogecoin_chainparams_ {
     char chainname[32];
     uint8_t b58prefix_pubkey_address;
@@ -51,6 +64,9 @@ typedef struct dogecoin_chainparams_ {
     dogecoin_dns_seed dnsseeds[8];
 } dogecoin_chainparams;
 
+/**
+ * A struct that contains a height, a hash, a timestamp, and a target.
+ */
 typedef struct dogecoin_checkpoint_ {
     uint32_t height;
     const char* hash;

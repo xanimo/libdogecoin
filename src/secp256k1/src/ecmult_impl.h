@@ -452,7 +452,7 @@ static int secp256k1_wnaf_fixed(int *wnaf, const secp256k1_scalar *s, int w) {
         }
         /* Set a coefficient to zero if it is 1 or -1 and the proceeding digit
          * is strictly negative or strictly positive respectively. Only change
-         * coefficients at previous positions because above code assumes that
+         * coefficients at previous positions because code below assumes that
          * wnaf[pos - 1] is odd.
          */
         if (pos >= 2 && ((wnaf[pos - 1] == 1 && wnaf[pos - 2] < 0) || (wnaf[pos - 1] == -1 && wnaf[pos - 2] > 0))) {

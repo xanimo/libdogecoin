@@ -25,19 +25,31 @@
 
 #include <libkern/OSByteOrder.h>
 
+/* Swapping the byte order of the 16-bit integer `x` from host byte order to big endian byte order. */
 #define htobe16(x) OSSwapHostToBigInt16(x)
+/* Swapping the byte order of the 16-bit integer `x` from host byte order to little endian byte order. */
 #define htole16(x) OSSwapHostToLittleInt16(x)
+/* Swapping the byte order of the 16-bit integer `x` from big endian byte order to host byte order. */
 #define be16toh(x) OSSwapBigToHostInt16(x)
+/* Swapping the byte order of the 16-bit integer `x` from little endian byte order to host byte order. */
 #define le16toh(x) OSSwapLittleToHostInt16(x)
 
+/* Swapping the byte order of the 32-bit integer `x` from host byte order to big endian byte order. */
 #define htobe32(x) OSSwapHostToBigInt32(x)
+/* Swapping the byte order of the 32-bit integer `x` from host byte order to little endian byte order. */
 #define htole32(x) OSSwapHostToLittleInt32(x)
+/* Swapping the byte order of the 32-bit integer `x` from big endian byte order to host byte order. */
 #define be32toh(x) OSSwapBigToHostInt32(x)
+/* Swapping the byte order of the 32-bit integer `x` from little endian byte order to host byte order. */
 #define le32toh(x) OSSwapLittleToHostInt32(x)
 
+/* Swapping the byte order of the 64-bit integer `x` from host byte order to big endian byte order. */
 #define htobe64(x) OSSwapHostToBigInt64(x)
+/* Swapping the byte order of the 64-bit integer `x` from host byte order to little endian byte order. */
 #define htole64(x) OSSwapHostToLittleInt64(x)
+/* Swapping the byte order of the 64-bit integer `x` from big endian byte order to host byte order. */
 #define be64toh(x) OSSwapBigToHostInt64(x)
+/* Swapping the byte order of the 64-bit integer `x` from little endian byte order to host byte order. */
 #define le64toh(x) OSSwapLittleToHostInt64(x)
 
 #define __BYTE_ORDER BYTE_ORDER
@@ -53,13 +65,23 @@
 
 #include <sys/endian.h>
 
+/* A macro that swaps the byte order of the 16-bit integer `x` from big endian byte order to host byte
+order. */
 #define be16toh(x) betoh16(x)
+/* A macro that swaps the byte order of the 16-bit integer `x` from little endian byte order to host
+byte order. */
 #define le16toh(x) letoh16(x)
 
+/* Swapping the byte order of the 32-bit integer `x` from big endian byte order to host byte order. */
 #define be32toh(x) betoh32(x)
+/* A macro that swaps the byte order of the 32-bit integer `x` from little endian byte order to host
+byte order. */
 #define le32toh(x) letoh32(x)
 
+/* Swapping the byte order of the 64-bit integer `x` from big endian byte order to host byte order. */
 #define be64toh(x) betoh64(x)
+/* A macro that swaps the byte order of the 64-bit integer `x` from little endian byte order to host
+byte order. */
 #define le64toh(x) letoh64(x)
 
 #elif defined(__WINDOWS__)
@@ -71,38 +93,68 @@
 
 #if BYTE_ORDER == LITTLE_ENDIAN
 
+/* Swapping the byte order of the 16-bit integer `x` from host byte order to big endian byte order. */
 #define htobe16(x) htons(x)
+/* A macro that swaps the byte order of the 16-bit integer `x` from host byte order to little endian
+byte order. */
 #define htole16(x) (x)
+/* Swapping the byte order of the 16-bit integer `x` from big endian byte order to host byte order. */
 #define be16toh(x) ntohs(x)
+/* A macro that swaps the byte order of the 16-bit integer `x` from little endian byte order to host
+byte order. */
 #define le16toh(x) (x)
 
+/* Swapping the byte order of the 32-bit integer `x` from host byte order to big endian byte order. */
 #define htobe32(x) htonl(x)
+/* A macro that swaps the byte order of the 32-bit integer `x` from host byte order to little endian
+byte order. */
 #define htole32(x) (x)
+/* Swapping the byte order of the 32-bit integer `x` from little endian byte order to host byte order. */
 #define be32toh(x) ntohl(x)
+/* A macro that swaps the byte order of the 32-bit integer `x` from little endian byte order to host
+byte order. */
 #define le32toh(x) (x)
 
+/* Swapping the byte order of the 64-bit integer `x` from host byte order to big endian byte order. */
 #define htobe64(x) htonll(x)
+/* A macro that swaps the byte order of the 64-bit integer `x` from host byte order to little endian
+byte order. */
 #define htole64(x) (x)
+/* Swapping the byte order of the 64-bit integer `x` from little endian byte order to host byte order. */
 #define be64toh(x) ntohll(x)
+/* A macro that swaps the byte order of the 64-bit integer `x` from little endian byte order to host
+byte order. */
 #define le64toh(x) (x)
 
 #elif BYTE_ORDER == BIG_ENDIAN
 
 /* that would be xbox 360 */
+/* A trick to make the code compile on both Linux and Windows. */
 #define htobe16(x) (x)
+/* Swapping the byte order of the 16-bit integer `x` from host byte order to little endian byte order. */
 #define htole16(x) bswap_16(x)
+/* A trick to make the code compile on both Linux and Windows. */
 #define be16toh(x) (x)
+/* Swapping the byte order of the 16-bit integer `x` from little endian byte order to host byte order. */
 #define le16toh(x) bswap_16(x)
 
+/* A trick to make the code compile on both Linux and Windows. */
 #define htobe32(x) (x)
+/* Swapping the byte order of the 32-bit integer `x` from host byte order to little endian byte order. */
 #define htole32(x) bswap_32(x)
+/* A trick to make the code compile on both Linux and Windows. */
 #define be32toh(x) (x)
+/* Swapping the byte order of the 32-bit integer `x` from little endian byte order to host byte order. */
 #define le32toh(x) bswap_32(x)
 
+/* A trick to make the code compile on both Linux and Windows. */
 #define htobe64(x) (x)
+/* Swapping the byte order of the 64-bit integer `x` from host byte order to little endian byte order. */
 #define htole64(x) bswap_64(x)
+/* A trick to make the code compile on both Linux and Windows. */
 #define be64toh(x) (x)
 
+/* Swapping the byte order of the 64-bit integer `x` from little endian byte order to host byte order. */
 #define le64toh(x) bswap_64(x)
 
 #else

@@ -22,8 +22,8 @@ void test_wallet()
 {
     unlink(wallettmpfile);
     dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
-    // int error;
-    enum logdb_error error;
+    int error;
+    // enum logdb_error error;
     dogecoin_bool created;
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
 
@@ -50,11 +50,11 @@ void test_wallet()
     // wallet->next_childindex = 0;
     // node3 = dogecoin_wallet_next_key(wallet);
     // dogecoin_wallet_hdnode_free(node3);
-    // node3 = dogecoin_wallet_next_key(wallet);
     // wallet->next_childindex = 0;
+    // node3 = dogecoin_wallet_next_key(wallet);
 
     // //now it should be equal
-    // u_assert_int_eq(memcmp(node2->hdnode->private_key, node3->hdnode->private_key, sizeof(node2->hdnode->private_key)) == 0, 1);
+    // u_assert_int_eq(memcmp(node2->hdnode->private_key, node3->hdnode->private_key, sizeof(node2->hdnode->private_key)), 1);
 
     // uint160 hash160;
 

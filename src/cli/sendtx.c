@@ -126,6 +126,8 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    /* The above code is checking if the data is NULL, if the data is empty or if the data is larger than
+    the maximum size of a message. */
     if (data == NULL || strlen(data) == 0 || strlen(data) > DOGECOIN_MAX_P2P_MSG_SIZE) {
         return showError("Transaction in invalid or to large.\n");
     }
@@ -134,6 +136,7 @@ int main(int argc, char* argv[]) {
     utils_hex_to_bin(data, data_bin, strlen(data), &outlen);
 
     dogecoin_tx* tx = dogecoin_tx_new();
+    /* Deserializing the transaction and broadcasting it to the network. */
     if (dogecoin_tx_deserialize(data_bin, outlen, tx, NULL, true)) {
         broadcast_tx(chain, tx, ips, maxnodes, timeout, debug);
     } else {
@@ -159,6 +162,14 @@ struct broadcast_ctx {
     uint64_t start_time;
 };
 
+/**
+ * If the node has been connected for more than the timeout, disconnect it
+ * 
+ * @param node the node that is being checked
+ * @param now the current time in seconds since the epoch
+ * 
+ * @return A boolean value.
+ */
 static dogecoin_bool broadcast_timer_cb(dogecoin_node* node, uint64_t* now) {
     struct broadcast_ctx* ctx = (struct broadcast_ctx*)node->nodegroup->ctx;
 
@@ -180,6 +191,14 @@ static dogecoin_bool broadcast_timer_cb(dogecoin_node* node, uint64_t* now) {
     return true;
 }
 
+/**
+ * We send an INV message to the peer, and set the hint bit 0 to indicate that we've sent an INV
+ * message
+ * 
+ * @param node The node that is broadcasting the handshake.
+ * 
+ * @return Nothing.
+ */
 void broadcast_handshake_done(struct dogecoin_node_* node) {
     char ipaddr[256];
     struct sockaddr_in *ad = (struct sockaddr_in *) &node->addr;
@@ -216,6 +235,13 @@ void broadcast_handshake_done(struct dogecoin_node_* node) {
     ctx->inved_to_peers++;
 }
 
+/**
+ * If we've already connected to the maximum number of peers, return false
+ * 
+ * @param node the node that is being broadcasted to
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool broadcast_should_connect_more(dogecoin_node* node) {
     struct broadcast_ctx* ctx = (struct broadcast_ctx*)node->nodegroup->ctx;
     node->nodegroup->log_write_cb("check if more nodes are required (connected to already: %d)\n", ctx->connected_to_peers);
@@ -225,6 +251,17 @@ dogecoin_bool broadcast_should_connect_more(dogecoin_node* node) {
     return true;
 }
 
+/**
+ * If we receive an INV message, we check if the tx is in the message. If it is, we set a hint bit to
+ * indicate that we have the tx. If we receive a GETDATA message, we check if the tx is in the message.
+ * If it is, we send the tx
+ * 
+ * @param node the node that received the message
+ * @param hdr The header of the message.
+ * @param buf the buffer containing the message
+ * 
+ * @return Nothing.
+ */
 void broadcast_post_cmd(struct dogecoin_node_* node, dogecoin_p2p_msg_hdr* hdr, struct const_buffer* buf) {
     struct broadcast_ctx* ctx = (struct broadcast_ctx*)node->nodegroup->ctx;
     if (strcmp(hdr->command, DOGECOIN_MSG_INV) == 0) {
@@ -285,6 +322,19 @@ void broadcast_post_cmd(struct dogecoin_node_* node, dogecoin_p2p_msg_hdr* hdr, 
     }
 }
 
+/**
+ * It connects to a set of nodes, and then waits for the transaction to be broadcasted
+ * 
+ * @param chain the chain parameters
+ * @param tx The transaction to broadcast
+ * @param ips a comma separated list of IPs or DNS seeds to connect to.
+ * @param maxpeers The maximum number of peers to connect to.
+ * @param timeout How long to wait for the transaction to be broadcasted.
+ * @param debug if set to 1, will print out debug messages
+ * 
+ * @return The return value is a boolean that indicates if the transaction was broadcasted
+ * successfully.
+ */
 dogecoin_bool broadcast_tx(const dogecoin_chainparams* chain, const dogecoin_tx* tx, const char* ips, int maxpeers, int timeout, dogecoin_bool debug) {
     struct broadcast_ctx ctx;
     ctx.tx = tx;

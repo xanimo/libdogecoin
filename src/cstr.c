@@ -8,6 +8,16 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
 
+/**
+ * If the string is already
+ * allocated and is large enough, return 1. Otherwise, allocate a new string of
+ * the next largest size and return 1
+ * 
+ * @param s The cstring object to allocate more space for.
+ * @param sz The size of the string to allocate.
+ * 
+ * @return Nothing.
+ */
 static int cstr_alloc_min_sz(cstring* s, size_t sz)
 {
     unsigned int shift;
@@ -37,6 +47,16 @@ static int cstr_alloc_min_sz(cstring* s, size_t sz)
     return 1;
 }
 
+/**
+ * If the new size is less than the current size, truncate the string. If the new size is greater than
+ * the current size, allocate a new string of the new size and copy the contents of the old string into
+ * the new string
+ * 
+ * @param s the string to be resized
+ * @param new_sz the new size of the string
+ * 
+ * @return 1 if the string was successfully resized, 0 otherwise.
+ */
 int cstr_alloc_minsize(cstring* s, size_t new_sz)
 {
     /* no change */
@@ -61,6 +81,13 @@ int cstr_alloc_minsize(cstring* s, size_t new_sz)
     return 1;
 }
 
+/**
+ * Allocate a new cstring and set its size to sz
+ * 
+ * @param sz The size of the string to allocate.
+ * 
+ * @return A pointer to a cstring object.
+ */
 cstring* cstr_new_sz(size_t sz)
 {
     cstring* s = dogecoin_calloc(1, sizeof(cstring));
@@ -76,6 +103,14 @@ cstring* cstr_new_sz(size_t sz)
     return s;
 }
 
+/**
+ * Create a new cstring object and initialize it with a buffer
+ * 
+ * @param buf The buffer to copy.
+ * @param sz The size of the buffer to allocate.
+ * 
+ * @return A pointer to a cstring object.
+ */
 cstring* cstr_new_buf(const void* buf, size_t sz)
 {
     cstring* s = cstr_new_sz(sz);
@@ -90,11 +125,25 @@ cstring* cstr_new_buf(const void* buf, size_t sz)
     return s;
 }
 
+/**
+ * Create a new cstring from a cstring
+ * 
+ * @param copy_str The string to copy.
+ * 
+ * @return A pointer to a new cstring object.
+ */
 cstring* cstr_new_cstr(const cstring* copy_str)
 {
     return cstr_new_buf(copy_str->str, copy_str->len);
 }
 
+/**
+ * Create a new cstring object
+ * 
+ * @param init_str The initial string to copy.
+ * 
+ * @return A pointer to a newly allocated string.
+ */
 cstring* cstr_new(const char* init_str)
 {
     size_t slen;
@@ -107,6 +156,14 @@ cstring* cstr_new(const char* init_str)
     return cstr_new_buf(init_str, slen);
 }
 
+/**
+ * Free the memory allocated for the cstring
+ * 
+ * @param s The cstring to free.
+ * @param free_buf If true, the buffer is freed. If false, it is not.
+ * 
+ * @return Nothing
+ */
 void cstr_free(cstring* s, int free_buf)
 {
     if (!s) {
@@ -121,6 +178,16 @@ void cstr_free(cstring* s, int free_buf)
     dogecoin_free(s);
 }
 
+/**
+ * If the new size is less than the current size, truncate the string. If the new size is greater than
+ * the current size, allocate a new string of the new size and copy the contents of the old string into
+ * the new string. If the new size is the same as the current size, do nothing
+ * 
+ * @param s the string to resize
+ * @param new_sz the new size of the string
+ * 
+ * @return 1 if successful, 0 otherwise.
+ */
 int cstr_resize(cstring* s, size_t new_sz)
 {
     /* no change */
@@ -148,6 +215,17 @@ int cstr_resize(cstring* s, size_t new_sz)
     return 1;
 }
 
+/**
+ * If the cstring object
+ * has enough space to hold the new data, then append the new data to the
+ * cstring object
+ * 
+ * @param s The cstring to append to.
+ * @param buf The buffer to append.
+ * @param sz The size of the buffer to be appended.
+ * 
+ * @return 1 if the string was successfully extended, 0 otherwise.
+ */
 int cstr_append_buf(cstring* s, const void* buf, size_t sz)
 {
     if (!cstr_alloc_min_sz(s, s->len + sz)) {
@@ -161,18 +239,44 @@ int cstr_append_buf(cstring* s, const void* buf, size_t sz)
     return 1;
 }
 
+/**
+ * Append the string pointed to by the second argument to the string pointed to by the first argument
+ * 
+ * @param s the cstring to append to
+ * @param append the string to append
+ * 
+ * @return Nothing.
+ */
 int cstr_append_cstr(cstring* s, cstring* append)
 {
     return cstr_append_buf(s, append->str, append->len);
 }
 
 
+/**
+ * Append a single character to a cstring
+ * 
+ * @param s the cstring to append to
+ * @param ch The character to append.
+ * 
+ * @return The number of characters appended.
+ */
 int cstr_append_c(cstring* s, char ch)
 {
     return cstr_append_buf(s, &ch, 1);
 }
 
 
+/**
+ * If a and b are both
+ * non-NULL, and they have the same length, and the memory pointed to by a and b
+ * are identical, then return 1. Otherwise, return 0
+ * 
+ * @param a The first string to compare.
+ * @param b The cstring to compare to a.
+ * 
+ * @return 1 if the strings are equal, 0 otherwise.
+ */
 int cstr_equal(const cstring* a, const cstring* b)
 {
     if (a == b) {
@@ -187,6 +291,14 @@ int cstr_equal(const cstring* a, const cstring* b)
     return (memcmp(a->str, b->str, a->len) == 0);
 }
 
+/**
+ * Compare two cstrings
+ * 
+ * @param a The first string to compare.
+ * @param b the buffer to be compared
+ * 
+ * @return The return value is an integer that is the result of the comparison.
+ */
 int cstr_compare(const cstring* a, const cstring* b)
 {
     unsigned int i;
@@ -212,6 +324,15 @@ int cstr_compare(const cstring* a, const cstring* b)
     return (0);
 }
 
+/**
+ * Erase the characters in the string starting at position pos and ending at pos + len
+ * 
+ * @param s the cstring to modify
+ * @param pos The position to start erasing from.
+ * @param len The number of characters to remove.
+ * 
+ * @return The number of characters that were erased.
+ */
 int cstr_erase(cstring* s, size_t pos, ssize_t len)
 {
     ssize_t old_tail;

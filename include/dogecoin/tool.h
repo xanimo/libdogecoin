@@ -34,16 +34,22 @@
 LIBDOGECOIN_BEGIN_DECL
 
 /* generate the p2pkh address from a given hex pubkey */
+/* This function is used to generate the p2pkh address from a given hex pubkey. */
 LIBDOGECOIN_API dogecoin_bool addresses_from_pubkey(const dogecoin_chainparams* chain, const char* pubkey_hex, char* p2pkh_address, char* p2sh_p2wpkh_address, char* p2wpkh_address);
 
 /* generate the hex publickey from a given hex private key */
+/* Generating the public key from the private key. */
 LIBDOGECOIN_API dogecoin_bool pubkey_from_privatekey(const dogecoin_chainparams* chain, const char* privkey_hex, char* pubkey_hex, size_t* sizeout);
 
 /* generate a new private key (hex) */
+/* Generating a new private key in hex format. */
 LIBDOGECOIN_API dogecoin_bool gen_privatekey(const dogecoin_chainparams* chain, char* privkey_wif, size_t strsize_wif, char* privkey_hex);
 
+/* Generating a new master key in hex format. */
 LIBDOGECOIN_API dogecoin_bool hd_gen_master(const dogecoin_chainparams* chain, char* masterkeyhex, size_t strsize);
+/* A function that prints the node in the form of a string. */
 LIBDOGECOIN_API dogecoin_bool hd_print_node(const dogecoin_chainparams* chain, const char* nodeser);
+/* A function that derives a new key from a master key. */
 LIBDOGECOIN_API dogecoin_bool hd_derive(const dogecoin_chainparams* chain, const char* masterkey, const char* keypath, char* extkeyout, size_t extkeyout_size);
 
 LIBDOGECOIN_END_DECL

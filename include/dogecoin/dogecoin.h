@@ -37,10 +37,12 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
 #ifndef __cplusplus
 #ifndef true
+/* Defining `true` to be `1`. */
 #define true 1
 #endif
 
 #ifndef false
+/* A macro that defines `false` to be `0`. */
 #define false 0
 #endif
 #endif //__cplusplus
@@ -69,21 +71,35 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
 #if defined(_MSC_VER)
 #include <BaseTsd.h>
+/**
+ * The ssize_t type is a signed integer type that is at least 32 bits in size.
+ */
 typedef SSIZE_T ssize_t;
 #endif
 
+/* This is the length of the uncompressed public key. */
 #define DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH 65
+/* Defining the length of the compressed public key. */
 #define DOGECOIN_ECKEY_COMPRESSED_LENGTH 33
+/* Defining the length of the public key. */
 #define DOGECOIN_ECKEY_PKEY_LENGTH 32
-#define DOGECOIN_ECKEY_PKEY_LENGTH 32
+/* Defining the length of the hash. */
 #define DOGECOIN_HASH_LENGTH 32
 
+/* This is a macro that returns the minimum of two integers. */
 #define DOGECOIN_MIN(a, b) (((a) < (b)) ? (a) : (b))
+/* This is a macro that returns the maximum of two integers. */
 #define DOGECOIN_MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * An array of 32 bytes.
+ */
 typedef uint8_t uint256[32];
+/**
+ * An array of 20 bytes.
+ */
 typedef uint8_t uint160[20];
 
 LIBDOGECOIN_END_DECL

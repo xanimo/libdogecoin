@@ -34,18 +34,30 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * A buffer is a pointer to a
+ * block of memory and a length.
+ */
 struct buffer {
     void* p;
     size_t len;
 };
 
+/**
+ * A const_buffer is a pointer to a buffer of data that is read-only.
+ */
 struct const_buffer {
     const void* p;
     size_t len;
 };
 
+/* This is a function declaration. It is saying that the function `buffer_equal` is defined in the
+`LIBDOGECOIN_API` namespace. */
 LIBDOGECOIN_API int buffer_equal(const void* a, const void* b);
+/* This is a function declaration. It is saying that the function `buffer_free` is defined in the
+`LIBDOGECOIN_API` namespace. */
 LIBDOGECOIN_API void buffer_free(void* struct_buffer);
+/* Creating a new buffer and copying the data into it. */
 LIBDOGECOIN_API struct buffer* buffer_copy(const void* data, size_t data_len);
 
 LIBDOGECOIN_END_DECL

@@ -47,6 +47,7 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
 
+/* This is a list of all the options that can be used with the program. */
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
@@ -57,29 +58,51 @@ static struct option long_options[] = {
         {"continuous", no_argument, NULL, 'c'},
         {NULL, 0, NULL, 0}};
 
+/**
+ * Print_version() prints the version of the program
+ */
 static void print_version() {
     printf("Version: %s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
 }
 
+/**
+ * This function prints the usage of the spvnode command
+ */
 static void print_usage() {
     print_version();
-    printf("Usage: dogecoin-spv (-c|continuous) (-i|-ips <ip,ip,...]>) (-m[--maxpeers] <int>) (-t[--testnet]) (-f <headersfile|0 for in mem only>) (-r[--regtest]) (-d[--debug]) (-s[--timeout] <secs>) <command>\n");
+    printf("Usage: spvnode (-c|continuous) (-i|-ips <ip,ip,...]>) (-m[--maxpeers] <int>) (-t[--testnet]) (-f <headersfile|0 for in mem only>) (-r[--regtest]) (-d[--debug]) (-s[--timeout] <secs>) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
     printf("Sync up to the chain tip and stores all headers in headers.db (quit once synced):\n");
-    printf("> dogecoin-spv scan\n\n");
+    printf("> spvnode scan\n\n");
     printf("Sync up to the chain tip and give some debug output during that process:\n");
-    printf("> dogecoin-spv -d scan\n\n");
+    printf("> spvnode -d scan\n\n");
     printf("Sync up, show debug info, don't store headers in file (only in memory), wait for new blocks:\n");
-    printf("> dogecoin-spv -d -f 0 -c scan\n\n");
+    printf("> spvnode -d -f 0 -c scan\n\n");
 }
 
+/**
+ * Prints an error message to the screen
+ * 
+ * @param er The error message to display.
+ * 
+ * @return Nothing.
+ */
 static bool showError(const char* er) {
     printf("Error: %s\n", er);
     return 1;
 }
 
+/**
+ * When a new block is added to the blockchain, this function is called
+ * 
+ * @param client The client object.
+ * @param node The node that sent the message.
+ * @param newtip The new tip of the headers chain.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip) {
     UNUSED(client);
     UNUSED(node);
@@ -90,6 +113,12 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_ *client, 
 }
 
 static dogecoin_bool quit_when_synced = true;
+/**
+ * When the sync is complete, print a message and either exit or wait for new blocks or relevant
+ * transactions
+ * 
+ * @param client The client object.
+ */
 void spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
     if (quit_when_synced) {
@@ -158,6 +187,7 @@ int main(int argc, char* argv[]) {
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
+        /* Creating a new wallet and setting it as the sync_transaction_ctx. */
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false);
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
@@ -170,6 +200,7 @@ int main(int argc, char* argv[]) {
             fprintf(stdout, "Loading wallet failed\n");
             exit(EXIT_FAILURE);
         }
+        /* It creates a new key and sets it as the master key. */
         if (created) {
             // create a new key
 
@@ -187,13 +218,14 @@ int main(int argc, char* argv[]) {
             // ensure we have a key
             // TODO
         }
-
+        /* Creating a new key and setting it as the master key. */
         dogecoin_wallet_hdnode* node = dogecoin_wallet_next_key(wallet);
         size_t strsize = 128;
         char str[strsize];
         dogecoin_hdnode_get_p2pkh_address(node->hdnode, chain, str, strsize);
         printf("Wallet addr: %s (child %d)\n", str, node->hdnode->child_num);
 
+        /* Creating a vector of addresses and storing them in the wallet. */
         vector *addrs = vector_new(1, free);
         dogecoin_wallet_get_addresses(wallet, addrs);
         for (unsigned int i = 0; i < addrs->len; i++) {

@@ -4,6 +4,20 @@
 
 #include <string.h>
 
+/**
+ * Encrypts the data in `data` with the key in `aes_key` using AES-256 in CBC mode
+ * 
+ * @param aes_key The key to use for the encryption.
+ * @param iv The initialization vector. This is a block of data that is randomly generated for each
+ * encryption. It is used to ensure that the same data is encrypted differently each time.
+ * @param data The data to be encrypted.
+ * @param size The size of the data to encrypt.
+ * @param pad If true, pad the input data with the value of the remaining space. If false, pad with the
+ * value of the remaining space, up to a full block.
+ * @param out The output buffer.
+ * 
+ * @return The number of bytes written to the output buffer.
+ */
 int aes256_cbc_encrypt(const unsigned char aes_key[32], const unsigned char iv[AES_BLOCK_SIZE], const unsigned char* data, int size, int pad, unsigned char* out)
 {
     int written = 0;
@@ -43,6 +57,18 @@ int aes256_cbc_encrypt(const unsigned char aes_key[32], const unsigned char iv[A
     return written;
 }
 
+/**
+ * It decrypts the data using AES256 in CBC mode.
+ * 
+ * @param aes_key The key to use for the AES encryption.
+ * @param iv The initialization vector. This is the first block of the data.
+ * @param data The data to be decrypted.
+ * @param size The size of the data to be decrypted.
+ * @param pad If true, the decrypted data will have the padding removed.
+ * @param out The buffer to write the decrypted data to.
+ * 
+ * @return The number of bytes written to the output buffer.
+ */
 int aes256_cbc_decrypt(const unsigned char aes_key[32], const unsigned char iv[AES_BLOCK_SIZE], const unsigned char* data, int size, int pad, unsigned char* out)
 {
     unsigned char padsize = 0;

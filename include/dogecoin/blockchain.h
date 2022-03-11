@@ -34,6 +34,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * The block index is a data structure that stores the hash and header of each block in the blockchain.
+ */
 typedef struct dogecoin_blockindex {
     uint32_t height;
     uint256 hash;

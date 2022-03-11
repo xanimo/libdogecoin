@@ -693,6 +693,14 @@ void RBDelete(rb_red_blk_tree *tree, rb_red_blk_node *z) {
 #endif
 }
 
+/**
+ * Given a node in a red-black tree, return the number of nodes in the subtree rooted at that node
+ * 
+ * @param tree the tree we're counting nodes in
+ * @param x The node to count the children of.
+ * 
+ * @return The number of nodes in the tree.
+ */
 size_t rbtree_count_intern(rb_red_blk_tree *tree, rb_red_blk_node *x) {
     size_t cnt = 0;
     if (x != tree->nil) {
@@ -703,15 +711,34 @@ size_t rbtree_count_intern(rb_red_blk_tree *tree, rb_red_blk_node *x) {
     return cnt;
 }
 
+/**
+ * Given a red-black tree, return the number of nodes in the tree
+ * 
+ * @param tree the tree to count
+ * 
+ * @return The number of nodes in the tree.
+ */
 size_t rbtree_count(rb_red_blk_tree *tree) {
     return rbtree_count_intern(tree, tree->root->left);
 }
 
+/**
+ * Reset the iterator to the beginning of the tree
+ * 
+ * @param tree The tree to be iterated over.
+ */
 void rbtree_it_reset(rb_red_blk_tree *tree)
 {
     tree->it = NULL;
 }
 
+/**
+ * Given a tree and an iterator, return the next node in the tree
+ * 
+ * @param tree the tree we're enumerating
+ * 
+ * @return The node that is being returned is the node that is being enumerated.
+ */
 rb_red_blk_node* rbtree_enumerate_next(rb_red_blk_tree *tree)
 {
     rb_red_blk_node *nil=tree->nil;

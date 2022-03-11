@@ -33,10 +33,15 @@
 #include <dogecoin/chainparams.h>
 #include <dogecoin/dogecoin.h>
 
+/* Defining the size of the chaincode in bytes. */
 #define DOGECOIN_BIP32_CHAINCODE_SIZE 32
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * An HD wallet is a tree of nodes, each node has a depth, fingerprint, child number, chain code, and a
+ * private key or a public key.
+ */
 typedef struct
 {
     uint32_t depth;
@@ -47,29 +52,45 @@ typedef struct
     uint8_t public_key[DOGECOIN_ECKEY_COMPRESSED_LENGTH];
 } dogecoin_hdnode;
 
+/* This is a macro that is used to create a new node from an existing node. */
 #define dogecoin_hdnode_private_ckd_prime(X, I) dogecoin_hdnode_private_ckd((X), ((I) | 0x80000000))
 
+/* Creating a new dogecoin_hdnode object and returning a pointer to it. */
 LIBDOGECOIN_API dogecoin_hdnode* dogecoin_hdnode_new();
+/* Copying the `hdnode` structure. */
 LIBDOGECOIN_API dogecoin_hdnode* dogecoin_hdnode_copy(const dogecoin_hdnode* hdnode);
+/* Freeing the memory allocated for the `dogecoin_hdnode` object. */
 LIBDOGECOIN_API void dogecoin_hdnode_free(dogecoin_hdnode* node);
+/* A macro that calls `dogecoin_hdnode_private_ckd_prime(inout, i)` if `i` is odd. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i);
+/* This is a function that creates a new dogecoin_hdnode object from a seed. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_from_seed(const uint8_t* seed, int seed_len, dogecoin_hdnode* out);
+/* A macro that calls `dogecoin_hdnode_private_ckd_prime(inout, i)` if `i` is odd. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i);
+/* Filling the public key of the node with the public key of the parent node. */
 LIBDOGECOIN_API void dogecoin_hdnode_fill_public_key(dogecoin_hdnode* node);
+/* A macro that calls `dogecoin_hdnode_serialize_public(node, chain, str, strsize)` */
 LIBDOGECOIN_API void dogecoin_hdnode_serialize_public(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, int strsize);
+/* A macro that calls `dogecoin_hdnode_serialize_public(node, chain, str, strsize)` */
 LIBDOGECOIN_API void dogecoin_hdnode_serialize_private(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, int strsize);
 
 /* gives out the raw sha256/ripemd160 hash */
+/* A macro that calls `dogecoin_hdnode_get_hash160(node, hash160_out)` */
 LIBDOGECOIN_API void dogecoin_hdnode_get_hash160(const dogecoin_hdnode* node, uint160 hash160_out);
+/* A function that takes a dogecoin_hdnode object and a chainparams object and returns a string. */
 LIBDOGECOIN_API void dogecoin_hdnode_get_p2pkh_address(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, int strsize);
+/* A macro that calls `dogecoin_hdnode_serialize_public(node, chain, str, strsize)` */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_get_pub_hex(const dogecoin_hdnode* node, char* str, size_t* strsize);
+/* Deserializing a string into a dogecoin_hdnode object. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_deserialize(const char* str, const dogecoin_chainparams* chain, dogecoin_hdnode* node);
 
 //!derive dogecoin_hdnode from extended private or extended public key orkey
 //if you use pub child key derivation, pass usepubckd=true
+/* A function that takes a dogecoin_hdnode object and a chainparams object and returns a string. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hd_generate_key(dogecoin_hdnode* node, const char* keypath, const uint8_t* keymaster, const uint8_t* chaincode, dogecoin_bool usepubckd);
 
 //!checks if a node has the according private key (or if its a pubkey only node)
+/* Checking if the node has a private key. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_hdnode_has_privkey(dogecoin_hdnode* node);
 
 LIBDOGECOIN_END_DECL

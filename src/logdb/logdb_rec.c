@@ -35,6 +35,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+/**
+ * Allocate a new logdb_record and initialize its fields
+ * 
+ * @return A pointer to a logdb_record struct.
+ */
 logdb_record* logdb_record_new()
 {
     logdb_record* record;
@@ -46,6 +51,13 @@ logdb_record* logdb_record_new()
     return record;
 }
 
+/**
+ * This function frees the memory allocated to the logdb_record struct
+ * 
+ * @param rec The record to free.
+ * 
+ * @return Nothing
+ */
 void logdb_record_free(logdb_record* rec)
 {
     if (!rec)
@@ -59,6 +71,15 @@ void logdb_record_free(logdb_record* rec)
     free(rec);
 }
 
+/**
+ * Given a logdb_record pointer, a key and a value, set the key and value of the logdb_record
+ * 
+ * @param rec the logdb_record to be modified
+ * @param key The key to be set.
+ * @param val The value to be written to the log.
+ * 
+ * @return Nothing.
+ */
 void logdb_record_set(logdb_record* rec, cstring *key, cstring *val) // logdb_record_set(logdb_record* rec, struct buffer *key, struct buffer *val)
 {
     if (key == NULL)
@@ -87,6 +108,13 @@ void logdb_record_set(logdb_record* rec, cstring *key, cstring *val) // logdb_re
         rec->mode = RECORD_TYPE_ERASE;
 }
 
+/**
+ * Create a new logdb_record object and copy the contents of the given logdb_record object into it
+ * 
+ * @param b_rec the logdb_record to copy
+ * 
+ * @return A pointer to a newly allocated logdb_record object.
+ */
 logdb_record* logdb_record_copy(logdb_record* b_rec)
 {
     logdb_record* a_rec = logdb_record_new();
@@ -97,6 +125,12 @@ logdb_record* logdb_record_copy(logdb_record* b_rec)
     return a_rec;
 }
 
+/**
+ * Given a logdb_record, serialize it into a cstring
+ * 
+ * @param rec the record to serialize
+ * @param buf the buffer to write to
+ */
 void logdb_record_ser(logdb_record* rec, cstring *buf)
 {
     ser_bytes(buf, &rec->mode, 1);
@@ -111,6 +145,14 @@ void logdb_record_ser(logdb_record* rec, cstring *buf)
     }
 }
 
+/**
+ * Given a pointer to the head of a linked list of logdb_records, return the number of records in the
+ * list that are of type RECORD_TYPE_WRITE
+ * 
+ * @param head The head of the logdb_record linked list.
+ * 
+ * @return The number of records in the log.
+ */
 size_t logdb_record_height(logdb_record* head)
 {
     size_t cnt = 0;
@@ -126,6 +168,14 @@ size_t logdb_record_height(logdb_record* head)
     return cnt;
 }
 
+/**
+ * The function takes a logdb_record pointer as its parameter
+ * 
+ * @param head The head of the linked list.
+ * @param key The key to search for.
+ * 
+ * @return A pointer to the value of the key.
+ */
 cstring * logdb_record_find_desc(logdb_record* head, cstring *key) // logdb_record_find_desc(logdb_record* head, struct buffer *key)
 {
     cstring *found_value = NULL;
@@ -159,6 +209,14 @@ cstring * logdb_record_find_desc(logdb_record* head, cstring *key) // logdb_reco
     return found_value;
 }
 
+/**
+ * Given a linked list of logdb_records, remove all records with the same key as the given key
+ * 
+ * @param usehead the head of the linked list
+ * @param key The key to search for.
+ * 
+ * @return The head of the linked list of records that match the key.
+ */
 logdb_record * logdb_record_rm_desc(logdb_record *usehead, cstring *key)
 {
     /* remove old records with same key */

@@ -38,12 +38,14 @@
 LIBDOGECOIN_BEGIN_DECL
 
 /** Sighash version types */
+/* A flag to indicate the version of the signature. */
 enum dogecoin_sig_version {
     SIGVERSION_BASE = 0,
     SIGVERSION_WITNESS_V0 = 1,
 };
 
 /** Signature hash types/flags */
+/* This is a bitmask that is used to specify how the output is calculated. */
 enum {
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
@@ -196,6 +198,7 @@ enum opcodetype {
     OP_INVALIDOPCODE = 0xff,
 };
 
+/* A enum type for script classifications. */
 enum dogecoin_tx_out_type {
     DOGECOIN_TX_INVALID = -1,
     DOGECOIN_TX_NONSTANDARD,
@@ -208,6 +211,9 @@ enum dogecoin_tx_out_type {
     DOGECOIN_TX_WITNESS_V0_SCRIPTHASH,
 };
 
+/**
+ * An opcode and associated data.
+ */
 typedef struct dogecoin_script_op_ {
     enum opcodetype op;  /* opcode found */
     unsigned char* data; /* associated data, if any */

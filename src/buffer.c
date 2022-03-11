@@ -8,6 +8,14 @@
 #include <dogecoin/buffer.h>
 #include <dogecoin/mem.h>
 
+/**
+ * Return 1 if the two buffers are equal, 0 otherwise
+ * 
+ * @param a_ the first buffer
+ * @param b_ The buffer to compare.
+ * 
+ * @return 1 if the buffers are equal, 0 otherwise.
+ */
 int buffer_equal(const void* a_, const void* b_)
 {
     const struct buffer* a = a_;
@@ -18,6 +26,13 @@ int buffer_equal(const void* a_, const void* b_)
     return memcmp(a->p, b->p, a->len) == 0;
 }
 
+/**
+ * It takes a pointer to a buffer struct, and frees the memory associated with it
+ * 
+ * @param struct_buffer The buffer to free.
+ * 
+ * @return Nothing
+ */
 void buffer_free(void* struct_buffer)
 {
     struct buffer* buf = struct_buffer;
@@ -29,6 +44,14 @@ void buffer_free(void* struct_buffer)
     dogecoin_free(buf);
 }
 
+/**
+ * Allocate a buffer, copy the data into it, and return the buffer
+ * 
+ * @param data The data to be copied.
+ * @param data_len The length of the data to be copied.
+ * 
+ * @return A buffer object.
+ */
 struct buffer* buffer_copy(const void* data, size_t data_len)
 {
     struct buffer* buf;

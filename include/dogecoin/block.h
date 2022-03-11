@@ -37,6 +37,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * A dogecoin block header is a struct with 5 fields.
+ */
 typedef struct dogecoin_block_header_ {
     int32_t version;
     uint256 prev_block;
@@ -46,11 +49,17 @@ typedef struct dogecoin_block_header_ {
     uint32_t nonce;
 } dogecoin_block_header;
 
+/* Creating a new block header object. */
 LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
+/* A macro that is used to free the memory allocated for the `dogecoin_block_header` struct. */
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
+/* Deserializing a block header from a buffer. */
 LIBDOGECOIN_API int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf);
+/* A function that serializes a block header into a cstring. */
 LIBDOGECOIN_API void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header);
+/* A macro that is used to copy the contents of the `src` block header into the `dest` block header. */
 LIBDOGECOIN_API void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_block_header* src);
+/* This is a macro that is used to hash the contents of the `dogecoin_block_header` struct. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256 hash);
 
 LIBDOGECOIN_END_DECL

@@ -356,6 +356,13 @@ static const sha2_word64 sha512_initial_hash_value[8] = {
 
 
 /*** SHA-256: *********************************************************/
+/**
+ * Initialize the hash context and set the initial hash value
+ * 
+ * @param context A pointer to the SHA256_CTX structure.
+ * 
+ * @return Nothing
+ */
 void sha256_init(sha256_context* context)
 {
     if (context == (sha256_context*)0)
@@ -458,6 +465,13 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
 
 #else /* SHA2_UNROLL_TRANSFORM */
 
+/**
+ * The SHA-256 algorithm is a set of instructions that can be used to compute a hash value from a
+ * message
+ * 
+ * @param context A pointer to the SHA256_CTX structure.
+ * @param data The input data to be hashed.
+ */
 static void sha256_transform(sha256_context* context, const sha2_word32* data)
 {
     sha2_word32 a, b, c, d, e, f, g, h, s0, s1;
@@ -539,6 +553,18 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
 
 #endif /* SHA2_UNROLL_TRANSFORM */
 
+/**
+ * The function sha256_write() takes a pointer to a context, a pointer to a buffer, and a length. 
+ * It then copies the length bytes from the buffer into the context buffer, and updates the context
+ * bitcount. 
+ * If the buffer is not empty, it will transform the context
+ * 
+ * @param context A pointer to the SHA256 context.
+ * @param data The data to be hashed.
+ * @param len The length of the data to be hashed.
+ * 
+ * @return Nothing.
+ */
 void sha256_write(sha256_context* context, const sha2_byte* data, size_t len)
 {
     unsigned int freespace, usedspace;
@@ -580,6 +606,12 @@ void sha256_write(sha256_context* context, const sha2_byte* data, size_t len)
     usedspace = freespace = 0;
 }
 
+/**
+ * The SHA-256 hash function is defined in FIPS 180-2
+ * 
+ * @param context The context to update.
+ * @param digest The digest buffer.
+ */
 void sha256_finalize(sha256_context* context, sha2_byte digest[]) {
     sha2_word32* d = (sha2_word32*)digest;
     unsigned int usedspace;
@@ -638,6 +670,13 @@ void sha256_finalize(sha256_context* context, sha2_byte digest[]) {
     usedspace = 0;
 }
 
+/**
+ * Given a message, the function will return a 256-bit hash of the message
+ * 
+ * @param data The data to be hashed.
+ * @param len The length of the data to be hashed.
+ * @param digest The output buffer to which the hash will be written.
+ */
 void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_LENGTH])
 {
     sha256_context context;
@@ -647,6 +686,13 @@ void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_
 }
 
 /*** SHA-512: *********************************************************/
+/**
+ * Initialize the SHA512 context by copying the initial hash value to the context state
+ * 
+ * @param context A pointer to the SHA512_CTX structure which must be initialized.
+ * 
+ * @return Nothing.
+ */
 void sha512_init(sha512_context* context)
 {
     if (context == (sha512_context*)0)
@@ -689,6 +735,12 @@ void sha512_init(sha512_context* context)
     (h) = T1 + Sigma0_512(a) + majority((a), (b), (c));                                                                         \
     j++
 
+/**
+ * The SHA-512 algorithm is a set of instructions for calculating a hash value
+ * 
+ * @param context A pointer to the SHA512_CTX structure.
+ * @param data The input data to the hash function.
+ */
 static void sha512_transform(sha512_context* context, const sha2_word64* data)
 {
     sha2_word64 a, b, c, d, e, f, g, h, s0, s1;
@@ -745,6 +797,12 @@ static void sha512_transform(sha512_context* context, const sha2_word64* data)
 
 #else /* SHA2_UNROLL_TRANSFORM */
 
+/**
+ * The SHA-512 algorithm is a set of instructions for calculating a hash value
+ * 
+ * @param context A pointer to the SHA512_CTX structure.
+ * @param data The input data to be hashed.
+ */
 static void sha512_transform(sha512_context* context, const sha2_word64* data)
 {
     sha2_word64 a, b, c, d, e, f, g, h, s0, s1;
@@ -824,6 +882,17 @@ static void sha512_transform(sha512_context* context, const sha2_word64* data)
 
 #endif /* SHA2_UNROLL_TRANSFORM */
 
+/**
+ * The function sha512_write() takes a pointer to a context, a pointer to a buffer, and a length. 
+ * It then copies the length bytes from the buffer into the context buffer, and updates the context
+ * bitcount
+ * 
+ * @param context A pointer to the SHA512_CTX structure.
+ * @param data The data to be hashed.
+ * @param len The length of the data to be hashed.
+ * 
+ * @return Nothing.
+ */
 void sha512_write(sha512_context* context, const sha2_byte* data, size_t len)
 {
     unsigned int freespace, usedspace;
@@ -865,6 +934,30 @@ void sha512_write(sha512_context* context, const sha2_byte* data, size_t len)
     usedspace = freespace = 0;
 }
 
+/**
+ * The last block is special. 
+ * 
+ * The last block is padded with a 1 bit, followed by a number of 0 bits, followed by the 64-bit length
+ * of the message. 
+ * 
+ * The padding is done in a special way so that the last block is always padded to a multiple of the
+ * block size. 
+ * 
+ * The last block is then transformed. 
+ * 
+ * The function returns a pointer to the hash value. 
+ * 
+ * The function is defined in the file sha512.c. 
+ * 
+ * The function is called by the function sha512_finish. 
+ * 
+ * The function is called by the function sha512_hash. 
+ * 
+ * The function is called by the function sha512_init. 
+ * 
+ * The function is called by the function sha512_update. 
+ * 
+ */
 static void sha512_last(sha512_context* context)
 {
     unsigned int usedspace;
@@ -905,6 +998,13 @@ static void sha512_last(sha512_context* context)
     sha512_transform(context, (sha2_word64*)context->buffer);
 }
 
+/**
+ * The SHA512_Finalize function takes the SHA512 context and the digest buffer and writes the hash data
+ * to the digest buffer
+ * 
+ * @param context A pointer to the SHA512_CTX structure.
+ * @param digest The digest buffer to fill with the digest.
+ */
 void sha512_finalize(sha512_context* context, sha2_byte digest[]) {
     sha2_word64* d = (sha2_word64*)digest;
     /* If no digest buffer is passed, we don't bother doing this: */
@@ -928,6 +1028,13 @@ void sha512_finalize(sha512_context* context, sha2_byte digest[]) {
     MEMSET_BZERO(context, sizeof(sha512_context));
 }
 
+/**
+ * Given a message, the function will calculate the SHA512 hash of the message
+ * 
+ * @param data The data to be hashed.
+ * @param len The length of the data to be hashed.
+ * @param digest The output buffer to which the hash will be written.
+ */
 void sha512_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA512_DIGEST_LENGTH])
 {
     sha512_context context;
@@ -936,6 +1043,27 @@ void sha512_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA512_DIGEST_
     sha512_finalize(&context, digest);
 }
 
+/**
+ * Given a key and a message, the function will compute the HMAC-SHA256 of the message using the key. 
+ * 
+ * The HMAC-SHA256 is computed by first using the key to derive a temporary key by XORing it with 0x5c
+ * and 0x36. 
+ * Then, the function will initialize a SHA256 context, write the i_key_pad value to it, write the
+ * message to it, 
+ * and finally write the o_key_pad value to it. 
+ * 
+ * After this, the function will initialize a SHA256 context again, write the o_key_pad value to it,
+ * write the 
+ * SHA256 digest to it, and finally write the i_key_pad value to it. 
+ * 
+ * The function will return the SHA256 digest.
+ * 
+ * @param key The key to use for the HMAC.
+ * @param keylen The length of the key.
+ * @param msg The message to be signed.
+ * @param msglen The length of the message to be hashed.
+ * @param hmac The HMAC output.
+ */
 void hmac_sha256(const uint8_t* key, const uint32_t keylen, const uint8_t* msg, const uint32_t msglen, uint8_t* hmac)
 {
     int i;
@@ -963,6 +1091,15 @@ void hmac_sha256(const uint8_t* key, const uint32_t keylen, const uint8_t* msg, 
     sha256_finalize(&ctx, hmac);
 }
 
+/**
+ * Compute the HMAC-SHA512 of a message using a key
+ * 
+ * @param key The key to use for the HMAC.
+ * @param keylen The length of the key.
+ * @param msg The message to be hashed.
+ * @param msglen The length of the message to be hashed.
+ * @param hmac The HMAC output.
+ */
 void hmac_sha512(const uint8_t* key, const uint32_t keylen, const uint8_t* msg, const uint32_t msglen, uint8_t* hmac)
 {
     int i;

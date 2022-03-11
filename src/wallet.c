@@ -46,6 +46,7 @@
 #include <dogecoin/wallet.h>
 #include <dogecoin/utils.h>
 
+/* Creating a new logdb object. */
 #include <logdb/logdb.h>
 #include <logdb/logdb_rec.h>
 #include <logdb/red_black_tree.h>
@@ -467,10 +468,14 @@ void dogecoin_wallet_logdb_append_cb(void* ctx, logdb_bool load_phase, logdb_rec
 {
    dogecoin_wallet* wallet = (dogecoin_wallet*)ctx;
    if (load_phase) {
+       /* Checking if the record is a wallet master key record and if it is a write record. */
        if (wallet->masterkey == NULL && rec->mode == RECORD_TYPE_WRITE && rec->key->len > strlen(hdmasterkey_key) && memcmp(rec->key->str, hdmasterkey_key, strlen(hdmasterkey_key)) == 0) {
+           /* Creating a new HDNode object. */
            wallet->masterkey = dogecoin_hdnode_new();
+           /* Deserializing the HDNode into the wallet. */
            dogecoin_hdnode_deserialize(rec->value->str, wallet->chain, wallet->masterkey);
        }
+       /* Checking if the key is the same as the one we are looking for. */
        if (rec->key->len == strlen(hdkey_key) + sizeof(uint160) && memcmp(rec->key->str, hdkey_key, strlen(hdkey_key)) == 0) {
            dogecoin_hdnode* hdnode = dogecoin_hdnode_new();
            dogecoin_hdnode_deserialize(rec->value->str, wallet->chain, hdnode);
@@ -485,6 +490,7 @@ void dogecoin_wallet_logdb_append_cb(void* ctx, logdb_bool load_phase, logdb_rec
                wallet->next_childindex = hdnode->child_num + 1;
        }
 
+       /* Checking if the key of the record is the same as the key of the transaction. */
        if (rec->key->len == strlen(tx_key) + SHA256_DIGEST_LENGTH && memcmp(rec->key->str, tx_key, strlen(tx_key)) == 0) {
            dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
            struct const_buffer buf = {rec->value->str, rec->value->len};

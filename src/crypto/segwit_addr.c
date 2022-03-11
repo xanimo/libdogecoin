@@ -24,6 +24,15 @@
 
 #include <dogecoin/crypto/segwit_addr.h>
 
+/**
+ * "Compute the Bech32 checksum."
+ * 
+ * The function takes a 32-bit number and "rotates" it 5 bits to the left
+ * 
+ * @param pre The pre-calculated hash value.
+ * 
+ * @return The result of the polynomial operation.
+ */
 uint32_t bech32_polymod_step(uint32_t pre)
 {
     uint8_t b = pre >> 25;
@@ -35,8 +44,10 @@ uint32_t bech32_polymod_step(uint32_t pre)
            (-((b >> 4) & 1) & 0x2a1462b3UL);
 }
 
+/* This is a lookup table for the reverse of the charset. */
 static const char* charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
+/* A lookup table for the reverse of the charset. */
 static const int8_t charset_rev[128] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -47,6 +58,16 @@ static const int8_t charset_rev[128] = {
     -1, 29, -1, 24, 13, 25, 9, 8, 23, -1, 18, 22, 31, 27, 19, -1,
     1, 0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1, -1, -1, -1, -1};
 
+/**
+ * Convert a human readable part and a data part to a bech32 string
+ * 
+ * @param output the output string
+ * @param hrp human-readable part
+ * @param data the data to encode
+ * @param data_len The length of the data to encode.
+ * 
+ * @return Nothing.
+ */
 int bech32_encode(char* output, const char* hrp, const uint8_t* data, size_t data_len)
 {
     uint32_t chk = 1;
@@ -87,6 +108,16 @@ int bech32_encode(char* output, const char* hrp, const uint8_t* data, size_t dat
     return 1;
 }
 
+/**
+ * It takes a string of characters and checks if it is a valid bech32 string
+ * 
+ * @param hrp human-readable part
+ * @param data the data to encode
+ * @param data_len The length of the data to be encoded.
+ * @param input the string to be decoded
+ * 
+ * @return Nothing.
+ */
 int bech32_decode(char* hrp, uint8_t* data, size_t* data_len, const char* input)
 {
     uint32_t chk = 1;
@@ -147,6 +178,19 @@ int bech32_decode(char* hrp, uint8_t* data, size_t* data_len, const char* input)
     return chk == 1;
 }
 
+/**
+ * Convert a bit string to a byte string
+ * 
+ * @param out the output buffer
+ * @param outlen The length of the output buffer.
+ * @param outbits the number of bits in the output
+ * @param in the input buffer
+ * @param inlen The length of the input buffer.
+ * @param inbits the number of bits in the input
+ * @param pad If true, pad the output with 0s to the next byte boundary.
+ * 
+ * @return 1 if the conversion was successful, and 0 if it was not.
+ */
 static int convert_bits(uint8_t* out, size_t* outlen, int outbits, const uint8_t* in, size_t inlen, int inbits, int pad)
 {
     uint32_t val = 0;
@@ -170,6 +214,18 @@ static int convert_bits(uint8_t* out, size_t* outlen, int outbits, const uint8_t
     return 1;
 }
 
+/**
+ * It takes a human readable prefix, a witness version, a witness program, and a witness program
+ * length, and encodes them into a bech32 address
+ * 
+ * @param output the output buffer to write the encoded address to
+ * @param hrp The human-readable part, which is "bc" for mainnet and "tb" for testnet.
+ * @param witver The witness version, must be 0 for the main network.
+ * @param witprog the witness program
+ * @param witprog_len The length of the witness program.
+ * 
+ * @return Nothing.
+ */
 int segwit_addr_encode(char* output, const char* hrp, int witver, const uint8_t* witprog, size_t witprog_len)
 {
     uint8_t data[65] = {0};
@@ -186,6 +242,17 @@ int segwit_addr_encode(char* output, const char* hrp, int witver, const uint8_t*
     return bech32_encode(output, hrp, data, datalen);
 }
 
+/**
+ * Convert a segwit address to a version and data
+ * 
+ * @param witver the witness version (0 for mainnet, 1 for testnet)
+ * @param witdata The witness data.
+ * @param witdata_len The length of the witdata array.
+ * @param hrp the human-readable part of the address
+ * @param addr The address to be decoded.
+ * 
+ * @return 1 if the address is valid, otherwise 0.
+ */
 int segwit_addr_decode(int* witver, uint8_t* witdata, size_t* witdata_len, const char* hrp, const char* addr)
 {
     uint8_t data[84] = {0};

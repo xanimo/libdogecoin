@@ -46,32 +46,65 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
 static const dogecoin_rnd_mapper default_rnd_mapper = {dogecoin_random_init_internal, dogecoin_random_bytes_internal};
 static dogecoin_rnd_mapper current_rnd_mapper = {dogecoin_random_init_internal, dogecoin_random_bytes_internal};
 
+/**
+ * The function sets the current random number mapper to the default random number mapper
+ */
 void dogecoin_rnd_set_mapper_default()
 {
     current_rnd_mapper = default_rnd_mapper;
 }
 
+/**
+ * The function takes a function pointer as an argument, and sets the current_rnd_mapper variable to
+ * that function pointer
+ * 
+ * @param mapper The function that will be used to map the random number to a value.
+ */
 void dogecoin_rnd_set_mapper(const dogecoin_rnd_mapper mapper)
 {
     current_rnd_mapper = mapper;
 }
 
+/**
+ * The function initializes the random number generator
+ */
 void dogecoin_random_init(void)
 {
     current_rnd_mapper.dogecoin_random_init();
 }
 
+/**
+ * Given a buffer and a length, it will return a random number of bytes
+ * 
+ * @param buf the buffer to fill with random bytes
+ * @param len The number of bytes to generate.
+ * @param update_seed If true, the random seed will be updated.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t update_seed)
 {
     return current_rnd_mapper.dogecoin_random_bytes(buf, len, update_seed);
 }
 
 #ifdef TESTING
+/**
+ * Initialize the random number generator
+ */
 void dogecoin_random_init_internal(void)
 {
     srand(time(NULL));
 }
 
+/**
+ * It generates a random number for each byte in the buffer
+ * 
+ * @param buf The buffer to fill with random bytes.
+ * @param len The number of bytes to generate.
+ * @param update_seed If true, the seed will be updated after each call to the random bytes function.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, uint8_t update_seed)
 {
     (void)update_seed;
@@ -80,9 +113,24 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, uint8_t
     return true;
 }
 #else
+/**
+ * The function is called by the dogecoin_random_init() function
+ */
 void dogecoin_random_init_internal(void)
 {
 }
+
+/**
+ * "This function reads random bytes from a file and stores them in a buffer."
+ * 
+ * The function is defined in the file dogecoin.c
+ * 
+ * @param buf the buffer to fill with random bytes
+ * @param len The number of bytes to read.
+ * @param update_seed If true, the random seed is updated.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed)
 {
 #ifdef WIN32

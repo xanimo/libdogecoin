@@ -33,6 +33,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/**
+ * It's a struct that has pointers to functions that do the actual memory management.
+ */
 typedef struct dogecoin_mem_mapper_ {
     void* (*dogecoin_malloc)(size_t size);
     void* (*dogecoin_calloc)(size_t count, size_t size);
@@ -42,14 +45,20 @@ typedef struct dogecoin_mem_mapper_ {
 
 // set's a custom memory mapper
 // this function is _not_ thread safe and must be called before anything else
+/* It's a function that sets a custom memory mapper. */
 LIBDOGECOIN_API void dogecoin_mem_set_mapper(const dogecoin_mem_mapper mapper);
 LIBDOGECOIN_API void dogecoin_mem_set_mapper_default();
 
+/* It's a function that allocates memory. */
 LIBDOGECOIN_API void* dogecoin_malloc(size_t size);
+/* It's a function that allocates memory. */
 LIBDOGECOIN_API void* dogecoin_calloc(size_t count, size_t size);
+/* It's a function that reallocates memory. */
 LIBDOGECOIN_API void* dogecoin_realloc(void* ptr, size_t size);
+/* It's a macro that calls the function pointer that is set by `dogecoin_mem_set_mapper`. */
 LIBDOGECOIN_API void dogecoin_free(void* ptr);
 
+/* It's a macro that calls the function pointer that is set by `dogecoin_mem_set_mapper`. */
 LIBDOGECOIN_API volatile void* dogecoin_mem_zero(volatile void* dst, size_t len);
 
 LIBDOGECOIN_END_DECL

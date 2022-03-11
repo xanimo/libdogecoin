@@ -73,12 +73,23 @@
 static uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
 static char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
 
+/**
+ * Clear the buffers used to convert between hex and uint8
+ */
 void utils_clear_buffers(void)
 {
     memset(buffer_hex_to_uint8, 0, TO_UINT8_HEX_BUF_LEN);
     memset(buffer_uint8_to_hex, 0, TO_UINT8_HEX_BUF_LEN);
 }
 
+/**
+ * Convert a hex string to a binary string
+ * 
+ * @param str The string to be converted.
+ * @param out The output buffer.
+ * @param inLen The length of the input string.
+ * @param outLen The length of the output buffer.
+ */
 void utils_hex_to_bin(const char* str, unsigned char* out, int inLen, int* outLen)
 {
     int bLen = inLen / 2;
@@ -108,6 +119,13 @@ void utils_hex_to_bin(const char* str, unsigned char* out, int inLen, int* outLe
     *outLen = i;
 }
 
+/**
+ * Convert a hex string to a uint8_t array
+ * 
+ * @param str The string to be converted to a uint8_t array.
+ * 
+ * @return The buffer_hex_to_uint8 array.
+ */
 uint8_t* utils_hex_to_uint8(const char* str)
 {
     uint8_t c;
@@ -141,6 +159,13 @@ uint8_t* utils_hex_to_uint8(const char* str)
     return buffer_hex_to_uint8;
 }
 
+/**
+ * Convert a binary array to a hex string
+ * 
+ * @param bin_in The binary data to be converted to hex.
+ * @param inlen The length of the input buffer.
+ * @param hex_out The output buffer to write the hexadecimal string to.
+ */
 void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out)
 {
     static char digits[] = "0123456789abcdef";
@@ -152,6 +177,14 @@ void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out)
     hex_out[inlen * 2] = '\0';
 }
 
+/**
+ * Convert a binary array to a hex string
+ * 
+ * @param bin the binary data to be converted
+ * @param l The length of the input buffer.
+ * 
+ * @return A pointer to a string of hexadecimal digits.
+ */
 char* utils_uint8_to_hex(const uint8_t* bin, size_t l)
 {
     static char digits[] = "0123456789abcdef";
@@ -168,6 +201,12 @@ char* utils_uint8_to_hex(const uint8_t* bin, size_t l)
     return buffer_uint8_to_hex;
 }
 
+/**
+ * Reverse the order of the bytes in a hex string
+ * 
+ * @param h The hex string to be reversed.
+ * @param len The length of the hex string to be reversed.
+ */
 void utils_reverse_hex(char* h, int len)
 {
     char* copy = dogecoin_calloc(1, len);
@@ -200,11 +239,24 @@ const signed char p_util_hexdigit[256] =
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 };
 
+/**
+ * Given a hexadecimal digit, return the value of the digit
+ * 
+ * @param c The character to convert.
+ * 
+ * @return The value of the hex digit.
+ */
 signed char utils_hex_digit(char c)
 {
     return p_util_hexdigit[(unsigned char)c];
 }
 
+/**
+ * Convert a hex string to a uint256
+ * 
+ * @param psz The string to be converted.
+ * @param out The output buffer.
+ */
 void utils_uint256_sethex(char* psz, uint8_t* out)
 {
     memset(out, 0, sizeof(uint256));
@@ -250,6 +302,13 @@ void* safe_malloc(size_t size)
     }
 }
 
+/**
+ * It generates a random number between 0 and 255 and stores it in the buffer at the index specified by
+ * the first parameter
+ * 
+ * @param buf The buffer to fill with random bytes.
+ * @param len The number of bytes to generate.
+ */
 void dogecoin_cheap_random_bytes(uint8_t* buf, uint32_t len)
 {
     srand(time(NULL));
@@ -258,6 +317,13 @@ void dogecoin_cheap_random_bytes(uint8_t* buf, uint32_t len)
     }
 }
 
+/**
+ * "Get the default data directory for Dogecoin."
+ * 
+ * The function is defined in the file "dogecoin.c" in the source code for Dogecoin
+ * 
+ * @param path_out The path to the directory where the data directory should be created.
+ */
 void dogecoin_get_default_datadir(cstring* path_out)
 {
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\Bitcoin
