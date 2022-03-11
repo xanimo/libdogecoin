@@ -244,6 +244,6 @@ void test_bip32()
     u_assert_int_eq(memcmp(nodeheap->private_key, nodeheap_copy->private_key, 32), 0);
     u_assert_int_eq(memcmp(nodeheap->public_key, nodeheap_copy->public_key, 33), 0)
 
-        dogecoin_hdnode_free(nodeheap);
+    dogecoin_hdnode_free(nodeheap);
     dogecoin_hdnode_free(nodeheap_copy);
 }

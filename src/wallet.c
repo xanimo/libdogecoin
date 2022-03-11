@@ -45,6 +45,8 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/wallet.h>
 #include <dogecoin/utils.h>
+#include <logdb/logdb_rec.h>
+#include <logdb/red_black_tree.h>
 
 uint8_t WALLET_DB_REC_TYPE_MASTERKEY = 0;
 uint8_t WALLET_DB_REC_TYPE_PUBKEYCACHE = 1;
@@ -159,9 +161,9 @@ dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_bu
 dogecoin_wallet_hdnode* dogecoin_wallet_hdnode_new()
 {
     dogecoin_wallet_hdnode* whdnode;
-    whdnode = dogecoin_calloc(1, sizeof(*whdnode));
+    whdnode = dogecoin_malloc(sizeof(*whdnode));
     whdnode->hdnode = dogecoin_hdnode_new();
-
+    whdnode->pubkeyhash;
     return whdnode;
 }
 void dogecoin_wallet_hdnode_free(dogecoin_wallet_hdnode* whdnode)
@@ -221,8 +223,8 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     wallet->chain = params;
     wallet->spends = vector_new(10, free);
 
-    wallet->wtxes_rbtree = NULL;
-    wallet->hdkeys_rbtree = NULL;
+    // wallet->wtxes_rbtree = 0;
+    // wallet->hdkeys_rbtree = 0;
     return wallet;
 }
 
@@ -404,8 +406,9 @@ dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet)
 
 void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, dogecoin_hdnode* masterkey)
 {
-    if (!masterkey)
+    if (!masterkey) {
         return;
+    }
 
     if (wallet->masterkey != NULL) {
         //changing the master key should not be done,...

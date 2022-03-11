@@ -643,12 +643,7 @@ dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromP
         ser_s32(s, hashtype);
     }
 
-    char str[10000];
-    memset(str, strlen(str), 0);
-    utils_bin_to_hex((unsigned char *)s->str, s->len, str);
-
-    sha256_raw((const uint8_t*)s->str, s->len, hash);
-    sha256_raw(hash, DOGECOIN_HASH_LENGTH, hash);
+    dogecoin_hash((const uint8_t*)s->str, s->len, hash);
 
     cstr_free(s, true);
 
