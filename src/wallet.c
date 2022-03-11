@@ -73,6 +73,16 @@ static logdb_memmapper dogecoin_wallet_db_mapper = {
 /* ====================== */
 /* compare btree callback */
 /* ====================== */
+/**
+ * "Compare two HDNode structs by comparing their public key hashes."
+ * 
+ * The function is used to sort the HDNode structs in the wallet
+ * 
+ * @param l pointer to the first item in the array
+ * @param r The number of bits to use for the private key.
+ * 
+ * @return Nothing.
+ */
 int dogecoin_wallet_hdnode_compare(const void *l, const void *r)
 {
     const dogecoin_wallet_hdnode *lm = l;
@@ -95,6 +105,14 @@ int dogecoin_wallet_hdnode_compare(const void *l, const void *r)
     return 0;
 }
 
+/**
+ * The function compares the hashes of two transactions
+ * 
+ * @param l the left item to compare
+ * @param r The pointer to the right-hand side of the comparison.
+ * 
+ * @return Nothing.
+ */
 int dogecoin_wtx_compare(const void *l, const void *r)
 {
     const dogecoin_wtx *lm = l;
@@ -119,18 +137,36 @@ int dogecoin_wtx_compare(const void *l, const void *r)
 /* ==================== */
 /* txes rbtree callback */
 /* ==================== */
+/**
+ * This function is called by the rbtree when it needs to free a key
+ * 
+ * @param a The key to be freed.
+ */
 void dogecoin_rbtree_wtxes_free_key(void* a) {
     /* keys are cstrings that needs to be released by the rbtree */
     cstring *key = (cstring *)a;
     cstr_free(key, true);
 }
 
+/**
+ * It takes a pointer to a dogecoin_wtx and frees it
+ * 
+ * @param a the value to be freed
+ */
 void dogecoin_rbtree_wtxes_free_value(void *a){
     /* free the wallet transaction */
     dogecoin_wtx *wtx = (dogecoin_wtx *)a;
     dogecoin_wallet_wtx_free(wtx);
 }
 
+/**
+ * Given two pointers to cstrings, compare the cstrings
+ * 
+ * @param a a pointer to a cstring
+ * @param b The tree to search
+ * 
+ * @return Nothing.
+ */
 int dogecoin_rbtree_wtxes_compare(const void* a,const void* b) {
     return cstr_compare((cstring *)a, (cstring *)b);
 }
@@ -139,18 +175,37 @@ int dogecoin_rbtree_wtxes_compare(const void* a,const void* b) {
 /* ====================== */
 /* hdkeys rbtree callback */
 /* ====================== */
+/**
+ * This function is called by the rbtree when it needs to free a key
+ * 
+ * @param a The key to be freed.
+ */
 void dogecoin_rbtree_hdkey_free_key(void* a) {
     /* keys are cstrings that needs to be released by the rbtree */
     cstring *key = (cstring *)a;
     cstr_free(key, true);
 }
 
+/**
+ * It takes a pointer to a dogecoin_hdnode and frees it
+ * 
+ * @param a The key to be freed.
+ */
 void dogecoin_rbtree_hdkey_free_value(void *a){
     /* free the hdnode */
     dogecoin_hdnode *node = (dogecoin_hdnode *)a;
     dogecoin_hdnode_free(node);
 }
 
+/**
+ * Given two keys, return a negative number if the first key is smaller, a positive number if the first
+ * key is larger, and 0 if the keys are equal
+ * 
+ * @param a The first parameter is a pointer to the first key to compare.
+ * @param b The first parameter is a pointer to the root of the tree.
+ * 
+ * @return Nothing.
+ */
 int dogecoin_rbtree_hdkey_compare(const void* a,const void* b) {
     return cstr_compare((cstring *)a, (cstring *)b);
 }
@@ -161,6 +216,11 @@ int dogecoin_rbtree_hdkey_compare(const void* a,const void* b) {
  ==========================================================
 */
 
+/**
+ * It allocates memory for a new dogecoin_wtx object and initializes it.
+ * 
+ * @return A pointer to a new dogecoin_wtx object.
+ */
 dogecoin_wtx* dogecoin_wallet_wtx_new()
 {
     dogecoin_wtx* wtx;
@@ -171,6 +231,14 @@ dogecoin_wtx* dogecoin_wallet_wtx_new()
     return wtx;
 }
 
+/**
+ * Create a new dogecoin_wtx object and copy the transaction data from the given dogecoin_wtx object
+ * into it
+ * 
+ * @param wtx the transaction to copy
+ * 
+ * @return A copy of the transaction.
+ */
 dogecoin_wtx* dogecoin_wallet_wtx_copy(dogecoin_wtx* wtx)
 {
     dogecoin_wtx* wtx_copy;
@@ -180,12 +248,24 @@ dogecoin_wtx* dogecoin_wallet_wtx_copy(dogecoin_wtx* wtx)
     return wtx_copy;
 }
 
+/**
+ * It takes a pointer to a dogecoin_wtx struct, and frees the memory allocated to the dogecoin_wtx
+ * struct
+ * 
+ * @param wtx The transaction to free.
+ */
 void dogecoin_wallet_wtx_free(dogecoin_wtx* wtx)
 {
     dogecoin_tx_free(wtx->tx);
     dogecoin_free(wtx); // free(wtx);
 }
 
+/**
+ * This function serializes a dogecoin_wtx object into a cstring
+ * 
+ * @param s The string to write the serialized data to.
+ * @param wtx the transaction object
+ */
 void dogecoin_wallet_wtx_serialize(cstring* s, const dogecoin_wtx* wtx)
 {
     ser_u32(s, wtx->height);
@@ -195,6 +275,14 @@ void dogecoin_wallet_wtx_serialize(cstring* s, const dogecoin_wtx* wtx)
     dogecoin_tx_serialize(s, wtx->tx, true); // dogecoin_tx_serialize(s, wtx->tx);
 }
 
+/**
+ * The function deserializes a transaction from a buffer into a dogecoin_wtx struct
+ * 
+ * @param wtx the dogecoin_wtx struct to be filled in
+ * @param buf The buffer containing the serialized transaction.
+ * 
+ * @return The return value is a boolean value indicating success or failure.
+ */
 dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_buffer* buf)
 {
     deser_u32(&wtx->height, buf);
@@ -210,6 +298,11 @@ dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_bu
  ==========================================================
 */
 
+/**
+ * It creates a new dogecoin_wallet_hdnode object and returns a pointer to it
+ * 
+ * @return A pointer to a new dogecoin_wallet_hdnode object.
+ */
 dogecoin_wallet_hdnode* dogecoin_wallet_hdnode_new()
 {
     dogecoin_wallet_hdnode* whdnode;
@@ -218,12 +311,25 @@ dogecoin_wallet_hdnode* dogecoin_wallet_hdnode_new()
     whdnode->pubkeyhash;
     return whdnode;
 }
+
+/**
+ * It takes a pointer to a dogecoin_wallet_hdnode, and frees the memory associated with it
+ * 
+ * @param whdnode The pointer to the dogecoin_wallet_hdnode struct.
+ */
 void dogecoin_wallet_hdnode_free(dogecoin_wallet_hdnode* whdnode)
 {
     dogecoin_hdnode_free(whdnode->hdnode);
     dogecoin_free(whdnode);
 }
 
+/**
+ * It takes a dogecoin_wallet_hdnode, and serializes it into a string
+ * 
+ * @param s The serialization buffer
+ * @param params The chainparams struct.
+ * @param whdnode The dogecoin_wallet_hdnode object to serialize
+ */
 void dogecoin_wallet_hdnode_serialize(cstring* s, const dogecoin_chainparams *params, const dogecoin_wallet_hdnode* whdnode)
 {
     ser_bytes(s, whdnode->pubkeyhash, sizeof(uint160));
@@ -232,6 +338,16 @@ void dogecoin_wallet_hdnode_serialize(cstring* s, const dogecoin_chainparams *pa
     ser_str(s, strbuf, sizeof(strbuf));
 }
 
+/**
+ * It takes a buffer and a pointer to a dogecoin_wallet_hdnode struct. It deserializes the buffer into
+ * the struct
+ * 
+ * @param whdnode the dogecoin_wallet_hdnode object to be filled in
+ * @param params The chainparams struct.
+ * @param buf The buffer to deserialize from.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_wallet_hdnode_deserialize(dogecoin_wallet_hdnode* whdnode, const dogecoin_chainparams *params, struct const_buffer* buf) {
     deser_bytes(&whdnode->pubkeyhash, buf, sizeof(uint160));
     char strbuf[196];
@@ -246,6 +362,11 @@ dogecoin_bool dogecoin_wallet_hdnode_deserialize(dogecoin_wallet_hdnode* whdnode
  ==========================================================
  */
 
+/**
+ * Create a new dogecoin_output object and return it
+ * 
+ * @return A pointer to a dogecoin_output struct.
+ */
 dogecoin_output* dogecoin_wallet_output_new()
 {
     dogecoin_output* output;
@@ -256,6 +377,11 @@ dogecoin_output* dogecoin_wallet_output_new()
     return output;
 }
 
+/**
+ * It takes a pointer to a dogecoin_output struct, and frees the memory allocated to it
+ * 
+ * @param output The output to free.
+ */
 void dogecoin_wallet_output_free(dogecoin_output* output)
 {
     dogecoin_wallet_wtx_free(output->wtx);
@@ -266,6 +392,13 @@ void dogecoin_wallet_output_free(dogecoin_output* output)
  ==========================================================
  WALLET CORE FUNCTIONS
  ==========================================================
+ */
+/**
+ * The function creates a new dogecoin wallet
+ * 
+ * @param params The chainparams structure that contains the chain parameters.
+ * 
+ * @return A dogecoin_wallet object.
  */
 dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
 {
@@ -282,6 +415,13 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     return wallet;
 }
 
+/**
+ * It frees the memory allocated to the wallet
+ * 
+ * @param wallet the wallet to free
+ * 
+ * @return Nothing
+ */
 void dogecoin_wallet_free(dogecoin_wallet* wallet)
 {
     if (!wallet) {
@@ -315,6 +455,14 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     dogecoin_free(wallet); // free(wallet);
 }
 
+/**
+ * This function is called by the logdb when it is loading the database. 
+ * used to load the masterkey and the hdkeys.
+ * 
+ * @param ctx The wallet object.
+ * @param load_phase If true, this is the first time the wallet is being loaded.
+ * @param rec The record that was just read.
+ */
 void dogecoin_wallet_logdb_append_cb(void* ctx, logdb_bool load_phase, logdb_record* rec)
 {
    dogecoin_wallet* wallet = (dogecoin_wallet*)ctx;
@@ -426,6 +574,18 @@ void dogecoin_wallet_logdb_append_cb(void* ctx, logdb_bool load_phase, logdb_rec
 //         *error = db_error;
 //         return false;
 
+/**
+ * Loads the wallet from the file
+ * 
+ * @param wallet the wallet to load
+ * @param file_path The path to the wallet file.
+ * @param error pointer to an int, which will be set to 0 if the function succeeds, or non-zero if it
+ * fails.
+ * @param created a pointer to a boolean that will be set to true if the file was created, false if it
+ * already existed.
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_path, int *error, dogecoin_bool *created)
 {
     (void)(error);
@@ -528,12 +688,27 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
     return true;
 }
 
+/**
+ * Flush the database to disk
+ * 
+ * @param wallet the wallet to flush
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet)
 {
     dogecoin_file_commit(wallet->dbfile);
     return true; // return logdb_flush(wallet->db);
 }
 
+/**
+ * The function takes a dogecoin_hdnode and stores it in the wallet database
+ * 
+ * @param wallet the wallet to set the master key for
+ * @param masterkey The master key to use.
+ * 
+ * @return Nothing.
+ */
 void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, dogecoin_hdnode* masterkey)
 {
     if (!masterkey) {
@@ -573,6 +748,18 @@ void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, dogecoin_hdnod
     dogecoin_file_commit(wallet->dbfile);
 }
 
+/**
+ * The function takes a wallet and a child index, and returns a dogecoin_wallet_hdnode object. The
+ * function then creates a new dogecoin_wallet_hdnode object, copies the masterkey into it, and then
+ * calls dogecoin_hdnode_private_ckd() to generate the child key. The function then generates the
+ * public key hash from the child key, and then adds the new dogecoin_wallet_hdnode object to the
+ * binary tree. The function then serializes the new dogecoin_wallet_hdnode object and writes it to the
+ * database file. The function then returns the new dogecoin_wallet_hdnode object
+ * 
+ * @param wallet the wallet object
+ * 
+ * @return A dogecoin_wallet_hdnode object.
+ */
 dogecoin_wallet_hdnode* dogecoin_wallet_next_key(dogecoin_wallet* wallet)
 {
     if (!wallet || !wallet->masterkey)
@@ -607,6 +794,14 @@ dogecoin_wallet_hdnode* dogecoin_wallet_next_key(dogecoin_wallet* wallet)
     return whdnode;
 }
 
+/**
+ * Given a dogecoin_wallet, return a vector of addresses
+ * 
+ * @param wallet the wallet to get addresses from
+ * @param addr_out The vector to store the addresses in.
+ * 
+ * @return A vector of strings.
+ */
 void dogecoin_wallet_get_addresses(dogecoin_wallet* wallet, vector* addr_out)
 {
     rb_red_blk_node* hdkey_rbtree_node;
@@ -627,6 +822,14 @@ void dogecoin_wallet_get_addresses(dogecoin_wallet* wallet, vector* addr_out)
     }
 }
 
+/**
+ * Given a wallet and a public key hash, find the corresponding HD node
+ * 
+ * @param wallet the wallet to search
+ * @param search_addr the address to search for
+ * 
+ * @return A pointer to the dogecoin_hdnode.
+ */
 dogecoin_wallet_hdnode* dogecoin_wallet_find_hdnode_byaddr(dogecoin_wallet* wallet, const char* search_addr) // dogecoin_hdnode * 
 {
     if (!wallet || !search_addr)
@@ -664,6 +867,14 @@ dogecoin_wallet_hdnode* dogecoin_wallet_find_hdnode_byaddr(dogecoin_wallet* wall
     return needle;
 }
 
+/**
+ * Adds a transaction to the wallet
+ * 
+ * @param wallet the wallet to add the wtx to
+ * @param wtx the wtx to add
+ * 
+ * @return Nothing.
+ */
 dogecoin_bool dogecoin_wallet_add_wtx_move(dogecoin_wallet* wallet, dogecoin_wtx* wtx) // dogecoin_wallet_add_wtx
 {
     if (!wallet || !wtx)
@@ -704,6 +915,17 @@ dogecoin_bool dogecoin_wallet_add_wtx_move(dogecoin_wallet* wallet, dogecoin_wtx
     return true;
 }
 
+/**
+ * "Check if the wallet has the private key for the given public key hash."
+ * 
+ * The function is pretty simple. It first checks if the wallet has been initialized. If not, it
+ * returns false
+ * 
+ * @param wallet the wallet to search
+ * @param hash160 The hash160 of the public key.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool dogecoin_wallet_have_key(dogecoin_wallet* wallet, uint160 hash160) // uint8_t *hash160
 {
     if (!wallet)
@@ -730,6 +952,16 @@ dogecoin_bool dogecoin_wallet_have_key(dogecoin_wallet* wallet, uint160 hash160)
     // return false;
 }
 
+/**
+ * "Get the balance of the wallet."
+ * 
+ * The function is pretty simple. It iterates over the rbtree of wtxes, and adds up the credit of each
+ * wtx
+ * 
+ * @param wallet the wallet to get the balance for
+ * 
+ * @return The balance of the wallet.
+ */
 int64_t dogecoin_wallet_get_balance(dogecoin_wallet* wallet)
 {
     rb_red_blk_node* hdkey_rbtree_node;
@@ -748,6 +980,14 @@ int64_t dogecoin_wallet_get_balance(dogecoin_wallet* wallet)
     return credit;
 }
 
+/**
+ * Given a transaction, return the amount of money that the transaction is sending to the wallet
+ * 
+ * @param wallet The wallet to check.
+ * @param wtx The transaction object.
+ * 
+ * @return The amount of coins that are being spent by this transaction.
+ */
 int64_t dogecoin_wallet_wtx_get_credit(dogecoin_wallet* wallet, dogecoin_wtx* wtx)
 {
     int64_t credit = 0;
@@ -774,6 +1014,15 @@ int64_t dogecoin_wallet_wtx_get_credit(dogecoin_wallet* wallet, dogecoin_wtx* wt
     return credit;
 }
 
+/**
+ * If the script_pubkey is a standard pay-to-pubkey-hash script, and the wallet has the private key for
+ * the corresponding pubkey, then the txout is yours
+ * 
+ * @param wallet the wallet to check
+ * @param tx_out The transaction output to check.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool dogecoin_wallet_txout_is_mine(dogecoin_wallet* wallet, dogecoin_tx_out* tx_out)
 {
     if (!wallet || !tx_out) return false;
@@ -797,6 +1046,14 @@ dogecoin_bool dogecoin_wallet_txout_is_mine(dogecoin_wallet* wallet, dogecoin_tx
     return ismine;
 }
 
+/**
+ * If the transaction has any outputs, check if any of them are ours
+ * 
+ * @param wallet The wallet to check.
+ * @param tx The transaction to check.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool dogecoin_wallet_is_mine(dogecoin_wallet* wallet, const dogecoin_tx *tx)
 {
     if (!wallet || !tx) return false;
@@ -811,6 +1068,14 @@ dogecoin_bool dogecoin_wallet_is_mine(dogecoin_wallet* wallet, const dogecoin_tx
     return false;
 }
 
+/**
+ * If the transaction input is in the wallet, return the debit value
+ * 
+ * @param wallet the wallet to search
+ * @param txin The transaction input to get the debit from.
+ * 
+ * @return The debit value of the transaction input.
+ */
 int64_t dogecoin_wallet_get_debit_txi(dogecoin_wallet *wallet, const dogecoin_tx_in *txin) {
     if (!wallet || !txin) return 0;
 
@@ -827,6 +1092,14 @@ int64_t dogecoin_wallet_get_debit_txi(dogecoin_wallet *wallet, const dogecoin_tx
     return 0;
 }
 
+/**
+ * Given a transaction, return the total amount of coins spent in the transaction
+ * 
+ * @param wallet the wallet to get the debit from
+ * @param tx The transaction to get the debit from.
+ * 
+ * @return The sum of the debit values of all the inputs of the transaction.
+ */
 int64_t dogecoin_wallet_get_debit_tx(dogecoin_wallet *wallet, const dogecoin_tx *tx) {
     int64_t debit = 0;
     if (tx->vin) {
@@ -840,11 +1113,30 @@ int64_t dogecoin_wallet_get_debit_tx(dogecoin_wallet *wallet, const dogecoin_tx 
     return debit;
 }
 
+/**
+ * "Is this transaction a debit transaction for this wallet?"
+ * 
+ * The function returns a boolean value. If the transaction is a debit transaction for this wallet, the
+ * function returns true. Otherwise, it returns false
+ * 
+ * @param wallet The wallet to check.
+ * @param tx The transaction to check.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool dogecoin_wallet_is_from_me(dogecoin_wallet *wallet, const dogecoin_tx *tx)
 {
     return (dogecoin_wallet_get_debit_tx(wallet, tx) > 0);
 }
 
+/**
+ * This function adds the outpoint of the transaction to the wallet's spent list
+ * 
+ * @param wallet the wallet to add the transaction to
+ * @param wtx The transaction to add to the spent list.
+ * 
+ * @return Nothing.
+ */
 void dogecoin_wallet_add_to_spent(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
     if (!wallet || !wtx)
         return;
@@ -864,6 +1156,17 @@ void dogecoin_wallet_add_to_spent(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
     }
 }
 
+/**
+ * "Check if the wallet has spent the given output."
+ * 
+ * The function takes a wallet and a hash of the output to check, and a number of the output to check
+ * 
+ * @param wallet the wallet to check
+ * @param hash The hash of the transaction that we are checking.
+ * @param n The number of the block that contains the transaction you want to know about.
+ * 
+ * @return A boolean value.
+ */
 dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256 hash, uint32_t n)
 {
     if (!wallet)
@@ -878,6 +1181,14 @@ dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256 hash, ui
     return false;
 }
 
+/**
+ * Get all unspent outputs from the wallet
+ * 
+ * @param wallet the wallet to get the unspent outputs from
+ * @param unspents vector of dogecoin_output
+ * 
+ * @return An array of dogecoin_output structs.
+ */
 dogecoin_bool dogecoin_wallet_get_unspent(dogecoin_wallet* wallet, vector* unspents)
 {
     (void)(wallet);
@@ -916,6 +1227,14 @@ dogecoin_bool dogecoin_wallet_get_unspent(dogecoin_wallet* wallet, vector* unspe
     return true;
 }
 
+/**
+ * If the transaction is relevant to the wallet, print a message
+ * 
+ * @param ctx The wallet context.
+ * @param tx The transaction to check.
+ * @param pos The transaction's position in the block.
+ * @param pindex The block index of the block containing the transaction.
+ */
 void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex) {
     (void)(pos);
     (void)(pindex);

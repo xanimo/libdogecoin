@@ -49,6 +49,15 @@
 #include <dogecoin/tool.h>
 #include <dogecoin/utils.h>
 
+/**
+ * Generate a new private key and public key pair
+ * 
+ * @param wif_privkey The private key in WIF format.
+ * @param p2pkh_pubkey The public key that will be used to generate a p2pkh address.
+ * @param is_testnet boolean, if true, use testnet parameters, otherwise use mainnet parameters
+ * 
+ * @return Nothing.
+ */
 int generatePrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet)
 {
     /* internal variables */
@@ -99,6 +108,16 @@ int generatePrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testne
     return true;
 }
 
+/**
+ * The function takes in a private key and returns a public key
+ * 
+ * @param wif_privkey_master The private key in WIF format.
+ * @param p2pkh_pubkey_master The public key of the master HD wallet.
+ * @param is_testnet If true, use the testnet chain parameters. If false, use the mainnet chain
+ * parameters.
+ * 
+ * @return Nothing.
+ */
 int generateHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet)
 {
     size_t strsize = 128;
@@ -135,6 +154,14 @@ int generateHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_mast
     return true;
 }
 
+/**
+ * The function takes a private key and returns the public key
+ * 
+ * @param wif_privkey_master The private key in WIF format.
+ * @param p2pkh_pubkey The public key in the format of a p2pkh address.
+ * 
+ * @return The public key hash of the derived HD public key.
+ */
 int generateDerivedHDPubkey(const char* wif_privkey_master, char* p2pkh_pubkey)
 {
     /* require master key */
@@ -172,6 +199,16 @@ int generateDerivedHDPubkey(const char* wif_privkey_master, char* p2pkh_pubkey)
     return true;
 }
 
+/**
+ * Verify that the provided private key is valid and that the public key derived from it matches the
+ * provided public key
+ * 
+ * @param wif_privkey The private key in WIF format.
+ * @param p2pkh_pubkey The public key you want to verify.
+ * @param is_testnet whether or not the testnet or mainnet parameters should be used.
+ * 
+ * @return Nothing.
+ */
 int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet) {
     /* require both private and public key */
     if (!wif_privkey || !p2pkh_pubkey) return 0;
@@ -206,6 +243,15 @@ int verifyPrivPubKeypair(char* wif_privkey, char* p2pkh_pubkey, bool is_testnet)
     return true;
 }
 
+/**
+ * The function verifies that the given private key is a valid private key for the given public key
+ * 
+ * @param wif_privkey_master The private key in WIF format.
+ * @param p2pkh_pubkey_master The public key of the master node.
+ * @param is_testnet whether the network is testnet or mainnet
+ * 
+ * @return true if the public key derived from the private key matches the public key given.
+ */
 int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet) {
     /* require both private and public key */
     if (!wif_privkey_master || !p2pkh_pubkey_master) return false;
