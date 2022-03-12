@@ -34,12 +34,12 @@
 #define __LIBDOGECOIN_CRYPTO_SHA2_H__
 #define __SHA2_H__
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include <dogecoin/dogecoin.h>
 
 LIBDOGECOIN_BEGIN_DECL
+
+#include <stddef.h>
+#include <stdint.h>
 
 #define SHA256_BLOCK_LENGTH 64
 #define SHA256_DIGEST_LENGTH 32

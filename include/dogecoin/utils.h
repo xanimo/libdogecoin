@@ -72,7 +72,7 @@ static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *))
 {
     struct dogecoin_btree_node *r = (struct dogecoin_btree_node*)root;
 
-    if (r == 0)
+    if (r == 0 || (uintptr_t) r == 1)
         return;
     if (freekey) goto end;
     dogecoin_btree_tdestroy(r->left, freekey);

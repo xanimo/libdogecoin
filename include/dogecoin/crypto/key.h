@@ -29,10 +29,11 @@
 #ifndef __LIBDOGECOIN_CRYPTO_KEY_H__
 #define __LIBDOGECOIN_CRYPTO_KEY_H__
 
-#include <dogecoin/chainparams.h>
 #include <dogecoin/dogecoin.h>
 
 LIBDOGECOIN_BEGIN_DECL
+
+#include <dogecoin/chainparams.h>
 
 typedef struct dogecoin_key_ {
     uint8_t privkey[DOGECOIN_ECKEY_PKEY_LENGTH];

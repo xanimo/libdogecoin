@@ -265,7 +265,8 @@ int main(int argc, char* argv[])
         uint64_t to = 0;
 
         static char digits[] = "0123456789";
-        for (unsigned int i = 0; i<strlen(keypath); i++) {
+        unsigned int i;
+        for (i = 0; i<strlen(keypath); i++) {
             if (i > maxlen) {
                 break;
             }
@@ -307,7 +308,8 @@ int main(int argc, char* argv[])
         }
 
         if (end > -1 && from <= to) {
-            for (uint64_t i = from; i <= to; i++) {
+            uint64_t i;
+            for (i = from; i <= to; i++) {
                 char keypathnew[strlen(keypath)+16];
                 memcpy(keypathnew, keypath, posanum-1);
                 char index[9] = {0};
@@ -381,8 +383,7 @@ int main(int argc, char* argv[])
         dogecoin_privkey_init(&key);
         if (dogecoin_privkey_decode_wif(pkey, chain, &key)) {
             sign = true;
-        }
-        else {
+        } else {
             if (strlen(pkey) > 50) {
                 dogecoin_tx_free(tx);
                 cstr_free(script, true);

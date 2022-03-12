@@ -29,13 +29,14 @@
 #ifndef __LIBDOGECOIN_CRYPTO_HASH_H__
 #define __LIBDOGECOIN_CRYPTO_HASH_H__
 
-#include <dogecoin/crypto/sha2.h>
-#include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
-#include <dogecoin/mem.h>
-#include <dogecoin/vector.h>
 
 LIBDOGECOIN_BEGIN_DECL
+
+#include <dogecoin/crypto/sha2.h>
+#include <dogecoin/cstr.h>
+#include <dogecoin/mem.h>
+#include <dogecoin/vector.h>
 
 /**
  * Given a hash, return true if the hash is empty

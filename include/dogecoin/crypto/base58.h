@@ -26,12 +26,12 @@
 #ifndef __LIBDOGECOIN_CRYPTO_BASE58_H__
 #define __LIBDOGECOIN_CRYPTO_BASE58_H__
 
-#include <stdint.h>
-
 #include <dogecoin/dogecoin.h>
-#include <dogecoin/chainparams.h>
 
 LIBDOGECOIN_BEGIN_DECL
+
+#include <stdint.h>
+#include <dogecoin/chainparams.h>
 
 LIBDOGECOIN_API int dogecoin_base58_encode_check(const uint8_t* data, int len, char* str, int base58_length);
 LIBDOGECOIN_API int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen);

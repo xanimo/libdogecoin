@@ -11,6 +11,8 @@
 #ifndef __LIBDOGECOIN_COMPAT_PORTABLE_ENDIAN_H__
 #define __LIBDOGECOIN_COMPAT_PORTABLE_ENDIAN_H__
 
+#include <dogecoin/dogecoin.h>
+
 LIBDOGECOIN_BEGIN_DECL
 
 #if defined(HAVE_CONFIG_H)

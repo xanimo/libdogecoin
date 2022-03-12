@@ -36,6 +36,7 @@
 #include "libdogecoin-config.h"
 
 #include <dogecoin/chainparams.h>
+#include <dogecoin/crypto/base58.h>
 #include <dogecoin/crypto/ecc.h>
 #include <dogecoin/net/net.h>
 #include <dogecoin/net/spv.h>
@@ -218,16 +219,17 @@ int main(int argc, char* argv[]) {
             // TODO
             }
         /* Creating a new key and setting it as the master key. */
-        dogecoin_wallet_hdnode* node = dogecoin_wallet_next_key(wallet);
+        dogecoin_wallet_addr* waddr = dogecoin_wallet_next_addr(wallet);
         size_t strsize = 128;
         char str[strsize];
-        dogecoin_hdnode_get_p2pkh_address(node->hdnode, chain, str, strsize);
-        printf("Wallet addr: %s (child %d)\n", str, node->hdnode->child_num);
+        dogecoin_p2wpkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, str);
+        printf("Wallet addr: %s (child %d)\n", str, waddr->childindex);
 
         /* Creating a vector of addresses and storing them in the wallet. */
         vector* addrs = vector_new(1, free);
         dogecoin_wallet_get_addresses(wallet, addrs);
-        for (unsigned int i = 0; i < addrs->len; i++) {
+        unsigned int i;
+        for (i = 0; i < addrs->len; i++) {
             char* addr = vector_idx(addrs, i);
             printf("Addr: %s\n", addr);
             }

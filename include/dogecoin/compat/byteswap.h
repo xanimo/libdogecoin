@@ -7,6 +7,8 @@
 #ifndef __LIBDOGECOIN_COMPAT_BYTESWAP_H__
 #define __LIBDOGECOIN_COMPAT_BYTESWAP_H__
 
+#include <dogecoin/dogecoin.h>
+
 LIBDOGECOIN_BEGIN_DECL
 
 #if defined(HAVE_CONFIG_H)
@@ -46,7 +48,7 @@ LIBDOGECOIN_BEGIN_DECL
  * 
  * @return the value of the 16-bit number x after swapping the two bytes.
  */
-LIBDOGECOIN_API inline uint16_t bswap_16(uint16_t x)
+LIBDOGECOIN_API static inline uint16_t bswap_16(uint16_t x)
 {
     return (x >> 8) | ((x & 0x00ff) << 8);
 }
@@ -60,7 +62,7 @@ LIBDOGECOIN_API inline uint16_t bswap_16(uint16_t x)
  * 
  * @return the 32-bit value with the bytes in the reverse order.
  */
-LIBDOGECOIN_API inline uint32_t bswap_32(uint32_t x)
+LIBDOGECOIN_API static inline uint32_t bswap_32(uint32_t x)
 {
     return (((x & 0xff000000U) >> 24) | ((x & 0x00ff0000U) >> 8) |
             ((x & 0x0000ff00U) << 8) | ((x & 0x000000ffU) << 24));
@@ -75,7 +77,7 @@ LIBDOGECOIN_API inline uint32_t bswap_32(uint32_t x)
  * 
  * @return the 64-bit integer x with its bytes in reverse order.
  */
-LIBDOGECOIN_API inline uint64_t bswap_64(uint64_t x)
+LIBDOGECOIN_API static inline uint64_t bswap_64(uint64_t x)
 {
      return (((x & 0xff00000000000000ull) >> 56)
           | ((x & 0x00ff000000000000ull) >> 40)

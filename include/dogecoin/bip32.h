@@ -28,15 +28,16 @@
 #ifndef __LIBDOGECOIN_BIP32_H__
 #define __LIBDOGECOIN_BIP32_H__
 
+#include <dogecoin/dogecoin.h>
+
+LIBDOGECOIN_BEGIN_DECL
+
 #include <stdint.h>
 
 #include <dogecoin/chainparams.h>
-#include <dogecoin/dogecoin.h>
 
 /* Defining the size of the chaincode in bytes. */
 #define DOGECOIN_BIP32_CHAINCODE_SIZE 32
-
-LIBDOGECOIN_BEGIN_DECL
 
 /**
  * An HD wallet is a tree of nodes, each node has a depth, fingerprint, child number, chain code, and a

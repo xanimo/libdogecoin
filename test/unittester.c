@@ -68,8 +68,9 @@ extern void test_vector();
 extern void test_red_black_tree();
 extern void test_logdb_memdb();
 extern void test_logdb_rbtree();
-
 extern void test_logdb();
+
+extern void test_wallet_basics();
 extern void test_wallet();
 #endif
 
@@ -78,9 +79,9 @@ extern void test_tool();
 #endif
 
 #ifdef WITH_NET
-extern void test_netspv();
 extern void test_net_basics_plus_download_block();
 extern void test_protocol();
+extern void test_netspv();
 #endif
 
 extern void dogecoin_ecc_start();
@@ -123,20 +124,21 @@ int main()
     u_run_test(test_vector);
 
 #ifdef WITH_WALLET
+    u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
-    // u_run_test(test_red_black_tree);
-    // u_run_test(test_logdb_memdb);
-    // u_run_test(test_logdb_rbtree);
+    u_run_test(test_red_black_tree);
+    u_run_test(test_logdb_memdb);
+    u_run_test(test_logdb_rbtree);
 #endif
 
 #ifdef WITH_TOOLS
-    // u_run_test(test_tool);
+    u_run_test(test_tool);
 #endif
 
 #ifdef WITH_NET
+    u_run_test(test_net_basics_plus_download_block);
+    u_run_test(test_protocol);
     u_run_test(test_netspv);
-    // u_run_test(test_protocol);
-    // u_run_test(test_net_basics_plus_download_block);
 #endif
 
     dogecoin_ecc_stop();

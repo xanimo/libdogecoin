@@ -30,12 +30,13 @@
 #define __LIBDOGECOIN_NET_SPV_H__
 
 #include <dogecoin/dogecoin.h>
+
+LIBDOGECOIN_BEGIN_DECL
+
 #include <dogecoin/blockchain.h>
 #include <dogecoin/headersdb.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/net/net.h>
-
-LIBDOGECOIN_BEGIN_DECL
 
 enum SPV_CLIENT_STATE {
     SPV_HEADER_SYNC_FLAG        = (1 << 0),
