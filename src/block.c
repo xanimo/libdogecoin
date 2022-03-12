@@ -32,7 +32,7 @@
 #include <string.h>
 
 #include <dogecoin/block.h>
-
+#include <dogecoin/net/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/crypto/sha2.h>
 #include <dogecoin/utils.h>
@@ -86,7 +86,7 @@ int dogecoin_get_block_header_version(struct const_buffer* buffer) {
     int32_t version;
     if (!deser_s32(&version, buffer))
         return false;
-    printf("version: %d\n", version);
+    // printf("version: %d\n", version);
     return true;
 }
 
@@ -94,28 +94,25 @@ int dogecoin_get_block_header_prev_block(struct const_buffer* buffer) {
     uint256 prev_block;
     if (!deser_u256(prev_block, buffer))
         return false;
-    printf("prev_block: %s\n", prev_block);
+    // printf("prev_block: %s\n", prev_block);
     return true;
 }
-
 
 int dogecoin_get_block_header_merkle_root(struct const_buffer* buffer) {
     uint256 merkle_root;
     if (!deser_u256(merkle_root, buffer))
         return false;
-    printf("merkle_root: %s\n", merkle_root);
+    // printf("merkle_root: %s\n", merkle_root);
     return true;
 }
-
 
 int dogecoin_get_block_header_timestamp(struct const_buffer* buffer) {
     uint32_t timestamp;
     if (!deser_u32(&timestamp, buffer))
         return false;
-    printf("timestamp: %u\n", timestamp);
+    // printf("timestamp: %u\n", timestamp);
     return true;
 }
-
 
 int dogecoin_get_block_header_bits(struct const_buffer* buffer) {
     int32_t version;
@@ -125,7 +122,6 @@ int dogecoin_get_block_header_bits(struct const_buffer* buffer) {
     return true;
 }
 
-
 int dogecoin_get_block_header_nonce(struct const_buffer* buffer) {
     int32_t version;
     if (!deser_s32(&version, buffer))
@@ -134,69 +130,61 @@ int dogecoin_get_block_header_nonce(struct const_buffer* buffer) {
     return true;
 }
 
-
 int dogecoin_get_block_header_coinbase_txn(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t coinbase_txn;
+    if (!deser_s32(&coinbase_txn, buffer))
         return false;
-    printf("dogecoin_tx_is_coinbaseversion: %d\n", version);
+    printf("dogecoin_tx_is_coinbaseversion: %d\n", coinbase_txn);
     return true;
 }
-
 
 int dogecoin_get_block_header_block_hash(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t block_hash;
+    if (!deser_s32(&block_hash, buffer))
         return false;
-    printf("version: %d\n", version);
+    printf("block_hash: %d\n", block_hash);
     return true;
 }
-
 
 int dogecoin_get_block_header_coinbase_branch(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t coinbase_branch;
+    if (!deser_s32(&coinbase_branch, buffer))
         return false;
-    printf("version: %d\n", version);
+    printf("coinbase_branch: %d\n", coinbase_branch);
     return true;
 }
-
 
 int dogecoin_get_block_header_blockchain_branch(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t blockchain_branch;
+    if (!deser_s32(&blockchain_branch, buffer))
         return false;
-    printf("version: %d\n", version);
+    printf("blockchain_branch: %d\n", blockchain_branch);
     return true;
 }
-
 
 int dogecoin_get_block_header_parent_block(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t parent_block;
+    if (!deser_s32(&parent_block, buffer))
         return false;
-    printf("version: %d\n", version);
+    printf("parent_block: %d\n", parent_block);
     return true;
 }
-
 
 int dogecoin_get_block_header_txn_count(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t txn_count;
+    if (!deser_s32(&txn_count, buffer))
         return false;
-    printf("version: %d\n", version);
+    printf("txn_count: %d\n", txn_count);
     return true;
 }
-
 
 int dogecoin_get_block_header_txns(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+    int32_t txns;
+    if (!deser_s32(&txns, buffer))
         return false;
-    printf("version: %d\n", version);
+    printf("txns: %d\n", txns);
     return true;
 }
-
 
 /**
  * It deserializes a block header from a buffer
@@ -207,29 +195,10 @@ int dogecoin_get_block_header_txns(struct const_buffer* buffer) {
  * @return Nothing.
  */
 int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf) {
-    
-    if (header->nonce == 0 && header->version >= 6422786) {
-        // if (!deser_s32(&header->aux_data.parent_coinbase, buf))
-        //     return false;
-        // if (!deser_u256(header->aux_data.parent_hash, buf))
-        //     return false;
-        // if (!deser_u256(header->aux_data.coinbase_branch, buf))
-        //     return false;
-        // if (!deser_u32(&header->aux_data.blockchain_branch, buf))
-        //     return false;
-        // if (!deser_u32(&header->aux_data.parent_block, buf))
-        //     return false;
-        // printf("buf length: %d\n", buf->len);
-        // printf("header nonce: %d %d\n", header->nonce, 6422786);
-        // printf("version: %x\n", header->version);
-        // printf("previous block hash: %u\n", header->prev_block);
-        // printf("merkle_root: %x\n", header->merkle_root);
-        // printf("header.timestamp: %u\n", header->timestamp);
-        // printf("header.bits: %u\n", header->bits);
-        // printf("header.nonce: %u\n", header->nonce);
-        // printf("header.nonce: %u\n", header->aux_data);
+    if (header->nonce == 0 && &header->version >= 0x00620102) {
+        // printBits(buf->len, buf->p);
+        // printf("auxpow_block_header }:P\n");
     }
-    // printBits(buf->len, buf->p);
     if (!deser_s32(&header->version, buf))
         return false;
     if (!deser_u256(header->prev_block, buf))
@@ -243,6 +212,41 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     if (!deser_u32(&header->nonce, buf))
         return false;
     return true;
+}
+
+int deser_merkle_branch(merkle_branch* mb, struct const_buffer* buffer) {
+    if (!deser_u256(mb->hashes[sizeof(mb)], buffer)) {
+        return false;
+    }
+}
+
+int deserialize_auxpow_block_header(auxpow_block_header* hdr, struct const_buffer* buffer) {
+    if (buffer == NULL || buffer->len == 0 || buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
+        return printf("Transaction in invalid or to large.\n");
+    }
+    uint8_t* data_bin = dogecoin_malloc(buffer->len / 2 + 1);
+    int outlen = 0;
+    utils_hex_to_bin(buffer->p, data_bin, buffer->len, &outlen);
+
+    dogecoin_tx* tx = dogecoin_tx_new();
+    if (!dogecoin_tx_deserialize(data_bin, outlen, &hdr->parent_coinbase, NULL, false)) {
+        printf("Transaction is invalid\n");
+    }
+    dogecoin_free(data_bin);
+    dogecoin_tx_free(tx);
+
+    if (!deser_u256(hdr->parent_hash, buffer)) {
+        return false;
+    }
+    if (!deser_u256(hdr->parent_hash, buffer)) {
+        return false;
+    }
+    if (!deser_u256(hdr->blockchain_branch, buffer)) {
+        return false;
+    }
+    if (!dogecoin_block_header_deserialize(&hdr->parent_header, buffer)) {
+        return false;
+    }
 }
 
 /**
@@ -285,20 +289,10 @@ void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_bloc
  */
 dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256 hash) {
     cstring* s = cstr_new_sz(80);
-
-    // printf("version: %u\n", header->version);
-    // printf("previous block hash: %u\n", header->prev_block);
-    // printf("merkle_root: %u\n", header->merkle_root);
-    // printf("header.timestamp: %u\n", header->timestamp);
-    // printf("header.bits: %u\n", header->bits);
-    // printf("header.nonce: %u\n", header->nonce);
     dogecoin_block_header_serialize(s, header);
-    // printf("string %s\n", s->str);
     sha256_raw((const uint8_t*)s->str, s->len, hash);
-    // printf("string %s\n", s->str);
     sha256_raw(hash, SHA256_DIGEST_LENGTH, hash);
     cstr_free(s, true);
-    // printf("hash:  %s\n", hash);
     dogecoin_bool ret = true;
     return ret;
 }

@@ -38,9 +38,6 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/**
- * A dogecoin block header is a struct with 5 fields.
- */
 typedef struct dogecoin_block_header_ {
     int32_t version;
     uint256 prev_block;
@@ -50,20 +47,24 @@ typedef struct dogecoin_block_header_ {
     uint32_t nonce;
 } dogecoin_block_header;
 
-// const int vAuxPow = 0x0100;
+typedef struct merkle_branch_ {
+    uint256 hashes;
+    uint32_t sidemask;
+} merkle_branch;
 
 typedef struct auxpow_block_header_ {
     dogecoin_tx parent_coinbase;
     uint256 parent_hash;
     uint256 coinbase_branch;
     uint256 blockchain_branch;
-    dogecoin_block_header parent_block;
+    dogecoin_block_header parent_header;
 } auxpow_block_header;
 
-typedef struct dogecoin_auxpow_block_header_ {
+typedef struct auxpow_block_ {
     dogecoin_block_header block_header;
     auxpow_block_header aux_data;
-} dogecoin_auxpow_block_header;
+    dogecoin_tx txns[];
+} auxpow_block;
 
 /* Creating a new block header object. */
 LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
