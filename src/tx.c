@@ -621,6 +621,7 @@ void dogecoin_tx_sequence_hash(const dogecoin_tx* tx, uint256 hash)
  */
 void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256 hash)
 {
+    if (!tx->vout || !hash) return;
     cstring* s = cstr_new_sz(512);
     size_t i, len = tx->vout->len;
     dogecoin_tx_out* tx_out;
@@ -653,7 +654,7 @@ void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256 hash)
 dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromPubKey, unsigned int in_num, int hashtype, const uint64_t amount, const enum dogecoin_sig_version sigversion, uint256 hash)
 {
     /* Checking if the input number is greater than the number of inputs. */
-    if (in_num >= tx_to->vin->len) {
+    if (in_num >= tx_to->vin->len || !tx_to->vout) {
         return false;
     }
 
