@@ -54,7 +54,7 @@ void dogecoin_tx_in_free(dogecoin_tx_in* tx_in)
     if (!tx_in)
         return;
 
-    memset(&tx_in->prevout.hash, 0, sizeof(tx_in->prevout.hash));
+    dogecoin_mem_zero(&tx_in->prevout.hash, sizeof(tx_in->prevout.hash));
     tx_in->prevout.n = 0;
 
     if (tx_in->script_sig) {
@@ -67,7 +67,7 @@ void dogecoin_tx_in_free(dogecoin_tx_in* tx_in)
         tx_in->witness_stack = NULL;
     }
 
-    memset(tx_in, 0, sizeof(*tx_in));
+    dogecoin_mem_zero(tx_in, sizeof(*tx_in));
     dogecoin_free(tx_in);
 }
 
@@ -115,7 +115,7 @@ dogecoin_tx_in* dogecoin_tx_in_new()
 {
     dogecoin_tx_in* tx_in;
     tx_in = dogecoin_calloc(1, sizeof(*tx_in));
-    memset(&tx_in->prevout, 0, sizeof(tx_in->prevout));
+    dogecoin_mem_zero(&tx_in->prevout, sizeof(tx_in->prevout));
     tx_in->sequence = UINT32_MAX;
     tx_in->witness_stack = vector_new(8, dogecoin_tx_in_witness_stack_free_cb);
     return tx_in;
@@ -140,7 +140,7 @@ void dogecoin_tx_out_free(dogecoin_tx_out* tx_out)
         tx_out->script_pubkey = NULL;
     }
 
-    memset(tx_out, 0, sizeof(*tx_out));
+    dogecoin_mem_zero(tx_out, sizeof(*tx_out));
     dogecoin_free(tx_out);
 }
 
@@ -1239,7 +1239,7 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 
     /* Signing the transaction. */
     uint256 sighash;
-    memset(sighash, 0, sizeof(sighash));
+    dogecoin_mem_zero(sighash, sizeof(sighash));
     /* Checking if the signature is valid. */
     if (!dogecoin_tx_sighash(tx_in_out, script_sign, inputindex, sighashtype, amount, sig_version, sighash)) {
         cstr_free(witness_set_scriptsig, true);

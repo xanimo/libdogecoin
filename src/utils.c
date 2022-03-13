@@ -78,8 +78,8 @@ static char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
  */
 void utils_clear_buffers(void)
 {
-    memset(buffer_hex_to_uint8, 0, TO_UINT8_HEX_BUF_LEN);
-    memset(buffer_uint8_to_hex, 0, TO_UINT8_HEX_BUF_LEN);
+    dogecoin_mem_zero(buffer_hex_to_uint8, TO_UINT8_HEX_BUF_LEN);
+    dogecoin_mem_zero(buffer_uint8_to_hex, TO_UINT8_HEX_BUF_LEN);
 }
 
 /**
@@ -94,7 +94,7 @@ void utils_hex_to_bin(const char* str, unsigned char* out, int inLen, int* outLe
 {
     int bLen = inLen / 2;
     int i;
-    memset(out, 0, bLen);
+    dogecoin_mem_zero(out, bLen);
     for (i = 0; i < bLen; i++) {
         if (str[i * 2] >= '0' && str[i * 2] <= '9') {
             *out = (str[i * 2] - '0') << 4;
@@ -133,7 +133,7 @@ uint8_t* utils_hex_to_uint8(const char* str)
     if (strlens(str) > TO_UINT8_HEX_BUF_LEN) {
         return NULL;
     }
-    memset(buffer_hex_to_uint8, 0, TO_UINT8_HEX_BUF_LEN);
+    dogecoin_mem_zero(buffer_hex_to_uint8, TO_UINT8_HEX_BUF_LEN);
     for (i = 0; i < strlens(str) / 2; i++) {
         c = 0;
         if (str[i * 2] >= '0' && str[i * 2] <= '9') {
@@ -192,7 +192,7 @@ char* utils_uint8_to_hex(const uint8_t* bin, size_t l)
     if (l > (TO_UINT8_HEX_BUF_LEN / 2 - 1)) {
         return NULL;
     }
-    memset(buffer_uint8_to_hex, 0, TO_UINT8_HEX_BUF_LEN);
+    dogecoin_mem_zero(buffer_uint8_to_hex, TO_UINT8_HEX_BUF_LEN);
     for (i = 0; i < l; i++) {
         buffer_uint8_to_hex[i * 2] = digits[(bin[i] >> 4) & 0xF];
         buffer_uint8_to_hex[i * 2 + 1] = digits[bin[i] & 0xF];
@@ -259,7 +259,7 @@ signed char utils_hex_digit(char c)
  */
 void utils_uint256_sethex(char* psz, uint8_t* out)
 {
-    memset(out, 0, sizeof(uint256));
+    dogecoin_mem_zero(out, sizeof(uint256));
 
     // skip leading spaces
     while (isspace(*psz)) {

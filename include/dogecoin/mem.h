@@ -33,6 +33,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+typedef int errno_t;
+typedef size_t rsize_t;
+#define RSIZE_MAX (SIZE_MAX >> 1)
 /**
  * It's a struct that has pointers to functions that do the actual memory management.
  */
@@ -58,6 +61,7 @@ LIBDOGECOIN_API void* dogecoin_realloc(void* ptr, size_t size);
 /* It's a macro that calls the function pointer that is set by `dogecoin_mem_set_mapper`. */
 LIBDOGECOIN_API void dogecoin_free(void* ptr);
 
+LIBDOGECOIN_API errno_t memset_s(volatile void *v, rsize_t smax, int c, rsize_t n);
 /* It's a macro that calls the function pointer that is set by `dogecoin_mem_set_mapper`. */
 LIBDOGECOIN_API volatile void* dogecoin_mem_zero(volatile void* dst, size_t len);
 

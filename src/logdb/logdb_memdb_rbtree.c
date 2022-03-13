@@ -35,6 +35,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <dogecoin/utils.h>
+
 /**
  * The function is called by the rbtree_free_key function
  * 
@@ -123,7 +125,7 @@ void logdb_rbtree_free(void *ctx)
 
     RBTreeDestroy(handle->tree);
 
-    memset(handle, 0, sizeof(*handle));
+    dogecoin_mem_zero(handle, sizeof(*handle));
     free(handle);
 }
 

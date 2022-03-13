@@ -58,8 +58,8 @@ dogecoin_block_header* dogecoin_block_header_new() {
 void dogecoin_block_header_free(dogecoin_block_header* header) {
     if (!header) return;
     header->version = 1;
-    memset(&header->prev_block, 0, DOGECOIN_HASH_LENGTH);
-    memset(&header->merkle_root, 0, DOGECOIN_HASH_LENGTH);
+    dogecoin_mem_zero(&header->prev_block, DOGECOIN_HASH_LENGTH);
+    dogecoin_mem_zero(&header->merkle_root, DOGECOIN_HASH_LENGTH);
     header->bits = 0;
     header->timestamp = 0;
     header->nonce = 0;

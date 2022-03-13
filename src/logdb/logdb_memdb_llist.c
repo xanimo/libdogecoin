@@ -34,6 +34,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <dogecoin/utils.h>
+
 /**
  * Create a new logdb_llist_db handle
  * 
@@ -71,7 +73,7 @@ void logdb_llist_db_free(void *ctx)
         rec = prev_rec;
     }
 
-    memset(handle, 0, sizeof(*handle));
+    dogecoin_mem_zero(handle, sizeof(*handle));
     free(handle);
 }
 

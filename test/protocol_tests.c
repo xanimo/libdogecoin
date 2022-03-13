@@ -23,8 +23,8 @@ void test_protocol()
     cstring *inv_msg_cstr = cstr_new_sz(256);
 
     struct sockaddr_in test_sa, test_sa_check;
-    memset(&test_sa, 0, sizeof(test_sa));
-    memset(&test_sa_check, 0, sizeof(test_sa_check));
+    dogecoin_mem_zero(&test_sa, sizeof(test_sa));
+    dogecoin_mem_zero(&test_sa_check, sizeof(test_sa_check));
     test_sa.sin_family = AF_INET;
     struct sockaddr_in6 test_sa6, test_sa6_check;
     test_sa6.sin6_family = AF_INET6;
@@ -32,14 +32,14 @@ void test_protocol()
     evutil_inet_pton(AF_INET, "10.0.0.1", &test_sa.sin_addr); // store IP in antelope
 
     char i6buf[1024];
-    memset(&i6buf, 0, 1024);
+    dogecoin_mem_zero(&i6buf, 1024);
 
     evutil_inet_pton(AF_INET6, "::1", &test_sa6.sin6_addr);
     dogecoin_p2p_address ipv6Test;
     dogecoin_p2p_address_init(&ipv6Test);
     dogecoin_addr_to_p2paddr((struct sockaddr *)&test_sa6, &ipv6Test);
     dogecoin_p2paddr_to_addr(&ipv6Test, (struct sockaddr *)&test_sa6_check);
-    memset(&i6buf, 0, 1024);
+    dogecoin_mem_zero(&i6buf, 1024);
     u_assert_int_eq(test_sa6.sin6_port, test_sa6_check.sin6_port);
 
     /* copy socket_addr to p2p addr */
@@ -55,7 +55,7 @@ void test_protocol()
 
     /* create a inv message struct */
     dogecoin_p2p_inv_msg inv_msg, inv_msg_check;
-    memset(&inv_msg, 0, sizeof(inv_msg));
+    dogecoin_mem_zero(&inv_msg, sizeof(inv_msg));
 
     uint256 hash = {0};
 
@@ -70,7 +70,7 @@ void test_protocol()
 
     /* create a version message struct */
     dogecoin_p2p_version_msg version_msg;
-    memset(&version_msg, 0, sizeof(version_msg));
+    dogecoin_mem_zero(&version_msg, sizeof(version_msg));
 
     /* create a serialized version message */
     dogecoin_p2p_msg_version_init(&version_msg, &fromAddr, &toAddr, "client", false);

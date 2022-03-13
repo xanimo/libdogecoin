@@ -215,7 +215,7 @@ void broadcast_handshake_done(struct dogecoin_node_* node) {
     /* create a INV */
     cstring* inv_msg_cstr = cstr_new_sz(256);
     dogecoin_p2p_inv_msg inv_msg;
-    memset(&inv_msg, 0, sizeof(inv_msg));
+    dogecoin_mem_zero(&inv_msg, sizeof(inv_msg));
 
     uint256 hash;
     dogecoin_tx_hash(ctx->tx, hash);
@@ -301,7 +301,7 @@ void broadcast_post_cmd(struct dogecoin_node_* node, dogecoin_p2p_msg_hdr* hdr, 
         }
 
         dogecoin_p2p_inv_msg inv_msg;
-        memset(&inv_msg, 0, sizeof(inv_msg));
+        dogecoin_mem_zero(&inv_msg, sizeof(inv_msg));
         if (!dogecoin_p2p_msg_inv_deser(&inv_msg, buf) || inv_msg.type != DOGECOIN_INV_TYPE_TX) {
             dogecoin_node_misbehave(node);
             return;

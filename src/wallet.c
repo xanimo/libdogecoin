@@ -198,7 +198,7 @@ dogecoin_wallet_addr* dogecoin_wallet_addr_new()
 {
     dogecoin_wallet_addr* waddr;
     waddr = dogecoin_calloc(1, sizeof(*waddr));
-    memset(waddr->pubkeyhash, 1, sizeof(waddr->pubkeyhash));
+    memset_s(waddr->pubkeyhash, 1, sizeof(waddr->pubkeyhash), 1);
     return waddr;
 }
 void dogecoin_wallet_addr_free(dogecoin_wallet_addr* waddr)
@@ -412,8 +412,8 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 uint32_t len;
                 char strbuf[196];
                 char strbuf_check[196];
-                memset(strbuf, 0, sizeof(strbuf));
-                memset(strbuf_check, 0, sizeof(strbuf_check));
+                dogecoin_mem_zero(strbuf, sizeof(strbuf));
+                dogecoin_mem_zero(strbuf_check, sizeof(strbuf_check));
                 if (!deser_varlen_from_file(&len, wallet->dbfile)) return false;
                 if (len > sizeof(strbuf)) { return false; }
                 if (fread(strbuf, len, 1, wallet->dbfile) != 1) return false;
@@ -573,7 +573,7 @@ dogecoin_wallet_addr* dogecoin_wallet_find_waddr_byaddr(dogecoin_wallet* wallet,
 
 
     uint8_t hashdata[strlen(search_addr)];
-    memset(hashdata, 0, sizeof(uint160));
+    dogecoin_mem_zero(hashdata, sizeof(uint160));
     int outlen = dogecoin_base58_decode_check(search_addr, hashdata, strlen(search_addr));
 
     if (outlen > 0 && hashdata[0] == wallet->chain->b58prefix_pubkey_address) {

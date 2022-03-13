@@ -19,8 +19,8 @@ void test_address()
     char privkeywif_test[privkeywiflen];
     char p2pkh_pubkey_main[33];
     char p2pkh_pubkey_test[33];
-    memset(privkeywif_main, 0, privkeywiflen);
-    memset(privkeywif_test, 0, privkeywiflen);
+    dogecoin_mem_zero(privkeywif_main, privkeywiflen);
+    dogecoin_mem_zero(privkeywif_test, privkeywiflen);
     // test generation ability
     u_assert_int_eq(generatePrivPubKeypair(privkeywif_main, NULL, false), true)
     u_assert_int_eq(generatePrivPubKeypair(privkeywif_main, p2pkh_pubkey_main, false), true)
@@ -48,12 +48,12 @@ void test_address()
     size_t pubkeysize = 35;
     char masterkey_main[masterkeysize];
     char masterkey_test[masterkeysize];
-    memset(masterkey_main, 0, masterkeysize);
-    memset(masterkey_test, 0, masterkeysize);
+    dogecoin_mem_zero(masterkey_main, masterkeysize);
+    dogecoin_mem_zero(masterkey_test, masterkeysize);
     char p2pkh_master_pubkey_main[pubkeysize];
     char p2pkh_master_pubkey_test[pubkeysize];
-    memset(p2pkh_master_pubkey_main, 0, pubkeysize);
-    memset(p2pkh_master_pubkey_test, 0, pubkeysize);
+    dogecoin_mem_zero(p2pkh_master_pubkey_main, pubkeysize);
+    dogecoin_mem_zero(p2pkh_master_pubkey_test, pubkeysize);
     u_assert_int_eq(generateHDMasterPubKeypair(masterkey_main, NULL, false), true)
     u_assert_int_eq(generateHDMasterPubKeypair(NULL, NULL, false), true)
     u_assert_int_eq(generateHDMasterPubKeypair(NULL, NULL, NULL), true)

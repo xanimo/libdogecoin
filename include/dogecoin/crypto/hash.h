@@ -57,7 +57,7 @@ LIBDOGECOIN_API static inline dogecoin_bool dogecoin_hash_is_empty(uint256 hash)
  */
 LIBDOGECOIN_API static inline void dogecoin_hash_clear(uint256 hash)
 {
-    memset(hash, 0, DOGECOIN_HASH_LENGTH);
+    dogecoin_mem_zero(hash, DOGECOIN_HASH_LENGTH);
 }
 
 /**

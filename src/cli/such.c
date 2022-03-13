@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     int inputindex  = 0;
     int sighashtype = 1;
     uint64_t amount = 0;
-    memset(&pkey, 0, sizeof(pkey));
+    dogecoin_mem_zero(&pkey, sizeof(pkey));
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
             return showError("attempt to generate pubkey from privatekey failed");
 
         /* erase previous private key */
-        memset(pkey, 0, strlen(pkey));
+        dogecoin_mem_zero(pkey, strlen(pkey));
 
         /* generate public key hex from private key hex */
         printf("public key hex: %s\n", pubkey_hex);
@@ -199,9 +199,9 @@ int main(int argc, char* argv[])
         printf("p2sh-p2wpkh address: %s\n", address_p2sh_p2wpkh);
 
         /* clean memory */
-        memset(pubkey_hex, 0, strlen(pubkey_hex));
-        memset(address_p2pkh, 0, strlen(address_p2pkh));
-        memset(address_p2sh_p2wpkh, 0, strlen(address_p2sh_p2wpkh));
+        dogecoin_mem_zero(pubkey_hex, strlen(pubkey_hex));
+        dogecoin_mem_zero(address_p2pkh, strlen(address_p2pkh));
+        dogecoin_mem_zero(address_p2sh_p2wpkh, strlen(address_p2sh_p2wpkh));
     /* Creating a new address from a public key. */
     } else if (strcmp(cmd, "p2pkh") == 0) {
         /* get p2pkh address from pubkey */
@@ -218,9 +218,9 @@ int main(int argc, char* argv[])
         printf("p2sh-p2wpkh address: %s\n", address_p2sh_p2wpkh);
         printf("p2wpkh (doge / bech32) address: %s\n", address_p2wpkh);
 
-        memset(pubkey, 0, strlen(pubkey));
-        memset(address_p2pkh, 0, strlen(address_p2pkh));
-        memset(address_p2sh_p2wpkh, 0, strlen(address_p2sh_p2wpkh));
+        dogecoin_mem_zero(pubkey, strlen(pubkey));
+        dogecoin_mem_zero(address_p2pkh, strlen(address_p2pkh));
+        dogecoin_mem_zero(address_p2sh_p2wpkh, strlen(address_p2sh_p2wpkh));
     /* Generating a new private key and printing it out. */
     } else if (strcmp(cmd, "generate_private_key") == 0) {
         size_t sizeout = 128;
@@ -231,8 +231,8 @@ int main(int argc, char* argv[])
         gen_privatekey(chain, newprivkey_wif, sizeout, newprivkey_hex);
         printf("private key wif: %s\n", newprivkey_wif);
         printf("private key hex: %s\n", newprivkey_hex);
-        memset(newprivkey_wif, 0, strlen(newprivkey_wif));
-        memset(newprivkey_hex, 0, strlen(newprivkey_hex));
+        dogecoin_mem_zero(newprivkey_wif, strlen(newprivkey_wif));
+        dogecoin_mem_zero(newprivkey_hex, strlen(newprivkey_hex));
     /* Generating a new master key. */
     } else if (strcmp(cmd, "bip32_extended_master_key") == 0) {
         size_t sizeout = 128;
@@ -241,7 +241,7 @@ int main(int argc, char* argv[])
         /* generate a new hd master key */
         hd_gen_master(chain, masterkey, sizeout);
         printf("bip32 extended master key: %s\n", masterkey);
-        memset(masterkey, 0, strlen(masterkey));
+        dogecoin_mem_zero(masterkey, strlen(masterkey));
     /* Printing the node keys. */
     } else if (strcmp(cmd, "print_keys") == 0) {
         if (!pkey)
@@ -362,7 +362,7 @@ int main(int argc, char* argv[])
         cstring* script = cstr_new_buf(script_data, outlen);
 
         uint256 sighash;
-        memset(sighash, 0, sizeof(sighash));
+        dogecoin_mem_zero(sighash, sizeof(sighash));
         dogecoin_tx_sighash(tx, script, inputindex, sighashtype, 0, SIGVERSION_BASE, sighash);
 
         char *hex = utils_uint8_to_hex(sighash, 32);
@@ -407,7 +407,7 @@ int main(int argc, char* argv[])
             utils_bin_to_hex((unsigned char *)sigcompact, 64, sigcompacthex);
 
             char sigderhex[74*2+2+1]; //74 der, 2 hashtype, 1 nullbyte
-            memset(sigderhex, 0, sizeof(sigderhex));
+            dogecoin_mem_zero(sigderhex, sizeof(sigderhex));
             utils_bin_to_hex((unsigned char *)sigder_plus_hashtype, sigderlen, sigderhex);
 
             printf("\nSignature created:\n");

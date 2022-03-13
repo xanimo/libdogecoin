@@ -75,7 +75,7 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b5
     uint32_t zeromask = bytesleft ? (b58_almostmaxint_mask << (bytesleft * 8)) : 0;
     unsigned zerocount = 0;
 
-    memset(outi, 0, outisz * sizeof(*outi));
+    dogecoin_mem_zero(outi, outisz * sizeof(*outi));
     for (i = 0; i < b58sz && b58u[i] == '1'; ++i) {
         ++zerocount; // leading zeros, just count
     }
@@ -94,11 +94,11 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b5
             outi[j] = t & b58_almostmaxint_mask;
         }
         if (c) {
-            memset(outi, 0, outisz * sizeof(*outi));
+            dogecoin_mem_zero(outi, outisz * sizeof(*outi));
             return false; // output number too big (carry to the next int32)
         }
         if (outi[0] & zeromask) {
-            memset(outi, 0, outisz * sizeof(*outi));
+            dogecoin_mem_zero(outi, outisz * sizeof(*outi));
             return false; // output number too big (last int32 filled too far)
         }
     }
@@ -125,7 +125,7 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b5
         return false; /* result too large */
     }
 	*binszp += zerocount;
-    memset(outi, 0, outisz * sizeof(*outi));
+    dogecoin_mem_zero(outi, outisz * sizeof(*outi));
     return true;
 }
 
@@ -186,7 +186,7 @@ int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t bi
     }
     size = (binsz - zcount) * 138 / 100 + 1;
     uint8_t buf[size];
-    memset(buf, 0, size);
+    dogecoin_mem_zero(buf, size);
     for (i = zcount, high = size - 1; i < (ssize_t)binsz; ++i, high = j) {
         for (carry = bin[i], j = size - 1; (j > high) || carry; --j) {
             carry += 256 * buf[j];
@@ -200,7 +200,7 @@ int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t bi
         ;
     if (*b58sz <= zcount + size - j) {
         *b58sz = zcount + size - j + 1;
-        memset(buf, 0, size);
+        dogecoin_mem_zero(buf, size);
         return false;
     }
     if (zcount) {
@@ -211,7 +211,7 @@ int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t bi
     }
     b58[i] = '\0';
     *b58sz = i + 1;
-    memset(buf, 0, size);
+    dogecoin_mem_zero(buf, size);
     return true;
 }
 
@@ -244,7 +244,7 @@ int dogecoin_base58_encode_check(const uint8_t* data, int datalen, char* str, in
     } else {
         ret = res;
     }
-    memset(buf, 0, sizeof(buf));
+    dogecoin_mem_zero(buf, sizeof(buf));
     return ret;
 }
 
@@ -274,7 +274,7 @@ int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
         return ret;
     }
     memmove(data, data + strl - binsize, binsize);
-    memset(data + binsize, 0, datalen - binsize);
+    dogecoin_mem_zero(data + binsize, datalen - binsize);
     if (dogecoin_b58check(data, binsize, str) < 0) {
         ret = 0;
     } else {
