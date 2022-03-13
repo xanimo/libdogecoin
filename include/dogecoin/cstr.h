@@ -38,7 +38,7 @@ LIBDOGECOIN_BEGIN_DECL
  * A cstring is a string that is
  * allocated on the heap.
  */
-typedef struct cstring {
+typedef struct cstring_ {
     char* str;    /* string data, incl. NUL */
     size_t len;   /* length of string, not including NUL */
     size_t alloc; /* total allocated buffer length */

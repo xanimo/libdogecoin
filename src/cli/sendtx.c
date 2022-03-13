@@ -273,13 +273,13 @@ void broadcast_post_cmd(struct dogecoin_node_* node, dogecoin_p2p_msg_hdr* hdr, 
         //  decompose
         uint32_t vsize;
         if (!deser_varlen(&vsize, buf)) {
-            dogecoin_node_missbehave(node);
+            dogecoin_node_misbehave(node);
             return;
         };
         for (unsigned int i = 0; i < vsize; i++) {
             dogecoin_p2p_inv_msg inv_msg;
             if (!dogecoin_p2p_msg_inv_deser(&inv_msg, buf)) {
-                dogecoin_node_missbehave(node);
+                dogecoin_node_misbehave(node);
                 return;
             }
             if (memcmp(hash, inv_msg.hash, sizeof(hash)) == 0) {
@@ -296,14 +296,14 @@ void broadcast_post_cmd(struct dogecoin_node_* node, dogecoin_p2p_msg_hdr* hdr, 
         //only allow a single object in getdata for the broadcaster
         uint32_t vsize;
         if (!deser_varlen(&vsize, buf) || vsize != 1) {
-            dogecoin_node_missbehave(node);
+            dogecoin_node_misbehave(node);
             return;
         }
 
         dogecoin_p2p_inv_msg inv_msg;
         memset(&inv_msg, 0, sizeof(inv_msg));
         if (!dogecoin_p2p_msg_inv_deser(&inv_msg, buf) || inv_msg.type != DOGECOIN_INV_TYPE_TX) {
-            dogecoin_node_missbehave(node);
+            dogecoin_node_misbehave(node);
             return;
         };
 

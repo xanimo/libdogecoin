@@ -21,7 +21,7 @@
 
 #ifndef __LIBDOGECOIN_CRYPTO_SEGWIT_ADDR_H__
 #define __LIBDOGECOIN_CRYPTO_SEGWIT_ADDR_H__
-#define _SEGWIT_ADDR_H_ 1
+#define _SEGWIT_ADDR_H_ 0
 
 #include <dogecoin/dogecoin.h>
 

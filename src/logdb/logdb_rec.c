@@ -237,11 +237,13 @@ logdb_record * logdb_record_rm_desc(logdb_record *usehead, cstring *key)
             /* if we are going to delete the head, report new head */
             if (rec_loop == usehead)
                 rec_head = rec_loop->prev;
-
-            logdb_record_free(rec_loop);
+                
+            goto out;
         }
-        
         rec_loop = prev_rec;
     }
+
+out:
+    logdb_record_free(rec_loop);
     return rec_head;
 }

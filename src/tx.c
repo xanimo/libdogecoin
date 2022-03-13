@@ -117,7 +117,6 @@ dogecoin_tx_in* dogecoin_tx_in_new()
     tx_in = dogecoin_calloc(1, sizeof(*tx_in));
     memset(&tx_in->prevout, 0, sizeof(tx_in->prevout));
     tx_in->sequence = UINT32_MAX;
-
     tx_in->witness_stack = vector_new(8, dogecoin_tx_in_witness_stack_free_cb);
     return tx_in;
 }
@@ -185,10 +184,12 @@ void dogecoin_tx_free(dogecoin_tx* tx)
 {
     if (tx->vin) {
         vector_free(tx->vin, true);
+        tx->vin = NULL;
     }
 
     if (tx->vout) {
         vector_free(tx->vout, true);
+        tx->vout = NULL;
     }
 
     dogecoin_free(tx);
@@ -459,8 +460,6 @@ void dogecoin_tx_hash(const dogecoin_tx* tx, uint256 hashout)
 {
     cstring* txser = cstr_new_sz(1024);
     dogecoin_tx_serialize(txser, tx, false);
-
-
     sha256_raw((const uint8_t*)txser->str, txser->len, hashout);
     sha256_raw(hashout, DOGECOIN_HASH_LENGTH, hashout);
     cstr_free(txser, true);
@@ -479,8 +478,7 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
 
     if (!src->script_sig) {
         dest->script_sig = NULL;
-    }
-    else {
+    } else {
         dest->script_sig = cstr_new_sz(src->script_sig->len);
         cstr_append_buf(dest->script_sig,
                         src->script_sig->str,
@@ -489,8 +487,7 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
 
     if (!src->witness_stack) {
         dest->witness_stack = NULL;
-    }
-    else {
+    } else {
         dest->witness_stack = vector_new(src->witness_stack->len, dogecoin_tx_in_witness_stack_free_cb);
         for (unsigned int i = 0; i < src->witness_stack->len; i++) {
             cstring* witness_item = vector_idx(src->witness_stack, i);
@@ -512,8 +509,7 @@ void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_tx_out* src)
 
     if (!src->script_pubkey) {
         dest->script_pubkey = NULL;
-    }
-    else {
+    } else {
         dest->script_pubkey = cstr_new_sz(src->script_pubkey->len);
         cstr_append_buf(dest->script_pubkey,
                         src->script_pubkey->str,
@@ -534,8 +530,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 
     if (!src->vin) {
         dest->vin = NULL;
-    }
-    else {
+    } else {
         unsigned int i;
 
         if (dest->vin) {
@@ -546,7 +541,6 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 
         for (i = 0; i < src->vin->len; i++) {
             dogecoin_tx_in *tx_in_old, *tx_in_new;
-
             tx_in_old = vector_idx(src->vin, i);
             tx_in_new = dogecoin_calloc(1, sizeof(*tx_in_new));
             dogecoin_tx_in_copy(tx_in_new, tx_in_old);
@@ -556,8 +550,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 
     if (!src->vout) {
         dest->vout = NULL;
-    }
-    else {
+    } else {
         unsigned int i;
 
         if (dest->vout)
@@ -629,9 +622,9 @@ void dogecoin_tx_sequence_hash(const dogecoin_tx* tx, uint256 hash)
 void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256 hash)
 {
     cstring* s = cstr_new_sz(512);
-    unsigned int i;
+    size_t i, len = tx->vout->len;
     dogecoin_tx_out* tx_out;
-    for (i = 0; i < tx->vout->len; i++) {
+    for (i = 0; i < len; i++) {
         tx_out = vector_idx(tx->vout, i);
         dogecoin_tx_out_serialize(s, tx_out);
     }

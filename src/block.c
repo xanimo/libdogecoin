@@ -82,12 +82,12 @@ void printBits(size_t const size, void const* ptr)
     puts("");
 }
 
-int dogecoin_get_block_header_version(struct const_buffer* buffer) {
+int32_t dogecoin_get_block_header_version(struct const_buffer* buffer) {
     int32_t version;
     if (!deser_s32(&version, buffer))
         return false;
-    // printf("version: %d\n", version);
-    return true;
+    printf("version: %d\n", version);
+    return version;
 }
 
 int dogecoin_get_block_header_prev_block(struct const_buffer* buffer) {
@@ -122,12 +122,12 @@ int dogecoin_get_block_header_bits(struct const_buffer* buffer) {
     return true;
 }
 
-int dogecoin_get_block_header_nonce(struct const_buffer* buffer) {
-    int32_t version;
-    if (!deser_s32(&version, buffer))
+int32_t dogecoin_get_block_header_nonce(struct const_buffer* buffer) {
+    int32_t nonce;
+    if (!deser_s32(&nonce, buffer))
         return false;
-    printf("version: %d\n", version);
-    return true;
+    printf("nonce: %d\n", nonce);
+    return nonce;
 }
 
 int dogecoin_get_block_header_coinbase_txn(struct const_buffer* buffer) {
@@ -195,7 +195,7 @@ int dogecoin_get_block_header_txns(struct const_buffer* buffer) {
  * @return Nothing.
  */
 int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf) {
-    if (header->nonce == 0 && &header->version >= 0x00620102) {
+    if (header->nonce == 0 && &header->version >= (int32_t*)0x00620102) {
         // printBits(buf->len, buf->p);
         // printf("auxpow_block_header }:P\n");
     }
@@ -215,21 +215,22 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
 }
 
 int deser_merkle_branch(merkle_branch* mb, struct const_buffer* buffer) {
-    if (!deser_u256(mb->hashes[sizeof(mb)], buffer)) {
+    if (!deser_u256(&mb->hashes[sizeof(mb)], buffer)) {
         return false;
     }
+    return true;
 }
 
 int deserialize_auxpow_block_header(auxpow_block_header* hdr, struct const_buffer* buffer) {
     if (buffer == NULL || buffer->len == 0 || buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
-        return printf("Transaction in invalid or to large.\n");
+        return printf("Transaction is invalid or to large.\n");
     }
     uint8_t* data_bin = dogecoin_malloc(buffer->len / 2 + 1);
     int outlen = 0;
     utils_hex_to_bin(buffer->p, data_bin, buffer->len, &outlen);
 
     dogecoin_tx* tx = dogecoin_tx_new();
-    if (!dogecoin_tx_deserialize(data_bin, outlen, &hdr->parent_coinbase, NULL, false)) {
+    if (!dogecoin_tx_deserialize(data_bin, outlen, &hdr->parent_coinbase, NULL, true)) {
         printf("Transaction is invalid\n");
     }
     dogecoin_free(data_bin);
@@ -247,6 +248,7 @@ int deserialize_auxpow_block_header(auxpow_block_header* hdr, struct const_buffe
     if (!dogecoin_block_header_deserialize(&hdr->parent_header, buffer)) {
         return false;
     }
+    return true;
 }
 
 /**

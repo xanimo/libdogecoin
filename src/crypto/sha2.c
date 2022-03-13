@@ -546,9 +546,6 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
     context->state[5] += f;
     context->state[6] += g;
     context->state[7] += h;
-
-    /* Clean up */
-    a = b = c = d = e = f = g = h = T1 = T2 = 0;
 }
 
 #endif /* SHA2_UNROLL_TRANSFORM */
@@ -585,8 +582,6 @@ void sha256_write(sha256_context* context, const sha2_byte* data, size_t len)
             /* The buffer is not yet full */
             MEMCPY_BCOPY(&context->buffer[usedspace], data, len);
             context->bitcount += len << 3;
-            /* Clean up: */
-            usedspace = freespace = 0;
             return;
         }
     }
@@ -602,8 +597,6 @@ void sha256_write(sha256_context* context, const sha2_byte* data, size_t len)
         MEMCPY_BCOPY(context->buffer, data, len);
         context->bitcount += len << 3;
     }
-    /* Clean up: */
-    usedspace = freespace = 0;
 }
 
 /**
@@ -667,7 +660,6 @@ void sha256_finalize(sha256_context* context, sha2_byte digest[]) {
     }
     /* Clean up state data: */
     MEMSET_BZERO(context, sizeof(sha256_context));
-    usedspace = 0;
 }
 
 /**
@@ -875,9 +867,6 @@ static void sha512_transform(sha512_context* context, const sha2_word64* data)
     context->state[5] += f;
     context->state[6] += g;
     context->state[7] += h;
-
-    /* Clean up */
-    a = b = c = d = e = f = g = h = T1 = T2 = 0;
 }
 
 #endif /* SHA2_UNROLL_TRANSFORM */
@@ -913,8 +902,6 @@ void sha512_write(sha512_context* context, const sha2_byte* data, size_t len)
             /* The buffer is not yet full */
             MEMCPY_BCOPY(&context->buffer[usedspace], data, len);
             ADDINC128(context->bitcount, len << 3);
-            /* Clean up: */
-            usedspace = freespace = 0;
             return;
         }
     }
@@ -930,8 +917,6 @@ void sha512_write(sha512_context* context, const sha2_byte* data, size_t len)
         MEMCPY_BCOPY(context->buffer, data, len);
         ADDINC128(context->bitcount, len << 3);
     }
-    /* Clean up: */
-    usedspace = freespace = 0;
 }
 
 /**

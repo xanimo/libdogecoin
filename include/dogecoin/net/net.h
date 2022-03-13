@@ -41,7 +41,7 @@ LIBDOGECOIN_BEGIN_DECL
 #include <dogecoin/net/protocol.h>
 #include <dogecoin/vector.h>
 
-static const unsigned int DOGECOIN_P2P_MESSAGE_CHUNK_SIZE = 4096;
+static const unsigned int DOGECOIN_P2P_MESSAGE_CHUNK_SIZE = 4000;
 
 enum NODE_STATE {
     NODE_CONNECTING = (1 << 0),
@@ -124,7 +124,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_node_set_ipport(dogecoin_node* node, cons
 LIBDOGECOIN_API void dogecoin_node_disconnect(dogecoin_node* node);
 
 /* mark a node missbehave and disconnect */
-LIBDOGECOIN_API dogecoin_bool dogecoin_node_missbehave(dogecoin_node* node);
+LIBDOGECOIN_API dogecoin_bool dogecoin_node_misbehave(dogecoin_node* node);
 
 /* =================================== */
 /* NODE GROUPS */

@@ -110,6 +110,7 @@ int main(int argc, char* argv[])
     int inputindex  = 0;
     int sighashtype = 1;
     uint64_t amount = 0;
+    memset(&pkey, 0, sizeof(pkey));
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
@@ -266,7 +267,7 @@ int main(int argc, char* argv[])
 
         static char digits[] = "0123456789";
         unsigned int i;
-        for (i = 0; i<strlen(keypath); i++) {
+        for (i = 0; i < strlen(keypath); i++) {
             if (i > maxlen) {
                 break;
             }
@@ -279,13 +280,11 @@ int main(int argc, char* argv[])
                     char buf[9] = {0};
                     memcpy (buf, &keypath[posanum], i-posanum);
                     from = strtoull(buf, NULL, 10);
-                }
-                else if (!strchr(digits, keypath[i])) {
+                } else if (!strchr(digits, keypath[i])) {
                     posanum = -1;
                     break;
                 }
-            }
-            else if (posanum > -1 && posbnum > -1) {
+            } else if (posanum > -1 && posbnum > -1) {
                 if (keypath[i] == ']' || keypath[i] == ')') {
                     if (i-posbnum >= 9) {
                         break;
@@ -295,9 +294,8 @@ int main(int argc, char* argv[])
                     to = strtoull(buf, NULL, 10);
                     end = i+1;
                     break;
-                }
-                else if (!strchr(digits, keypath[i])) {
-                    posbnum = -1;
+                } else if (!strchr(digits, keypath[i])) {
+                    // posbnum = -1; // value stored is never read
                     posanum = -1;
                     break;
                 }
@@ -357,7 +355,7 @@ int main(int argc, char* argv[])
             return showError("Inputindex out of range");
         }
 
-        dogecoin_tx_in *tx_in = vector_idx(tx->vin, inputindex);
+        vector_idx(tx->vin, inputindex);
 
         uint8_t script_data[strlen(scripthex) / 2 + 1];
         utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlen);
@@ -384,12 +382,15 @@ int main(int argc, char* argv[])
         if (dogecoin_privkey_decode_wif(pkey, chain, &key)) {
             sign = true;
         } else {
-            if (strlen(pkey) > 50) {
-                dogecoin_tx_free(tx);
-                cstr_free(script, true);
-                return showError("Invalid wif privkey\n");
+            if (pkey) {
+                if (strlen(pkey) > 50) {
+                    dogecoin_tx_free(tx);
+                    cstr_free(script, true);
+                    return showError("Invalid wif privkey\n");
+                }
+            } else {
+                printf("No private key provided, signing will not happen\n");
             }
-            printf("No private key provided, signing will not happen\n");
         }
         if (sign) {
             uint8_t sigcompact[64] = {0};
@@ -422,15 +423,7 @@ int main(int argc, char* argv[])
             cstr_free(signed_tx, true);
         }
         dogecoin_tx_free(tx);
-    }
-    /**
-     * Convert a compact signature to a DER signature
-     * 
-     * @param scripthex The hex-encoded signature.
-     * 
-     * @return Nothing.
-     */
-    else if (strcmp(cmd, "comp2der") == 0) {
+    } else if (strcmp(cmd, "comp2der") == 0) {
         if(!scripthex || strlen(scripthex) != 128) {
             return showError("Missing signature or invalid length (use hex, 128 chars == 64 bytes)\n");
         }
@@ -447,9 +440,7 @@ int main(int argc, char* argv[])
         char hexbuf[sigderlen*2 + 1];
         utils_bin_to_hex(sigder, sigderlen, hexbuf);
         printf("DER: %s\n", hexbuf);
-    }
-    /* Creating a bip32 master key from a private key. */
-    else if (strcmp(cmd, "bip32maintotest") == 0) {
+    } else if (strcmp(cmd, "bip32maintotest") == 0) { /* Creating a bip32 master key from a private key. */
         dogecoin_hdnode node;
         if (!dogecoin_hdnode_deserialize(pkey, chain, &node))
             return false;

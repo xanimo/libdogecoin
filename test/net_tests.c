@@ -1,6 +1,7 @@
 #include "utest.h"
 #include <stdarg.h>
 #include <dogecoin/block.h>
+#include <dogecoin/chainparams.h>
 #include <dogecoin/net/net.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/serialize.h>
@@ -77,8 +78,8 @@ void postcmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, struct cons
 
         uint32_t vsize;
         if (!deser_varlen(&vsize, buf)) return;
-
-        for (unsigned int i = 0; i < vsize; i++)
+        unsigned int i;
+        for (i = 0; i < vsize; i++)
         {
             dogecoin_tx *tx = dogecoin_tx_new(); //needs to be on the heep
             dogecoin_tx_deserialize(buf->p, buf->len, tx, NULL, true);
@@ -98,8 +99,8 @@ void postcmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, struct cons
         uint8_t hash[36];
         uint32_t type;
         if (!deser_varlen(&vsize, buf)) return;
-
-        for (unsigned int i = 0; i < vsize; i++)
+        unsigned int i;
+        for (i = 0; i < vsize; i++)
         {
             if (!deser_u32(&type, buf)) return;
             if (!deser_u256(hash, buf)) return;
@@ -155,7 +156,8 @@ void node_connection_state_changed(struct dogecoin_node_ *node)
 void handshake_done(struct dogecoin_node_ *node)
 {
     /* make sure only one node is used for header sync */
-    for(size_t i =0;i< node->nodegroup->nodes->len; i++)
+    size_t i;
+    for(i = 0; i < node->nodegroup->nodes->len; i++)
     {
         dogecoin_node *check_node = vector_idx(node->nodegroup->nodes, i);
         if ((check_node->state & NODE_HEADERSYNC) == NODE_HEADERSYNC)
@@ -192,7 +194,8 @@ void test_net_basics_plus_download_block()
     const dogecoin_dns_seed seed = dogecoin_chainparams_test.dnsseeds[0];
 
     dogecoin_get_peers_from_dns(seed.domain, ips, dogecoin_chainparams_test.default_port, AF_INET);
-    for (unsigned int i = 0; i<ips->len; i++)
+    unsigned int i;
+    for (i = 0; i < ips->len; i++)
     {
         char *ip = (char *)vector_idx(ips, i);
         printf("dns seed ip %d: %s\n", i, ip);

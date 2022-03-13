@@ -73,7 +73,7 @@ LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 
 LIBDOGECOIN_API static int calcLength(char buf, int offset);
 
-LIBDOGECOIN_API int dogecoin_get_block_header_version(struct const_buffer* buffer);
+LIBDOGECOIN_API int32_t dogecoin_get_block_header_version(struct const_buffer* buffer);
 
 LIBDOGECOIN_API int dogecoin_get_block_header_prev_block(struct const_buffer* buffer);
 
@@ -83,7 +83,7 @@ LIBDOGECOIN_API int dogecoin_get_block_header_timestamp(struct const_buffer* buf
 
 LIBDOGECOIN_API int dogecoin_get_block_header_bits(struct const_buffer* buffer);
 
-LIBDOGECOIN_API int dogecoin_get_block_header_nonce(struct const_buffer* buffer);
+LIBDOGECOIN_API int32_t dogecoin_get_block_header_nonce(struct const_buffer* buffer);
 
 LIBDOGECOIN_API int dogecoin_get_block_header_coinbase_txn(struct const_buffer* buffer);
 

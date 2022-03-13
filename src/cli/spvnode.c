@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
         /* exit if no command was provided */
         print_usage();
         exit(EXIT_FAILURE);
-        }
+    }
     data = argv[argc - 1];
 
     /* get arguments */
@@ -164,13 +164,13 @@ int main(int argc, char* argv[]) {
                     debug = true;
                     break;
                 case 's':
-                    timeout = (int)strtol(optarg, (char**)NULL, 10);
+                    // timeout = (int)strtol(optarg, (char**)NULL, 10); // value stored is never read
                     break;
                 case 'i':
                     ips = optarg;
                     break;
                 case 'm':
-                    maxnodes = (int)strtol(optarg, (char**)NULL, 10);
+                    // maxnodes = (int)strtol(optarg, (char**)NULL, 10); // value stored is never read
                     break;
                 case 'f':
                     dbfile = optarg;
@@ -194,30 +194,28 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
         dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
         int error;
-        dogecoin_bool* created;
+        dogecoin_bool created;
         dogecoin_bool res = dogecoin_wallet_load(wallet, "wallet.db", &error, &created);
         if (!res) {
             fprintf(stdout, "Loading wallet failed\n");
             exit(EXIT_FAILURE);
-            }
+        }
         /* It creates a new key and sets it as the master key. */
         if (created) {
             // create a new key
-
             dogecoin_hdnode node;
             uint8_t seed[32];
             res = dogecoin_random_bytes(seed, sizeof(seed), true);
             if (!res) {
                 fprintf(stdout, "Generating random bytes failed\n");
                 exit(EXIT_FAILURE);
-                }
+            }
             dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
             dogecoin_wallet_set_master_key_copy(wallet, &node);
-            }
-        else {
-            // ensure we have a key
-            // TODO
-            }
+        } else {
+        // ensure we have a key
+        // TODO
+        }
         /* Creating a new key and setting it as the master key. */
         dogecoin_wallet_addr* waddr = dogecoin_wallet_next_addr(wallet);
         size_t strsize = 128;
@@ -232,7 +230,7 @@ int main(int argc, char* argv[]) {
         for (i = 0; i < addrs->len; i++) {
             char* addr = vector_idx(addrs, i);
             printf("Addr: %s\n", addr);
-            }
+        }
         vector_free(addrs, true);
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
@@ -240,8 +238,7 @@ int main(int argc, char* argv[]) {
         if (!dogecoin_spv_client_load(client, (dbfile ? dbfile : "headers.db"))) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
-            }
-        else {
+        } else {
             printf("Discover peers...");
             dogecoin_spv_client_discover_peers(client, ips);
             printf("done\n");
@@ -249,12 +246,11 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_client_runloop(client);
             dogecoin_spv_client_free(client);
             ret = EXIT_SUCCESS;
-            }
-        dogecoin_ecc_stop();
         }
-    else {
-        printf("Invalid command (use -?)\n");
-        ret = EXIT_FAILURE;
+            dogecoin_ecc_stop();
+        } else {
+            printf("Invalid command (use -?)\n");
+            ret = EXIT_FAILURE;
         }
     return ret;
-    }
+}

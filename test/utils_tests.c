@@ -38,10 +38,10 @@ void test_utils()
     utils_hex_to_bin(hex, data2, strlen(hex), &outlen);
     assert(outlen == 8);
     assert(memcmp(data, data2, outlen) == 0);
-    hash_bin = utils_hex_to_uint8(hash_buffer_exc);
+    utils_hex_to_uint8(hash_buffer_exc);
 
     /* test upper and lowercase A / F */
     utils_hex_to_bin(hex2, data3, strlen(hex2), &outlen);
-    hash_bin = utils_hex_to_uint8(hex2);
+    utils_hex_to_uint8(hex2);
     utils_clear_buffers();
 }

@@ -163,7 +163,7 @@ void test_wallet()
     int outlen = 0;
     utils_hex_to_bin("e195b669de8e49f955749033fa2d79390732c435", waddr->pubkeyhash, 40, &outlen);
 
-    dogecoin_wallet_addr* checknode = tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
+    tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
 
     int64_t totalin = 0;
     unsigned int i;
@@ -267,7 +267,7 @@ void test_wallet_basics()
     wtx->height = 0;
     dogecoin_wallet_add_wtx_move(wallet, wtx);
     wallet->bestblockheight = 200;
-    amount = dogecoin_wallet_wtx_get_available_credit(wallet, wtx);
+    dogecoin_wallet_wtx_get_available_credit(wallet, wtx);
     wallet->bestblockheight = 0;
 
     dogecoin_wtx* wtx2 = dogecoin_wallet_wtx_new();
@@ -298,7 +298,7 @@ void test_wallet_basics()
     u_assert_uint32_eq(amount, -1000000);
 
 
-    amount = dogecoin_wallet_wtx_get_available_credit(wallet, wtx);
+    dogecoin_wallet_wtx_get_available_credit(wallet, wtx);
 
     dogecoin_wallet_flush(wallet);
     dogecoin_wallet_free(wallet);
@@ -307,7 +307,7 @@ void test_wallet_basics()
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
 
 
-    amount = dogecoin_wallet_get_balance(wallet);
+    dogecoin_wallet_get_balance(wallet);
 
     vector *unspents = vector_new(10, free);
     dogecoin_wallet_get_unspent(wallet, unspents);

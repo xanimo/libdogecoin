@@ -229,7 +229,6 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     /* Setting the height of the chain header to the height of the block. */
                     chainheader->height = height;
                     /* Deserializing the block header. */
-                    printf("cbuf_all: %d\n", sizeof(&cbuf_all));
                     if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all)) {
                         /* The code below is freeing the memory allocated to the chainheader variable. */
                         dogecoin_free(chainheader);
@@ -364,7 +363,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
         variable db->use_binary_tree to 1. */
         if (db->use_binary_tree) {
             /* Searching the tree for the blockindex. */
-            dogecoin_blockindex *retval = tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
+            tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
         }
 
         /* Checking if the maximum number of headers in memory is set. */
@@ -377,10 +376,10 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             for(unsigned int i = 0; i<db->max_hdr_in_mem+1;i++)
             {
                 /* Checking if the scan_tip is not the first scan_tip in the linked list. */
-                if (scan_tip->prev)
+                if (scan_tip->prev) {
                     /* Moving the scan_tip pointer to the previous node. */
                     scan_tip = scan_tip->prev;
-                else {
+                } else {
                     break;
                 }
 
@@ -394,7 +393,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
                         tdelete(scan_tip->prev, &db->tree_root, dogecoin_header_compare);
                         /* Freeing the memory of the previous block. */
                         dogecoin_free(scan_tip->prev);
-
                         /* Setting the previous pointer of the scan_tip to NULL. */
                         scan_tip->prev = NULL;
                         /* Setting the chainbottom of the database to the scan_tip. */

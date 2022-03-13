@@ -129,8 +129,9 @@ void read_cb(struct bufferevent* bev, void* ctx)
         dogecoin_p2p_deser_msghdr(&hdr, &buf);
         /* This is checking if the data length is greater than the maximum allowed size. */
         if (hdr.data_len > DOGECOIN_MAX_P2P_MSG_SIZE) {
+            printf("header size exceeds maximum allowed size\n");
             // check for invalid message lengths
-            dogecoin_node_missbehave(node);
+            dogecoin_node_misbehave(node);
             return;
         }
         /* Checking if the buffer is smaller than the data length. */
@@ -385,13 +386,13 @@ void dogecoin_node_release_events(dogecoin_node* node)
 }
 
 /**
- * Mark the node as missbehaved
+ * Mark the node as misbehaved
  * 
- * @param node The node that is being marked as missbehaved.
+ * @param node The node that is being marked as misbehaved.
  * 
  * @return Nothing
  */
-dogecoin_bool dogecoin_node_missbehave(dogecoin_node* node)
+dogecoin_bool dogecoin_node_misbehave(dogecoin_node* node)
 {
     node->nodegroup->log_write_cb("Mark node %d as missbehaved\n", node->nodeid);
     node->state |= NODE_MISSBEHAVED;
@@ -752,7 +753,8 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
 {
     node->nodegroup->log_write_cb("received command from node %d: %s\n", node->nodeid, hdr->command);
     if (memcmp(hdr->netmagic, node->nodegroup->chainparams->netmagic, sizeof(node->nodegroup->chainparams->netmagic)) != 0) {
-        return dogecoin_node_missbehave(node);
+        printf("netmagic mismatch\n");
+        return dogecoin_node_misbehave(node);
     }
 
     /* send the header and buffer to the possible callback */
@@ -761,7 +763,8 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
         if (strcmp(hdr->command, DOGECOIN_MSG_VERSION) == 0) {
             dogecoin_p2p_version_msg v_msg_check;
             if (!dogecoin_p2p_msg_version_deser(&v_msg_check, buf)) {
-                return dogecoin_node_missbehave(node);
+                printf("v_msg_check deser failed\n");
+                return dogecoin_node_misbehave(node);
             }
             if ((v_msg_check.services & DOGECOIN_NODE_NETWORK) != DOGECOIN_NODE_NETWORK) {
                 dogecoin_node_disconnect(node);
@@ -783,7 +786,8 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
             /* response pings */
             uint64_t nonce = 0;
             if (!deser_u64(&nonce, buf)) {
-                return dogecoin_node_missbehave(node);
+                printf("deser nonce error\n");
+                return dogecoin_node_misbehave(node);
             }
             cstring* pongmsg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_PONG, &nonce, 8);
             dogecoin_node_send(node, pongmsg);
@@ -871,7 +875,8 @@ dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *g
         /* todo: make sure we have enought peers, eventually */
         /* call another seeder */
         dogecoin_get_peers_from_dns(seed.domain, ips_dns, group->chainparams->default_port, AF_INET);
-        for (unsigned int i = 0; i < ips_dns->len; i++) {
+        unsigned int i;
+        for (i = 0; i < ips_dns->len; i++) {
             char* ip = (char*)vector_idx(ips_dns, i);
 
             /* create a node */
@@ -887,7 +892,8 @@ dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *g
         char working_str[64];
         memset(working_str, 0, sizeof(working_str));
         size_t offset = 0;
-        for (unsigned int i = 0; i <= strlen(ips); i++) {
+        unsigned int i;
+        for (i = 0; i <= strlen(ips); i++) {
             if (i == strlen(ips) || ips[i] == ',') {
                 dogecoin_node* node = dogecoin_node_new();
                 if (dogecoin_node_set_ipport(node, working_str) > 0) {

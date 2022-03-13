@@ -52,22 +52,14 @@ void test_block_header()
         uint256 hash_data;
         utils_hex_to_bin(test->hexheader, header_data, 160, &outlen);
         struct const_buffer buf_version = {header_data, 4};
-        if (!dogecoin_get_block_header_version(&buf_version)) {
-            printf("false\n");
-        }
-        struct const_buffer buf_prev_block = {header_data, 32};
-        if (!dogecoin_get_block_header_prev_block(&buf_prev_block)) {
-            printf("false\n");
-        }
-        struct const_buffer buf_merkle_root = {header_data, 32};
-        if (!dogecoin_get_block_header_merkle_root(&buf_merkle_root)) {
-            printf("false\n");
-        }
-        struct const_buffer buf_timestamp = {header_data, 4};
-        if (!dogecoin_get_block_header_timestamp(&buf_timestamp)) {
-            printf("false\n");
-        }
+        int32_t version, nonce;
 
+        version = dogecoin_get_block_header_version(&buf_version);
+        if (!version) printf("false\n");
+        struct const_buffer buf_nonce = {header_data, 4};
+        nonce = dogecoin_get_block_header_nonce(&buf_nonce);
+        if (!nonce) printf("non nonce\n");
+        printf("version: %d nonce: %d\n", version, nonce);
 
         utils_hex_to_bin(test->hexhash, hash_data, sizeof(hash_data), &outlen);
 
@@ -83,6 +75,7 @@ void test_block_header()
         // Check the serialized form matches
         dogecoin_block_header_serialize(serialized, header);
         utils_bin_to_hex((unsigned char*) serialized->str, serialized->len, hexbuf);
+        printf("serialized: %s\n", hexbuf);
         assert(memcmp(hexbuf, test->hexheader, 160) == 0);
 
         // Check the block hash
@@ -91,6 +84,7 @@ void test_block_header()
 
         utils_bin_to_hex(blockhash, DOGECOIN_HASH_LENGTH, hexbuf);
         utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH*2);
+        printf("blockhash = %s\n", hexbuf);
         assert(memcmp(hexbuf, test->hexhash, DOGECOIN_HASH_LENGTH*2) == 0);
         // Check version, ts, bits, nonce
         assert(header->version == test->version);
