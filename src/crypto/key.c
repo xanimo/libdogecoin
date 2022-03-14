@@ -375,6 +375,7 @@ dogecoin_bool dogecoin_pubkey_getaddr_p2sh_p2wpkh(const dogecoin_pubkey* pubkey,
 {
     cstring* p2wphk_script = cstr_new_sz(22);
     uint160 keyhash;
+    dogecoin_mem_zero(&keyhash, sizeof(keyhash));
     dogecoin_pubkey_get_hash160(pubkey, keyhash);
     dogecoin_script_build_p2wpkh(p2wphk_script, keyhash);
     uint8_t hash160[sizeof(uint160) + 1];
@@ -415,6 +416,7 @@ dogecoin_bool dogecoin_pubkey_getaddr_p2pkh(const dogecoin_pubkey* pubkey, const
 dogecoin_bool dogecoin_pubkey_getaddr_p2wpkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char* addrout)
 {
     uint160 hash160;
+    dogecoin_mem_zero(&hash160, sizeof(hash160));
     dogecoin_pubkey_get_hash160(pubkey, hash160);
     segwit_addr_encode(addrout, chain->bech32_hrp, 0, hash160, sizeof(hash160));
     return true;

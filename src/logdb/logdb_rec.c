@@ -179,7 +179,6 @@ size_t logdb_record_height(logdb_record* head)
 cstring * logdb_record_find_desc(logdb_record* head, cstring *key) // logdb_record_find_desc(logdb_record* head, struct buffer *key)
 {
     cstring *found_value = NULL;
-    cstring *keycstr;
     logdb_record *rec;
 
     if (key == NULL)

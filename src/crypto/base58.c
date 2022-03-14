@@ -68,7 +68,6 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b5
     unsigned char* binu = bin;
     size_t outisz = (binsz + sizeof(b58_almostmaxint_t) - 1) / sizeof(b58_almostmaxint_t);
 	b58_maxint_t t;
-	b58_almostmaxint_t c;
     size_t i, j = 0;
     uint8_t bytesleft = binsz % sizeof(b58_almostmaxint_t);
     b58_almostmaxint_t outi[outisz];
@@ -81,6 +80,7 @@ int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b5
     }
 
     for (; i < b58sz; ++i) {
+        b58_almostmaxint_t c;
         if (b58u[i] & 0x80) {
             return false; // high-bit set on invalid digit
         }
@@ -178,7 +178,6 @@ static const char b58digits_ordered[] =
 int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t binsz)
 {
     const uint8_t* bin = data;
-    int carry = 0;
     ssize_t i = 0, j = 0, high = 0, zcount = 0;
     size_t size = 0;
     while (zcount < (ssize_t)binsz && !bin[zcount]) {
@@ -188,6 +187,7 @@ int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t bi
     uint8_t buf[size];
     dogecoin_mem_zero(buf, size);
     for (i = zcount, high = size - 1; i < (ssize_t)binsz; ++i, high = j) {
+        int carry = 0;
         for (carry = bin[i], j = size - 1; (j > high) || carry; --j) {
             carry += 256 * buf[j];
             buf[j] = carry % 58;
@@ -260,8 +260,8 @@ int dogecoin_base58_encode_check(const uint8_t* data, int datalen, char* str, in
  */
 int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
 {
-    int ret, i;
-    for (i = 0; str[i] && i < 1024; i++){};
+    int ret, i = 0;
+    for (; str[i] && i < 1024; i++){};
     size_t strl = i;
     /* buffer needs to be at least the strsize, will be used
        for the whole decoding */

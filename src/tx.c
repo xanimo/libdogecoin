@@ -308,9 +308,8 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
     if ((flags & 1) && allow_witness) {
         /* The witness flag is present, and we support witnesses. */
         flags ^= 1;
-        for (size_t i = 0; i < tx->vin->len; i++) {
+        for (i = 0; i < tx->vin->len; i++) {
             dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
-            uint32_t vlen;
             if (!deser_varlen(&vlen, &buf))
                 return false;
             for (size_t j = 0; j < vlen; j++) {
@@ -582,9 +581,8 @@ void dogecoin_tx_prevout_hash(const dogecoin_tx* tx, uint256 hash)
 {
     cstring* s = cstr_new_sz(512);
     unsigned int i;
-    dogecoin_tx_in* tx_in;
     for (i = 0; i < tx->vin->len; i++) {
-        tx_in = vector_idx(tx->vin, i);
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
         ser_u256(s, tx_in->prevout.hash);
         ser_u32(s, tx_in->prevout.n);
     }
@@ -603,9 +601,8 @@ void dogecoin_tx_sequence_hash(const dogecoin_tx* tx, uint256 hash)
 {
     cstring* s = cstr_new_sz(512);
     unsigned int i;
-    dogecoin_tx_in* tx_in;
     for (i = 0; i < tx->vin->len; i++) {
-        tx_in = vector_idx(tx->vin, i);
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
         ser_u32(s, tx_in->sequence);
     }
 
@@ -623,10 +620,9 @@ void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256 hash)
 {
     if (!tx->vout || !hash) return;
     cstring* s = cstr_new_sz(512);
-    size_t i, len = tx->vout->len;
-    dogecoin_tx_out* tx_out;
-    for (i = 0; i < len; i++) {
-        tx_out = vector_idx(tx->vout, i);
+    size_t i;
+    for (i = 0; i < tx->vout->len; i++) {
+        dogecoin_tx_out* tx_out = vector_idx(tx->vout, i);
         dogecoin_tx_out_serialize(s, tx_out);
     }
 
@@ -688,9 +684,6 @@ dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromP
         if (!(hashtype & SIGHASH_ANYONECANPAY)) {
             /* This code is calculating the hash of the previous outputs. */
             dogecoin_tx_prevout_hash(tx_tmp, hash_prevouts);
-        }
-        if (!(hashtype & SIGHASH_ANYONECANPAY)) {
-            /* This code is calculating the hash of the outputs of the transaction. */
             dogecoin_tx_outputs_hash(tx_tmp, hash_outputs);
         }
         if (!(hashtype & SIGHASH_ANYONECANPAY) && (hashtype & 0x1f) != SIGHASH_SINGLE && (hashtype & 0x1f) != SIGHASH_NONE) {

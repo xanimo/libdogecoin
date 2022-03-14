@@ -71,7 +71,7 @@ LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
 /* A macro that is used to free the memory allocated for the `dogecoin_block_header` struct. */
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 
-LIBDOGECOIN_API static int calcLength(char buf, int offset);
+LIBDOGECOIN_API int calcLength(char buf, int offset);
 
 LIBDOGECOIN_API int32_t dogecoin_get_block_header_version(struct const_buffer* buffer);
 

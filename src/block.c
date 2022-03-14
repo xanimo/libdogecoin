@@ -70,7 +70,6 @@ void printBits(size_t const size, void const* ptr)
 {
     unsigned char *b = (unsigned char*) ptr;
     unsigned char byte;
-    uint64_t bytestr;
     int i, j;
     
     for (i = size-1; i >= 0; i--) {

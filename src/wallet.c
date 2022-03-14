@@ -57,10 +57,6 @@ static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* head
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
 static const uint32_t current_version = 1;
 
-static const char* hdkey_key = "hdkey";
-static const char* hdmasterkey_key = "mstkey";
-static const char* tx_key = "tx";
-
 /* ====================== */
 /* compare btree callback */
 /* ====================== */
@@ -428,10 +424,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 wallet->masterkey = dogecoin_hdnode_new();
                 printf("xpub: %s\n", strbuf);
                 dogecoin_hdnode_deserialize(strbuf, wallet->chain, wallet->masterkey);
-                int i = 0;
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
-                uint32_t len;
-
                 dogecoin_wallet_addr *waddr= dogecoin_wallet_addr_new();
                 size_t reclen = 20+1+4;
                 unsigned char buf[reclen];
@@ -721,10 +714,10 @@ dogecoin_bool dogecoin_wallet_txout_is_mine(dogecoin_wallet* wallet, dogecoin_tx
     if (type == DOGECOIN_TX_PUBKEYHASH) {
         //TODO: find a better format for vector elements (not a pure pointer)
         uint8_t* hash160 = vector_idx(vec, 0);
-        if (dogecoin_wallet_have_key(wallet, hash160))
+        if (dogecoin_wallet_have_key(wallet, hash160)) {
             ismine = true;
-    }
-    else if (type == DOGECOIN_TX_WITNESS_V0_PUBKEYHASH && vec->len == 1) {
+        }
+    } else if (type == DOGECOIN_TX_WITNESS_V0_PUBKEYHASH && vec->len == 1) {
         uint8_t *hash160 = vector_idx(vec, 0);
         if (dogecoin_wallet_have_key(wallet, hash160))
             ismine = true;
@@ -799,7 +792,7 @@ void dogecoin_wallet_add_to_spent(dogecoin_wallet* wallet, const dogecoin_wtx* w
     if (dogecoin_tx_is_coinbase(wtx->tx))
         return;
 
-    unsigned int i = 0;
+    unsigned int i;
     if (wtx->tx->vin) {
         for (i = 0; i < wtx->tx->vin->len; i++) {
             dogecoin_tx_in* tx_in = vector_idx(wtx->tx->vin, i);
@@ -819,8 +812,6 @@ dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256 hash, ui
 {
     if (!wallet)
         return false;
-
-    unsigned int i = 0;
 
     dogecoin_tx_outpoint outpoint;
     memcpy(&outpoint.hash, hash, sizeof(uint256));
@@ -874,7 +865,6 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
     (void)(pindex);
     dogecoin_wallet *wallet = (dogecoin_wallet *)ctx;
     if (dogecoin_wallet_is_mine(wallet, tx) || dogecoin_wallet_is_from_me(wallet, tx)) {
-        int i = 0;
         printf("\nFound relevant transaction!\n");
     }
 }

@@ -220,7 +220,6 @@ void logdb_free(logdb_log_db* db)
 logdb_bool logdb_load(logdb_log_db* handle, const char *file_path, logdb_bool create, enum logdb_error *error)
 {
     uint32_t v;
-    logdb_record *rec;
     enum logdb_error record_error;
 
     handle->file = fopen(file_path, create ? "a+b" : "r+b");
@@ -271,6 +270,7 @@ logdb_bool logdb_load(logdb_log_db* handle, const char *file_path, logdb_bool cr
         }
         handle->support_flags = le32toh(v);
 
+        logdb_record *rec;
         rec = logdb_record_new();
         while (logdb_record_deser_from_file(rec, handle, &record_error))
         {

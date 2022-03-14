@@ -90,16 +90,6 @@ static const char* DOGECOIN_MSG_BLOCK = "block";
 static const char* DOGECOIN_MSG_INV = "inv";
 static const char* DOGECOIN_MSG_TX = "tx";
 
-static const char* DOGECOIN_MSG_GETCFILTERS = "getcfilters";
-static const char* DOGECOIN_MSG_CFILTER = "cfilter";
-
-static const char* DOGECOIN_MSG_GETCFHEADERS = "getcfheaders";
-static const char* DOGECOIN_MSG_CFHEADERS = "cfheaders";
-
-static const char* DOGECOIN_MSG_GETCFCHECKPT = "getcfcheckpt";
-static const char* DOGECOIN_MSG_CFCHECKPT = "cfcheckpt";
-
-
 enum DOGECOIN_INV_TYPE {
     DOGECOIN_INV_TYPE_ERROR = 0,
     DOGECOIN_INV_TYPE_TX = 1,

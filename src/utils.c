@@ -128,14 +128,13 @@ void utils_hex_to_bin(const char* str, unsigned char* out, int inLen, int* outLe
  */
 uint8_t* utils_hex_to_uint8(const char* str)
 {
-    uint8_t c;
-    size_t i;
     if (strlens(str) > TO_UINT8_HEX_BUF_LEN) {
         return NULL;
     }
     dogecoin_mem_zero(buffer_hex_to_uint8, TO_UINT8_HEX_BUF_LEN);
+    size_t i;
     for (i = 0; i < strlens(str) / 2; i++) {
-        c = 0;
+        uint8_t c = 0;
         if (str[i * 2] >= '0' && str[i * 2] <= '9') {
             c += (str[i * 2] - '0') << 4;
         }

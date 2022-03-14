@@ -430,7 +430,6 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     the block gap to deduct from the start scan from. */
     if (client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp < client->oldest_item_of_interest - (BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S))
     {
-        size_t i;
         for(i = 0; i < client->nodegroup->nodes->len; i++)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
@@ -454,7 +453,6 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     /* Checking if the new headers are available and if there are any nodes connected to the nodegroup. */
     if (!new_headers_available && dogecoin_node_group_amount_of_connected_nodes(client->nodegroup, NODE_CONNECTED) > 0) {
         // try to fetch blocks if no new headers are available but connected nodes are reachable
-        size_t i;
         for(i = 0; i< client->nodegroup->nodes->len; i++)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
@@ -528,12 +526,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         {
             uint32_t type;
             deser_u32(&type, buf);
-            if (type == DOGECOIN_INV_TYPE_BLOCK)
-                contains_block = true;
-
             /* skip the hash, we are going to directly use the inv-buffer for the getdata */
             /* this means we don't support invs contanining blocks and txns as a getblock answer */
             if (type == DOGECOIN_INV_TYPE_BLOCK) {
+                contains_block = true;
                 /* Deserializing the last_requested_inv field of the node struct. */
                 deser_u256(node->last_requested_inv, buf);
             } else {
@@ -546,7 +542,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (contains_block)
         {
             node->time_last_request = time(NULL);
-
             /* request the blocks */
             client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
             /* Creating a new message object and setting the magic number, command, and payload. */
@@ -572,9 +567,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
     {
         dogecoin_bool connected;
         dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
-        printf("dogecoin_blockindex: pindex->height %u\n", pindex->height);
-        printf("dogecoin_blockindex: pindex->hash %s\n", pindex->hash);
-        printf("dogecoin_blockindex: pindex->prev->height %u\n", pindex->prev->height);
+
         /* deserialize the p2p header */
         if (!pindex) {
             return;
@@ -601,7 +594,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             time_t lasttime = pindex->header.timestamp;
             printf("Downloaded new block with size %d at height %d (%s)\n", hdr->data_len, pindex->height, ctime(&lasttime));
             uint64_t start = time(NULL);
-            printf("Start parsing %d transactions...\n", amount_of_txs);
+            printf("Start parsing %d transactions...\n", (int)amount_of_txs);
 
             size_t consumedlength = 0;
             /* Creating a random number of transactions to be added to the block. */
@@ -718,17 +711,5 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         }
         /* headers download seems to be completed */
         /* we should have switched to block request if the oldest_item_of_interest was set correctly */
-    }
-    if (strcmp(hdr->command, DOGECOIN_MSG_CFILTER) == 0)
-    {
-        client->nodegroup->log_write_cb("Got DOGECOIN_MSG_CFILTER\n");
-    }
-    if (strcmp(hdr->command, DOGECOIN_MSG_CFHEADERS) == 0)
-    {
-        client->nodegroup->log_write_cb("Got DOGECOIN_MSG_CFHEADERS\n");
-    }
-    if (strcmp(hdr->command, DOGECOIN_MSG_CFCHECKPT) == 0)
-    {
-        client->nodegroup->log_write_cb("Got DOGECOIN_MSG_CFCHECKPT\n");
     }
 }

@@ -358,7 +358,7 @@ int deser_varlen(uint32_t* lo, struct const_buffer* buf)
         uint64_t v64;
         if (!deser_u64(&v64, buf))
             return false;
-        printf("\n\n***WARNING: truncate %lu; L192-serialize.c\n\n", sizeof(v64));
+        printf("\n\n***WARNING: truncate %lu; L192-serialize.c\n\n", (unsigned long)sizeof(v64));
         len = v64; /* WARNING: truncate */
     } else {
         len = c;
@@ -413,7 +413,7 @@ int deser_varlen_from_file(uint32_t* lo, FILE* file)
             return false;
         if (!deser_u64(&v64, &buf))
             return false;
-        printf("\n\n***WARNING: truncate %lu; L234-serialize.c\n\n", sizeof(v64));
+        printf("\n\n***WARNING: truncate %lu; L234-serialize.c\n\n", (unsigned long)sizeof(v64));
         len = v64; /* WARNING: truncate */
     } else
         len = c;

@@ -9,7 +9,7 @@
 #include <logdb/logdb.h>
 #include <dogecoin/utils.h>
 
-#include "../../../test/utest.h"
+#include <test/utest.h>
 
 #include <unistd.h>
 #include <errno.h>
@@ -60,10 +60,6 @@ void test_logdb(logdb_log_db* (*new_func)())
     uint8_t *wrk_buf;
     FILE *f;
     unsigned int i;
-    char bufs[300][65];
-    rb_red_blk_node *nodetest;
-    unsigned int cnt = 0;
-    logdb_record* rec;
 
     key = cstr_new("key0");
     value = cstr_new("val0");
@@ -202,8 +198,7 @@ void test_logdb(logdb_log_db* (*new_func)())
     fseek(f, 0, SEEK_SET);
 
     buf = calloc(1, fsize + 1);
-    size_t dmp;
-    dmp = fread(buf, fsize, 1, f);
+    fread(buf, fsize, 1, f);
     // buf = malloc(fsize + 1);
     // fread(buf, fsize, 1, f);
     fclose(f);
@@ -423,8 +418,11 @@ void test_logdb(logdb_log_db* (*new_func)())
     {
         logdb_rbtree_db* handle = (logdb_rbtree_db *)db->cb_ctx;
         size_t size = rbtree_count(handle->tree);
-
+        char bufs[300][65];
+        rb_red_blk_node *nodetest;
         nodetest = NULL;
+        unsigned int cnt = 0;
+        logdb_record* rec;
         while ((nodetest = rbtree_enumerate_next(handle->tree)))
         {
             rec = (logdb_record *)nodetest->info;

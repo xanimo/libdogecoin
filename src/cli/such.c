@@ -306,7 +306,6 @@ int main(int argc, char* argv[])
         }
 
         if (end > -1 && from <= to) {
-            uint64_t i;
             for (i = from; i <= to; i++) {
                 char keypathnew[strlen(keypath)+16];
                 memcpy(keypathnew, keypath, posanum-1);

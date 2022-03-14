@@ -71,7 +71,6 @@ int aes256_cbc_encrypt(const unsigned char aes_key[32], const unsigned char iv[A
  */
 int aes256_cbc_decrypt(const unsigned char aes_key[32], const unsigned char iv[AES_BLOCK_SIZE], const unsigned char* data, int size, int pad, unsigned char* out)
 {
-    unsigned char padsize = 0;
     int written = 0;
     int fail = 0;
     const unsigned char* prev = iv;
@@ -97,10 +96,11 @@ int aes256_cbc_decrypt(const unsigned char aes_key[32], const unsigned char iv[A
 
     // When decrypting padding, attempt to run in constant-time
     if (pad) {
+        unsigned char padsize = 0;
         // If used, padding size is the value of the last decrypted byte. For
         // it to be valid, It must be between 1 and AES_BLOCK_SIZE.
         padsize = *--out;
-        fail = !padsize | (padsize > AES_BLOCK_SIZE);
+        fail = (!padsize) | (padsize > AES_BLOCK_SIZE);
 
         // If not well-formed, treat it as though there's no padding.
         padsize *= !fail;

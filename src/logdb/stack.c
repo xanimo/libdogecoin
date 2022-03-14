@@ -69,9 +69,9 @@ void StackPush(stk_stack *theStack, DATA_TYPE newInfoPointer) {
  */
 DATA_TYPE StackPop(stk_stack *theStack) {
   DATA_TYPE popInfo;
-  stk_stack_node *oldNode;
 
   if (theStack->top) {
+    stk_stack_node *oldNode;
     popInfo = theStack->top->info;
     oldNode = theStack->top;
     theStack->top = theStack->top->next;
@@ -91,16 +91,15 @@ DATA_TYPE StackPop(stk_stack *theStack) {
  * @param DestFunc The function to call when a node is removed from the stack.
  */
 void StackDestroy(stk_stack *theStack, void DestFunc(void *a)) {
+  if (!theStack->top) return;
   stk_stack_node *x = theStack->top;
   stk_stack_node *y;
 
-  if (theStack) {
-    while (x) {
-      y = x->next;
-      DestFunc(x->info);
-      free(x);
-      x = y;
-    }
-    free(theStack);
+  while (x) {
+    y = x->next;
+    DestFunc(x->info);
+    free(x);
+    x = y;
   }
+  free(theStack);
 }

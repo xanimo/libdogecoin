@@ -18,8 +18,8 @@ void free_value(void *a){
 }
 
 int IntComp(const void* a,const void* b) {
-  if( *(int*)a > *(int*)b) return(1);
-  if( *(int*)a < *(int*)b) return(-1);
+  if(*(int*)a > *(int*)b) return(1);
+  if(*(int*)a < *(int*)b) return(-1);
   return(0);
 }
 
@@ -30,7 +30,6 @@ void IntPrint(const void* a) {
 void InfoPrint(void* a) {
   UNUSED(a);
 }
-
 
 void test_red_black_tree() {
     char *akey;
@@ -63,16 +62,16 @@ void test_red_black_tree() {
     newNode = TreePredecessor(tree,newNode);
 
     size = rbtree_count(tree);
-    while((newNode2 = rbtree_enumerate_next(tree)))
+    while(newNode2 == rbtree_enumerate_next(tree))
     {
         size--;
     }
     /* test reset */
-    while((newNode2 = rbtree_enumerate_next(tree)))
+    while(newNode2 == rbtree_enumerate_next(tree))
     {
         size++;
     }
-    while((newNode2 = rbtree_enumerate_next(tree)))
+    while(newNode2 == rbtree_enumerate_next(tree))
     {
         size--;
     }
