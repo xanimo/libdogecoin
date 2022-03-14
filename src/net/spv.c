@@ -282,18 +282,6 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
  * 
  * The dogecoin_net_spv_periodic_statecheck function checks if the node is connected to the network. 
  * 
- * If it is, it checks if the node is synced. 
- * 
- * If it is, it checks if the node is in the mempool. 
- * 
- * If it is, it checks if the node is in the blockchain. 
- * 
- * If it is, it checks if the node is in the mempool. 
- * 
- * If it is, it checks if the node is in the blockchain. 
- * 
- * If it is, it checks if the node is in the
- * 
  * @param node The node that the timer is being called on.
  * @param now the current time in seconds since the epoch
  * 
@@ -335,10 +323,10 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector *bl
             size_t length = memcmp(client->chainparams, &dogecoin_chainparams_main, 8) == 0 ? mainnet_checkpoint_size : testnet_checkpoint_size;
             int i;
             for (i = length - 1; i >= 0; i--) {
-                printf("i: %d\n", i);
-                printf("hash: %s\n", checkpoint[i].hash);
-                printf("timestamp: %d\n", checkpoint[i].timestamp);
-                printf("min_timestamp: %ld\n", min_timestamp);
+                // printf("i: %d\n", i);
+                // printf("hash: %s\n", checkpoint[i].hash);
+                // printf("timestamp: %d\n", checkpoint[i].timestamp);
+                // printf("min_timestamp: %ld\n", min_timestamp);
                 if (checkpoint[i].timestamp < min_timestamp) {
                     uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
                     utils_uint256_sethex((char *)checkpoint[i].hash, (uint8_t *)hash);
@@ -352,7 +340,7 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector *bl
         }
         uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
         /* Copying the genesis block hash into the hash variable. */
-        memcpy(hash, &client->chainparams->genesisblockhash, sizeof(uint256));
+        memcpy_s(hash, &client->chainparams->genesisblockhash, sizeof(uint256));
         /* Adding the hash of the block to the blocklocators vector. */
         vector_add(blocklocators, (void *)hash);
         client->nodegroup->log_write_cb("Setting blocklocator with genesis block\n");

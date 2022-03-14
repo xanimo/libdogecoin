@@ -1,5 +1,6 @@
 #include <logdb/logdb_base.h>
 #include <logdb/red_black_tree.h>
+#include <dogecoin/utils.h>
 
 #include "../../../test/utest.h"
 
@@ -45,15 +46,15 @@ void test_red_black_tree() {
 
 
     akey = malloc(10);
-    memcpy(akey, (void *)"akey", 4);
+    memcpy_s(akey, (void *)"akey", 4);
     avalue = malloc(10);
-    memcpy(avalue, (void *)"avalue", 6);
+    memcpy_s(avalue, (void *)"avalue", 6);
     RBTreeInsert(tree,akey,avalue);
 
     akey2 = malloc(10);
-    memcpy(akey2, (void *)"bkey", 4);
+    memcpy_s(akey2, (void *)"bkey", 4);
     avalue2 = malloc(10);
-    memcpy(avalue2, (void *)"bvalue", 6);
+    memcpy_s(avalue2, (void *)"bvalue", 6);
     RBTreeInsert(tree,akey2,avalue2);
 
     newNode2 = RBExactQuery(tree,akey2);
@@ -80,6 +81,6 @@ void test_red_black_tree() {
 
     RBDelete(tree, newNode);
 
-    RBTreePrint(tree);
+    // RBTreePrint(tree);
     RBTreeDestroy(tree);
 }

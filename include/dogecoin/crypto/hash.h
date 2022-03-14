@@ -37,6 +37,7 @@ LIBDOGECOIN_BEGIN_DECL
 #include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/vector.h>
+#include <dogecoin/utils.h>
 
 /**
  * Given a hash, return true if the hash is empty
@@ -82,7 +83,7 @@ LIBDOGECOIN_API static inline dogecoin_bool dogecoin_hash_equal(uint256 hash_a, 
  */
 LIBDOGECOIN_API static inline void dogecoin_hash_set(uint256 hash_dest, const uint256 hash_src)
 {
-    memcpy(hash_dest, hash_src, DOGECOIN_HASH_LENGTH);
+    memcpy_s(hash_dest, hash_src, DOGECOIN_HASH_LENGTH);
 }
 
 /**

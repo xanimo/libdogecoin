@@ -33,7 +33,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "libdogecoin-config.h"
+#include <src/libdogecoin-config.h>
 
 #include <dogecoin/chainparams.h>
 #include <dogecoin/crypto/base58.h>

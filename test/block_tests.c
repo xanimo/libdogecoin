@@ -51,15 +51,15 @@ void test_block_header()
         uint8_t header_data[80];
         uint256 hash_data;
         utils_hex_to_bin(test->hexheader, header_data, 160, &outlen);
-        struct const_buffer buf_version = {header_data, 4};
-        int32_t version, nonce;
+        // struct const_buffer buf_version = {header_data, 4};
+        // int32_t version, nonce;
 
-        version = dogecoin_get_block_header_version(&buf_version);
-        if (!version) printf("false\n");
-        struct const_buffer buf_nonce = {header_data, 4};
-        nonce = dogecoin_get_block_header_nonce(&buf_nonce);
-        if (!nonce) printf("non nonce\n");
-        printf("version: %d nonce: %d\n", version, nonce);
+        // version = dogecoin_get_block_header_version(&buf_version);
+        // if (!version) printf("false\n");
+        // struct const_buffer buf_nonce = {header_data, 4};
+        // nonce = dogecoin_get_block_header_nonce(&buf_nonce);
+        // if (!nonce) printf("non nonce\n");
+        // printf("version: %d nonce: %d\n", version, nonce);
 
         utils_hex_to_bin(test->hexhash, hash_data, sizeof(hash_data), &outlen);
 
@@ -75,7 +75,7 @@ void test_block_header()
         // Check the serialized form matches
         dogecoin_block_header_serialize(serialized, header);
         utils_bin_to_hex((unsigned char*) serialized->str, serialized->len, hexbuf);
-        printf("serialized: %s\n", hexbuf);
+        // printf("serialized: %s\n", hexbuf);
         assert(memcmp(hexbuf, test->hexheader, 160) == 0);
 
         // Check the block hash
@@ -84,7 +84,7 @@ void test_block_header()
 
         utils_bin_to_hex(blockhash, DOGECOIN_HASH_LENGTH, hexbuf);
         utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH*2);
-        printf("blockhash = %s\n", hexbuf);
+        // printf("blockhash = %s\n", hexbuf);
         assert(memcmp(hexbuf, test->hexhash, DOGECOIN_HASH_LENGTH*2) == 0);
         // Check version, ts, bits, nonce
         assert(header->version == test->version);
@@ -105,7 +105,7 @@ void test_block_header()
     bheader.bits = 456184976; // 371338
     char *prevblock_hex_o = "60323982f9c5ff1b5a954eac9dc1269352835f47c2c5222691d80f0d50dcf053"; // 371337
     char *prevblock_hex = dogecoin_malloc(strlen(prevblock_hex_o)+1);
-    memcpy(prevblock_hex, prevblock_hex_o, strlen(prevblock_hex_o));
+    memcpy_s(prevblock_hex, prevblock_hex_o, strlen(prevblock_hex_o));
     utils_reverse_hex(prevblock_hex, 64);
     outlen = 0;
     utils_hex_to_bin(prevblock_hex, bheader.prev_block, 64, &outlen);
@@ -113,7 +113,7 @@ void test_block_header()
 
     char *merkleroot_hex_o = "366747b6b22fab0a5ef71d433c14e5949b601c1f103984181364618b83eef67d"; // 427928
     char *merkleroot_hex = dogecoin_malloc(strlen(merkleroot_hex_o)+1);
-    memcpy(merkleroot_hex, merkleroot_hex_o, strlen(merkleroot_hex_o));
+    memcpy_s(merkleroot_hex, merkleroot_hex_o, strlen(merkleroot_hex_o));
     utils_reverse_hex(merkleroot_hex, 64);
     outlen = 0;
     utils_hex_to_bin(merkleroot_hex, bheader.merkle_root, 64, &outlen);
@@ -126,7 +126,7 @@ void test_block_header()
 
     prevblock_hex_o = "46a8b109fb016fa41abd17a19186ca78d39c60c020c71fcd2690320d47036f0d"; // 371336
     prevblock_hex = dogecoin_malloc(strlen(prevblock_hex_o)+1);
-    memcpy(prevblock_hex, prevblock_hex_o, strlen(prevblock_hex_o));
+    memcpy_s(prevblock_hex, prevblock_hex_o, strlen(prevblock_hex_o));
     utils_reverse_hex(prevblock_hex, 64);
     outlen = 0;
     utils_hex_to_bin(prevblock_hex, bheaderprev.prev_block, 64, &outlen);
@@ -134,7 +134,7 @@ void test_block_header()
 
     merkleroot_hex_o = "ee27b8fb782a5bfb99c975f0d4686440b9af9e16846603e5f2830e0b6fbf158a"; // 371337
     merkleroot_hex = dogecoin_malloc(strlen(merkleroot_hex_o)+1);
-    memcpy(merkleroot_hex, merkleroot_hex_o, strlen(merkleroot_hex_o));
+    memcpy_s(merkleroot_hex, merkleroot_hex_o, strlen(merkleroot_hex_o));
     utils_reverse_hex(merkleroot_hex, 64);
     outlen = 0;
     utils_hex_to_bin(merkleroot_hex, bheaderprev.merkle_root, 64, &outlen);

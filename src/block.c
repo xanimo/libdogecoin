@@ -133,7 +133,7 @@ int dogecoin_get_block_header_coinbase_txn(struct const_buffer* buffer) {
     int32_t coinbase_txn;
     if (!deser_s32(&coinbase_txn, buffer))
         return false;
-    printf("dogecoin_tx_is_coinbaseversion: %d\n", coinbase_txn);
+    printf("dogecoin_coinbase_txn: %d\n", coinbase_txn);
     return true;
 }
 
@@ -273,8 +273,8 @@ void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* he
  */
 void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_block_header* src) {
     dest->version = src->version;
-    memcpy(&dest->prev_block, &src->prev_block, sizeof(src->prev_block));
-    memcpy(&dest->merkle_root, &src->merkle_root, sizeof(src->merkle_root));
+    memcpy_s(&dest->prev_block, &src->prev_block, sizeof(src->prev_block));
+    memcpy_s(&dest->merkle_root, &src->merkle_root, sizeof(src->merkle_root));
     dest->timestamp = src->timestamp;
     dest->bits = src->bits;
     dest->nonce = src->nonce;

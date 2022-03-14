@@ -234,7 +234,7 @@ int dogecoin_base58_encode_check(const uint8_t* data, int datalen, char* str, in
     }
     uint8_t buf[1 + datalen + 0x20];
     uint8_t* hash = buf + datalen;
-    memcpy(buf, data, datalen);
+    memcpy_s(buf, data, datalen);
     if (!dogecoin_dblhash(data, datalen, hash)) {
         return false;
     }
@@ -296,7 +296,7 @@ int dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
 dogecoin_bool dogecoin_p2pkh_addr_from_hash160(const uint160 hashin, const dogecoin_chainparams* chain, char *addrout, int len) {
     uint8_t hash160[sizeof(uint160)+1];
     hash160[0] = chain->b58prefix_pubkey_address;
-    memcpy(hash160 + 1, hashin, sizeof(uint160));
+    memcpy_s(hash160 + 1, hashin, sizeof(uint160));
 
     return (dogecoin_base58_encode_check(hash160, sizeof(uint160)+1, addrout, len) > 0);
 }
@@ -316,7 +316,7 @@ dogecoin_bool dogecoin_p2sh_addr_from_hash160(const uint160 hashin, const dogeco
 {
     uint8_t hash160[sizeof(uint160) + 1];
     hash160[0] = chain->b58prefix_script_address;
-    memcpy(hash160 + 1, hashin, sizeof(uint160));
+    memcpy_s(hash160 + 1, hashin, sizeof(uint160));
 
     return (dogecoin_base58_encode_check(hash160, sizeof(uint160) + 1, addrout, len) > 0);
 }

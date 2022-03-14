@@ -198,7 +198,7 @@ void test_net_basics_plus_download_block()
     for (i = 0; i < ips->len; i++)
     {
         char *ip = (char *)vector_idx(ips, i);
-        printf("dns seed ip %d: %s\n", i, ip);
+        // printf("dns seed ip %d: %s\n", i, ip);
     }
     vector_free(ips, true);
 
@@ -232,7 +232,7 @@ void test_net_basics_plus_download_block()
     group->periodic_timer_cb = timer_cb;
 
     /* set a individual log print function */
-    group->log_write_cb = net_write_log_printf;
+    group->log_write_cb = net_write_log_null;
     group->parse_cmd_cb = parse_cmd;
     group->postcmd_cb = postcmd;
     group->node_connection_state_changed_cb = node_connection_state_changed;

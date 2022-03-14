@@ -108,6 +108,7 @@ typedef struct dogecoin_node_ {
 } dogecoin_node;
 
 LIBDOGECOIN_API int net_write_log_printf(const char* format, ...);
+LIBDOGECOIN_API int net_write_log_null(const char* format, ...);
 
 /* =================================== */
 /* NODES */

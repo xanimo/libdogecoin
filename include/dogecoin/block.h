@@ -31,12 +31,13 @@
 #define __LIBDOGECOIN_BLOCK_H__
 
 #include <dogecoin/dogecoin.h>
+
+LIBDOGECOIN_BEGIN_DECL
+
 #include <dogecoin/buffer.h>
 #include <dogecoin/cstr.h>
 #include <dogecoin/crypto/hash.h>
 #include <dogecoin/tx.h>
-
-LIBDOGECOIN_BEGIN_DECL
 
 typedef struct dogecoin_block_header_ {
     int32_t version;
@@ -71,6 +72,7 @@ LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
 /* A macro that is used to free the memory allocated for the `dogecoin_block_header` struct. */
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 
+// TODO
 LIBDOGECOIN_API int calcLength(char buf, int offset);
 
 LIBDOGECOIN_API int32_t dogecoin_get_block_header_version(struct const_buffer* buffer);
@@ -98,6 +100,7 @@ LIBDOGECOIN_API int dogecoin_get_block_header_parent_block(struct const_buffer* 
 LIBDOGECOIN_API int dogecoin_get_block_header_txn_count(struct const_buffer* buffer);
 
 LIBDOGECOIN_API int dogecoin_get_block_header_txns(struct const_buffer* buffer);
+// END TODO
 
 /* Deserializing a block header from a buffer. */
 LIBDOGECOIN_API int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf);

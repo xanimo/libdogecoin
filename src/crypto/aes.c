@@ -34,14 +34,14 @@ int aes256_cbc_encrypt(const unsigned char aes_key[32], const unsigned char iv[A
     // Set cipher key
     AES256_init(&aes_ctx, aes_key);
 
-    memcpy(mixed, iv, AES_BLOCK_SIZE);
+    memcpy_s(mixed, iv, AES_BLOCK_SIZE);
 
     // Write all but the last block
     while (written + AES_BLOCK_SIZE <= size) {
         for (int i = 0; i != AES_BLOCK_SIZE; i++)
             mixed[i] ^= *data++;
         AES256_encrypt(&aes_ctx, 1, out + written, mixed);
-        memcpy(mixed, out + written, AES_BLOCK_SIZE);
+        memcpy_s(mixed, out + written, AES_BLOCK_SIZE);
         written += AES_BLOCK_SIZE;
     }
     if (pad) {

@@ -8,6 +8,7 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/crypto/common.h>
 #include <dogecoin/serialize.h>
+#include <dogecoin/utils.h>
 
 /**
  * Append a buffer to a cstring
@@ -198,7 +199,7 @@ int deser_bytes(void* po, struct const_buffer* buf, size_t len)
         return false;
     }
 
-    memcpy(po, buf->p, len);
+    memcpy_s(po, buf->p, len);
     p = (char*)buf->p;
     p += len;
     buf->p = p;
@@ -413,8 +414,7 @@ int deser_varlen_from_file(uint32_t* lo, FILE* file)
             return false;
         if (!deser_u64(&v64, &buf))
             return false;
-        printf("\n\n***WARNING: truncate %lu; L234-serialize.c\n\n", (unsigned long)sizeof(v64));
-        len = v64; /* WARNING: truncate */
+        len = (uint32_t)v64; /* WARNING: truncate */
     } else
         len = c;
 
@@ -458,7 +458,7 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
         uint16_t v16;
         if (fread((void*)buf.p, 1, sizeof(v16), file) != sizeof(v16))
             return false;
-        memcpy(rawdata + 1, buf.p, sizeof(v16));
+        memcpy_s(rawdata + 1, buf.p, sizeof(v16));
         *buflen_inout += sizeof(v16);
         if (!deser_u16(&v16, &buf))
             return false;
@@ -467,7 +467,7 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
         uint32_t v32;
         if (fread((void*)buf.p, 1, sizeof(v32), file) != sizeof(v32))
             return false;
-        memcpy(rawdata + 1, buf.p, sizeof(v32));
+        memcpy_s(rawdata + 1, buf.p, sizeof(v32));
         *buflen_inout += sizeof(v32);
         if (!deser_u32(&v32, &buf))
             return false;
@@ -476,11 +476,10 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
         uint64_t v64;
         if (fread((void*)buf.p, 1, sizeof(v64), file) != sizeof(v64))
             return false;
-        memcpy(rawdata + 1, buf.p, sizeof(uint32_t)); /* warning, truncate! */
+        memcpy_s(rawdata + 1, buf.p, sizeof(uint32_t)); /* warning, truncate! */
         *buflen_inout += sizeof(uint32_t);
         if (!deser_u64(&v64, &buf))
             return false;
-        printf("\n\n***WARNING: truncate %lu; L291-serialize.c\n\n", sizeof(v64));
         len = (uint32_t)v64; /* WARNING: truncate */
     } else {
         len = c;

@@ -118,7 +118,7 @@ cstring* cstr_new_buf(const void* buf, size_t sz)
         return NULL;
     }
 
-    memcpy(s->str, buf, sz);
+    memcpy_s(s->str, buf, sz);
     s->len = sz;
     s->str[s->len] = 0;
 
@@ -232,7 +232,7 @@ int cstr_append_buf(cstring* s, const void* buf, size_t sz)
         return 0;
     }
 
-    memcpy(s->str + s->len, buf, sz);
+    memcpy_s(s->str + s->len, buf, sz);
     s->len += sz;
     s->str[s->len] = 0;
 

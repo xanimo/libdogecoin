@@ -422,7 +422,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                     return false;
                 }
                 wallet->masterkey = dogecoin_hdnode_new();
-                printf("xpub: %s\n", strbuf);
+                // printf("xpub: %s\n", strbuf);
                 dogecoin_hdnode_deserialize(strbuf, wallet->chain, wallet->masterkey);
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
                 dogecoin_wallet_addr *waddr= dogecoin_wallet_addr_new();
@@ -503,7 +503,7 @@ void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, const dogecoin
     cstring* record = cstr_new_sz(256);
     char strbuf[196];
     dogecoin_hdnode_serialize_public(wallet->masterkey, wallet->chain, strbuf, sizeof(strbuf));
-    printf("xpub: %s\n", strbuf);
+    // printf("xpub: %s\n", strbuf);
     ser_str(record, strbuf, sizeof(strbuf));
     ser_str(record, strbuf, sizeof(strbuf));
 
@@ -581,7 +581,7 @@ dogecoin_wallet_addr* dogecoin_wallet_find_waddr_byaddr(dogecoin_wallet* wallet,
         size_t programmlen = 0;
         if(segwit_addr_decode(&version, programm, &programmlen, wallet->chain->bech32_hrp, search_addr) == 1) {
             if (programmlen == 20) {
-                memcpy(hashdata+1, (const uint8_t *)programm, 20);
+                memcpy_s(hashdata+1, (const uint8_t *)programm, 20);
             }
         }
         else {
@@ -591,7 +591,7 @@ dogecoin_wallet_addr* dogecoin_wallet_find_waddr_byaddr(dogecoin_wallet* wallet,
 
     dogecoin_wallet_addr* waddr_search;
     waddr_search = dogecoin_calloc(1, sizeof(*waddr_search));
-    memcpy(waddr_search->pubkeyhash, hashdata+1, sizeof(uint160));
+    memcpy_s(waddr_search->pubkeyhash, hashdata+1, sizeof(uint160));
 
     dogecoin_wallet_addr *needle = tfind(waddr_search, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare); /* read */
     if (needle) {
@@ -628,7 +628,7 @@ dogecoin_bool dogecoin_wallet_have_key(dogecoin_wallet* wallet, uint160 hash160)
         return false;
 
     dogecoin_wallet_addr waddr_search;
-    memcpy(&waddr_search.pubkeyhash, hash160, sizeof(uint160));
+    memcpy_s(&waddr_search.pubkeyhash, hash160, sizeof(uint160));
 
     dogecoin_wallet_addr *needle = tfind(&waddr_search, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare); /* read */
     if (needle) {
@@ -746,7 +746,7 @@ int64_t dogecoin_wallet_get_debit_txi(dogecoin_wallet *wallet, const dogecoin_tx
     if (!wallet || !txin) return 0;
 
     dogecoin_wtx wtx;
-    memcpy(wtx.tx_hash_cache, txin->prevout.hash, sizeof(wtx.tx_hash_cache));
+    memcpy_s(wtx.tx_hash_cache, txin->prevout.hash, sizeof(wtx.tx_hash_cache));
 
     dogecoin_wtx* prevwtx = tfind(&wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
     if (prevwtx) {
@@ -799,7 +799,7 @@ void dogecoin_wallet_add_to_spent(dogecoin_wallet* wallet, const dogecoin_wtx* w
 
             // form outpoint
             dogecoin_tx_outpoint* outpoint = dogecoin_calloc(1, sizeof(dogecoin_tx_outpoint));
-            memcpy(outpoint, &tx_in->prevout, sizeof(dogecoin_tx_outpoint));
+            memcpy_s(outpoint, &tx_in->prevout, sizeof(dogecoin_tx_outpoint));
 
             // add to binary tree
             // memory is managed there (will free on tdestroy
@@ -814,7 +814,7 @@ dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256 hash, ui
         return false;
 
     dogecoin_tx_outpoint outpoint;
-    memcpy(&outpoint.hash, hash, sizeof(uint256));
+    memcpy_s(&outpoint.hash, hash, sizeof(uint256));
     outpoint.n = n;
     dogecoin_tx_outpoint* possible_found = tfind(&outpoint, &wallet->spends_rbtree, dogecoin_tx_outpoint_compare);
     if (possible_found) {

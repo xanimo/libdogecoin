@@ -29,11 +29,13 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
+#include <errno.h>
+#include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
 
@@ -200,6 +202,18 @@ char* utils_uint8_to_hex(const uint8_t* bin, size_t l)
     return buffer_uint8_to_hex;
 }
 
+void* memcpy_s(void* destination, const void* source, unsigned int count) {
+    char *pszDest = (char *)destination;
+    const char *pszSource =( const char*)source;
+    if((pszDest!= NULL) && (pszSource!= NULL)) {
+        while(count) {
+            *(pszDest++)= *(pszSource++);
+            --count;
+        }
+    }
+    return destination;
+}
+
 /**
  * Reverse the order of the bytes in a hex string
  * 
@@ -210,8 +224,8 @@ void utils_reverse_hex(char* h, int len)
 {
     char* copy = dogecoin_calloc(1, len);
     int i;
-    strncpy(copy, h, len);
-    for (i = 0; i < len; i += 2) {
+    memcpy_s(copy, h, len);
+    for (i = 0; i < len - 1; i += 2) {
         h[i] = copy[len - i - 2];
         h[i + 1] = copy[len - i - 1];
     }
@@ -319,9 +333,9 @@ void* safe_malloc(size_t size)
  */
 void dogecoin_cheap_random_bytes(uint8_t* buf, uint32_t len)
 {
-    srand(time(NULL));
+    srand(time(NULL)); // insecure
     for (uint32_t i = 0; i < len; i++) {
-        buf[i] = rand();
+        buf[i] = rand(); // weak non secure cryptographic rng
     }
 }
 

@@ -89,7 +89,7 @@ dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainpa
 
     db->genesis.height = 0;
     db->genesis.prev = NULL;
-    memcpy(db->genesis.hash, chainparams->genesisblockhash, DOGECOIN_HASH_LENGTH);
+    memcpy_s(db->genesis.hash, chainparams->genesisblockhash, DOGECOIN_HASH_LENGTH);
     db->chaintip = &db->genesis;
     db->chainbottom = &db->genesis;
 
@@ -254,7 +254,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
         }
     }
     /* The code below is connecting the headers to the chain. */
-    printf("Connected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
+    // printf("Connected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
 
@@ -433,7 +433,7 @@ void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector *blo
             /* Allocating memory for a uint256 and then initializing it to 0. */
             uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
             /* Copying the hash of the tip of the chain into the hash variable. */
-            memcpy(hash, scan_tip->hash, sizeof(uint256));
+            memcpy_s(hash, scan_tip->hash, sizeof(uint256));
 
             /* The code below is adding the hash of the block to the blocklocators vector. */
             vector_add(blocklocators, (void *)hash);
@@ -462,7 +462,7 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256 h
         /* Allocating memory for a dogecoin_blockindex struct and initializing it to zero. */
         dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
         /* Copying the hash of the block into the block index. */
-        memcpy(blockindex->hash, hash, sizeof(uint256));
+        memcpy_s(blockindex->hash, hash, sizeof(uint256));
         /* Searching the tree for the blockindex with the given hash. */
         dogecoin_blockindex *blockindex_f = tfind(blockindex, &db->tree_root, dogecoin_header_compare); /* read */
         if (blockindex_f) {
@@ -543,7 +543,7 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256 ha
     /* Setting the height of the bottom chain to the height of the top chain. */
     db->chainbottom->height = height;
     /* Copying the hash of the previous block into the hash of the current block. */
-    memcpy(db->chainbottom->hash, hash, sizeof(uint256));
+    memcpy_s(db->chainbottom->hash, hash, sizeof(uint256));
     /* Setting the chain tip to the chain bottom. */
     db->chaintip = db->chainbottom;
 }

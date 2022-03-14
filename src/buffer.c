@@ -7,6 +7,7 @@
 
 #include <dogecoin/buffer.h>
 #include <dogecoin/mem.h>
+#include <dogecoin/utils.h>
 
 /**
  * Return 1 if the two buffers are equal, 0 otherwise
@@ -65,7 +66,7 @@ struct buffer* buffer_copy(const void* data, size_t data_len)
         goto err_out_free;
     }
 
-    memcpy(buf->p, data, data_len);
+    memcpy_s(buf->p, data, data_len);
     buf->len = data_len;
 
     return buf;

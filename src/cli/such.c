@@ -278,7 +278,7 @@ int main(int argc, char* argv[])
                     }
                     posbnum = i+1;
                     char buf[9] = {0};
-                    memcpy (buf, &keypath[posanum], i-posanum);
+                    memcpy_s(buf, &keypath[posanum], i-posanum);
                     from = strtoull(buf, NULL, 10);
                 } else if (!strchr(digits, keypath[i])) {
                     posanum = -1;
@@ -290,12 +290,12 @@ int main(int argc, char* argv[])
                         break;
                     }
                     char buf[9] = {0};
-                    memcpy (buf, &keypath[posbnum], i-posbnum);
+                    memcpy_s(buf, &keypath[posbnum], i-posbnum);
                     to = strtoull(buf, NULL, 10);
                     end = i+1;
                     break;
                 } else if (!strchr(digits, keypath[i])) {
-                    // posbnum = -1; // value stored is never read
+                    posbnum = -1; // value stored is never read
                     posanum = -1;
                     break;
                 }
@@ -308,11 +308,11 @@ int main(int argc, char* argv[])
         if (end > -1 && from <= to) {
             for (i = from; i <= to; i++) {
                 char keypathnew[strlen(keypath)+16];
-                memcpy(keypathnew, keypath, posanum-1);
+                memcpy_s(keypathnew, keypath, posanum-1);
                 char index[9] = {0};
                 sprintf(index, "%lld", (long long)i);
-                memcpy(keypathnew+posanum-1, index, strlen(index));
-                memcpy(keypathnew+posanum-1+strlen(index), &keypath[end], strlen(keypath)-end);
+                memcpy_s(keypathnew+posanum-1, index, strlen(index));
+                memcpy_s(keypathnew+posanum-1+strlen(index), &keypath[end], strlen(keypath)-end);
 
 
                 if (!hd_derive(chain, pkey, keypathnew, newextkey, sizeout))

@@ -205,7 +205,7 @@ void test_logdb(logdb_log_db* (*new_func)())
 
     /* ---------------------------------------------------- */
     wrk_buf = safe_malloc(fsize + 1);
-    memcpy(wrk_buf, buf, fsize);
+    memcpy_s(wrk_buf, buf, fsize);
     wrk_buf[0] = 0x88; /* wrong header */
 
     unlink(dbtmpfile);
@@ -219,7 +219,7 @@ void test_logdb(logdb_log_db* (*new_func)())
     logdb_free(db);
 
     /* ---------------------------------------------------- */
-    memcpy(wrk_buf, buf, fsize);
+    memcpy_s(wrk_buf, buf, fsize);
     wrk_buf[66] = 0x00; /* wrong checksum hash */
 
     unlink(dbtmpfile);
@@ -233,7 +233,7 @@ void test_logdb(logdb_log_db* (*new_func)())
     logdb_free(db);
 
     /* ---------------------------------------------------- */
-    memcpy(wrk_buf, buf, fsize);
+    memcpy_s(wrk_buf, buf, fsize);
     wrk_buf[42] = 0xFF; /* wrong value length */
 
     unlink(dbtmpfile);
@@ -319,7 +319,7 @@ void test_logdb(logdb_log_db* (*new_func)())
         int outlen = sizeof(tx->txhash) / 2;
         utils_hex_to_bin(tx->txhash, hashbin, strlen(tx->txhash), &outlen);
 
-        memcpy(hexrev, tx->txhash, sizeof(tx->txhash));
+        memcpy_s(hexrev, tx->txhash, sizeof(tx->txhash));
         utils_reverse_hex(hexrev, strlen(tx->txhash));
         outlenrev = sizeof(tx->txhash) / 2;
         utils_hex_to_bin(hexrev, txbin_rev, strlen(hexrev), &outlenrev);

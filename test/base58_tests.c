@@ -140,7 +140,7 @@ void test_base58()
     char strn[53];
     while (*raw && *str) {
         size_t len = strlen(*raw) / 2;
-        memcpy(rawn, utils_hex_to_uint8(*raw), len);
+        memcpy_s(rawn, utils_hex_to_uint8(*raw), len);
         int r = dogecoin_base58_encode_check(rawn, len, strn, sizeof(strn));
         assert(r == (int)strlen(*str) + 1);
         assert(strcmp(strn, *str) == 0);
@@ -154,7 +154,7 @@ void test_base58()
     uint8_t i_rawn[2048];
     while (*i_raw && *i_cmd) {
         size_t len = strlen(*i_raw) / 2;
-        memcpy(i_rawn, utils_hex_to_uint8(*i_raw), len);
+        memcpy_s(i_rawn, utils_hex_to_uint8(*i_raw), len);
         unsigned char outbuf[1024];
         int r = 0;
         if (strncmp(*i_cmd, "ec", 2) == 0)
