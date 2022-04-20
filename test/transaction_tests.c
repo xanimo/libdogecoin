@@ -236,7 +236,7 @@ void test_transaction()
     u_assert_int_eq(verifyPrivPubKeypair(private_key_wif, internal_p2pkh_address, true), 1);
 
     // prove internal p2pkh address was derived from public key hex:
-    size_t sizeout = 33; // public hexadecimal keys are 66 characters long (divided by 2 for byte size)
+    size_t sizeout = 34; // public hexadecimal keys are 66 characters long (divided by 2 for byte size)
     char p2pkh_pubkey_internal[sizeout];
     dogecoin_pubkey pubkeytx;
     dogecoin_pubkey_init(&pubkeytx);
@@ -252,7 +252,7 @@ void test_transaction()
     dogecoin_pubkey_getaddr_p2pkh(&pubkeytx, &dogecoin_chainparams_test, p2pkh_pubkey_internal);
 
     // assert the p2pkh address we just generated matches the one from dogecoin core:
-    u_assert_str_eq(internal_p2pkh_address, p2pkh_pubkey_internal);
+    u_assert_int_eq(memcmp(internal_p2pkh_address, p2pkh_pubkey_internal, strlen(internal_p2pkh_address)), 0);
 
     // validate p2pkh we will send 5 dogecoin to:
     u_assert_int_eq(verifyP2pkhAddress(external_p2pkh_address, strlen(external_p2pkh_address)), 1);

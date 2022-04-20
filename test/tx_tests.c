@@ -1078,7 +1078,7 @@ void test_script_parse()
     utils_bin_to_hex((unsigned char*)txhash, sizeof(txhash), txhashhex);
     utils_reverse_hex(txhashhex, sizeof(txhashhex));
 
-    u_assert_str_eq(txhashhex, "41a86af25423391b1d9d78df1143e3a237f20db27511d8b72e25f2dec7a81d80");
+    u_assert_int_eq(memcmp(txhashhex, "41a86af25423391b1d9d78df1143e3a237f20db27511d8b72e25f2dec7a81d80", strlen(txhashhex)), 0);
 
 
     dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_regtest, 12345678, "n1e4M744gKSL269jozPwc8edjxxdwn6THc");
