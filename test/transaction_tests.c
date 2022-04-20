@@ -97,7 +97,9 @@ void test_transaction()
     //     {
     //       "value": 5885.98644000,
             dogecoin_tx_out* tx_out = vector_idx(tx_worth_2->vout, 0);
-            u_assert_double_eq(koinu_to_coins(tx_out->value), 5885.98644000);
+            long double tx_out_value = koinu_to_coins(tx_out->value);
+            long double expected_tx_out_value = 5885.98644000;
+            u_assert_double_eq(tx_out_value, expected_tx_out_value);
     //       "n": 0,
     //       "scriptPubKey": {
     //         "asm": "OP_DUP OP_HASH160 a4a942c99c94522a025b2b8cfd2edd149fb49954 OP_EQUALVERIFY OP_CHECKSIG",

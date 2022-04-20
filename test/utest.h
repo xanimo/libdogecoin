@@ -123,13 +123,13 @@
 
 #define u_assert_double_eq(R, E)                                         \
     {                                                                    \
-        double r_ = (R);                                               \
-        double e_ = (E);                                               \
+        double r_ = (R);                                                 \
+        double e_ = (E);                                                 \
         do {                                                             \
             if (r_ != e_) {                                              \
                 printf("FAILED - %s() - Line %d\n", __func__, __LINE__); \
-                printf("\tExpect: \t%lf\n", e_);                 \
-                printf("\tReceive:\t%lf\n", r_);                 \
+                printf("\tExpect: \t%lf\n", e_);                         \
+                printf("\tReceive:\t%lf\n", r_);                         \
                 U_TESTS_FAIL++;                                          \
                 return;                                                  \
             };                                                           \
