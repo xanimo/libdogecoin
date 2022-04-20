@@ -35,7 +35,7 @@ jobs:
           - name: armhf-linux
             host: arm-linux-gnueabihf
             os: ubuntu-20.04
-            arch: armhf
+            # arch: armhf
             packages: g++-arm-linux-gnueabihf qemu-user-static qemu-user
             dep-opts: "CROSS_COMPILE='yes' CFLAGS='-s -static --static' LIBTOOL_APP_LDFLAGS='-all-static' LDFLAGS='-static-libgcc -static-libstdc++'"
             config-opts: "LIBTOOL_APP_LDFLAGS='-all-static' --enable-glibc-back-compat LDFLAGS=-static-libstdc++ --enable-static --disable-shared"
@@ -43,8 +43,8 @@ jobs:
             goal: install
           - name: aarch64-linux
             host: aarch64-linux-gnu
-            os: ubuntu-18.04
-            arch: arm64
+            os: ubuntu-20.04
+            # arch: arm64
             packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
             dep-opts: "CROSS_COMPILE='yes' CFLAGS='-s -static --static' LIBTOOL_APP_LDFLAGS='-all-static' LDFLAGS='-static-libgcc -static-libstdc++'"
             config-opts: "LIBTOOL_APP_LDFLAGS='-all-static' --enable-glibc-back-compat LDFLAGS='-static' --enable-static --disable-shared"
