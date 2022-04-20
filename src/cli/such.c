@@ -451,7 +451,7 @@ void transaction_output_menu(int txindex, int is_testnet) {
             // escape encompassing while loop so we return to previous menu
             if (i == length - 1) {
                 printf("\n\n");
-                printf("subtotal - desired fee: %f\n", koinu_to_coins(tx_out_total));
+                printf("subtotal - desired fee: %Lf\n", koinu_to_coins(tx_out_total));
                 printf("\n");
                 printf("1. select output to edit\n");
                 printf("2. main menu\n");
