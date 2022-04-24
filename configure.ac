@@ -102,12 +102,12 @@ fi
 if test "$host" = "mingw"; then
   # -static is interpreted by libtool, where it has a different meaning.
   # In libtool-speak, it's -all-static.
-  AX_CHECK_LINK_FLAG([[-static]],[LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -all-static"])
+  AX_CHECK_LINK_FLAG([[-static]],[LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -all-static -no-undefined"])
 fi
 
 if test x$with_net = "xyes"; then
   AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
-  AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
+  AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
   if test "$host" = "mingw"; then
     AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
   fi
