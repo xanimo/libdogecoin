@@ -451,13 +451,71 @@ void print_image(FILE* fptr)
         printf("%s", read_string);
     }
 
-long double koinu_to_coins(uint64_t koinu) {
+long double koinu_to_coins(uint64_t koinu) {    
+    debug_print("(uint64_t) koinu:                                    %llu\n", koinu);
+    debug_print("(uint64_t) koinu / 10000000000):                     %llu\n", koinu / 10000000000);
+    debug_print("(long double)(koinu / 10000000000):                  %.25Lf\n", (long double)(koinu / 10000000000));
     return (long double)koinu / (long double)1e8;
 }
 
 uint64_t coins_to_koinu(long double coins) {
+    debug_print("(long double) koinu:                                 %.25Lf\n", coins);
+    debug_print("(long double) koinu / 10000000000):                  %.25Lf\n", coins * 10000000000);
+    debug_print("(long double)(koinu / 10000000000):                  %.25Lf\n", (long double)(coins * 10000000000));
     return round((long double)coins * (long double)1e8);
 }
+
+// jaxlotl x86_64-pc-linux-gnu string version:
+// // =================================================================
+// uint64_t coins_to_koinu(long double coins) {
+//     debug_print("(long double) koinu:                                 %.25Lf\n", coins);
+//     debug_print("(long double) koinu / 10000000000):                  %.25Lf\n", coins * 10000000000);
+//     debug_print("(long double)(koinu / 10000000000):                  %.25Lf\n", (long double)(coins * 10000000000));
+//     char coins_string[32];
+//     char koinu_string[32];
+//     sprintf(coins_string, "%.9Lf", coins);
+//     char* c_ptr = coins_string;
+//     char* k_ptr = koinu_string;
+
+//     //copy all digits until end of string or decimal point is reached
+//     while (*c_ptr != '\0') {
+//         if (*c_ptr =='.') {
+//             c_ptr++;
+//             break;
+//         }
+//         memcpy(k_ptr, c_ptr, 1);
+//         c_ptr++;
+//         k_ptr++;
+//     }
+//     //copy remaining 8 or less decimal places
+//     for (int i=1; i<=8; i++) {
+//         if (*c_ptr=='\0') {
+//             memset(k_ptr, 0, 8-i); //fill with zeroes if less than 8 decimal places
+//             k_ptr+=(8-i);
+//             memset(k_ptr, '\0', 1);
+//             break;
+//         }
+//         if (i==8) {
+//             //assessing the 9th decimal place
+//             if (c_ptr[1] >= '5') {
+//                 char curr_val = *c_ptr;
+//                 memset(k_ptr, curr_val+1, 1);
+//                 k_ptr++;
+//             }
+//             else {
+//                 memcpy(k_ptr, c_ptr, 1);
+//                 k_ptr++;
+//             }
+//             memset(k_ptr, '\0', 1);
+//             break;
+//         }
+//         memcpy(k_ptr, c_ptr, 1);
+//         c_ptr++;
+//         k_ptr++;
+//     }
+//     uint64_t result = (uint64_t)strtoul(koinu_string, &k_ptr, 10);
+//     return result;
+// }
 
 void print_bits(size_t const size, void const* ptr)
     {
