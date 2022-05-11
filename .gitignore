@@ -113,5 +113,6 @@ test-suite.log
 **/__pycache__/
 *.py[cod]
 libdogecoin.egg-info/
-bindings/py_wrappers/libdogecoin/libdogecoin.c
+**/libdogecoin.c
 dist/
+test.py
