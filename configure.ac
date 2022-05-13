@@ -111,6 +111,11 @@ if test "x$random_device" = x"/dev/random"; then
   AC_DEFINE([RANDOM_DEVICE],["/dev/random"],[Define to set random file handle])
 fi
 
+# These packages don't provide pkgconfig config files across all
+# platforms, so we use older autoconf detection mechanisms:
+AC_CHECK_HEADER([gmp.h],,AC_MSG_ERROR(libgmp headers missing))
+AC_CHECK_LIB([gmp],[[__gmpn_sub_n]],GMP_LIBS=-lgmp, [AC_MSG_ERROR(libgmp missing)])
+
 if test "$host" = "mingw"; then
   # -static is interpreted by libtool, where it has a different meaning.
   # In libtool-speak, it's -all-static.
@@ -131,6 +136,8 @@ AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(BUILD_EXEEXT)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
+AC_SUBST(GMP_LIBS)
+AC_SUBST(GMPXX_LIBS)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
