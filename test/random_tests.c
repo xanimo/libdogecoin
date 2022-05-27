@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <test/utest.h>
+#include <../test/utest.h>
 
 #include <dogecoin/crypto/random.h>
 #include <dogecoin/utils.h>

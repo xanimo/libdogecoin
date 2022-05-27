@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <test/utest.h>
+#include <../test/utest.h>
 
 #include <dogecoin/crypto/ecc.h>
 #include <dogecoin/crypto/key.h>

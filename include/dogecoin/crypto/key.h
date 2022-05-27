@@ -29,8 +29,8 @@
 #ifndef __LIBDOGECOIN_CRYPTO_KEY_H__
 #define __LIBDOGECOIN_CRYPTO_KEY_H__
 
-#include <dogecoin/chainparams.h>
 #include <dogecoin/dogecoin.h>
+#include <dogecoin/chainparams.h>
 
 LIBDOGECOIN_BEGIN_DECL
 

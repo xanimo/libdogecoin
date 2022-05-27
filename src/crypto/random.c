@@ -27,9 +27,11 @@
 */
 
 #include <dogecoin/crypto/random.h>
+#ifdef HAVE_CONFIG_H
+#  include <src/libdogecoin-config.h>
+#endif
 
 #include <assert.h>
-#include <src/libdogecoin-config.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

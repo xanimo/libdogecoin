@@ -26,9 +26,12 @@
 
 */
 
+#ifdef HAVE_CONFIG_H
+#  include <src/libdogecoin-config.h>
+#endif
+
 #include <assert.h>
 #include <getopt.h>
-#include <src/libdogecoin-config.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>

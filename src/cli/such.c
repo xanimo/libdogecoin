@@ -25,15 +25,19 @@
  OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#ifdef HAVE_CONFIG_H
+#  include <src/libdogecoin-config.h>
+#endif
+
 #include <assert.h>
 #include <getopt.h>
-#include <src/libdogecoin-config.h>
 #include <stdbool.h>
 #include <stdio.h>   /* printf */
 #include <stdlib.h>  /* atoi, malloc */
 #include <string.h>  /* strcpy */
 #include <unistd.h>
-#include <contrib/uthash/uthash.h>
+#include <../../contrib/uthash/uthash.h>
 
 #include <dogecoin/bip32.h>
 #include <dogecoin/chainparams.h>

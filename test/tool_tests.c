@@ -6,7 +6,7 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
-#include <test/utest.h>
+#include <../test/utest.h>
 
 #include <dogecoin/chainparams.h>
 #include <dogecoin/crypto/base58.h>

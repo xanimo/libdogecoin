@@ -2,8 +2,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <secp256k1/include/secp256k1.h>
-#include <secp256k1/include/secp256k1_recovery.h>
+#include "../secp256k1/include/secp256k1.h"
+#include "../secp256k1/include/secp256k1_recovery.h"
 
 #include <dogecoin/crypto/random.h>
 #include <dogecoin/dogecoin.h>

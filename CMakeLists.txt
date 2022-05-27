@@ -41,7 +41,6 @@ IF(WITH_NET)
 ENDIF()
 FILE(TOUCH src/libdogecoin-config.h)
 
-
 ADD_LIBRARY(${LIBDOGECOIN_NAME})
 
 INSTALL(FILES
@@ -131,6 +130,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE ${SECP256K1})
 INCLUDE_DIRECTORIES(
     include
     src/secp256k1
+    src/secp256k1/include
     ${GMP_INSTALL_DIR}/include)
 
 IF(USE_TESTS)
@@ -147,6 +147,7 @@ IF(USE_TESTS)
         test/hash_tests.c
         test/key_tests.c
         test/mem_tests.c
+        test/opreturn_tests.c
         test/random_tests.c
         test/rmd160_tests.c
         test/serialize_tests.c
@@ -158,7 +159,7 @@ IF(USE_TESTS)
         test/utils_tests.c
         test/vector_tests.c
     )
-    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME})
+    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} m)
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
 ENDIF()
 
@@ -192,13 +193,13 @@ IF(WITH_TOOLS)
 
     ADD_EXECUTABLE(such src/cli/such.c)
     INSTALL(TARGETS such RUNTIME)
-    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME})
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} m)
     TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
     IF(WITH_NET)
         ADD_EXECUTABLE(sendtx src/cli/sendtx.c)
         INSTALL(TARGETS sendtx RUNTIME)
-        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME})
+        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME} m)
         TARGET_INCLUDE_DIRECTORIES(sendtx PRIVATE src)
     ENDIF()
 ENDIF()

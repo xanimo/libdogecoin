@@ -26,6 +26,7 @@
  
 */
 
+#include <dogecoin/crypto/key.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -36,7 +37,6 @@
 #include <dogecoin/crypto/base58.h>
 #include <dogecoin/crypto/ecc.h>
 #include <dogecoin/crypto/hash.h>
-#include <dogecoin/crypto/key.h>
 #include <dogecoin/crypto/random.h>
 #include <dogecoin/crypto/rmd160.h>
 #include <dogecoin/crypto/segwit_addr.h>
