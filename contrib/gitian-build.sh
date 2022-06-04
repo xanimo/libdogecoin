@@ -209,7 +209,7 @@ function download_descriptor() {
         wget $uri -O gitian-"$1".yml || exit 1
     else
         # CI tests
-        cp ../ci/descriptor/"$1".yml gitian-"$1".yml || exit 1
+        # cp ../ci/descriptor/"$1".yml gitian-"$1".yml || exit 1
     fi
 }
 
@@ -217,9 +217,9 @@ function download_descriptor() {
 
 if [[ $test == true ]]; then
     if [[ $commit == true ]]; then
-        VERSION="8a445ae368395185afc0e5006ffa3faf93412ab5"
+        VERSION="676117dbaa9a16e2be2c40b1a25bf6c538dd13b5"
     else
-        VERSION="0.1-dev-gitian"
+        VERSION="0.0.1-dev"
     fi
     DESCRIPTORS=('test')
     SIGN_DESCRIPTORS=()
