@@ -217,7 +217,7 @@ function download_descriptor() {
 
 if [[ $test == true ]]; then
     if [[ $commit == true ]]; then
-        VERSION="676117dbaa9a16e2be2c40b1a25bf6c538dd13b5"
+        VERSION="443f83754e34dca033ff094bae6a1d74a9524dbf"
     else
         VERSION="0.0.1-dev"
     fi
