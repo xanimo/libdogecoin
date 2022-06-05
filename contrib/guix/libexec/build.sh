@@ -3,14 +3,6 @@ export LC_ALL=C
 set -e -o pipefail
 export TZ=UTC
 
-if [ -n "$V" ]; then
-    # Print both unexpanded (-v) and expanded (-x) forms of commands as they are
-    # read from this file.
-    set -vx
-    # Set VERBOSE for CMake-based builds
-    export VERBOSE="$V"
-fi
-
 # Check that environment variables assumed to be set by the environment are set
 echo "Building for platform triple ${HOST:?not set} with reference timestamp ${SOURCE_DATE_EPOCH:?not set}..."
 echo "At most ${MAX_JOBS:?not set} jobs will run at once..."
@@ -158,7 +150,7 @@ GIT_ARCHIVE="${OUTDIR}/src/${DISTNAME}.tar.gz"
 # Create the source tarball if not already there
 if [ ! -e "$GIT_ARCHIVE" ]; then
     mkdir -p "$(dirname "$GIT_ARCHIVE")"
-    git archive --prefix="${DISTNAME}/" --output="$GIT_ARCHIVE" HEAD
+    git archive --output="$GIT_ARCHIVE" HEAD
 fi
 
 ###########################
@@ -166,7 +158,7 @@ fi
 ###########################
 
 # CONFIGFLAGS
-CONFIGFLAGS="--enable-reduce-exports"
+CONFIGFLAGS="--enable-reduce-exports --disable-bench --disable-gui-tests"
 case "$HOST" in
     *linux*) CONFIGFLAGS+=" --enable-glibc-back-compat" ;;
 esac
@@ -193,7 +185,7 @@ export PATH="${BASEPREFIX}/${HOST}/native/bin:${PATH}"
     cd "$DISTSRC"
 
     # Extract the source tarball
-    tar --strip-components=1 -xf "${GIT_ARCHIVE}"
+    tar -xf "${GIT_ARCHIVE}"
 
     ./autogen.sh
 
@@ -209,7 +201,7 @@ export PATH="${BASEPREFIX}/${HOST}/native/bin:${PATH}"
                     CXXFLAGS="${HOST_CXXFLAGS}" \
                     ${HOST_LDFLAGS:+LDFLAGS="${HOST_LDFLAGS}"}
 
-    sed -i.old 's/-lstdc++ //g' config.status libtool
+    sed -i.old 's/-lstdc++ //g' config.status libtool src/univalue/config.status src/univalue/libtool
 
     # Build Bitcoin Core
     make --jobs="$MAX_JOBS" ${V:+V=1}
@@ -228,7 +220,7 @@ export PATH="${BASEPREFIX}/${HOST}/native/bin:${PATH}"
     # Make the os-specific installers
     case "$HOST" in
         *mingw*)
-            make deploy ${V:+V=1} BITCOIN_WIN_INSTALLER="${OUTDIR}/${DISTNAME}-win64-setup-unsigned.exe"
+            make deploy ${V:+V=1}
             ;;
     esac
 
@@ -240,6 +232,19 @@ export PATH="${BASEPREFIX}/${HOST}/native/bin:${PATH}"
     # Install built Bitcoin Core to $INSTALLPATH
     make install DESTDIR="${INSTALLPATH}" ${V:+V=1}
 
+    case "$HOST" in
+        *mingw*)
+            # This step not only moves the unsigned NSIS executable to
+            # "${OUTDIR}", but also renames it
+            #
+            # from:
+            #   bitcoin-@PACKAGE_VERSION@-win64-setup-unsigned.exe
+            # to:
+            #   ${DISTNAME}-win64-setup-unsigned.exe
+            #
+            cp -f ./bitcoin-*-win64-setup-unsigned.exe "${OUTDIR}/${DISTNAME}-win64-setup-unsigned.exe"
+            ;;
+    esac
     (
         cd installed
 
@@ -264,10 +269,10 @@ export PATH="${BASEPREFIX}/${HOST}/native/bin:${PATH}"
 
         case "$HOST" in
             *mingw*)
-                # cp "${DISTSRC}/doc/README_windows.txt" "${DISTNAME}/readme.txt"
+                cp "${DISTSRC}/doc/README_windows.txt" "${DISTNAME}/readme.txt"
                 ;;
             *linux*)
-                # cp "${DISTSRC}/README.md" "${DISTNAME}/"
+                cp "${DISTSRC}/README.md" "${DISTNAME}/"
                 ;;
         esac
 
