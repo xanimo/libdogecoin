@@ -55,7 +55,7 @@ fi
 
 if [ "$DEPENDS" = "1" ]; then
     if has_param '--clean' "$@"; then
-        git clean -xdff --exclude='/depends/SDKs/*' --exclude='/depends/sdk-sources/*'
+        git clean -xdff --exclude='/depends/SDKs/*'
     fi
     ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET --depends
     ./contrib/scripts/build.sh --host $TARGET_HOST_TRIPLET --depends

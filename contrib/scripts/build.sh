@@ -39,11 +39,11 @@ if has_param '--host' "$@"; then
         ;;
         "x86_64-w64-mingw32")
             TARGET_ARCH="amd64"
-            LDFLAGS += -no-undefined
+            LDFLAGS+=-no-undefined
         ;;
         "i686-w64-mingw32")
             TARGET_ARCH="i386"
-            LDFLAGS += -no-undefined
+            LDFLAGS+=-no-undefined
             LIBS+="-lpthread -lwinpthread -lshell32 -ladvapi32 -liphlpapi -lws2_32 -lbcrypt -lcrypt32 -DWIN32"
         ;;
         "x86_64-apple-darwin14")
@@ -82,4 +82,3 @@ if [ $DEPENDS ]; then
 else
     ./configure
 fi
-make

@@ -67,31 +67,34 @@ jobs:
             sdk: 12.1
             sdk-build: 12A7403
             sdk-shasum: "be17f48fd0b08fb4dcd229f55a6ae48d9f781d210839b4ea313ef17dd12d6ea5"
-          # - name: x86_64-win
-          #   host: x86_64-w64-mingw32
-          #   os: ubuntu-20.04
-          #   packages: python3 nsis g++-mingw-w64-x86-64 wine64 wine-stable bc wine-binfmt
-          #   postinstall: |
-          #     sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-          #     sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
-          #     sudo update-binfmts --import /usr/share/binfmts/wine
-          #   dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-          #   config-opts: ""
-          #   run-tests: true
-          #   goal: install
-          # - name: i686-win
-          #   host: i686-w64-mingw32
-          #   arch: i386
-          #   os: ubuntu-20.04
-          #   packages: python3 nsis g++-mingw-w64 wine32 wine-stable bc wine-binfmt
-          #   postinstall: |
-          #     sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-          #     sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
-          #     sudo update-binfmts --import /usr/share/binfmts/wine
-          #   dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-          #   config-opts: ""
-          #   run-tests: true
-          #   goal: install
+          - name: x86_64-win
+            host: x86_64-w64-mingw32
+            arch: i386
+            os: ubuntu-20.04
+            packages: python3 nsis g++-mingw-w64-x86-64 wine64 wine-stable bc wine-binfmt
+            postinstall: |
+              sudo dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
+              sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
+              sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
+              sudo update-binfmts --import /usr/share/binfmts/wine
+            dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
+            config-opts: ""
+            run-tests: true
+            goal: install
+          - name: i686-win
+            host: i686-w64-mingw32
+            arch: i386
+            os: ubuntu-20.04
+            packages: python3 nsis g++-mingw-w64 wine32 wine-stable bc wine-binfmt
+            postinstall: |
+              sudo dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
+              sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
+              sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
+              sudo update-binfmts --import /usr/share/binfmts/wine
+            dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
+            config-opts: ""
+            run-tests: true
+            goal: install
           # - name: i686-linux
           #   host: i686-pc-linux-gnu
           #   os: ubuntu-18.04
@@ -117,7 +120,7 @@ jobs:
               echo PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH" >> ~/.bashrc
               source ~/.bashrc
           else
-            if ([ "${{ matrix.name }}" == "i686-win" ]); then
+            if ([ "${{ matrix.name }}" == "x86_64-win" ] || [ "${{ matrix.name }}" == "i686-win" ]); then
               sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9
               sudo add-apt-repository 'deb [arch=amd64] https://mirror.mxe.cc/repos/apt focal main'
               sudo apt -qq update
@@ -179,8 +182,12 @@ jobs:
       - name: configure libdogecoin
         run: |
           depends/${{ matrix.host }}/native/bin/ccache --max-size=$CCACHE_SIZE
-          ./autogen.sh
-          ./configure --prefix=`pwd`/depends/${{ matrix.host }} ${{ matrix.config-opts }} HOST=${{ matrix.host }} || ( cat config.log && false)
+          if ([ "${{ matrix.name }}" == "x86_64-win" ] || [ "${{ matrix.name }}" == "i686-win" ]); then
+            contrib/scripts/build.sh --host ${{ matrix.host }} --depends
+          else
+            ./autogen.sh
+            ./configure --prefix=`pwd`/depends/${{ matrix.host }} ${{ matrix.config-opts }} HOST=${{ matrix.host }} || ( cat config.log && false)
+          fi
 
       - name: build libdogecoin
         run: |

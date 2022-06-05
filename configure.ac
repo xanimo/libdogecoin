@@ -11,7 +11,7 @@ AH_TOP([#define LIBDOGECOIN_CONFIG_H])
 AH_BOTTOM([#endif /*LIBDOGECOIN_CONFIG_H*/])
 AM_INIT_AUTOMAKE([no-define subdir-objects foreign])
 AC_HEADER_STDBOOL
-LT_INIT
+LT_INIT([win32-dll])
 
 PKG_PROG_PKG_CONFIG
 AC_PATH_TOOL(AR, ar)

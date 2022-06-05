@@ -52,9 +52,6 @@ if has_param '--host' "$@"; then
             fi
             ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt"
             TARGET_ARCH="amd64"
-            sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-            sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
-            sudo update-binfmts --import /usr/share/binfmts/wine
         ;;
         "i686-w64-mingw32")
             if [ $DEPENDS ]; then
@@ -62,9 +59,6 @@ if has_param '--host' "$@"; then
             fi
             ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt"
             TARGET_ARCH="i386"
-            sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-            sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
-            sudo update-binfmts --import /usr/share/binfmts/wine
         ;;
         "x86_64-apple-darwin14")
             ARCH_PACKAGES="cmake zlib xorriso"
@@ -86,7 +80,7 @@ if has_param '--host' "$@"; then
 fi
 
 OPTIONS=""
-# sudo dpkg --add-architecture $TARGET_ARCH
+sudo dpkg --add-architecture $TARGET_ARCH
 if [[ $TARGET_HOST_TRIPLET == "x86_64-apple-darwin14" ]]; then
     brew update
     brew install automake coreutils libtool python3 $ARCH_PACKAGES
@@ -102,6 +96,17 @@ if [[ $TARGET_HOST_TRIPLET == "x86_64-apple-darwin14" ]]; then
 else
     sudo apt-get update
     DEBIAN_FRONTEND=noninteractive sudo apt-get install --no-install-recommends -y $COMMON_PACKAGES $ARCH_PACKAGES
+    if ([ "$TARGET_HOST_TRIPLET" == "i686-w64-mingw32" ]); then
+        sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
+        sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
+        sudo update-binfmts --import /usr/share/binfmts/wine
+        exit
+    elif ([ "$TARGET_HOST_TRIPLET" == "x86_64-w64-mingw32" ]); then
+        sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
+        sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
+        sudo update-binfmts --import /usr/share/binfmts/wine
+        exit
+    fi
 fi
 NO_X_COMPILE=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "x86_64-apple-darwin14");
 
