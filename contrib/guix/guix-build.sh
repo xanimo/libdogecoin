@@ -10,6 +10,16 @@ set -e -o pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/libexec/prelude.bash"
 
 ################
+# Check 1: Make sure that we can invoke required tools
+################
+for cmd in git make guix cat mkdir curl; do
+    if ! command -v "$cmd" > /dev/null 2>&1; then
+        echo "ERR: This script requires that '$cmd' is installed and available in your \$PATH"
+        exit 1
+    fi
+done
+
+################
 # GUIX_BUILD_OPTIONS should be empty
 ################
 #
@@ -50,17 +60,97 @@ Hint: To make your git worktree clean, You may want to:
          using a dirty worktree
 EOF
 exit 1
+else
+    GIT_COMMIT=$(git rev-parse --short=12 HEAD)
 fi
 
-mkdir -p "$VERSION_BASE"
+################
+# Check 4: Make sure that build directories do not exist
+################
+
+# Default to building for all supported HOSTs (overridable by environment)
+export HOSTS="${HOSTS:-x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu i686-linux-gnu
+                       x86_64-w64-mingw32
+                       x86_64-apple-darwin11}"
+
+DISTSRC_BASE="${DISTSRC_BASE:-${PWD}}"
+
+# Usage: distsrc_for_host HOST
+#
+#   HOST: The current platform triple we're building for
+#
+distsrc_for_host() {
+    echo "${DISTSRC_BASE}/distsrc-${GIT_COMMIT}-${1}"
+}
+
+# Accumulate a list of build directories that already exist...
+hosts_distsrc_exists=""
+for host in $HOSTS; do
+    if [ -e "$(distsrc_for_host "$host")" ]; then
+        hosts_distsrc_exists+=" ${host}"
+    fi
+done
+
+if [ -n "$hosts_distsrc_exists" ]; then
+# ...so that we can print them out nicely in an error message
+cat << EOF
+ERR: Build directories for this commit already exist for the following platform
+     triples you're attempting to build, probably because of previous builds.
+     Please remove, or otherwise deal with them prior to starting another build.
+     Aborting...
+EOF
+for host in $hosts_distsrc_exists; do
+    echo "     ${host} '$(distsrc_for_host "$host")'"
+done
+exit 1
+else
+    mkdir -p "$DISTSRC_BASE"
+fi
+
+################
+# Check 5: When building for darwin, make sure that the macOS SDK exists
+################
+
+# for host in $HOSTS; do
+#     case "$host" in
+#         *darwin*)
+#             OSX_SDK="$(make -C "${PWD}/depends" --no-print-directory HOST="$host" print-OSX_SDK | sed 's@^[^=]\+=[[:space:]]\+@@g')"
+#             if [ -e "$OSX_SDK" ]; then
+#                 echo "Found macOS SDK at '${OSX_SDK}', using..."
+#             else
+#                 echo "macOS SDK does not exist at '${OSX_SDK}', please place the extracted, untarred SDK there to perform darwin builds, exiting..."
+#                 exit 1
+#             fi
+#             ;;
+#     esac
+# done
+
+#########
+# Setup #
+#########
 
 # Determine the maximum number of jobs to run simultaneously (overridable by
 # environment)
-MAX_JOBS="${MAX_JOBS:-$(nproc)}"
+JOBS="${JOBS:-$(nproc)}"
+
+# Usage: host_to_commonname HOST
+#
+#   HOST: The current platform triple we're building for
+#
+host_to_commonname() {
+    case "$1" in
+        *darwin*) echo osx ;;
+        *mingw*)  echo win ;;
+        *linux*)  echo linux ;;
+        *)        exit 1 ;;
+    esac
+}
 
 # Download the depends sources now as we won't have internet access in the build
 # container
-make -C "${PWD}/depends" -j"$MAX_JOBS" download ${V:+V=1} ${SOURCES_PATH:+SOURCES_PATH="$SOURCES_PATH"}
+for host in $HOSTS; do
+    make -C "${PWD}/depends" -j"$JOBS" download-"$(host_to_commonname "$host")" ${V:+V=1} ${SOURCES_PATH:+SOURCES_PATH="$SOURCES_PATH"}
+done
 
 # Determine the reference time used for determinism (overridable by environment)
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log --format=%at -1)}"
@@ -68,10 +158,19 @@ SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log --format=%at -1)}"
 # Execute "$@" in a pinned, possibly older version of Guix, for reproducibility
 # across time.
 time-machine() {
+    # shellcheck disable=SC2086
     guix time-machine --url=https://github.com/dongcarl/guix.git \
-                      --commit=b066c25026f21fb57677aa34692a5034338e7ee3 \
+                      --commit=490e39ff303f4f6873a04bfb8253755bdae1b29c \
+                      --cores="$JOBS" \
+                      --keep-failed \
+                      ${SUBSTITUTE_URLS:+--substitute-urls="$SUBSTITUTE_URLS"} \
+                      ${ADDITIONAL_GUIX_COMMON_FLAGS} ${ADDITIONAL_GUIX_TIMEMACHINE_FLAGS} \
                       -- "$@"
 }
+
+# Make sure an output directory exists for our builds
+OUTDIR="${OUTDIR:-${PWD}/output}"
+[ -e "$OUTDIR" ] || mkdir -p "$OUTDIR"
 
 # Function to be called when building for host ${1} and the user interrupts the
 # build
@@ -90,9 +189,15 @@ and untracked files and directories will be wiped, allowing you to start anew.
 EOF
 }
 
+# Create SOURCES_PATH, BASE_CACHE, and SDK_PATH if they are non-empty so that we
+# can map them into the container
+[ -z "$SOURCES_PATH" ] || mkdir -p "$SOURCES_PATH"
+[ -z "$BASE_CACHE" ]   || mkdir -p "$BASE_CACHE"
+[ -z "$SDK_PATH" ]     || mkdir -p "$SDK_PATH"
+
 # Deterministically build Bitcoin Core for HOSTs (overridable by environment)
 # shellcheck disable=SC2153
-for host in ${HOSTS=x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu riscv64-linux-gnu x86_64-w64-mingw32}; do
+for host in $HOSTS; do
 
     # Display proper warning when the user interrupts the build
     trap 'int_trap ${host}' INT
@@ -101,6 +206,19 @@ for host in ${HOSTS=x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu riscv
         # Required for 'contrib/guix/manifest.scm' to output the right manifest
         # for the particular $HOST we're building for
         export HOST="$host"
+
+        # shellcheck disable=SC2030
+cat << EOF
+INFO: Building commit ${GIT_COMMIT:?not set} for platform triple ${HOST:?not set}:
+      ...using reference timestamp: ${SOURCE_DATE_EPOCH:?not set}
+      ...running at most ${JOBS:?not set} jobs
+      ...from worktree directory: '${PWD}'
+          ...bind-mounted in container to: '/libdogecoin'
+      ...in build directory: '$(distsrc_for_host "$HOST")'
+          ...bind-mounted in container to: '$(DISTSRC_BASE=/distsrc-base && distsrc_for_host "$HOST")'
+      ...outputting in: '${OUTDIR:?not set}'
+          ...bind-mounted in container to: '/outdir'
+EOF
 
         # Run the build script 'contrib/guix/libexec/build.sh' in the build
         # container specified by 'contrib/guix/manifest.scm'.
@@ -121,24 +239,24 @@ for host in ${HOSTS=x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu riscv
         #
         #     When --container is specified, the default behavior is to share
         #     the current working directory with the isolated container at the
-        #     same exact path (e.g. mapping '/home/satoshi/bitcoin/' to
-        #     '/home/satoshi/bitcoin/'). This means that the $PWD inside the
+        #     same exact path (e.g. mapping '/home/satoshi/libdogecoin/' to
+        #     '/home/satoshi/libdogecoin/'). This means that the $PWD inside the
         #     container becomes a source of irreproducibility. --no-cwd disables
         #     this behaviour.
         #
         #   --share=SPEC       for containers, share writable host file system
         #                      according to SPEC
         #
-        #   --share="$PWD"=/bitcoin
+        #   --share="$PWD"=/libdogecoin
         #
-        #                     maps our current working directory to /bitcoin
+        #                     maps our current working directory to /libdogecoin
         #                     inside the isolated container, which we later cd
         #                     into.
         #
         #     While we don't want to map our current working directory to the
         #     same exact path (as this introduces irreproducibility), we do want
         #     it to be at a _fixed_ path _somewhere_ inside the isolated
-        #     container so that we have something to build. '/bitcoin' was
+        #     container so that we have something to build. '/libdogecoin' was
         #     chosen arbitrarily.
         #
         #   ${SOURCES_PATH:+--share="$SOURCES_PATH"}
@@ -157,14 +275,25 @@ for host in ${HOSTS=x86_64-linux-gnu arm-linux-gnueabihf aarch64-linux-gnu riscv
                                  --pure \
                                  --no-cwd \
                                  --share="$PWD"=/libdogecoin \
+                                 --share="$DISTSRC_BASE"=/distsrc-base \
+                                 --share="$OUTDIR"=/outdir \
                                  --expose="$(git rev-parse --git-common-dir)" \
                                  ${SOURCES_PATH:+--share="$SOURCES_PATH"} \
-                                 ${ADDITIONAL_GUIX_ENVIRONMENT_FLAGS} \
+                                 ${BASE_CACHE:+--share="$BASE_CACHE"} \
+                                 ${SDK_PATH:+--share="$SDK_PATH"} \
+                                 --cores="$JOBS" \
+                                 --keep-failed \
+                                 ${SUBSTITUTE_URLS:+--substitute-urls="$SUBSTITUTE_URLS"} \
+                                 ${ADDITIONAL_GUIX_COMMON_FLAGS} ${ADDITIONAL_GUIX_ENVIRONMENT_FLAGS} \
                                  -- env HOST="$host" \
-                                        MAX_JOBS="$MAX_JOBS" \
+                                        JOBS="$JOBS" \
                                         SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:?unable to determine value}" \
                                         ${V:+V=1} \
                                         ${SOURCES_PATH:+SOURCES_PATH="$SOURCES_PATH"} \
+                                        ${BASE_CACHE:+BASE_CACHE="$BASE_CACHE"} \
+                                        ${SDK_PATH:+SDK_PATH="$SDK_PATH"} \
+                                        DISTSRC="$(DISTSRC_BASE=/distsrc-base && distsrc_for_host "$HOST")" \
+                                        OUTDIR=/outdir \
                                       bash -c "cd /libdogecoin && bash contrib/guix/libexec/build.sh"
     )
 

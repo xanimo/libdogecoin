@@ -176,12 +176,12 @@ chain for " target " development."))
         ;; Build tools
         gnu-make
         libtool
-        autoconf
+        autoconf-2.71
         automake
         pkg-config
         ;; Scripting
         perl
-        python-3.7
+        python-3
         ;; Git
         git
         ;; Native gcc 9 toolchain targeting glibc 2.27
