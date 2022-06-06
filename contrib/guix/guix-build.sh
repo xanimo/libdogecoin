@@ -2,6 +2,58 @@
 export LC_ALL=C
 set -e -o pipefail
 
+# Source the common prelude, which:
+#   1. Checks if we're at the top directory of the Bitcoin Core repository
+#   2. Defines a few common functions and variables
+#
+# shellcheck source=libexec/prelude.bash
+source "$(dirname "${BASH_SOURCE[0]}")/libexec/prelude.bash"
+
+################
+# GUIX_BUILD_OPTIONS should be empty
+################
+#
+# GUIX_BUILD_OPTIONS is an environment variable recognized by guix commands that
+# can perform builds. This seems like what we want instead of
+# ADDITIONAL_GUIX_COMMON_FLAGS, but the value of GUIX_BUILD_OPTIONS is actually
+# _appended_ to normal command-line options. Meaning that they will take
+# precedence over the command-specific ADDITIONAL_GUIX_<CMD>_FLAGS.
+#
+# This seems like a poor user experience. Thus we check for GUIX_BUILD_OPTIONS's
+# existence here and direct users of this script to use our (more flexible)
+# custom environment variables.
+if [ -n "$GUIX_BUILD_OPTIONS" ]; then
+cat << EOF
+Error: Environment variable GUIX_BUILD_OPTIONS is not empty:
+  '$GUIX_BUILD_OPTIONS'
+Unfortunately this script is incompatible with GUIX_BUILD_OPTIONS, please unset
+GUIX_BUILD_OPTIONS and use ADDITIONAL_GUIX_COMMON_FLAGS to set build options
+across guix commands or ADDITIONAL_GUIX_<CMD>_FLAGS to set build options for a
+specific guix command.
+See contrib/guix/README.md for more details.
+EOF
+exit 1
+fi
+
+################
+# The git worktree should not be dirty
+################
+
+if ! git diff-index --quiet HEAD -- && [ -z "$FORCE_DIRTY_WORKTREE" ]; then
+cat << EOF
+ERR: The current git worktree is dirty, which may lead to broken builds.
+     Aborting...
+Hint: To make your git worktree clean, You may want to:
+      1. Commit your changes,
+      2. Stash your changes, or
+      3. Set the 'FORCE_DIRTY_WORKTREE' environment variable if you insist on
+         using a dirty worktree
+EOF
+exit 1
+fi
+
+mkdir -p "$VERSION_BASE"
+
 # Determine the maximum number of jobs to run simultaneously (overridable by
 # environment)
 MAX_JOBS="${MAX_JOBS:-$(nproc)}"
