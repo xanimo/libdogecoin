@@ -11,7 +11,7 @@ AH_TOP([#define LIBDOGECOIN_CONFIG_H])
 AH_BOTTOM([#endif /*LIBDOGECOIN_CONFIG_H*/])
 AM_INIT_AUTOMAKE([no-define subdir-objects foreign])
 AC_HEADER_STDBOOL
-LT_INIT
+LT_INIT([win32-dll])
 
 PKG_PROG_PKG_CONFIG
 AC_PATH_TOOL(AR, ar)
@@ -30,9 +30,11 @@ case $host in
      TARGET_OS=windows
       case $host in
        i?86-*) 
+        LDFLAGS += -no-undefined
         LIBS="$LIBS -lpthread -lwinpthread -lshell32 -ladvapi32 -liphlpapi -lws2_32 -lbcrypt -lcrypt32 -DWIN32"
        ;;
        x86_64-*) 
+        LDFLAGS += -no-undefined
        ;;
        *) AC_MSG_ERROR("Could not determine win32/win64 for installer") ;;
       esac
