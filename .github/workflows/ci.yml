@@ -3,8 +3,6 @@
 name: CI
 
 on:
-  push:
-    branches: [ "*" ]
   pull_request:
     branches: [ "*" ]
 
@@ -24,38 +22,38 @@ jobs:
       fail-fast: false
       matrix:
         name:
-          # - armhf-linux
-          # - aarch64-linux
-          # - x86_64-linux-dbg
+          - armhf-linux
+          - aarch64-linux
+          - x86_64-linux-dbg
           - x86_64-macos
-          # - x86_64-win
-          # - i686-win
-          # - i686-linux
+          - x86_64-win
+          - i686-win
+          - i686-linux
         include:
-          # - name: armhf-linux
-          #   host: arm-linux-gnueabihf
-          #   os: ubuntu-20.04
-          #   packages: g++-arm-linux-gnueabihf qemu-user-static qemu-user
-          #   dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-          #   config-opts: "--enable-static --disable-shared"
-          #   run-tests: true
-          #   goal: install
-          # - name: aarch64-linux
-          #   host: aarch64-linux-gnu
-          #   os: ubuntu-20.04
-          #   packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
-          #   dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-          #   config-opts: "LIBS='-levent_pthreads' --enable-static --disable-shared"
-          #   run-tests: true
-          #   goal: install
-          # - name: x86_64-linux-dbg
-          #   host: x86_64-pc-linux-gnu
-          #   os: ubuntu-20.04
-          #   run-tests: true
-          #   packages: python3-dev python3-dbg python
-          #   dep-opts: "DEBUG=1 SPEED=slow V=1"
-          #   config-opts: "LD_LIBRARY_PATH='`pwd`/depends/x86_64-pc-linux-gnu/lib/' CFLAGS='-I`pwd`/depends/x86_64-pc-linux-gnu/include/ -fPIC' LDFLAGS='-L`pwd`/depends/x86_64-pc-linux-gnu/lib -static-libgcc -static-libstdc++' PKG_CONFIG_PATH=`pwd`/depends/x86_64-pc-linux-gnu/lib/pkgconfig --enable-static --disable-shared"
-          #   goal: install
+          - name: armhf-linux
+            host: arm-linux-gnueabihf
+            os: ubuntu-20.04
+            packages: g++-arm-linux-gnueabihf qemu-user-static qemu-user
+            dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
+            config-opts: "--enable-static --disable-shared"
+            run-tests: true
+            goal: install
+          - name: aarch64-linux
+            host: aarch64-linux-gnu
+            os: ubuntu-20.04
+            packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
+            dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
+            config-opts: "LIBS='-levent_pthreads' --enable-static --disable-shared"
+            run-tests: true
+            goal: install
+          - name: x86_64-linux-dbg
+            host: x86_64-pc-linux-gnu
+            os: ubuntu-20.04
+            run-tests: true
+            packages: python3-dev python3-dbg python
+            dep-opts: "DEBUG=1 SPEED=slow V=1"
+            config-opts: "LD_LIBRARY_PATH='`pwd`/depends/x86_64-pc-linux-gnu/lib/' CFLAGS='-I`pwd`/depends/x86_64-pc-linux-gnu/include/ -fPIC' LDFLAGS='-L`pwd`/depends/x86_64-pc-linux-gnu/lib -static-libgcc -static-libstdc++' PKG_CONFIG_PATH=`pwd`/depends/x86_64-pc-linux-gnu/lib/pkgconfig --enable-static --disable-shared"
+            goal: install
           - name: x86_64-macos
             host: x86_64-apple-darwin14
             os: macos-latest
@@ -95,14 +93,14 @@ jobs:
             config-opts: ""
             run-tests: true
             goal: install
-          # - name: i686-linux
-          #   host: i686-pc-linux-gnu
-          #   os: ubuntu-18.04
-          #   packages: g++-multilib bc
-          #   run-tests: true
-          #   dep-opts: "SPEED=slow V=1"
-          #   config-opts: "--enable-static --disable-shared"
-          #   goal: install
+          - name: i686-linux
+            host: i686-pc-linux-gnu
+            os: ubuntu-18.04
+            packages: g++-multilib bc
+            run-tests: true
+            dep-opts: "SPEED=slow V=1"
+            config-opts: "--enable-static --disable-shared"
+            goal: install
 
     runs-on: ${{ matrix.os }}
 
