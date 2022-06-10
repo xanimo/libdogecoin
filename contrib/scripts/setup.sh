@@ -160,8 +160,12 @@ case "$TARGET_HOST_TRIPLET" in
         contrib/scripts/sdk.sh
     ;;
     *)
+        if [[ $EUID == 0 ]] || [[ $DOCKER == 1 ]]; then
+            dpkg --add-architecture $TARGET_ARCH
+        else
+            echo "please run with sudo"
+        fi
         setup_linux
-        echo $TARGET_ARCH done
     ;;
 esac
 
