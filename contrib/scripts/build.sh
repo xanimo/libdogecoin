@@ -40,6 +40,7 @@ if has_param '--host' "$@"; then
         "x86_64-w64-mingw32")
             TARGET_ARCH="amd64"
             LDFLAGS+=-no-undefined
+            LIBS+="-lpthread -lwinpthread"
         ;;
         "i686-w64-mingw32")
             TARGET_ARCH="i386"
@@ -71,7 +72,6 @@ fi
 
 ./autogen.sh
 if [ $DEPENDS ]; then
-    echo $PREFIX
     ./configure \
     --prefix=$PREFIX \
     CFLAGS=$CFLAGS \
