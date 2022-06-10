@@ -23,13 +23,15 @@ AC_PROG_CC_C99
 CFLAGS="$CFLAGS -W"
 warn_CFLAGS="-std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings"
 saved_CFLAGS="$CFLAGS"
-CFLAGS="$CFLAGS -lm $warn_CFLAGS"
+CFLAGS="$CFLAGS $warn_CFLAGS"
 AC_MSG_CHECKING([if ${CC} supports ${warn_CFLAGS}])
 AC_COMPILE_IFELSE([AC_LANG_SOURCE([[char foo;]])],
   [ AC_MSG_RESULT([yes]) ],
   [ AC_MSG_RESULT([no])
     CFLAGS="$saved_CFLAGS"
   ])
+
+AC_SEARCH_LIBS([powl],[m],[have_math=yes],[have_math=no])
 
 # Enable debug
 AC_ARG_ENABLE([debug],
