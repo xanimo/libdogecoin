@@ -11,7 +11,7 @@ AH_TOP([#define LIBDOGECOIN_CONFIG_H])
 AH_BOTTOM([#endif /*LIBDOGECOIN_CONFIG_H*/])
 AM_INIT_AUTOMAKE([no-define subdir-objects foreign])
 AC_HEADER_STDBOOL
-LT_INIT([win32-dll])
+LT_INIT
 
 PKG_PROG_PKG_CONFIG
 AC_PATH_TOOL(AR, ar)
@@ -20,7 +20,7 @@ AC_PATH_TOOL(STRIP, strip)
 AM_PROG_CC_C_O
 AC_PROG_CC_C99
 
-CFLAGS="$CFLAGS -W"
+CFLAGS="$CFLAGS -W -fPIC"
 warn_CFLAGS="-std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings"
 saved_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS $warn_CFLAGS"
@@ -96,6 +96,7 @@ fi
 
 if test x$with_net = "xyes"; then
   AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
+  AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent_core missing))
   AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
   if test "$host" = "mingw"; then
     AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
@@ -111,7 +112,7 @@ AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
 
-ac_configure_args="${ac_configure_args} --enable-module-recovery"
+ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery"
 AC_CONFIG_SUBDIRS([src/secp256k1])
 
 dnl make sure nothing new is exported so that we don't break the cache
