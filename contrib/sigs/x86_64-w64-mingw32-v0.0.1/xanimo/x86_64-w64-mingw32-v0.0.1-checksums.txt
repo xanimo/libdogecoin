@@ -1,0 +1,4 @@
+e2ca7e84629b1355e41d16fbe5781f62a4bc8547ccfe12fe5eda3bb40b754b50  ./build/libdogecoin-x86_64-w64-mingw32-v0.0.1/libdogecoin.a
+d21a5cfacb3bac99f56532b4db8a089f7cc30ed2c29d1b3ae36a2e97c087be77  ./build/libdogecoin-x86_64-w64-mingw32-v0.0.1/libdogecoin.h
+c3317379dfa17548ed57a6c6fe91914e69a3ec7c3c02cac4789f716b8c1fa46c  ./build/libdogecoin-x86_64-w64-mingw32-v0.0.1/sendtx.exe
+0b0c63e39bc6a0ae835fe5b3953df95e3b09399a664363d760a7b4e7636f4c7f  ./build/libdogecoin-x86_64-w64-mingw32-v0.0.1/such.exe

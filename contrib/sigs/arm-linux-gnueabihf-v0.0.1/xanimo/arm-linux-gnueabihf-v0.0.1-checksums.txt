@@ -1,0 +1,4 @@
+c80411f40579d921dd79af153a6e68758cd8faeeff219e7c97f7fc792a155e88  ./build/libdogecoin-arm-linux-gnueabihf-v0.0.1/libdogecoin.a
+d21a5cfacb3bac99f56532b4db8a089f7cc30ed2c29d1b3ae36a2e97c087be77  ./build/libdogecoin-arm-linux-gnueabihf-v0.0.1/libdogecoin.h
+0d127b072a7b5fbbab2adae83b4801346f315ca39aa18a52c0f64324d0d50ce7  ./build/libdogecoin-arm-linux-gnueabihf-v0.0.1/sendtx
+31c28acd0ba4a5fec63f6ea56b77d3313c32a6aebdcd22b5c6c7b11e86fc4ee3  ./build/libdogecoin-arm-linux-gnueabihf-v0.0.1/such
