@@ -1,0 +1,4 @@
+7a75940818332040e8ee5b7c7d6337599603d2e37458ef7f0a1a3ea795825668  ./build/libdogecoin-i686-pc-linux-gnu-v0.0.1/libdogecoin.a
+d21a5cfacb3bac99f56532b4db8a089f7cc30ed2c29d1b3ae36a2e97c087be77  ./build/libdogecoin-i686-pc-linux-gnu-v0.0.1/libdogecoin.h
+7bd4fc4a3ea6be033e83be38f0ee059dee518f5e5935de9d90a1adef094d4151  ./build/libdogecoin-i686-pc-linux-gnu-v0.0.1/sendtx
+baccd5000ce1ad56098026d1634d549d3dd024c6a40e9e33dc78fc2598a543b2  ./build/libdogecoin-i686-pc-linux-gnu-v0.0.1/such
