@@ -1,0 +1,4 @@
+130d4128172decdf2aebffd60162b0dfdc78f29fae2e1cc5992f283d75e7493c  ./build/libdogecoin-x86_64-apple-darwin14-v0.0.1/libdogecoin.a
+d21a5cfacb3bac99f56532b4db8a089f7cc30ed2c29d1b3ae36a2e97c087be77  ./build/libdogecoin-x86_64-apple-darwin14-v0.0.1/libdogecoin.h
+c51de054e55893922c39f81a656e71c5f84c18247c84b5814d7b98e6d9472f99  ./build/libdogecoin-x86_64-apple-darwin14-v0.0.1/sendtx
+823ec9df710665ccd996cc6fba52702f1201ab7de395beaded8f79098cd7b734  ./build/libdogecoin-x86_64-apple-darwin14-v0.0.1/such
