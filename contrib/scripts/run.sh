@@ -76,6 +76,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET
         fi
 
+        PACKAGE=""
         if has_param '--package' "$@"; then
             SIGN=""
             if has_param '--sign' "$@"; then
@@ -89,7 +90,8 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
                     exit 1
                 fi
             fi
-            ./contrib/scripts/package.sh --host $TARGET_HOST_TRIPLET $RELEASE $SIGN $RELEASE
+            PACKAGE="--package"
+            ./contrib/scripts/package.sh --host $TARGET_HOST_TRIPLET $RELEASE $SIGN $PACKAGE
         fi
     done
 fi
