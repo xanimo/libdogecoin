@@ -25,7 +25,7 @@ has_param() {
     return 1
 }
 
-COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates libtool libtool-bin pkg-config procps python3 rsync valgrind"
+COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates libtool libtool-bin pkg-config procps python3 python3.10-venv rsync valgrind"
 ARCH_PACKAGES=""
 OS_PACKAGES=""
 DEPENDS=""
@@ -84,11 +84,11 @@ if has_param '--host' "$@"; then
         ;;
         "x86_64-apple-darwin14")
             OS_PACKAGES="cmake zlib xorriso"
-            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python python-dev python-setuptools"
+            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal python-dev python-setuptools"
             TARGET_ARCH="amd64"
         ;;
         "x86_64-pc-linux-gnu") 
-            ARCH_PACKAGES="python3-dev python3-dbg python"
+            ARCH_PACKAGES="python3-dev python3-dbg python2-minimal"
             TARGET_ARCH="amd64"
         ;;
         "i686-pc-linux-gnu")
