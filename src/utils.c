@@ -460,8 +460,8 @@ long double rnd(long double v, long double digit) {
     return r / _pow;
 }
 
-long double length(double n) {
-    if (n < 0) n = (n == DBL_MIN) ? DBL_MAX : -n;
+int length(uint64_t n) {
+    if (n < 0) n = (n == 0) ? UINT64_MAX : -n;
     if (n < 10) return 1;
     if (n < 100) return 2;
     if (n < 1000) return 3;
@@ -480,7 +480,7 @@ long double length(double n) {
     if (n < 10000000000000000) return 16;
     if (n < 100000000000000000) return 17;
     if (n < 1000000000000000000) return 18;
-    if (n < 10000000000000000000UL) return 19;
+    if (n < 10000000000000000000) return 19;
     // UINT64_MAX // 18446744073709551615
     return 20;
     }
@@ -494,6 +494,273 @@ void show_fe_currentrnding_direction(void)
            case FE_TOWARDZERO: debug_print ("FE_TOWARDZERO: %d\n", FE_TOWARDZERO); break;
            default:            debug_print ("%s\n", "unknown");
     };
+}
+
+enum conversion_type {
+    CONVERSION_SUCCESS,
+    CONVERSION_NON_DECIMAL,
+    CONVERSION_INVALID_STR_TERMINATION,
+    CONVERSION_OUT_OF_RANGE,
+    CONVERSION_OVERFLOW,
+    CONVERSION_UNDERFLOW,
+    CONVERSION_UNSUPPORTED_VALUE,
+    CONVERSION_FAILURE
+};
+
+const char* conversion_type_to_str(const enum conversion_type type)
+{
+    if (type == CONVERSION_SUCCESS) {
+        return "CONVERSION_SUCCESS";
+    } else if (type == CONVERSION_NON_DECIMAL) {
+        return "CONVERSION_NON_DECIMAL";
+    } else if (type == CONVERSION_INVALID_STR_TERMINATION) {
+        return "CONVERSION_INVALID_STR_TERMINATION";
+    } else if (type == CONVERSION_OUT_OF_RANGE) {
+        return "CONVERSION_OUT_OF_RANGE";
+    } else if (type == CONVERSION_OVERFLOW) {
+        return "CONVERSION_OVERFLOW";
+    } else if (type == CONVERSION_UNDERFLOW) {
+        return "CONVERSION_UNDERFLOW";
+    } else if (type == CONVERSION_UNSUPPORTED_VALUE) {
+        return "CONVERSION_UNSUPPORTED_VALUE";
+    } else if (type == CONVERSION_FAILURE) {
+        return "CONVERSION_FAILURE";
+    } else {
+        return "CONVERSION_UNKNOWN_ERROR";
+    }
+}
+
+int check_length(char* string) {
+    int integer_length, mantissa;
+    // length minus 1 representative of decimal point and 8 representative of koinu
+    integer_length = strlen(string) - 9;
+    // set max length for all string inputs to 22 to account for total supply
+    // passing 1T in ~180 years from 2022. this limit will be valid for the
+    // next 1980 years so make sure to update in year 4002. :)
+    if (integer_length > 13) {
+        return false;
+    }
+    return integer_length;
+}
+
+int includes(const char* src, char* dest) {
+    char* ok = strstr(src, dest);
+    if (ok) return true;
+    else return false;
+}
+
+int substr(char* dest, char* src, int start, int length) {
+    dogecoin_mem_zero(dest, length + 1);
+    uint64_t x = start;
+    for (; x < length; x++) dest[x] = src[x];
+    return includes(src, dest);
+}
+
+enum conversion_type validate_conversion(uint64_t converted, const char* src, const char* src_end, const char* target_end) {
+    printf("src: %s\n", src);
+    printf("src_end: %s\n", src_end);
+    printf("target_end: %s\n", target_end);
+    printf("src_end==target_end: %d\n", src_end==target_end);
+    printf("converted: %"PRIu64"\n", converted);
+    enum conversion_type type;
+    if (src_end == src) {
+        type = CONVERSION_NON_DECIMAL;
+        debug_print("%s: not a decimal\n", src);
+    } else if (*target_end != *src_end) {
+        type = CONVERSION_INVALID_STR_TERMINATION;
+        debug_print("%s: extra characters at end of input: %s\n", src, src_end);
+    } else if ((UINT64_MAX == converted) && ERANGE == errno) {
+        type = CONVERSION_OUT_OF_RANGE;
+        debug_print("%s out of range of type uint64_t\n", src);
+    } else if (converted == UINT64_MAX) {
+        type = CONVERSION_OVERFLOW;
+        debug_print("%"PRIu64" greater than UINT64_MAX\n", converted);
+    // } else if (converted == UINT64_MAX) { // uint64_t does not have UINT64_MIN
+    //     type = CONVERSION_UNDERFLOW;
+    //     debug_print("%"PRIu64" less than 0\n", converted);
+    // } else if (errno == EINVAL) { /* not in all c99 implementations - gcc OK */
+    //     type = CONVERSION_UNSUPPORTED_VALUE;
+    //     debug_print("%"PRIu64" contains unsupported value\n", converted);
+    } else {
+        type = CONVERSION_SUCCESS;
+    }
+    return type;
+}
+
+int calc_length(uint64_t x) {
+    int count = 0;
+    while (x > 0) {
+        x /= 10;
+        count++;
+    }
+    return count;
+}
+
+// void* conversion_type_classify(char* coins, uint64_t koinu, enum conversion_type state, char* type)
+// {
+//     if (strcmp(type, "koinu")==0) {
+//         // if (is_decimal_str(coins)) {
+//             printf("decimal string\n");
+//             int integer_length = check_length(coins);
+//             if (!integer_length) {
+//                 state = CONVERSION_OUT_OF_RANGE;
+//                 return false;
+//             }
+//             printf("integer length: %d\n", integer_length);
+//             char* int_string[(integer_length + 1) * 2], *int_end;
+//             if (!substr((char*)int_string, coins, 0, integer_length)) {
+//                 state = CONVERSION_FAILURE;
+//                 return false;
+//             }
+//             koinu = strtoull((const char*)int_string, &int_end, 10);
+//             state = validate_conversion(koinu, (const char*)int_string, int_end, ".");
+//             if (state == CONVERSION_SUCCESS) koinu *= 1e8;
+//             else return false;
+//             printf("koinu: %"PRIu64"\n", koinu);
+//             uint64_t y = integer_length;
+//             for (; y <= strlen(coins) - 9; y++) {
+//                 printf("coins: %s\n", &coins[y]);
+//                 uint64_t mantissa = strtoull(&coins[y], &int_end, 10) / 10;
+//                 printf("mantissa: %"PRIu64"\n", mantissa);
+//                 state = validate_conversion(mantissa, &coins[y], int_end, "\0");
+//                 if (state == CONVERSION_SUCCESS) {
+//                     koinu += mantissa;
+//                 }         
+//                 printf("koinu: %"PRIu64"\n", koinu);
+//                 // if (type == CONVERSION_SUCCESS) koinu += mantissa;
+//                 // else return type;
+//             }
+//         // } else {
+//         //     state = CONVERSION_UNSUPPORTED_VALUE;
+//         // }
+//         return (void*)koinu;
+//     } else if (strcmp(type, "coins")==0) {
+//         int len = calc_length(koinu);
+//         uint64_t integer = koinu / 100000000, 
+//         base = integer * 100000000,
+//         mantissa = koinu - base;
+//         char* int_str[len + 1], base_str, mantissa_str[8];
+//         dogecoin_mem_zero(int_str, len + 1);
+//         debug_print("%"PRIu64"\n", integer);
+//         debug_print("%"PRIu64"\n", base);
+//         debug_print("%"PRIu64"\n", mantissa);
+//         debug_print("%"PRIu64".%"PRIu64"\n", integer, mantissa);
+
+//         snprintf(&int_str, 22, "%"PRIu64".%"PRIu64, integer, mantissa);   
+        
+//         debug_print("int_str: %s\n", int_str);
+        
+//         strncpy(coins, &int_str, strlen(int_str));
+        
+//         debug_print("str: %s\n", coins);
+//         return (void*)coins;
+//     }
+// }
+
+char* substring(char* dest, char* src, int start, int length) {
+    int y = start - 1, end = start + length - 1;
+    for (; y <= end; y++) {
+        dest = &src[y];
+        break;
+    }
+    return dest;
+}
+
+char* koinu_to_coins_str(uint64_t koinu, char* str) {
+    enum conversion_type res;
+    int len = calc_length(koinu);
+    debug_print("koinu %"PRIu64"\n", koinu);
+    char* int_str[len + 1], base_str, mantissa_str[8], *src[len], *integer[len], *mantissa;
+    dogecoin_mem_zero(int_str, len + 1);
+    snprintf((char*)src, len + 1, "%"PRIu64, koinu);
+    debug_print("koinu %"PRIu64"\n", koinu);
+    int integer_length = check_length(src) + 1;
+    // if (!integer_length) {
+    //     state = CONVERSION_OUT_OF_RANGE;
+    //     return false;
+    // }
+    debug_print("integer_length %d\n", integer_length);
+    debug_print("src %s\n", src);
+    substr((char*)integer, (char*)src, 0, integer_length);
+    debug_print("src %s\n", src);
+    debug_print("integer %s\n", integer);
+    debug_print("integer %d\n", strlen(integer));
+    append(integer, ".");
+    debug_print("integer %s\n", integer);
+    debug_print("src %s\n", src);
+    int start = strlen(integer), mantissa_length = strlen(src) - integer_length;
+    debug_print("start %d\n", start);
+    debug_print("mantissa_length %d\n", mantissa_length);
+    mantissa = substring((char*)mantissa, (char*)src, start, mantissa_length);
+    debug_print("substring %s\n", mantissa);
+    debug_print("mantissa %s\n", mantissa);
+    append(integer, mantissa);
+    debug_print("integer %s\n", integer);
+    debug_print("integer %d\n", strlen(integer));
+    strncpy(str, &integer, strlen(integer));
+    debug_print("str: %s\n", str);
+    return true;
+}
+
+uint64_t coins_to_koinu_str(char* coins) {
+    uint64_t koinu;
+    enum conversion_type state;
+
+    printf("decimal string\n");
+    int integer_length = check_length(coins);
+    if (!integer_length) {
+        state = CONVERSION_OUT_OF_RANGE;
+        return false;
+    }
+    printf("integer length: %d\n", integer_length);
+    char* int_string[(integer_length + 1) * 2], *int_end;
+    if (!substr((char*)int_string, coins, 0, integer_length)) {
+        state = CONVERSION_FAILURE;
+        return false;
+    }
+    koinu = strtoull((const char*)int_string, &int_end, 10);
+    state = validate_conversion(koinu, (const char*)int_string, int_end, ".");
+    if (state == CONVERSION_SUCCESS) koinu *= 1e8;
+    else return false;
+    printf("koinu: %"PRIu64"\n", koinu);
+    uint64_t y = integer_length;
+    for (; y <= strlen(coins) - 9; y++) {
+        printf("coins: %s\n", &coins[y]);
+        uint64_t mantissa = strtoull(&coins[y], &int_end, 10) / 10;
+        printf("mantissa: %"PRIu64"\n", mantissa);
+        state = validate_conversion(mantissa, &coins[y], int_end, "\0");
+        if (state == CONVERSION_SUCCESS) {
+            koinu += mantissa;
+        }         
+        printf("koinu: %"PRIu64"\n", koinu);
+        // if (type == CONVERSION_SUCCESS) koinu += mantissa;
+        // else return type;
+    }
+    debug_print("coins: %s\n", coins);
+    debug_print("koinu: %"PRIu64"\n", koinu);
+    debug_print("%s\n", conversion_type_to_str(state));
+    if (state == CONVERSION_SUCCESS) {
+        return koinu;
+    } else {
+        debug_print("%s\n", conversion_type_to_str(state));
+        return false;
+    }
+}
+
+long double round_ld(long double x)
+{
+    fenv_t save_env;
+    feholdexcept(&save_env);
+    long double result = rintl(x);
+    if (fetestexcept(FE_INEXACT)) {
+        int const save_round = fegetround();
+        fesetround(FE_UPWARD);
+        result = rintl(copysignl(0.5 + fabsl(x), x));
+        debug_print("result: %.8Lf\n", result);
+        fesetround(save_round);
+    }
+    feupdateenv(&save_env);
+    return result;
 }
 
 long double koinu_to_coins(uint64_t koinu) {
@@ -517,46 +784,13 @@ long double koinu_to_coins(uint64_t koinu) {
     return output;
 }
 
-long double round_ld(long double x)
-{
-    fenv_t save_env;
-    feholdexcept(&save_env);
-    long double result = rintl(x);
-    if (fetestexcept(FE_INEXACT)) {
-        int const save_round = fegetround();
-        fesetround(FE_UPWARD);
-        result = rintl(copysignl(0.5 + fabsl(x), x));
-        debug_print("result: %.8Lf\n", result);
-        fesetround(save_round);
-    }
-    feupdateenv(&save_env);
-    return result;
-}
-
-uint64_t coins_to_koinu_str(char* coins) {
-    long double integer_length, mantissa;
-    // length minus 1 representative of decimal and 8 representative of koinu
-    integer_length = strlen(coins) - 9;
-    char* int_end, int_str[256];
-    uint64_t x = 0;
-    for (; x < integer_length; x++) {
-        int_str[x] = coins[x];
-    }
-    unsigned long long int u64 = strtoull(int_str, &int_end, 10);
-    u64 *= 1e8;
-    for (uint64_t y = x; y <= strlen(coins) - 9; y++) {
-        mantissa = roundl(strtold(&coins[y], &int_end) / 10);
-        u64 += (uint64_t)mantissa;
-    }
-    return u64;
-}
-
 long long unsigned coins_to_koinu(long double coins) {
     long double output;
 #if defined(__ARM_ARCH_7A__)
     long double integer_length, mantissa_length;
-    char* str[256];
-    sprintf(&str, "%.8Lf", coins);
+    char* str[22];
+    dogecoin_mem_zero(str, 11);
+    snprintf(&str, sizeof(str), "%.8Lf", coins);
     // length minus 1 representative of decimal and 8 representative of koinu
     integer_length = strlen(str) - 9;
     mantissa_length = integer_length + (8 - integer_length);
