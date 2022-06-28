@@ -89,7 +89,7 @@ void test_utils()
         u_assert_double_eq(tmp, coin_amounts[i]);
         u_assert_uint32_eq(actual_answer, exp_answers[i]);
     #ifdef WIN32
-        debug_print("T%d\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual: %"PRIu64"\n\n", i, (double)coin_amounts[i], exp_answers[i], actual_answer);
+        debug_print("T%d\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual: %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
     #else
         debug_print("T%d\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
     #endif
@@ -140,11 +140,11 @@ void test_utils()
         // so omit double/long double assertions if running on valgrind
         #ifdef RUNNING_ON_VALGRIND
             if (!RUNNING_ON_VALGRIND) {
-                #ifndef __ARM_ARCH_7A__
-                    u_assert_double_eq(tmp, coin_amounts2[i]);
-                #else
-                    u_assert_long_double_eq(tmp, exp_answers2[i] / 1e8);
-                #endif
+                if (strcmp(get_build(), "ARM7") == 0) {
+                    u_assert_double_eq(tmp, exp_answers2[i] / 1e8);
+                } else {
+                    u_assert_double_eq(coin_amounts2[i], tmp);
+                }
             }
         #endif
             u_assert_uint32_eq(actual_answer, exp_answers2[i]);
@@ -154,7 +154,7 @@ void test_utils()
             DISABLE_WARNING(-Wformat=)
             DISABLE_WARNING_PUSH
             // hack to print long double, not 100% reliable...
-            debug_print("\n\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", (double)coin_amounts2[i], exp_answers2[i], actual_answer);
+            debug_print("\n\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", coin_amounts2[i], exp_answers2[i], actual_answer);
             DISABLE_WARNING_POP
         #else
             debug_print("\n\n\tcoin_amt: %.8f\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", exp_answers2[i] / 1e8, exp_answers2[i], actual_answer);
