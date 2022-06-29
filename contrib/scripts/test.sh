@@ -43,10 +43,18 @@ if has_param '--host' "$@"; then
     TARGET_HOST_TRIPLET=$2
     case "$2" in
         "arm-linux-gnueabihf")
-            qemu-arm -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib/ /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 ./tests
+            if has_param '--docker' "$@"; then
+                make check
+            else
+                qemu-arm -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib/ /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 ./tests
+            fi
         ;;
         "aarch64-linux-gnu")
-            qemu-aarch64 -E LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib/ /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 ./tests
+            if has_param '--docker' "$@"; then
+                make check
+            else
+                qemu-aarch64 -E LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib/ /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 ./tests
+            fi
         ;;
         "x86_64-w64-mingw32")
             make check -j"$(getconf _NPROCESSORS_ONLN)" V=1

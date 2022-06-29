@@ -64,11 +64,17 @@ TARGET_HOST_TRIPLET=""
 ALL_HOST_TRIPLETS=""
 if has_param '--host' "$@"; then
     if has_param '--all' "$@"; then
-        ALL_HOST_TRIPLETS=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "aarch64-linux-gnu" "arm-linux-gnueabihf" "x86_64-apple-darwin14" "x86_64-w64-mingw32" "i686-w64-mingw32")
+        ALL_HOST_TRIPLETS=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "aarch64-linux-gnu" "arm-linux-gnueabihf" "x86_64-w64-mingw32" "i686-w64-mingw32") # "x86_64-apple-darwin14" failing
     else
         ALL_HOST_TRIPLETS=($2)
     fi
 fi
+
+build() {
+    pushd ./contrib/scripts/
+        docker buildx build --platform $OS/$TARGET_ARCH -t xanimo/libdogecoin:$TARGET_ARCH --load . --build-arg TARGET_HOST_TRIPET=$2
+    popd
+}
 
 if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
@@ -83,28 +89,31 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
         case "$TARGET_HOST_TRIPLET" in
             "arm-linux-gnueabihf")
                 TARGET_ARCH="armhf"
+                build
             ;;
             "aarch64-linux-gnu")
                 TARGET_ARCH="arm64"
+                build
             ;;
             "x86_64-w64-mingw32")
                 TARGET_ARCH="amd64"
+                build
             ;;
             "i686-w64-mingw32")
                 TARGET_ARCH="i386"
+                build
             ;;
             "x86_64-apple-darwin14")
                 TARGET_ARCH="amd64"
             ;;
             "x86_64-pc-linux-gnu")
                 TARGET_ARCH="amd64"
+                build
             ;;
             "i686-pc-linux-gnu")
                 TARGET_ARCH="i386"
+                build
             ;;
         esac
-        pushd ./contrib/scripts/
-            docker buildx build --platform $OS/$TARGET_ARCH --load .
-        popd
     done
 fi
