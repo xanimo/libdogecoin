@@ -64,8 +64,13 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             DEPENDS="--depends"
         fi
 
+        DOCKER=""
+        if has_param '--docker' "$@"; then
+            DOCKER="--docker"
+        fi
+
         if has_param '--setup' "$@"; then
-            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET $DEPENDS
+            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET $DEPENDS $DOCKER
         fi
 
         if has_param '--build' "$@"; then
@@ -73,7 +78,23 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
         fi
         
         if has_param '--test' "$@"; then
-            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET
+            GO=""
+            CYTHON=""
+            VALGRIND=""
+            EXTENDED=""
+            if has_param '--go' "$@"; then
+                GO="--go"
+            fi
+            if has_param '--cython' "$@"; then
+                CYTHON="--cython"
+            fi
+            if has_param '--valgrind' "$@"; then
+                VALGRIND="--valgrind"
+            fi
+            if has_param '--extended' "$@"; then
+                EXTENDED="--extended"
+            fi
+            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET $EXTENDED $VALGRIND $CYTHON $GO $DOCKER
         fi
 
         PACKAGE=""

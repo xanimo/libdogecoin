@@ -1,0 +1,9 @@
+#1 [internal] load .dockerignore
+#1 transferring context:
+#1 transferring context: 2B 0.3s done
+#1 DONE 0.3s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2B 0.3s done
+#2 DONE 0.4s
+error: failed to solve: failed to read dockerfile: open /tmp/buildkit-mount337257971/Dockerfile: no such file or directory

@@ -40,8 +40,9 @@ else
 fi
 
 if has_param '--docker' "$@"; then
-    DOCKER=1
-    COMMON_PACKAGES+=" git"
+    USE_SUDO=
+else
+    USE_SUDO="sudo"
 fi
 
 if has_param '--host' "$@"; then
@@ -66,9 +67,7 @@ if has_param '--host' "$@"; then
             fi
             ARCH_PACKAGES+="nsis wine64 wine-stable bc wine-binfmt"
             TARGET_ARCH="amd64"
-            sudo dpkg --add-architecture $TARGET_ARCH
-            sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-            sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
+            $USE_SUDO dpkg --add-architecture $TARGET_ARCH
             sudo update-binfmts --import /usr/share/binfmts/wine
         ;;
         "i686-w64-mingw32")
@@ -77,14 +76,12 @@ if has_param '--host' "$@"; then
             fi
             ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt"
             TARGET_ARCH="i386"
-            sudo dpkg --add-architecture $TARGET_ARCH
-            sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-            sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
+            $USE_SUDO dpkg --add-architecture $TARGET_ARCH
             sudo update-binfmts --import /usr/share/binfmts/wine
         ;;
         "x86_64-apple-darwin14")
             OS_PACKAGES="cmake zlib xorriso"
-            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal python-dev python-setuptools"
+            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal"
             TARGET_ARCH="amd64"
         ;;
         "x86_64-pc-linux-gnu") 
@@ -97,7 +94,7 @@ if has_param '--host' "$@"; then
             fi
             ARCH_PACKAGES+="bc"
             TARGET_ARCH="i386"
-            sudo dpkg --add-architecture $TARGET_ARCH
+            $USE_SUDO dpkg --add-architecture $TARGET_ARCH
         ;;
     esac
     TARGET_HOST_TRIPLET=$2
@@ -131,32 +128,26 @@ setup_brew() {
 }
 
 setup_linux() {
-    USE_SUDO=
-    if [[ $DOCKER != 1 ]]; then
-        USE_SUDO="sudo"
-    fi
     $USE_SUDO apt-get update
-    DEBIAN_FRONTEND=noninteractive $USE_SUDO apt-get install --no-install-recommends -y $COMMON_PACKAGES $ARCH_PACKAGES
+    DEBIAN_FRONTEND=noninteractive $USE_SUDO apt-get install -y $COMMON_PACKAGES $ARCH_PACKAGES
 }
 
 OPTIONS=""
 case "$TARGET_HOST_TRIPLET" in
     "x86_64-w64-mingw32")
         setup_linux
-        if [[ $EUID == 0 ]] || [[ $DOCKER == 1 ]]; then
-            dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
-            update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-            update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
-            update-binfmts --import /usr/share/binfmts/wine
+        if ! has_param '--docker' "$@"; then
+            $USE_SUDO dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
+        else
+            $USE_SUDO update-binfmts --import /usr/share/binfmts/wine
         fi
     ;;
     "i686-w64-mingw32")
         setup_linux
-        if [[ $EUID == 0 ]] || [[ $DOCKER == 1 ]]; then
-            dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
-            update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-            update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
-            update-binfmts --import /usr/share/binfmts/wine
+        if ! has_param '--docker' "$@"; then
+            $USE_SUDO dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
+        else
+            $USE_SUDO update-binfmts --import /usr/share/binfmts/wine
         fi
     ;;
     "x86_64-apple-darwin14")
