@@ -64,8 +64,13 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             DEPENDS="--depends"
         fi
 
+        DOCKER=""
+        if has_param '--docker' "$@"; then
+            DOCKER="--docker"
+        fi
+
         if has_param '--setup' "$@"; then
-            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET $DEPENDS
+            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET $DEPENDS $DOCKER
         fi
 
         if has_param '--build' "$@"; then

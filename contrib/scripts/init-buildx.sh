@@ -104,7 +104,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             ;;
         esac
         pushd ./contrib/scripts/
-            docker buildx build --platform $OS/$TARGET_ARCH --load .
+            docker buildx build --platform $OS/$TARGET_ARCH -t xanimo/libdogecoin:$TARGET_ARCH --no-cache --load .
         popd
     done
 fi
