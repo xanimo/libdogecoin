@@ -72,8 +72,6 @@ jobs:
             packages: python3 nsis g++-mingw-w64-x86-64 wine64 wine-stable bc wine-binfmt
             postinstall: |
               sudo dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
-              sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-              sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
               sudo update-binfmts --import /usr/share/binfmts/wine
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
             config-opts: ""
@@ -86,10 +84,8 @@ jobs:
             packages: python3 nsis g++-mingw-w64 wine32 wine-stable bc wine-binfmt
             postinstall: |
               sudo dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
-              sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-              sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
-              sudo update-binfmts --import /usr/share/binfmts/wine
-            dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
+              sudo update-binfmts --import /usr/share/binfmts/wine      
+            dep-opts: "BUILD=$(gcc -dumpmachine) CROSS_COMPILE='yes' SPEED=slow V=1"
             config-opts: ""
             run-tests: true
             goal: install
@@ -117,7 +113,6 @@ jobs:
               brew install automake coreutils python3 ${{ matrix.packages }}
               echo PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH" >> ~/.bashrc
               source ~/.bashrc
-
           else
             if ([ "${{ matrix.name }}" == "x86_64-win" ] || [ "${{ matrix.name }}" == "i686-win" ]); then
               sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9
@@ -127,7 +122,7 @@ jobs:
             else
               sudo apt-get update
             fi
-            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y autoconf automake libtool-bin libevent-dev build-essential curl python3 valgrind ${{ matrix.packages }}
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y autoconf automake libtool-bin libevent-dev lzip build-essential curl python3 valgrind ${{ matrix.packages }}
           fi
 
       - name: post install
@@ -168,6 +163,10 @@ jobs:
 
       - name: build depends
         run: |
+          if ([ "${{ matrix.name }}" == "x86_64-win" ] || [ "${{ matrix.name }}" == "i686-win" ]); then
+              export CC=${{ matrix.host }}-gcc
+              export CC_FOR_BUILD=$(gcc -dumpmachine)-gcc
+          fi
           make $MAKEJOBS -C depends HOST=${{ matrix.host }} ${{ matrix.dep-opts }}
 
       - name: ccache

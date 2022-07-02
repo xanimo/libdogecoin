@@ -25,7 +25,7 @@ has_param() {
     return 1
 }
 
-COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates libtool libtool-bin pkg-config procps python3 python3.10-venv rsync valgrind"
+COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates libtool libtool-bin lzip pkg-config procps python3 python3.10-venv rsync valgrind"
 ARCH_PACKAGES=""
 OS_PACKAGES=""
 DEPENDS=""
@@ -67,9 +67,9 @@ if has_param '--host' "$@"; then
             ARCH_PACKAGES+="nsis wine64 wine-stable bc wine-binfmt"
             TARGET_ARCH="amd64"
             sudo dpkg --add-architecture $TARGET_ARCH
-            sudo update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-            sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
             sudo update-binfmts --import /usr/share/binfmts/wine
+            export CC=$2-gcc
+            export CC_FOR_BUILD=$(gcc -dumpmachine)-gcc
         ;;
         "i686-w64-mingw32")
             if [ $DEPENDS ]; then
@@ -78,9 +78,9 @@ if has_param '--host' "$@"; then
             ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt"
             TARGET_ARCH="i386"
             sudo dpkg --add-architecture $TARGET_ARCH
-            sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-            sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
             sudo update-binfmts --import /usr/share/binfmts/wine
+            export CC=$2-gcc
+            export CC_FOR_BUILD=$(gcc -dumpmachine)-gcc
         ;;
         "x86_64-apple-darwin14")
             OS_PACKAGES="cmake zlib xorriso"
@@ -145,8 +145,6 @@ case "$TARGET_HOST_TRIPLET" in
         setup_linux
         if [[ $EUID == 0 ]] || [[ $DOCKER == 1 ]]; then
             dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
-            update-alternatives --set x86_64-w64-mingw32-gcc  /usr/bin/x86_64-w64-mingw32-gcc-posix
-            update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
             update-binfmts --import /usr/share/binfmts/wine
         fi
     ;;
@@ -154,8 +152,6 @@ case "$TARGET_HOST_TRIPLET" in
         setup_linux
         if [[ $EUID == 0 ]] || [[ $DOCKER == 1 ]]; then
             dpkg -s mono-runtime && sudo apt-get remove mono-runtime || echo "Very nothing to uninstall."
-            update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
-            update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
             update-binfmts --import /usr/share/binfmts/wine
         fi
     ;;
@@ -172,7 +168,7 @@ case "$TARGET_HOST_TRIPLET" in
     ;;
 esac
 
-NO_X_COMPILE=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "x86_64-apple-darwin14");
+NO_X_COMPILE=("x86_64-pc-linux-gnu" "x86_64-apple-darwin14" "x86_64-w64-mingw32");
 if [ "$DEPENDS" = "1" ]; then
     match=0
     for str in ${NO_X_COMPILE[@]}; do
@@ -182,7 +178,7 @@ if [ "$DEPENDS" = "1" ]; then
         fi
     done
     if [[ $match = 0 ]]; then
-        OPTIONS="CROSS_COMPILE='yes' "
+        OPTIONS="BUILD=$(gcc -dumpmachine) CROSS_COMPILE='yes' "
     fi
     OPTIONS+="SPEED=slow V=1"
     make -C depends HOST=$TARGET_HOST_TRIPLET $OPTIONS

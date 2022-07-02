@@ -4,9 +4,12 @@ $(package)_download_path=https://ftp.gnu.org/gnu/gmp/
 $(package)_file_name=gmp-6.2.1.tar.lz
 $(package)_sha256_hash=2c7f4f0d370801b2849c48c9ef3f59553b5f1d3791d070cffb04599f9fc67b41
 $(package)_dependencies=
-$(package)_config_opts=--enable-cxx --enable-static --disable-shared
 
-define $(package)_preprocess_cmds
+define $(package)_set_vars
+$(package)_config_opts=--enable-static --disable-shared --with-gnu-ld
+$(package)_config_opts_mingw32=--enable-mingw
+$(package)_config_opts_darwin=--enable-clang
+$(package)_config_opts_linux=--with-pic
 endef
 
 define $(package)_config_cmds
