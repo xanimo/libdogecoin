@@ -21,19 +21,19 @@
 #include <mpfr.h>
 #include <gmp.h>
 
-/* test a buffer overflow protection */
+ /* test a buffer overflow protection */
 static const char hash_buffer_exc[] = "28969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c1";
 
 static const char hex2[] = "AA969cdfFFffFF3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c1";
 
 void test_utils()
-{
+    {
 
-    #ifndef __STDC_IEC_559__
+#ifndef __STDC_IEC_559__
     puts("Warning: __STDC_IEC_559__ not defined. IEEE 754 floating point not fully supported."); // [9]
-    #endif
+#endif
     int outlen = 0;
-    unsigned char data[] = {0x00, 0xFF, 0x00, 0xAA, 0x00, 0xFF, 0x00, 0xAA};
+    unsigned char data[] = { 0x00, 0xFF, 0x00, 0xAA, 0x00, 0xFF, 0x00, 0xAA };
     char hash[] = "28969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c1";
     char hex[sizeof(data) * 2 + 1];
     unsigned char data2[sizeof(data)];
@@ -58,7 +58,7 @@ void test_utils()
     utils_clear_buffers();
 
     /* stress test conversion between coins and koinu, round values */
-    long double coin_amounts[] = {  0e-9, 1.0e-8, 
+    long double coin_amounts[] = { 0e-9, 1.0e-8,
                                     1.0e-7, 1.0e-6,
                                     1.0e-5, 1.0e-4,
                                     1.0e-3, 1.0e-2,
@@ -70,7 +70,7 @@ void test_utils()
                                     1.0e9, 1.0e10,
                                     1.0e11 };
 
-    uint64_t exp_answers[] = {      0UL, 1UL,
+    uint64_t exp_answers[] = { 0UL, 1UL,
                                     10UL, 100UL,
                                     1000UL, 10000UL,
                                     100000UL, 1000000UL,
@@ -81,27 +81,27 @@ void test_utils()
                                     1000000000000000UL, 10000000000000000UL,
                                     100000000000000000UL, 1000000000000000000UL,
                                     10000000000000000000UL };
-    
+
     uint64_t actual_answer;
     uint64_t diff;
     long double tmp;
-    int i=0;
-    for (; i<20; i++) {
+    int i = 0;
+    for (; i < 20; i++) {
         tmp = koinu_to_coins(exp_answers[i]);
         actual_answer = coins_to_koinu(tmp);
         u_assert_double_eq(tmp, coin_amounts[i]);
         u_assert_uint32_eq(actual_answer, exp_answers[i]);
-    #ifdef WIN32
+#ifdef WIN32
         debug_print("T%d\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual: %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
-    #else
+#else
         debug_print("T%d\n\tcoin_amt: %.8Lf\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
-    #endif
+#endif
         diff = (exp_answers[i] - actual_answer);
         u_assert_int_eq((int)diff, 0);
-    }
+        }
 
     /* stress test conversion between coins and koinu, random decimal values */
-    char* coin_amounts_str[] =  {   "183447094.020691168","410357585.029255459",
+    char* coin_amounts_str[] = { "183447094.020691168","410357585.029255459",
                                     "183447094.420691168","410357585.329255459",
                                     "567184894.440967455","1560227520.732426502",
                                     "2022535766.086211412","2047466422.707290167",
@@ -121,10 +121,10 @@ void test_utils()
                                     "15432527055.762317749","15778056333.994872841",
                                     "16654278072.590832439","17037268658.778085185",
                                     "17237308828.705953093","18606987445.409636773",
-                                    "19100595327.168318456","19674059614.504642487"};
-    
+                                    "19100595327.168318456","19674059614.504642487" };
+
     /* stress test conversion between coins and koinu, random decimal values */
-    char* coin_amounts_expected[] = {   "183447094.02069116","410357585.02925545",
+    char* coin_amounts_expected[] = { "183447094.02069116","410357585.02925545",
                                         "183447094.42069116","410357585.32925545",
                                         "567184894.44096745","1560227520.73242650",
                                         "2022535766.08621141","2047466422.70729016",
@@ -144,9 +144,9 @@ void test_utils()
                                         "15432527055.76231774","15778056333.99487284",
                                         "16654278072.59083243","17037268658.77808518",
                                         "17237308828.70595309","18606987445.40963677",
-                                        "19100595327.16831845","19674059614.50464248"};
+                                        "19100595327.16831845","19674059614.50464248" };
 
-    uint64_t exp_answers2[] = {     18344709402069116, 41035758502925545,
+    uint64_t exp_answers2[] = { 18344709402069116, 41035758502925545,
                                     18344709442069116, 41035758532925545,
                                     56718489444096745, 156022752073242650,
                                     202253576608621141, 204746642270729016,
@@ -173,32 +173,11 @@ void test_utils()
         actual_answer = coins_to_koinu_str(coin_amounts_str[i]);
         char* coins[22];
         dogecoin_mem_zero(coins, 22);
-        char* str[22];
-        dogecoin_mem_zero(str, 22);
-        // str = koinu_to_coins_str(actual_answer, (char*)coins);
-
-        // our string we want to equal coin_amounts_expected:
-        debug_print("coins: %s\n", (const char*)coins);
-        debug_print("str: %d\n", koinu_to_coins_str(actual_answer, coins));
-        debug_print("strlen(coins): %lu\n", strlen((const char*)coins));
-
-        // should equal to this:
-        debug_print("coin_amounts_expected[i]: %s\n", coin_amounts_expected[i]);
-        // should equal length:
-        debug_print("strlen(coin_amounts_expected[i]): %lu\n", strlen(coin_amounts_expected[i]));
-
-        // is equal despite strcmp failure:
-        debug_print("(char*)coin_amounts_expected[i]==coins: %d\n", coin_amounts_expected[i]==(const char*)coins);
-
-        //strcmp should pass:
-        debug_print("strcmp(coin_amounts_expected[i], coins): %d\n", strcmp(coin_amounts_expected[i], (const char*)coins)==0);
+        koinu_to_coins_str(actual_answer, (char*)coins);
         diff = exp_answers2[i] - actual_answer;
-
-        // need to pass this:
-        // u_assert_int_eq(strcmp(coin_amounts_expected[i], coins)==0, 1);
-        u_assert_str_eq((char*)coins, coin_amounts_expected[i]); // uncomment to assert string equality 6/30/22
+        u_assert_str_eq((char*)coins, coin_amounts_expected[i]);
         u_assert_uint32_eq(actual_answer, exp_answers2[i]);
         u_assert_int_eq((int)diff, 0);
         debug_print("\n\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", coin_amounts_expected[i], exp_answers2[i], actual_answer);
+        }
     }
-}

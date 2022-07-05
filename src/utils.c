@@ -534,9 +534,19 @@ int check_length(char* string) {
     int integer_length, mantissa;
     // length minus 1 representative of decimal point and 8 representative of koinu
     integer_length = strlen(string) - 9;
-    // set max length for all string inputs to 22 to account for total supply
-    // passing 1T in ~180 years from 2022. this limit will be valid for the
-    // next 1980 years so make sure to update in year 4002. :)
+    // length minus 1 representative of decimal point and 8 representative of koinu
+    integer_length = strlen(string) - 9;
+    // set max length for all string inputs to 20 to account for total supply in 2022
+    // (currently 132.67 billion dogecoin) + 1e8 koinu passing UINT64_MAX 184467440737
+    // in 9.854916426 years (2032) with output of 5,256,000,000 mined dogecoins per year
+    // TODO: in order to maintain portability on 64/32-bit platforms we can't support 
+    // literal representations of numbers greater than UINT64_MAX: 18446744073709551615
+    // therefore within the next 9.854916426 years, we need to roll our own uint128_t
+    // capable of providing support greater than 20 digit unsigned integers needed to 
+    // for uints in the trillions. once possible we need to implment max length below:
+    // set max length for all string inputs to 21 to account for total supply passing 
+    // 1T in ~180 years from 2022. this limit will be valid for the next 1980 years so 
+    // make sure to update in year 4002. :)
     if (integer_length > 13) {
         return false;
     }
@@ -557,11 +567,6 @@ int substr(char* dest, char* src, int start, int length) {
 }
 
 enum conversion_type validate_conversion(uint64_t converted, const char* src, const char* src_end, const char* target_end) {
-    printf("src: %s\n", src);
-    printf("src_end: %s\n", src_end);
-    printf("target_end: %s\n", target_end);
-    printf("src_end==target_end: %d\n", src_end==target_end);
-    printf("converted: %"PRIu64"\n", converted);
     enum conversion_type type;
     if (src_end == src) {
         type = CONVERSION_NON_DECIMAL;
@@ -575,12 +580,6 @@ enum conversion_type validate_conversion(uint64_t converted, const char* src, co
     } else if (converted == UINT64_MAX) {
         type = CONVERSION_OVERFLOW;
         debug_print("%"PRIu64" greater than UINT64_MAX\n", converted);
-    // } else if (converted == UINT64_MAX) { // uint64_t does not have UINT64_MIN
-    //     type = CONVERSION_UNDERFLOW;
-    //     debug_print("%"PRIu64" less than 0\n", converted);
-    // } else if (errno == EINVAL) { /* not in all c99 implementations - gcc OK */
-    //     type = CONVERSION_UNSUPPORTED_VALUE;
-    //     debug_print("%"PRIu64" contains unsupported value\n", converted);
     } else {
         type = CONVERSION_SUCCESS;
     }
@@ -596,67 +595,6 @@ int calc_length(uint64_t x) {
     return count;
 }
 
-// void* conversion_type_classify(char* coins, uint64_t koinu, enum conversion_type state, char* type)
-// {
-//     if (strcmp(type, "koinu")==0) {
-//         // if (is_decimal_str(coins)) {
-//             printf("decimal string\n");
-//             int integer_length = check_length(coins);
-//             if (!integer_length) {
-//                 state = CONVERSION_OUT_OF_RANGE;
-//                 return false;
-//             }
-//             printf("integer length: %d\n", integer_length);
-//             char* int_string[(integer_length + 1) * 2], *int_end;
-//             if (!substr((char*)int_string, coins, 0, integer_length)) {
-//                 state = CONVERSION_FAILURE;
-//                 return false;
-//             }
-//             koinu = strtoull((const char*)int_string, &int_end, 10);
-//             state = validate_conversion(koinu, (const char*)int_string, int_end, ".");
-//             if (state == CONVERSION_SUCCESS) koinu *= 1e8;
-//             else return false;
-//             printf("koinu: %"PRIu64"\n", koinu);
-//             uint64_t y = integer_length;
-//             for (; y <= strlen(coins) - 9; y++) {
-//                 printf("coins: %s\n", &coins[y]);
-//                 uint64_t mantissa = strtoull(&coins[y], &int_end, 10) / 10;
-//                 printf("mantissa: %"PRIu64"\n", mantissa);
-//                 state = validate_conversion(mantissa, &coins[y], int_end, "\0");
-//                 if (state == CONVERSION_SUCCESS) {
-//                     koinu += mantissa;
-//                 }         
-//                 printf("koinu: %"PRIu64"\n", koinu);
-//                 // if (type == CONVERSION_SUCCESS) koinu += mantissa;
-//                 // else return type;
-//             }
-//         // } else {
-//         //     state = CONVERSION_UNSUPPORTED_VALUE;
-//         // }
-//         return (void*)koinu;
-//     } else if (strcmp(type, "coins")==0) {
-//         int len = calc_length(koinu);
-//         uint64_t integer = koinu / 100000000, 
-//         base = integer * 100000000,
-//         mantissa = koinu - base;
-//         char* int_str[len + 1], base_str, mantissa_str[8];
-//         dogecoin_mem_zero(int_str, len + 1);
-//         debug_print("%"PRIu64"\n", integer);
-//         debug_print("%"PRIu64"\n", base);
-//         debug_print("%"PRIu64"\n", mantissa);
-//         debug_print("%"PRIu64".%"PRIu64"\n", integer, mantissa);
-
-//         snprintf(&int_str, 22, "%"PRIu64".%"PRIu64, integer, mantissa);   
-        
-//         debug_print("int_str: %s\n", int_str);
-        
-//         strncpy(coins, &int_str, strlen(int_str));
-        
-//         debug_print("str: %s\n", coins);
-//         return (void*)coins;
-//     }
-// }
-
 char* substring(char* dest, char* src, int start, int length) {
     int y = start - 1, end = start + length - 1;
     for (; y <= end; y++) {
@@ -669,50 +607,27 @@ char* substring(char* dest, char* src, int start, int length) {
 char* koinu_to_coins_str(uint64_t koinu, char* str) {
     enum conversion_type res;
     int len = calc_length(koinu);
-    debug_print("koinu %"PRIu64"\n", koinu);
     char* int_str[len + 1], base_str, mantissa_str[8], *src[len], *integer[len], *mantissa;
     dogecoin_mem_zero(int_str, len + 1);
     snprintf((char*)src, len + 1, "%"PRIu64, koinu);
-    debug_print("koinu %"PRIu64"\n", koinu);
     int integer_length = check_length(src) + 1;
-    // if (!integer_length) {
-    //     state = CONVERSION_OUT_OF_RANGE;
-    //     return false;
-    // }
-    debug_print("integer_length %d\n", integer_length);
-    debug_print("src %s\n", src);
     substr((char*)integer, (char*)src, 0, integer_length);
-    debug_print("src %s\n", src);
-    debug_print("integer %s\n", integer);
-    debug_print("integer %d\n", strlen(integer));
     append(integer, ".");
-    debug_print("integer %s\n", integer);
-    debug_print("src %s\n", src);
     int start = strlen(integer), mantissa_length = strlen(src) - integer_length;
-    debug_print("start %d\n", start);
-    debug_print("mantissa_length %d\n", mantissa_length);
     mantissa = substring((char*)mantissa, (char*)src, start, mantissa_length);
-    debug_print("substring %s\n", mantissa);
-    debug_print("mantissa %s\n", mantissa);
     append(integer, mantissa);
-    debug_print("integer %s\n", integer);
-    debug_print("integer %d\n", strlen(integer));
     strncpy(str, &integer, strlen(integer));
-    debug_print("str: %s\n", str);
     return true;
 }
 
 uint64_t coins_to_koinu_str(char* coins) {
     uint64_t koinu;
     enum conversion_type state;
-
-    printf("decimal string\n");
     int integer_length = check_length(coins);
     if (!integer_length) {
         state = CONVERSION_OUT_OF_RANGE;
         return false;
     }
-    printf("integer length: %d\n", integer_length);
     char* int_string[(integer_length + 1) * 2], *int_end;
     if (!substr((char*)int_string, coins, 0, integer_length)) {
         state = CONVERSION_FAILURE;
@@ -722,23 +637,13 @@ uint64_t coins_to_koinu_str(char* coins) {
     state = validate_conversion(koinu, (const char*)int_string, int_end, ".");
     if (state == CONVERSION_SUCCESS) koinu *= 1e8;
     else return false;
-    printf("koinu: %"PRIu64"\n", koinu);
     uint64_t y = integer_length;
     for (; y <= strlen(coins) - 9; y++) {
-        printf("coins: %s\n", &coins[y]);
         uint64_t mantissa = strtoull(&coins[y], &int_end, 10) / 10;
-        printf("mantissa: %"PRIu64"\n", mantissa);
         state = validate_conversion(mantissa, &coins[y], int_end, "\0");
-        if (state == CONVERSION_SUCCESS) {
-            koinu += mantissa;
-        }         
-        printf("koinu: %"PRIu64"\n", koinu);
-        // if (type == CONVERSION_SUCCESS) koinu += mantissa;
-        // else return type;
+        if (state == CONVERSION_SUCCESS) koinu += mantissa;
+        else return state;
     }
-    debug_print("coins: %s\n", coins);
-    debug_print("koinu: %"PRIu64"\n", koinu);
-    debug_print("%s\n", conversion_type_to_str(state));
     if (state == CONVERSION_SUCCESS) {
         return koinu;
     } else {
