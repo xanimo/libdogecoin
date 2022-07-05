@@ -28,6 +28,9 @@ TARGET_ARCH=""
 CONFIGURE_OPTIONS=""
 PREFIX="/usr/local"
 
+# clean build directory
+make clean
+
 if has_param '--host' "$@"; then
     TARGET_HOST_TRIPLET=$2
     LIBS+="-levent -levent_core"
