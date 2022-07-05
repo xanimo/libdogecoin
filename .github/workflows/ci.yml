@@ -219,7 +219,7 @@ jobs:
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
               python3 tooltests.py
               ./wrappers/python/pytest/cython_tests.sh -host=${{ matrix.host }}
-              ./wrappers/golang/libdogecoin/build.sh
+              ./wrappers/golang/libdogecoin/build.sh --host=${{ matrix.host }}
               ;;
               "i686-linux") 
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1

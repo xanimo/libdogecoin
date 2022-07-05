@@ -70,10 +70,27 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
 
         if has_param '--build' "$@"; then
             ./contrib/scripts/build.sh --host $TARGET_HOST_TRIPLET $DEPENDS
+            ./contrib/scripts/combine.sh --target .libs/libdogecoin.a --append "src/secp256k1/.libs/libsecp256k1.a src/secp256k1/.libs/libsecp256k1_precomputed.a"
         fi
         
         if has_param '--test' "$@"; then
-            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET
+            GO=""
+            CYTHON=""
+            VALGRIND=""
+            EXTENDED=""
+            if has_param '--go' "$@"; then
+                GO="--go"
+            fi
+            if has_param '--cython' "$@"; then
+                CYTHON="--cython"
+            fi
+            if has_param '--valgrind' "$@"; then
+                VALGRIND="--valgrind"
+            fi
+            if has_param '--extended' "$@"; then
+                EXTENDED="--extended"
+            fi
+            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET $EXTENDED $VALGRIND $CYTHON $GO
         fi
 
         PACKAGE=""

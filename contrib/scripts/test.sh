@@ -40,6 +40,7 @@ TARGET_HOST_TRIPLET=""
 TARGET_ARCH=""
 
 if has_param '--host' "$@"; then
+    TARGET_HOST_TRIPLET=$2
     case "$2" in
         "arm-linux-gnueabihf")
             qemu-arm -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib/ /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 ./tests
@@ -65,9 +66,16 @@ if has_param '--host' "$@"; then
             make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
         ;;
     esac
-    if has_param '--extended' "$@"; then
+fi
+
+if has_param '--extended' "$@"; then
+    if has_param '--valgrind' "$@"; then
         python3 tooltests.py
-        ./wrappers/python/pytest/cython_tests.sh
-        ./wrappers/golang/libdogecoin/build.sh
+    fi
+    if has_param '--cython' "$@"; then
+        ./wrappers/python/pytest/cython_tests.sh -host $TARGET_HOST_TRIPLET
+    fi
+    if has_param '--go' "$@"; then
+        ./wrappers/golang/libdogecoin/build.sh --host $TARGET_HOST_TRIPLET
     fi
 fi
