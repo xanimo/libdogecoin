@@ -60,12 +60,14 @@ if has_param '--host' "$@"; then
         ;;
         "x86_64-pc-linux-gnu") 
             make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
-            python3 tooltests.py
-            ./wrappers/python/pytest/cython_tests.sh
-            ./wrappers/golang/libdogecoin/build.sh
         ;;
         "i686-pc-linux-gnu")
             make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
         ;;
     esac
+    if has_param '--extended' "$@"; then
+        python3 tooltests.py
+        ./wrappers/python/pytest/cython_tests.sh
+        ./wrappers/golang/libdogecoin/build.sh
+    fi
 fi
