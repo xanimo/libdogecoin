@@ -18,7 +18,6 @@ AC_PATH_TOOL(AR, ar)
 AC_PATH_TOOL(RANLIB, ranlib)
 AC_PATH_TOOL(STRIP, strip)
 AM_PROG_CC_C_O
-AC_PROG_CC_C99
 
 LIBTOOL_APP_LDFLAGS="-all-static"
 LIBS="$LIBS -levent -levent_core"
