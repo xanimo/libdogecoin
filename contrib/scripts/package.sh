@@ -102,8 +102,9 @@ if has_param '--host' "$@"; then
         fi
         # copy files to build directory
         $SUDO "cp -f $FILES $BUILD_PATH"
+        $SUDO "cp -f ./build/$2/* $BUILD_PATH/*"
         # output sha256 checksums to new text file
-        sha256sum $PREFIX/* >> $2-$TAG-checksums.txt
+        sha256sum $PREFIX/* > $2-$TAG-checksums.txt
         $SUDO "mkdir -p $PREFIX $BUILD_PATH/docs"
         $SUDO "cp $FILES $BUILD_PATH"
         $SUDO "cp $DOCS $BUILD_PATH/docs"
