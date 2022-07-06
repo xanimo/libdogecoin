@@ -59,7 +59,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
         # clean MacOS SDKs
         if [ "$DEPENDS" = "1" ]; then
             if [ "$CLEAN" = "1" ]; then
-                git clean -xdff --exclude='/depends/SDKs/*'
+                git clean -xdff --exclude='/depends/SDKs/*' --exclude='/build/*'
             fi
             DEPENDS="--depends"
         fi
