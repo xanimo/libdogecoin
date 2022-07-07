@@ -533,9 +533,7 @@ const char* conversion_type_to_str(const enum conversion_type type)
 int check_length(char* string) {
     int integer_length, mantissa;
     // length minus 1 representative of decimal point and 8 representative of koinu
-    integer_length = strlen(string) - 9;
-    // length minus 1 representative of decimal point and 8 representative of koinu
-    integer_length = strlen(string) - 9;
+    integer_length = strlen(string);
     // set max length for all string inputs to 20 to account for total supply in 2022
     // (currently 132.67 billion dogecoin) + 1e8 koinu passing UINT64_MAX 184467440737
     // in 9.854916426 years (2032) with output of 5,256,000,000 mined dogecoins per year
@@ -547,7 +545,7 @@ int check_length(char* string) {
     // set max length for all string inputs to 21 to account for total supply passing 
     // 1T in ~180 years from 2022. this limit will be valid for the next 1980 years so 
     // make sure to update in year 4002. :)
-    if (integer_length > 13) {
+    if (integer_length > 20) {
         return false;
     }
     return integer_length;
@@ -607,49 +605,82 @@ char* substring(char* dest, char* src, int start, int length) {
 char* koinu_to_coins_str(uint64_t koinu, char* str) {
     enum conversion_type res;
     int len = calc_length(koinu);
+    debug_print("koinu %"PRIu64"\n", koinu);
     char* int_str[len + 1], base_str, mantissa_str[8], *src[len], *integer[len], *mantissa;
     dogecoin_mem_zero(int_str, len + 1);
     snprintf((char*)src, len + 1, "%"PRIu64, koinu);
-    int integer_length = check_length(src) + 1;
-    substr((char*)integer, (char*)src, 0, integer_length);
-    append(integer, ".");
-    int start = strlen(integer), mantissa_length = strlen(src) - integer_length;
-    mantissa = substring((char*)mantissa, (char*)src, start, mantissa_length);
-    append(integer, mantissa);
-    strncpy(str, &integer, strlen(integer));
-    return true;
+    debug_print("koinu %"PRIu64"\n", koinu);
+    // int integer_length = check_length(src) + 1;
+    // substr((char*)integer, (char*)src, 0, integer_length);
+    // append(integer, ".");
+    // int start = strlen(integer), mantissa_length = strlen(src) - integer_length;
+    // mantissa = substring((char*)mantissa, (char*)src, start, mantissa_length);
+    // append(integer, mantissa);
+    // strncpy(str, &integer, strlen(integer));
+    // return true;
+}
+
+char *strsep(char **stringp, const char *delim) {
+  if (*stringp == NULL) { return NULL; }
+  char *token_start = *stringp;
+  *stringp = strpbrk(token_start, delim);
+  if (*stringp) {
+    **stringp = '\0';
+    (*stringp)++;
+  }
+  return token_start;
+}
+
+int p(int a, int b) {
+    int i = 0, c = b;
+    for (; i < a; i++) {
+        c = c * b;
+    }
+    return c;
 }
 
 uint64_t coins_to_koinu_str(char* coins) {
-    uint64_t koinu;
+    uint64_t koinu, mantissa;
     enum conversion_type state;
-    int integer_length = check_length(coins);
-    if (!integer_length) {
-        state = CONVERSION_OUT_OF_RANGE;
-        return false;
+    int length = 0, i = 0;
+    char *token, *str, *tofree, *end;
+    tofree = str = strndup(coins, strlen(coins) + 1);
+    while ((token = strsep(&str, "."))) {
+        switch (length)
+        {
+        case 0:
+            koinu = strtoull(token, &end, 10);
+            koinu *= (uint64_t)100000000;
+            // state = validate_conversion(koinu, (const char*)token, end, "\0");
+            // if (state == CONVERSION_SUCCESS) koinu *= (uint64_t)100000000;
+            // else {
+            //     debug_print("%s\n", conversion_type_to_str(state));
+            //     return false;
+            // }
+            break;
+        case 1:
+            if (strlen(token) > 8) {
+                char* tmp[8];
+                substr((char*)tmp, token, 0, 8);
+                dogecoin_mem_zero(token, strlen(token));
+                token = (char*)tmp;
+            }
+            for (; i < 8; i++) if (isdigit(token[i]) == 0) token[i] = '0';
+            mantissa = strtoull(token, &end, 10);
+            koinu += mantissa;
+            // state = validate_conversion(mantissa, (const char*)token, end, "\0");
+            // if (state == CONVERSION_SUCCESS) koinu += mantissa;
+            // else {
+            //     debug_print("%s\n", conversion_type_to_str(state));
+            //     return false;
+            // }
+            break;
+        }
+        length++;
     }
-    char* int_string[(integer_length + 1) * 2], *int_end;
-    if (!substr((char*)int_string, coins, 0, integer_length)) {
-        state = CONVERSION_FAILURE;
-        return false;
-    }
-    koinu = strtoull((const char*)int_string, &int_end, 10);
-    state = validate_conversion(koinu, (const char*)int_string, int_end, ".");
-    if (state == CONVERSION_SUCCESS) koinu *= 1e8;
-    else return false;
-    uint64_t y = integer_length;
-    for (; y <= strlen(coins) - 9; y++) {
-        uint64_t mantissa = strtoull(&coins[y], &int_end, 10) / 10;
-        state = validate_conversion(mantissa, &coins[y], int_end, "\0");
-        if (state == CONVERSION_SUCCESS) koinu += mantissa;
-        else return state;
-    }
-    if (state == CONVERSION_SUCCESS) {
-        return koinu;
-    } else {
-        debug_print("%s\n", conversion_type_to_str(state));
-        return false;
-    }
+    free(str);
+    free(tofree);
+    return koinu;
 }
 
 long double round_ld(long double x)
