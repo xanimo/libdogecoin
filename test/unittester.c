@@ -121,7 +121,7 @@ int main()
 #endif
 
 #ifdef WITH_NET
-    // u_run_test(test_net_basics_plus_download_block); // uncomment when fixed and amended to initial commit
+    // u_run_test(test_net_basics_plus_download_block);
     u_run_test(test_protocol);
 #endif
 

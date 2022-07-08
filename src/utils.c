@@ -36,6 +36,7 @@
 #include <tgmath.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <inttypes.h> 
 #include <string.h>
 #include <assert.h>
@@ -575,7 +576,7 @@ enum conversion_type validate_conversion(uint64_t converted, const char* src, co
     } else if ((UINT64_MAX == converted) && ERANGE == errno) {
         type = CONVERSION_OUT_OF_RANGE;
         debug_print("%s out of range of type uint64_t\n", src);
-    } else if (converted == UINT64_MAX) {
+    } else if (converted > UINT64_MAX) {
         type = CONVERSION_OVERFLOW;
         debug_print("%"PRIu64" greater than UINT64_MAX\n", converted);
     } else {
@@ -593,94 +594,72 @@ int calc_length(uint64_t x) {
     return count;
 }
 
-char* substring(char* dest, char* src, int start, int length) {
-    int y = start - 1, end = start + length - 1;
-    for (; y <= end; y++) {
-        dest = &src[y];
-        break;
-    }
-    return dest;
-}
-
 char* koinu_to_coins_str(uint64_t koinu, char* str) {
     enum conversion_type res;
-    int len = calc_length(koinu);
-    debug_print("koinu %"PRIu64"\n", koinu);
-    char* int_str[len + 1], base_str, mantissa_str[8], *src[len], *integer[len], *mantissa;
-    dogecoin_mem_zero(int_str, len + 1);
-    snprintf((char*)src, len + 1, "%"PRIu64, koinu);
-    debug_print("koinu %"PRIu64"\n", koinu);
-    // int integer_length = check_length(src) + 1;
-    // substr((char*)integer, (char*)src, 0, integer_length);
-    // append(integer, ".");
-    // int start = strlen(integer), mantissa_length = strlen(src) - integer_length;
-    // mantissa = substring((char*)mantissa, (char*)src, start, mantissa_length);
-    // append(integer, mantissa);
-    // strncpy(str, &integer, strlen(integer));
-    // return true;
-}
-
-char *strsep(char **stringp, const char *delim) {
-  if (*stringp == NULL) { return NULL; }
-  char *token_start = *stringp;
-  *stringp = strpbrk(token_start, delim);
-  if (*stringp) {
-    **stringp = '\0';
-    (*stringp)++;
-  }
-  return token_start;
-}
-
-int p(int a, int b) {
-    int i = 0, c = b;
-    for (; i < a; i++) {
-        c = c * b;
+    char copy[20];
+    char int_str[(calc_length(koinu) - 8) + 1];
+    char mantissa_str[8];
+    int i = calc_length(koinu) - 8;
+    snprintf(copy, calc_length(koinu) + 1, "%"PRIu64, koinu);
+    snprintf(int_str, sizeof(int_str), "%"PRIu64, koinu);
+    for (; i < calc_length(koinu); i++) {
+        append(int_str, ".");
+        append(int_str, &copy[i]);
+        break;
     }
-    return c;
+    memcpy_safe(str, int_str, strlen(int_str) + 1);
+    return true;
 }
 
 uint64_t coins_to_koinu_str(char* coins) {
-    uint64_t koinu, mantissa;
     enum conversion_type state;
-    int length = 0, i = 0;
-    char *token, *str, *tofree, *end;
-    tofree = str = strndup(coins, strlen(coins) + 1);
-    while ((token = strsep(&str, "."))) {
-        switch (length)
-        {
-        case 0:
-            koinu = strtoull(token, &end, 10);
-            koinu *= (uint64_t)100000000;
-            // state = validate_conversion(koinu, (const char*)token, end, "\0");
-            // if (state == CONVERSION_SUCCESS) koinu *= (uint64_t)100000000;
-            // else {
-            //     debug_print("%s\n", conversion_type_to_str(state));
-            //     return false;
-            // }
-            break;
-        case 1:
-            if (strlen(token) > 8) {
-                char* tmp[8];
-                substr((char*)tmp, token, 0, 8);
-                dogecoin_mem_zero(token, strlen(token));
-                token = (char*)tmp;
-            }
-            for (; i < 8; i++) if (isdigit(token[i]) == 0) token[i] = '0';
-            mantissa = strtoull(token, &end, 10);
-            koinu += mantissa;
-            // state = validate_conversion(mantissa, (const char*)token, end, "\0");
-            // if (state == CONVERSION_SUCCESS) koinu += mantissa;
-            // else {
-            //     debug_print("%s\n", conversion_type_to_str(state));
-            //     return false;
-            // }
+    char coins_string[32];
+    char koinu_string[32];
+    sprintf(coins_string, "%s", coins);
+    char* c_ptr = coins_string;
+    char* k_ptr = koinu_string;
+    int i;
+
+    // copy all digits until end of string or decimal point is reached
+    while (*c_ptr != '\0') {
+        if (*c_ptr =='.') {
+            c_ptr++;
             break;
         }
-        length++;
+        memcpy(k_ptr, c_ptr, 1);
+        c_ptr++;
+        k_ptr++;
     }
-    free(str);
-    free(tofree);
-    return koinu;
+
+    // pad mantissa with up to 8 trailing zeros
+    if (strlen(c_ptr) != 8) {
+        for (i = strlen(c_ptr); i < 8; i++) {
+            if (i == 8) {
+                c_ptr[i] = '\0';
+            } else c_ptr[i] = '0';
+            
+        }
+    }
+
+    //copy remaining 8 or less decimal places
+    for (i = 1; i <= 8; i++) {
+        if (i==8) {
+            memcpy(k_ptr, c_ptr, 1);
+            k_ptr++;
+            memset(k_ptr, '\0', 1);
+            break;
+        }
+        memcpy(k_ptr, c_ptr, 1);
+        c_ptr++;
+        k_ptr++;
+    }
+    uint64_t result = strtoull(koinu_string, &k_ptr, 10);
+    state = validate_conversion(result, (const char*)koinu_string, k_ptr, "\0");
+    if (state == CONVERSION_SUCCESS) return result;
+    else {
+        debug_print("%s\n", conversion_type_to_str(state));
+        return false;
+    }
 }
 
 long double round_ld(long double x)

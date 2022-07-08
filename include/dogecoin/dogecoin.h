@@ -96,7 +96,7 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
 #endif
 
-#define DEBUG 0
+#define DEBUG 1
 #ifdef DEBUG
 #define debug_print(fmt, ...) \
         do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \

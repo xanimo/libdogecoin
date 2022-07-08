@@ -18,10 +18,10 @@
 #include <assert.h>
 #include <dogecoin/utils.h>
 #include <valgrind/valgrind.h>
-#include <mpfr.h>
-#include <gmp.h>
+ // #include <mpfr.h>
+ // #include <gmp.h>
 
- /* test a buffer overflow protection */
+  /* test a buffer overflow protection */
 static const char hash_buffer_exc[] = "28969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c128969cdfa74a12c82f3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c1";
 
 static const char hex2[] = "AA969cdfFFffFF3bad960b0b000aca2ac329deea5c2328ebc6f2ba9802c1";
@@ -100,6 +100,7 @@ void test_utils()
         u_assert_int_eq((int)diff, 0);
         }
 
+    uint64_t actual_answer2;
     /* stress test conversion between coins and koinu, random decimal values */
     char* coin_amounts_str[] = { "183447094.020691168","410357585.029255459",
                                     "183447094.420691168","410357585.329255459",
@@ -168,27 +169,35 @@ void test_utils()
                                     1723730882870595309, 1860698744540963677,
                                     1910059532716831845, 1967405961450464248 };
 
-    for (i = 0; i < 41; i++) {
+    for (i = 0; i < 42; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
-        actual_answer = coins_to_koinu_str(coin_amounts_str[i]);
-        // char* coins[22];
-        // dogecoin_mem_zero(coins, 22);
-        // koinu_to_coins_str(actual_answer, (char*)coins);
-        diff = exp_answers2[i] - actual_answer;
-        // u_assert_str_eq((char*)coins, coin_amounts_expected[i]);
-        u_assert_uint32_eq(actual_answer, exp_answers2[i]);
+        actual_answer2 = coins_to_koinu_str(coin_amounts_str[i]);
+        char* coins1[21];
+        dogecoin_mem_zero(coins1, strlen((const char*)coins1));
+        if (!koinu_to_coins_str(actual_answer2, (char*)coins1)) exit(EXIT_FAILURE);
+        diff = exp_answers2[i] - actual_answer2;
+        u_assert_str_eq((char*)coins1, coin_amounts_expected[i]);
+        u_assert_uint32_eq(actual_answer2, exp_answers2[i]);
         u_assert_int_eq((int)diff, 0);
-        debug_print("\n\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", coin_amounts_expected[i], exp_answers2[i], actual_answer);
+        debug_print("\n\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", coin_amounts_expected[i], exp_answers2[i], actual_answer2);
+        // free(*coins1);
         }
 
-        /* set of variable string length values */
-    char* varlen_coin_amounts_str[] = { "10.0001",
+    uint64_t actual_answer3;
+    /* set of variable string length values */
+    char* varlen_coin_amounts_str[] = { "10.0001", "1",
                                         "1.1","1.01",
                                         "1.001", "1.0001",
                                         "1.00001", "1.000001",
                                         "1.0000001", "1.00000001" };
 
-    uint64_t exp_answers3[] = { 1000010000,
+    char* varlen_exp_coin_amounts_str[] = { "10.00010000", "1.00000000",
+                                            "1.10000000","1.01000000",
+                                            "1.00100000", "1.00010000",
+                                            "1.00001000", "1.00000100",
+                                            "1.00000010", "1.00000001" };
+
+    uint64_t exp_answers3[] = { 1000010000, 100000000,
                                 110000000, 101000000,
                                 100100000, 100010000,
                                 100001000, 100000100,
@@ -196,31 +205,28 @@ void test_utils()
 
     for (i = 0; i < 9; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
-        actual_answer = coins_to_koinu_str(varlen_coin_amounts_str[i]);
-        char* coins[22];
-        dogecoin_mem_zero(coins, 22);
-        koinu_to_coins_str(actual_answer, (char*)coins);
-        diff = exp_answers3[i] - actual_answer;
-        // u_assert_str_eq((char*)coins, varlen_coin_amounts_str[i]);
-        u_assert_uint32_eq(actual_answer, exp_answers3[i]);
+        actual_answer3 = coins_to_koinu_str(varlen_coin_amounts_str[i]);
+        char* coins2[21];
+        dogecoin_mem_zero(coins2, strlen((const char*)coins2));
+        koinu_to_coins_str(actual_answer3, (char*)coins2);
+        diff = exp_answers3[i] - actual_answer3;
+        u_assert_str_eq((char*)coins2, varlen_exp_coin_amounts_str[i]);
+        u_assert_uint32_eq(actual_answer3, exp_answers3[i]);
         u_assert_int_eq((int)diff, 0);
-        debug_print("\n\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", varlen_coin_amounts_str[i], exp_answers3[i], actual_answer);
-    }
+        debug_print("\n\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", varlen_coin_amounts_str[i], exp_answers3[i], actual_answer3);
+        // free(*coins2);
+        }
 
-
+    uint64_t actual_answer4;
     /* max out values */
-    char* maxout_coin_amounts_str[] = { "184467440737.09551615" };
-    uint64_t exp_answers4[] = { 18446744073709551615 };
+    char* maxout_coin_amounts_str[] = { "184467440737.09551615", "184467440737.09551616" };
+    uint64_t exp_answers4[] = { 18446744073709551615, 0 };
 
-    for (i = 0; i < 1; i++) {
+    for (i = 0; i < 2; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
-        actual_answer = coins_to_koinu_str(maxout_coin_amounts_str[i]);
-        // char* coins[22];
-        // dogecoin_mem_zero(coins, 22);
-        // koinu_to_coins_str(actual_answer, (char*)coins);
-        diff = exp_answers4[i] - actual_answer;
-        // u_assert_str_eq((char*)coins, maxout_coin_amounts_str[i]);
-        u_assert_uint32_eq(actual_answer, exp_answers4[i]);
+        actual_answer4 = coins_to_koinu_str(maxout_coin_amounts_str[i]);
+        diff = exp_answers4[i] - actual_answer4;
+        u_assert_uint32_eq(actual_answer4, exp_answers4[i]);
         u_assert_int_eq((int)diff, 0);
+        }
     }
-}
