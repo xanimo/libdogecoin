@@ -38,8 +38,10 @@
 #include <uthash/uthash.h>
 
 #include <dogecoin/bip32.h>
+#include <dogecoin/cstr.h>
 #include <dogecoin/chainparams.h>
 #include <dogecoin/ecc.h>
+#include <dogecoin/koinu.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/tool.h>
 #include <dogecoin/transaction.h>
@@ -406,9 +408,9 @@ void transaction_output_menu(int txindex, int is_testnet) {
             if (i == length - 1) {
                 printf("\n\n");
                 #ifdef _WIN32
-                printf("subtotal - desired fee: %Lf\n", (double)koinu_to_coins(tx_out_total));
+                printf("subtotal - desired fee: %Lf\n", (long double)koinu_to_coins(tx_out_total));
                 #else
-                printf("subtotal - desired fee: %Lf\n", koinu_to_coins(tx_out_total));
+                printf("subtotal - desired fee: %Lf\n", (long double)koinu_to_coins(tx_out_total));
                 #endif
                 printf("\n");
                 printf("1. select output to edit\n");
