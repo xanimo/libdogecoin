@@ -25,15 +25,15 @@
 
 */
 
-#define _OPEN_SYS_ITOA_EXT
 #include <stdlib.h>
-#include <math.h>
-#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <inttypes.h>
+#include <math.h>
 #include <fenv.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <dogecoin/koinu.h>
 #include <dogecoin/utils.h>
@@ -107,42 +107,37 @@ int check_length(char* string) {
     // set max length for all string inputs to 21 to account for total supply passing 
     // 1T in ~180 years from 2022. this limit will be valid for the next 1980 years so 
     // make sure to update in year 4002. :)
-    if (integer_length > 20) {
+    if (integer_length > 21) {
         return false;
     }
     return integer_length;
 }
 
-int includes(const char* src, char* dest) {
-    char* ok = strstr(src, dest);
-    if (ok) return true;
-    else return false;
-}
-
-int substr(char* dest, char* src, int start, int length) {
-    dogecoin_mem_zero(dest, length + 1);
-    uint64_t x = start;
-    for (; x < (uint64_t)length; x++) dest[x] = src[x];
-    return includes(src, dest);
-}
-
 enum conversion_type validate_conversion(uint64_t converted, const char* src, const char* src_end, const char* target_end) {
-    enum conversion_type type;
-    if (src_end == src) {
-        type = CONVERSION_NON_DECIMAL;
-        debug_print("%s: not a decimal\n", src);
-    } else if (*target_end != *src_end) {
-        type = CONVERSION_INVALID_STR_TERMINATION;
-        debug_print("%s: extra characters at end of input: %s\n", src, src_end);
-    } else if ((UINT64_MAX == converted) && ERANGE == errno) {
+    enum conversion_type type = CONVERSION_SUCCESS;
+    if (src && src_end && target_end) {
+        if (src_end == src) {
+            type = CONVERSION_NON_DECIMAL;
+            debug_print("%s: not a decimal\n", src);
+        }
+        if (*target_end != *src_end) {
+            type = CONVERSION_INVALID_STR_TERMINATION;
+            debug_print("%s: extra characters at end of input: %s\n", src, src_end);
+        }
+    }
+    if ((UINT64_MAX == converted) && ERANGE == errno) {
         type = CONVERSION_OUT_OF_RANGE;
         debug_print("%s out of range of type uint64_t\n", src);
-    } else if (converted > UINT64_MAX) {
+    }
+    if ((converted >= UINT64_MAX)) {
         type = CONVERSION_OVERFLOW;
         debug_print("%"PRIu64" greater than UINT64_MAX\n", converted);
-    } else {
-        type = CONVERSION_SUCCESS;
     }
+    if (converted == 0xFFFFF511543FB600) {
+        type = CONVERSION_UNDERFLOW;
+        debug_print("%"PRIu64" equal to 0xFFFFF511543FB600\n", converted);
+    }
+    
     return type;
 }
 
@@ -170,6 +165,8 @@ void string(uint64_t input, char output[]) {
 }
 
 int koinu_to_coins_str(uint64_t koinu, char* str) {
+    enum conversion_type state = validate_conversion(koinu, NULL, NULL, NULL);
+    if (state != CONVERSION_SUCCESS) return false;
     uint64_t length = calc_length(koinu), target = length - 9, i = 0;
     char tmp[21];
     string(koinu, tmp);
@@ -188,6 +185,7 @@ int koinu_to_coins_str(uint64_t koinu, char* str) {
 }
 
 uint64_t coins_to_koinu_str(char* coins) {
+    if (!check_length(coins)) return false;
     enum conversion_type state;
     char coins_string[32];
     char koinu_string[32];
@@ -247,7 +245,6 @@ long double round_ld(long double x)
         int const save_round = fegetround();
         fesetround(FE_UPWARD);
         result = rintl(copysignl(0.5 + fabsl(x), x));
-        debug_print("result: %.8Lf\n", result);
         fesetround(save_round);
     }
     feupdateenv(&save_env);
