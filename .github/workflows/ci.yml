@@ -217,8 +217,8 @@ jobs:
               "x86_64-linux-dbg") 
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
               python3 tooltests.py
-              ./wrappers/python/pytest/cython_tests.sh -host=${{ matrix.host }}
-              ./wrappers/golang/libdogecoin/build.sh
+              # ./wrappers/python/pytest/cython_tests.sh -host=${{ matrix.host }} #TODO: go wrappers
+              # ./wrappers/golang/libdogecoin/build.sh #TODO: go wrappers
               ;;
               "i686-linux") 
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
