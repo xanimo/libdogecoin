@@ -72,9 +72,6 @@ const char* conversion_type_to_str(const enum conversion_type type)
 }
 
 int check_length(char* string) {
-    int integer_length;
-    // length minus 1 representative of decimal point and 8 representative of koinu
-    integer_length = strlen(string);
     // set max length for all string inputs to 20 to account for total supply in 2022
     // (currently 132.67 billion dogecoin) + 1e8 koinu passing UINT64_MAX 184467440737
     // in 9.854916426 years (2032) with output of 5,256,000,000 mined dogecoins per year
@@ -86,10 +83,9 @@ int check_length(char* string) {
     // set max length for all string inputs to 21 to account for total supply passing 
     // 1T in ~180 years from 2022. this limit will be valid for the next 1980 years so 
     // make sure to update in year 4002. :)
-    if (integer_length > 22) {
-        return false;
-    }
-    return integer_length;
+    int integer_length = strlen(string);
+    if (integer_length > 22) return false;
+    else return integer_length;
 }
 
 enum conversion_type validate_conversion(uint64_t converted, const char* src, const char* src_end, const char* target_end) {
@@ -145,34 +141,36 @@ void string(uint64_t input, char output[]) {
 int koinu_to_coins_str(uint64_t koinu, char* str) {
     enum conversion_type state = validate_conversion(koinu, NULL, NULL, NULL);
     if (state != CONVERSION_SUCCESS) return false;
-    uint64_t length = calc_length(koinu), target = length - 9, i = 0;
-    if (length <= 1) {
-        str[0] = koinu + '0';
+
+    uint64_t i = 0, j =0, length = calc_length(koinu),
+    target = length < 9 ? 10 - length : length - 9;
+    
+    if (length < 9) {
+        string(koinu, str);
+        int l = str ? strlen(str) : 0;
+        char swap[l + 1];
+        memcpy_safe(swap, str, l + 1);
+        for (; i < target; i++) {
+            if (i == 0 || i == 1) {
+                str[0] = '0';
+                str[1] = '.';
+            } else str[i] = '0';
+        }
+        for (; i < 10; i++, j++) str[i] = swap[j];
     } else {
         char tmp[21];
-        string(koinu, tmp);
+        string(koinu, tmp);        
         for (; i < length; i++) {
-            if (i < target) {
-                str[i] = tmp[i];
-            } else if (i == target) {
+            if (i < target) str[i] = tmp[i];
+            else if (i == target) {
                 str[i] = tmp[i];
                 str[i + 1] = '.';
-            } else if (i > target) {
-                str[i + 1] = tmp[i];
-            }
+            } else if (i > target) str[i + 1] = tmp[i];
         }
+        str[length + 1] = '\0';
     }
-    str[length + 1] = '\0';
-    return true;
-}
 
-uint64_t power(uint64_t v, uint64_t x) {
-    uint64_t y = v, z = 1;
-    while (x > 0) {
-        if (x % 2 == 1) z *= y;
-        y *= y; x /= 2;
-    }
-    return(z);
+    return true;
 }
 
 uint64_t coins_to_koinu_str(char* coins) {

@@ -13,7 +13,7 @@
 
 void test_koinu() {
     /* stress test conversion between coins and koinu, round values */
-    char* coin_amounts[] = { "0.000000001",
+    char* coin_amounts[] = {"0.000000001",
                             "0.00000001",
                             "0.00000010",
                             "0.00000100",
@@ -35,15 +35,15 @@ void test_koinu() {
                             "10000000000.00000000",
                             "100000000000.00000000" };
 
-    char* exp_coin_amounts[] = { "0",
-                                "1",
-                                "10",
-                                "100",
-                                "1000",
-                                "10000",
-                                "100000",
-                                "1000000",
-                                "10000000",
+    char* exp_coin_amounts[] = {"0.00000000",
+                                "0.00000001",
+                                "0.00000010",
+                                "0.00000100",
+                                "0.00001000",
+                                "0.00010000",
+                                "0.00100000",
+                                "0.01000000",
+                                "0.10000000",
                                 "1.00000000",
                                 "10.00000000",
                                 "100.00000000",
@@ -87,6 +87,7 @@ void test_koinu() {
         char* tmp[21];
         dogecoin_mem_zero(tmp, 21);
         koinu_to_coins_str(actual_answer, (char*)tmp);
+        debug_print("T%d\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
         u_assert_str_eq((char*)tmp, exp_coin_amounts[i]);
         u_assert_uint32_eq(actual_answer, exp_answers[i]);
         debug_print("T%d\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
@@ -178,9 +179,28 @@ void test_koinu() {
 
     uint64_t actual_answer3;
     /* set of variable string length values */
-    char* varlen_coin_amounts_str[] = { "10000.0001",
-                                        "100000000.0001",
+
+    char* varlen_coin_amounts_str[] = { 
+
+                                        "0.1",
+                                        "0.12",
+                                        "0.123",
+                                        "0.1234",
+                                        "0.12345",
+                                        "0.123456",
+                                        "0.1234567",
+                                        "0.12345678",
+                                        ".1",
+                                        ".12",
+                                        ".123",
+                                        ".1234",
+                                        ".12345",
+                                        ".123456",
+                                        ".1234567",
+                                        ".12345678",
                                         "10.0001",
+                                        "10000.0001",
+                                        "100000000.0001",
                                         "1",
                                         "1.1",
                                         "1.01",
@@ -198,9 +218,27 @@ void test_koinu() {
                                         "abcdefghijklmnopqrstuvwxyz",
                                         "1000000000000.123456789" };
 
-    char* varlen_exp_coin_amounts_str[] = { "10000.00010000",
-                                            "100000000.00010000",
+    char* varlen_exp_coin_amounts_str[] = { 
+                                      
+                                            "0.10000000",
+                                            "0.12000000",
+                                            "0.12300000",
+                                            "0.12340000",
+                                            "0.12345000",
+                                            "0.12345600",
+                                            "0.12345670",
+                                            "0.12345678",                                              
+                                            "0.10000000",
+                                            "0.12000000",
+                                            "0.12300000",
+                                            "0.12340000",
+                                            "0.12345000",
+                                            "0.12345600",
+                                            "0.12345670",
+                                            "0.12345678",
                                             "10.00010000",
+                                            "10000.00010000",
+                                            "100000000.00010000",
                                             "1.00000000",
                                             "1.10000000",
                                             "1.01000000",
@@ -210,17 +248,34 @@ void test_koinu() {
                                             "1.00000100",
                                             "1.00000010",
                                             "1.00000001",
-                                            "0",
+                                            "0.00000000",
                                             "12345678910.00000000",
-                                            "0",
-                                            "0",
-                                            "0",
-                                            "0",
-                                            "0" };
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000" };
 
-    uint64_t exp_answers3[] = { 1000000010000,
-                                10000000000010000,
+    uint64_t exp_answers3[] = { 
+                                10000000,
+                                12000000,
+                                12300000,
+                                12340000,
+                                12345000,
+                                12345600,
+                                12345670,
+                                12345678,
+                                10000000,
+                                12000000,
+                                12300000,
+                                12340000,
+                                12345000,
+                                12345600,
+                                12345670,
+                                12345678,
                                 1000010000,
+                                1000000010000,
+                                10000000000010000,
                                 100000000,
                                 110000000,
                                 101000000,
@@ -238,7 +293,7 @@ void test_koinu() {
                                 0,
                                 0 };
 
-    for (i = 0; i < 19; i++) {
+    for (i = 0; i < 35; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
         actual_answer3 = coins_to_koinu_str(varlen_coin_amounts_str[i]);
         char* coins2[21];
@@ -254,7 +309,7 @@ void test_koinu() {
     uint64_t actual_answer4;
     /* max out values */
     char* maxout_coin_amounts_str[] = { "184467440737.09551614", "184467440737.09551615", "184467440737.09551616" };
-    char* maxout_exp_coin_amounts_str[] = { "184467440737.09551614", "0", "0" };
+    char* maxout_exp_coin_amounts_str[] = { "184467440737.09551614", "0.00000000", "0.00000000" };
     uint64_t exp_answers4[] = { 18446744073709551614UL, 0, 0 };
 
     for (i = 0; i < 3; i++) {
