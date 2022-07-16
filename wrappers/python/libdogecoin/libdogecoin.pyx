@@ -204,7 +204,7 @@ def w_add_utxo(tx_index, hex_utxo_txid, vout):
     # verify arguments are valid
     assert isinstance(tx_index, int)
     assert isinstance(hex_utxo_txid, (str, bytes))
-    assert isinstance(vout, (int, float))
+    assert isinstance(vout, (int, str))
 
     # prepare arguments
     if not isinstance(hex_utxo_txid, bytes):
@@ -228,7 +228,7 @@ def w_add_output(tx_index, destination_address, amount):
     # verify arguments are valid
     assert isinstance(tx_index, int)
     assert isinstance(destination_address, (str, bytes))
-    assert isinstance(amount, (int, float))
+    assert isinstance(amount, (int, str))
 
     # prepare arguments
     if not isinstance(destination_address, bytes):
@@ -257,8 +257,8 @@ def w_finalize_transaction(tx_index, destination_address, subtracted_fee, out_do
     # verify arguments are valid
     assert isinstance(tx_index, int)
     assert isinstance(destination_address, (str, bytes))
-    assert isinstance(subtracted_fee, (int, float))
-    assert isinstance(out_dogeamount_for_verification, (int, float))
+    assert isinstance(subtracted_fee, (int, str))
+    assert isinstance(out_dogeamount_for_verification, (int, str))
     assert isinstance(changeaddress, (str, bytes))
 
     # prepare arguments
@@ -336,7 +336,7 @@ def w_sign_raw_transaction(tx_index, incoming_raw_tx, script_hex, sig_hash_type,
     assert isinstance(incoming_raw_tx, (str, bytes))
     assert isinstance(script_hex, (str, bytes))
     assert isinstance(sig_hash_type, int)
-    assert isinstance(amount, (int, float))
+    assert isinstance(amount, (int, str))
     assert isinstance(privkey, (str, bytes))
 
     # prepare arguments
@@ -374,7 +374,7 @@ def w_sign_transaction(tx_index, amounts, script_pubkey, privkey):
     if not isinstance(amounts, list):
         amounts = [amounts]
     for amt in amounts:
-        assert isinstance(amt, (int, float))
+        assert isinstance(amt, (int, str))
     assert isinstance(script_pubkey, (str, bytes))
     assert isinstance(privkey, (str, bytes))
 
