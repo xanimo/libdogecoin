@@ -101,7 +101,7 @@ void test_transaction()
             dogecoin_tx_out* tx_out = vector_idx(tx_worth_2->vout, 0);
             char* dogecoin[21];
             dogecoin_mem_zero(dogecoin, 21);
-            koinu_to_coins_str(tx_out->value, (char*)dogecoin);
+            koinu_to_coins(tx_out->value, (char*)dogecoin);
             u_assert_str_eq((char*)dogecoin, "5885.98644000");
     //       "n": 0,
     //       "scriptPubKey": {
@@ -119,7 +119,7 @@ void test_transaction()
     //       "value": 2.00000000,
     //       "n": 1,
             tx_out = vector_idx(tx_worth_2->vout, 1);
-            koinu_to_coins_str(tx_out->value, (char*)dogecoin);
+            koinu_to_coins(tx_out->value, (char*)dogecoin);
             u_assert_str_eq((char*)dogecoin, "2.00000000");
     //       "scriptPubKey": {
     //         "asm": "OP_DUP OP_HASH160 d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c OP_EQUALVERIFY OP_CHECKSIG",
@@ -197,7 +197,7 @@ void test_transaction()
     //       "value": 227889.99548000,
     //       "n": 0,
             dogecoin_tx_out* tx_out_10 = vector_idx(tx_worth_10->vout, 0);
-            koinu_to_coins_str(tx_out_10->value, (char*)dogecoin);
+            koinu_to_coins(tx_out_10->value, (char*)dogecoin);
             u_assert_str_eq((char*)dogecoin, "227889.99548000");
     //       "scriptPubKey": {
     //         "asm": "OP_DUP OP_HASH160 1476c35e582eb198e1a28c455005a70c68695868 OP_EQUALVERIFY OP_CHECKSIG",
@@ -214,7 +214,7 @@ void test_transaction()
     //       "value": 10.00000000,
     //       "n": 1,
             tx_out_10 = vector_idx(tx_worth_10->vout, 1);
-            koinu_to_coins_str(tx_out_10->value, (char*)dogecoin);
+            koinu_to_coins(tx_out_10->value, (char*)dogecoin);
             u_assert_str_eq((char*)dogecoin, "10.00000000");
     //       "scriptPubKey": {
     //         "asm": "OP_DUP OP_HASH160 d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c OP_EQUALVERIFY OP_CHECKSIG",

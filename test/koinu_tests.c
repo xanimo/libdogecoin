@@ -83,10 +83,10 @@ void test_koinu() {
     uint64_t diff;
     int i = 0;
     for (; i < 21; i++) {
-        actual_answer = coins_to_koinu_str(coin_amounts[i]);
+        actual_answer = coins_to_koinu(coin_amounts[i]);
         char* tmp[21];
         dogecoin_mem_zero(tmp, 21);
-        koinu_to_coins_str(actual_answer, (char*)tmp);
+        koinu_to_coins(actual_answer, (char*)tmp);
         debug_print("T%d\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
         u_assert_str_eq((char*)tmp, exp_coin_amounts[i]);
         u_assert_uint32_eq(actual_answer, exp_answers[i]);
@@ -166,10 +166,10 @@ void test_koinu() {
 
     for (i = 0; i < 42; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
-        actual_answer2 = coins_to_koinu_str(coin_amounts_str[i]);
+        actual_answer2 = coins_to_koinu(coin_amounts_str[i]);
         char* coins1[21];
         dogecoin_mem_zero(coins1, 21);
-        if (!koinu_to_coins_str(actual_answer2, (char*)coins1)) exit(EXIT_FAILURE);
+        if (!koinu_to_coins(actual_answer2, (char*)coins1)) exit(EXIT_FAILURE);
         u_assert_str_eq((char*)coins1, coin_amounts_expected[i]);
         diff = exp_answers2[i] - actual_answer2;
         u_assert_uint32_eq(actual_answer2, exp_answers2[i]);
@@ -181,7 +181,6 @@ void test_koinu() {
     /* set of variable string length values */
 
     char* varlen_coin_amounts_str[] = { 
-
                                         "0.1",
                                         "0.12",
                                         "0.123",
@@ -216,7 +215,13 @@ void test_koinu() {
                                         "4893028948091289480183944",
                                         "0x5a",
                                         "abcdefghijklmnopqrstuvwxyz",
-                                        "1000000000000.123456789" };
+                                        "1000000000000.123456789",
+                                        "",
+                                        ".1.",
+                                        "..",
+                                        ";",
+                                        "000000000.0",
+                                        "000000000.00000001" };
 
     char* varlen_exp_coin_amounts_str[] = { 
                                       
@@ -254,7 +259,13 @@ void test_koinu() {
                                             "0.00000000",
                                             "0.00000000",
                                             "0.00000000",
-                                            "0.00000000" };
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000000",
+                                            "0.00000001" };
 
     uint64_t exp_answers3[] = { 
                                 10000000,
@@ -291,14 +302,20 @@ void test_koinu() {
                                 0,
                                 0,
                                 0,
-                                0 };
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                1 };
 
-    for (i = 0; i < 35; i++) {
+    for (i = 0; i < 41; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
-        actual_answer3 = coins_to_koinu_str(varlen_coin_amounts_str[i]);
+        actual_answer3 = coins_to_koinu(varlen_coin_amounts_str[i]);
         char* coins2[21];
         dogecoin_mem_zero(coins2, 21);
-        koinu_to_coins_str(actual_answer3, (char*)coins2);
+        koinu_to_coins(actual_answer3, (char*)coins2);
         u_assert_str_eq((char*)coins2, varlen_exp_coin_amounts_str[i]);
         diff = exp_answers3[i] - actual_answer3;
         u_assert_uint32_eq(actual_answer3, exp_answers3[i]);
@@ -314,10 +331,10 @@ void test_koinu() {
 
     for (i = 0; i < 3; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
-        actual_answer4 = coins_to_koinu_str(maxout_coin_amounts_str[i]);
+        actual_answer4 = coins_to_koinu(maxout_coin_amounts_str[i]);
         char* coins3[21];
         dogecoin_mem_zero(coins3, 21);
-        koinu_to_coins_str(actual_answer4, (char*)coins3);
+        koinu_to_coins(actual_answer4, (char*)coins3);
         u_assert_str_eq((char*)coins3, maxout_exp_coin_amounts_str[i]);
         diff = exp_answers4[i] - actual_answer4;
         u_assert_uint32_eq(actual_answer4, exp_answers4[i]);

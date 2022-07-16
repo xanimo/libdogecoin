@@ -138,7 +138,7 @@ void string(uint64_t input, char output[]) {
     output[length] = '\0';
 }
 
-int koinu_to_coins_str(uint64_t koinu, char* str) {
+int koinu_to_coins(uint64_t koinu, char* str) {
     enum conversion_type state = validate_conversion(koinu, NULL, NULL, NULL);
     if (state != CONVERSION_SUCCESS) return false;
 
@@ -169,11 +169,10 @@ int koinu_to_coins_str(uint64_t koinu, char* str) {
         }
         str[length + 1] = '\0';
     }
-
     return true;
 }
 
-uint64_t coins_to_koinu_str(char* coins) {
+uint64_t coins_to_koinu(char* coins) {
     if (coins[0] == '-') return false;
     int length = check_length(coins);
     if (!length) return false;
@@ -213,7 +212,6 @@ uint64_t coins_to_koinu_str(char* coins) {
     if (state == CONVERSION_SUCCESS) { 
         if (strlen(dogecoin_string) <= 12) dogecoin *= 100000000; 
     } else debug_print("%s\n", conversion_type_to_str(state));
-
 
     errno = 0;
     uint64_t koinu = strtoull(koinu_string, &end, 10) + dogecoin;

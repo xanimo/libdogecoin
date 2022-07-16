@@ -32,10 +32,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-LIBDOGECOIN_API long double koinu_to_coins(uint64_t koinu);
-LIBDOGECOIN_API int koinu_to_coins_str(uint64_t koinu, char* str);
-LIBDOGECOIN_API uint64_t coins_to_koinu_str(char* coins);
-LIBDOGECOIN_API unsigned long long coins_to_koinu(long double coins);
+LIBDOGECOIN_API int koinu_to_coins(uint64_t koinu, char* str);
+LIBDOGECOIN_API uint64_t coins_to_koinu(char* coins);
 
 LIBDOGECOIN_END_DECL
 
