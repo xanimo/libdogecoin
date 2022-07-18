@@ -13,16 +13,17 @@ git \
 wget
 RUN git clone https://github.com/xanimo/libdogecoin
 WORKDIR /libdogecoin
+
+FROM build as builder
 RUN git checkout $COMMIT && rm -rf ./contrib/scripts/*
 COPY . ./contrib/scripts/
 RUN ./contrib/scripts/run.sh --host ${TARGET_HOST} --docker --setup --depends
 RUN ./contrib/scripts/run.sh --host ${TARGET_HOST} --docker --build --depends
-RUN TAG=${TAG} ./contrib/scripts/run.sh --host ${TARGET_HOST} --docker --package
-RUN cp ./build ./root/build
+RUN ./contrib/scripts/pack.sh --host=${TARGET_HOST} --prefix=build --docker 
 
-FROM scratch as artifact
+FROM builder as artifact
 ARG TARGET_HOST
 ARG TAG=${TAG:-v0.1}
-COPY --from=build /root/build/libdogecoin-${TARGET_HOST}-${TAG} /build/libdogecoin-${TARGET_HOST}-${TAG}
+COPY --from=builder /output /build
 
 FROM release
