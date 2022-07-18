@@ -2,7 +2,6 @@
 export LC_ALL=C
 set -e -o pipefail
 
-
 if [ $# -eq 0 ]; then
     echo "No arguments provided"
     exit 1
@@ -87,7 +86,13 @@ if has_param '--host' "$@"; then
             FILES="$LIB $EXE"
         ;;
     esac
-    SUDO="sudo -u $(whoami) -H bash -c"
+
+    if has_param '--docker' "$@"; then
+        SUDO="bash -c"
+    else
+        SUDO="sudo -u $(whoami) -H bash -c"
+    fi
+
     if [ "$TAG" != "" ]; then
         PREFIX=`pwd`/build/libdogecoin-$2-$TAG
         BUILD_PATH=./build/libdogecoin-$2-$TAG
@@ -109,53 +114,10 @@ if has_param '--host' "$@"; then
         $SUDO "cp $DOCS $BUILD_PATH/docs"
         sha256sum $BUILD_PATH/docs/* >> $2-$TAG-checksums.txt
 
-        # parse repository url to fetch username
-        # url="git://github.com/some-user/my-repo.git"
-        # url="https://github.com/some-user/my-repo.git"
-        url=`git config --get remote.origin.url`
-
-        re="^(https|git)(:\/\/|@)([^\/:]+)[\/:]([^\/:]+)\/(.+)(.git)*$"
-
-        if [[ $url =~ $re ]]; then    
-            protocol=${BASH_REMATCH[1]}
-            separator=${BASH_REMATCH[2]}
-            hostname=${BASH_REMATCH[3]}
-            # only need user but leaving other vars in case others find useful
-            user=${BASH_REMATCH[4]}
-            repo=${BASH_REMATCH[5]}
+        if has_param '--package' "$@"; then
+            pushd $BUILD_PATH
+                tar -czvf "$2-$TAG.tar.gz" *
+            popd
         fi
-
-        # sign sha256 checksum file
-        gpg --detach-sign --yes -o $2-$TAG-checksums.txt.sig ./$2-$TAG-checksums.txt
-
-        # verify good signature
-        gpg --verify $2-$TAG-checksums.txt.sig ./$2-$TAG-checksums.txt
-        
-        $SUDO "mkdir -p ./contrib/sigs/$2-$TAG/$user"
-        $SUDO "chmod u=rwx,g=r,o=r ./contrib/sigs/$2-$TAG/$user"
-        $SUDO "mv -u ./$2-$TAG-checksums.txt.sig ./contrib/sigs/$2-$TAG/$user/$2-$TAG-checksums.txt.sig"
-        $SUDO "mv -u ./$2-$TAG-checksums.txt ./contrib/sigs/$2-$TAG/$user/$2-$TAG-checksums.txt"
-    else
-        PREFIX=`pwd`/build/libdogecoin-$2
-        BUILD_PATH=./build/libdogecoin-$2
-        $SUDO "rm -rf $BUILD_PATH"
-        $SUDO "mkdir -p $BUILD_PATH $BUILD_PATH/docs"
-        $SUDO "cp $FILES $BUILD_PATH"
-        $SUDO "cp $DOCS $BUILD_PATH/docs"
-    fi
-
-    if has_param '--package' "$@"; then
-        if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            git tag -d $TAG
-        fi
-        pushd $BUILD_PATH
-            tar -czvf "$2-$TAG.tar.gz" *
-            gpg --armor --detach-sign --yes "$2-$TAG.tar.gz"
-            gpg --verify $2-$TAG.tar.gz.asc $2-$TAG.tar.gz
-            mv $2-$TAG.tar.gz ../$2-$TAG.tar.gz
-            mv $2-$TAG.tar.gz.asc ../$2-$TAG.tar.gz.asc
-        popd
-        rm -rf $BUILD_PATH
-        sha256sum ./build/$2-$TAG.tar.gz ./build/$2-$TAG.tar.gz.asc >> ./contrib/sigs/$2-$TAG/$user/$2-$TAG-checksums.txt
     fi
 fi

@@ -38,6 +38,7 @@ case $machine in
     "mac")      OS="mac";;
 esac
 
+PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/386
 if ! command -v docker buildx &> /dev/null
 then
     ARCH=`dpkg --print-architecture`
@@ -53,10 +54,14 @@ then
     rm -rf checksums.txt
     sudo apt-get update
     sudo apt install qemu-user
-    PLATFORMS=linux/amd64,linux/arm64
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    if ! docker buildx ls | grep -q container-builder; then\
-            docker buildx create --platform ${PLATFORMS} --name container-builder --use;\
+    if ! docker buildx ls | grep -q container-builder; then
+        docker buildx create --platform ${PLATFORMS} --name container-builder --use;
+    fi
+else
+    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    if ! docker buildx ls | grep -q container-builder; then
+        docker buildx create --platform ${PLATFORMS} --name container-builder --node container-builder --use;
     fi
 fi
 
@@ -70,22 +75,27 @@ if has_param '--host' "$@"; then
     fi
 fi
 
+if [ "$MEM" != "" ]; then
+    MEMORY="-m $MEM"
+fi
+
+ALLOCATED_RESOURCES="$MEMORY"
+
 build() {
+    ROOT_DIR=`pwd`
     pushd ./contrib/scripts/
         docker buildx build \
+        $ALLOCATED_RESOURCES \
         --platform $OS/$TARGET_ARCH \
         -t xanimo/libdogecoin:$TARGET_HOST_TRIPLET \
         --build-arg TARGET_HOST=$TARGET_HOST_TRIPLET \
         --build-arg IMG_ARCH=$IMG_ARCH \
-        --no-cache . --load
+        --progress=plain \
+        --target artifact --output type=local,dest=$ROOT_DIR/ .
     popd
 }
 
 if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
-    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    if ! docker buildx ls | grep -q container-builder; then\
-            docker buildx create --platform ${PLATFORMS} --name container-builder --use;\
-    fi
     END=$((${#ALL_HOST_TRIPLETS[@]} - 1))
     for i in "${!ALL_HOST_TRIPLETS[@]}"
     do
@@ -106,7 +116,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             ;;
             "i686-w64-mingw32")
                 TARGET_ARCH="i386"
-                IMG_ARCH="amd64"
+                IMG_ARCH="386"
             ;;
             "x86_64-apple-darwin14")
                 TARGET_ARCH="amd64"
@@ -118,9 +128,9 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             ;;
             "i686-pc-linux-gnu")
                 TARGET_ARCH="i386"
-                IMG_ARCH="amd64"
+                IMG_ARCH="386"
             ;;
         esac
-        build
+        build `pwd`
     done
 fi
