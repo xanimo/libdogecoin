@@ -3,7 +3,7 @@ export LC_ALL=C
 set -e -o pipefail
 
 if [ $# -eq 0 ]; then
-    echo "No arguments provided (sign)"
+    echo "No arguments provided (archive.sh)"
     exit 1
 fi
 
@@ -16,7 +16,7 @@ check_tools() {
     done
 }
 
-check_tools gpg
+check_tools tar
 
 git_root() {
     git rev-parse --show-toplevel 2> /dev/null
@@ -92,75 +92,20 @@ if [ "$ERROR" == 1 ]; then
     exit 1
 fi
 
-
-help() {
-    echo "Usage: sign 
-               [ -i | --input ]
-               [ -h | --help  ]"
-    exit 2
-}
-
-
-SHORT=i:,h:
-LONG=input:,help
-OPTS=$(getopt -a -n sign --options $SHORT --longoptions $LONG -- "$@")
-
-VALID_ARGUMENTS=$# # Returns the count of arguments that are in short or long options
-
-if [ "$VALID_ARGUMENTS" -eq 0 ]; then
-  help
-fi
-
-eval set -- "$OPTS"
-
-while :
-do
-  case "$1" in
-    --host )
-      export host="$2"
-      shift 2
-      ;;
-    -i | --input )
-      export input="$2"
-      shift 2
-      ;;
-    -h | --help)
-      help
-      ;;
-    --)
-      shift;
-      break
-      ;;
-    *)
-      echo "Unexpected option: $1"
-      help
-      ;;
-  esac
-done
-
-SIGN="--armor --detach-sign --yes $output $input"
-
-if [ ! $input ]; then
-    echo "Please provide an input to sign."
-    exit 1
-else
-  if [ ! -f "$input" ]; then
-    echo "Input is not valid."
-    exit 1
-  fi
-fi
-
-filename=$(basename -- "$input")
-# extract file extension after first .
-extension="${input#*.}"
-# extract file name before first .
-filename="${input%%.*}"
-
-# if archive then gpg sign .asc
-if [ "$extension" == "tar.gz" ] || [ "$extension" == "zip" ]; then
-  gpg --armor --detach-sign --yes -o "$input.asc" $input
-  gpg --verify "$input.asc" $input
-else
-  gpg --detach-sign --yes -o $input.sig $input
-  gpg --verify "$input.sig" $input
+TARGET_DIRECTORY=$(echo `find . -maxdepth 2 -type d -regex ".*\libdogecoin-$TARGET_HOST_TRIPLET*.*\$"`)
+if [ "$TARGET_DIRECTORY" != "" ]; then
+    basedir=$(dirname "$TARGET_DIRECTORY")
+    targetdir=$(basename "$TARGET_DIRECTORY")
+    echo windows $TARGET_HOST_TRIPLET
+    echo $TARGET_DIRECTORY
+    echo $basedir
+    if [[ "$TARGET_HOST_TRIPLET" == *-w64-mingw32 ]]; then
+        pushd $basedir
+            zip -r "$targetdir.zip" $targetdir
+        popd
+    else
+        pushd $basedir
+            tar -czvf "$targetdir.tar.gz" $targetdir
+        popd
+    fi
 fi

@@ -69,7 +69,7 @@ TARGET_HOST_TRIPLET=""
 ALL_HOST_TRIPLETS=""
 if has_param '--host' "$@"; then
     if has_param '--all' "$@"; then
-        ALL_HOST_TRIPLETS=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "aarch64-linux-gnu" "arm-linux-gnueabihf" "x86_64-w64-mingw32" "i686-w64-mingw32")
+        ALL_HOST_TRIPLETS=("x86_64-apple-darwin14" "x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "aarch64-linux-gnu" "arm-linux-gnueabihf" "x86_64-w64-mingw32" "i686-w64-mingw32")
     else
         ALL_HOST_TRIPLETS=($2)
     fi
@@ -82,16 +82,14 @@ fi
 ALLOCATED_RESOURCES="$MEMORY"
 
 build() {
-    ROOT_DIR=`pwd`
-    pushd ./contrib/scripts/
+    pushd contrib/scripts/
         docker buildx build \
         $ALLOCATED_RESOURCES \
-        --platform $OS/$TARGET_ARCH \
+        --platform linux/$TARGET_ARCH \
         -t xanimo/libdogecoin:$TARGET_HOST_TRIPLET \
         --build-arg TARGET_HOST=$TARGET_HOST_TRIPLET \
         --build-arg IMG_ARCH=$IMG_ARCH \
-        --progress=plain \
-        --target artifact --output type=local,dest=$ROOT_DIR/ .
+         --no-cache --target artifact --output type=local,dest=../../ .
     popd
 }
 
@@ -128,7 +126,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
             ;;
             "i686-pc-linux-gnu")
                 TARGET_ARCH="i386"
-                IMG_ARCH="386"
+                IMG_ARCH="i386"
             ;;
         esac
         build `pwd`
