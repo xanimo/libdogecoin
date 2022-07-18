@@ -112,7 +112,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
                 fi
             fi
             PACKAGE="--package"
-            ./contrib/scripts/package.sh --host $TARGET_HOST_TRIPLET $RELEASE $SIGN $PACKAGE
+            ./contrib/scripts/package.sh --host $TARGET_HOST_TRIPLET $RELEASE $SIGN $PACKAGE $DOCKER
         fi
     done
 fi
