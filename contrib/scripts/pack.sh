@@ -1,4 +1,4 @@
-
+#!/bin/bash
 export LC_ALL=C
 set -e -o pipefail
 
@@ -48,7 +48,7 @@ check_error() {
 BUILD_PREFIX=""
 BUILD_SUFFIX=""
 COMMIT=""
-DOCUMENTATION="`pwd`/doc/*.md README.md"
+DOCUMENTATION="`pwd`/doc/*.md README.md `pwd`/contrib/scripts/README-scripts.md"
 DOCKER=""
 ERROR=""
 HOST=""
@@ -70,9 +70,6 @@ case $i in
     ;;
     -p=*|--prefix=*)
         BUILD_PREFIX="${i#*=}"
-    ;;
-    -s=*|--searchpath=*)
-        SEARCHPATH="${i#*=}"
     ;;
     -t=*|--tag=*)
         TAG="${i#*=}"
@@ -133,25 +130,25 @@ echo $EXE
 check_error
 
 # allow either tag or commit for git repositories
-if [ "$TAG" ] && [ "$COMMIT" ]; then
-    echo "Please specify only a commit or a tag and try again."
-    exit 1
-else 
-    if [ "$TAG" ]; then
-        # logic may need refining
-        if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "$TAG is a legitimate commit"
-            # git tag -f -s $TAG -m "$TAG"
-        else
-            git tag -s $TAG -m "$TAG"
-        fi
-        BUILD_SUFFIX=$BUILD_SUFFIX-$TAG
-    else 
-        if [ "$COMMIT" ]; then
-            BUILD_SUFFIX=$BUILD_SUFFIX-$COMMIT
-        fi
-    fi
-fi
+# if [ "$TAG" ] && [ "$COMMIT" ]; then
+#     echo "Please specify only a commit or a tag and try again."
+#     exit 1
+# else
+#     # if [ "$TAG" ]; then
+#     #     # logic may need refining
+#     #     if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+#     #         echo "$TAG is a legitimate commit"
+#     #         # git tag -f -s $TAG -m "$TAG"
+#     #     else
+#     #         git tag -s $TAG -m "$TAG"
+#     #     fi
+#     #     BUILD_SUFFIX=$BUILD_SUFFIX-$TAG
+#     # else 
+#     #     if [ "$COMMIT" ]; then
+#     #         BUILD_SUFFIX=$BUILD_SUFFIX-$COMMIT
+#     #     fi
+#     # fi
+# fi
 
 echo HOST = ${HOST}
 echo PREFIX = ${PREFIX}

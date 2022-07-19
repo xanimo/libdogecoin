@@ -75,6 +75,7 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
 
         if has_param '--build' "$@"; then
             ./contrib/scripts/build.sh --host $TARGET_HOST_TRIPLET $DEPENDS
+            ./contrib/scripts/combine.sh --target .libs/libdogecoin.a --append "src/secp256k1/.libs/libsecp256k1.a src/secp256k1/.libs/libsecp256k1_precomputed.a"
         fi
         
         if has_param '--test' "$@"; then

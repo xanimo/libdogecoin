@@ -51,17 +51,15 @@ has_param() {
 
 help() {
     echo "Usage: sign 
-               [ -a | --armor ]
                [ -i | --input ]
                [ -o | --output ]
-               [ -v | --verify ]
                [ -h | --help  ]"
     exit 2
 }
 
 
-SHORT=a:,i:,o:,v:,h:
-LONG=armor:,input:,output:,verify:,help
+SHORT=i:,o:,h:
+LONG=input:,output:,host:,help
 OPTS=$(getopt -a -n sign --options $SHORT --longoptions $LONG -- "$@")
 
 VALID_ARGUMENTS=$# # Returns the count of arguments that are in short or long options
@@ -75,6 +73,10 @@ eval set -- "$OPTS"
 while :
 do
   case "$1" in
+    --host )
+      export host="$2"
+      shift 2
+      ;;
     -i | --input )
       export input="$2"
       shift 2
@@ -101,13 +103,17 @@ SIGN="$armor --detach-sign --yes $output $input"
 
 if [ ! $input ]; then
     echo "Please provide an input to sign."
+    exit 1
 fi
 
 if [ ! $output ]; then
     echo "Please provide a file name to output."
+    exit 1
 fi
 
 gpg --detach-sign --yes -o "$output.sig" $input
 gpg --verify "$output.sig" $output
 gpg --armor --detach-sign --yes -o "$output.asc" $input
 gpg --verify "$output.asc" $output
+
+
