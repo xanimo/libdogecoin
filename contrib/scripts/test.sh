@@ -40,6 +40,7 @@ TARGET_HOST_TRIPLET=""
 TARGET_ARCH=""
 
 if has_param '--host' "$@"; then
+    echo $2
     case "$2" in
         "arm-linux-gnueabihf")
             if has_param '--docker' "$@"; then
@@ -67,13 +68,23 @@ if has_param '--host' "$@"; then
             fi
         ;;
         "x86_64-pc-linux-gnu") 
-            make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
-            python3 tooltests.py
-            ./wrappers/python/pytest/cython_tests.sh
-            ./wrappers/golang/libdogecoin/build.sh
+            # make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
         ;;
         "i686-pc-linux-gnu")
             make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
         ;;
     esac
+    export TARGET_HOST_TRIPLET=$2
+fi
+
+if has_param '--extended' "$@"; then
+    if has_param '--valgrind' "$@"; then
+        python3 tooltests.py
+    fi
+    if has_param '--cython' "$@"; then
+        ./wrappers/python/pytest/cython_tests.sh --host $TARGET_HOST_TRIPLET
+    fi
+    if has_param '--go' "$@"; then
+        ./wrappers/golang/libdogecoin/build.sh --host $TARGET_HOST_TRIPLET
+    fi
 fi

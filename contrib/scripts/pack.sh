@@ -53,7 +53,7 @@ DOCKER=""
 ERROR=""
 HOST=""
 LIB="`pwd`/.libs/libdogecoin.a `pwd`/include/dogecoin/libdogecoin.h"
-SUDO="sudo -u $(whoami) -H bash -c"
+SUDO="sudo"
 SHA=sha256sum
 BINARY_SUFFIX=""
 for i in "$@"
@@ -85,12 +85,10 @@ done
 
 check_error
 
-echo $SUDO before
 # strip sudo if using docker
 if [ "$DOCKER" ]; then
     SUDO=""
 fi
-echo $SUDO after
 
 # set up build directory if it doesn't exist
 if [ ! -d "$BUILD_PREFIX" ]; then
@@ -125,8 +123,6 @@ if [ "$HOST" ]; then
     FILES="$LIB $EXE"
 fi
 
-echo $EXE
-
 check_error
 
 # allow either tag or commit for git repositories
@@ -152,13 +148,6 @@ else
     fi
 fi
 
-echo HOST = ${HOST}
-echo PREFIX = ${PREFIX}
-echo SEARCH PATH = ${SEARCHPATH}
-echo DIRS = ${DIR}
-echo $BUILD_PREFIX/$BUILD_SUFFIX
-echo $BUILD_SUFFIX
-
 if [ ! -d "output" ]; then
     $SUDO mkdir -p "`pwd`/output"
 fi
@@ -176,6 +165,18 @@ pushd $BUILD_PREFIX/$BUILD_SUFFIX
     $SHA * > checksums.txt
 popd
 
+if [ ! -d "$BUILD_PREFIX/$BUILD_SUFFIX/lib" ]; then
+    $SUDO mkdir -p "$BUILD_PREFIX/$BUILD_SUFFIX/lib"
+fi
+
+$SUDO mv "$BUILD_PREFIX/$BUILD_SUFFIX/libdogecoin.a" "$BUILD_PREFIX/$BUILD_SUFFIX/lib/libdogecoin.a"
+
+if [ ! -d "$BUILD_PREFIX/$BUILD_SUFFIX/include" ]; then
+    $SUDO mkdir -p "$BUILD_PREFIX/$BUILD_SUFFIX/include"
+fi
+
+$SUDO mv "$BUILD_PREFIX/$BUILD_SUFFIX/libdogecoin.h" "$BUILD_PREFIX/$BUILD_SUFFIX/include/libdogecoin.h"
+
 if [ ! -d "$BUILD_PREFIX/$BUILD_SUFFIX/docs" ]; then
     $SUDO mkdir -p "$BUILD_PREFIX/$BUILD_SUFFIX/docs"
 fi
@@ -185,4 +186,4 @@ $SUDO cp -r $DOCUMENTATION "$BUILD_PREFIX/$BUILD_SUFFIX/docs"
 $SUDO mv `pwd`/$BUILD_PREFIX/* `pwd`/output
 
 # clean up
-# $SUDO rm -rf $BUILD_PREFIX
+$SUDO rm -rf $BUILD_PREFIX

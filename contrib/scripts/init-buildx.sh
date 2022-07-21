@@ -23,7 +23,7 @@ detect_os() {
     uname_out="$(uname -s)"
     case "${uname_out}" in
         Linux*)     machine=linux;;
-        Darwin*)    machine=mac;;
+        Darwin*)    machine=darwin;;
         CYGWIN*)    machine=cygwin;;
         MINGW*)     machine=mingw;;
         MSYS_NT*)   machine=windows;;
@@ -35,42 +35,46 @@ OS=
 detect_os
 case $machine in
     "linux")    OS="linux";; 
-    "mac")      OS="mac";;
+    "darwin")      OS="darwin";;
 esac
 
 PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/386
 if ! command -v docker &> /dev/null
 then
-    if [ $OS == "mac" ]; then
-        curl -O -L https://gist.githubusercontent.com/xanimo/a966f04e0b87adf0803e33b724e07f0c/raw/08efcdcfe31a26cb333097e49162cef43e1e1ea3/init-docker-macos.sh
-        chmod +x init-docker-macos.sh
-        ./init-docker-macos.sh
+    if [ $OS == "darwin" ]; then
+        export HOMEBREW_NO_INSTALL_CLEANUP=1
+        NONINTERACTIVE=1 brew install --cask docker
+        export HOMEBREW_NO_INSTALL_CLEANUP=0
+        if [ "$(uname -m)" == "x86_64" ]; then
+            ARCH="amd64"
+        fi
     else
         curl -O -L https://gist.githubusercontent.com/xanimo/5fd1e8091909f85547de8a5d8268d522/raw/9d10ff5fb1700d4adcf6038397c2638d4d950ce7/docker-init.sh
         chmod +x docker-init.sh
         ./docker-init.sh
+        ARCH=`dpkg --print-architecture`
     fi
     if ! command -v docker buildx &> /dev/null
     then
-        if [ $OS == "mac" ]; then
-            if [ "$(uname -m)" == "x86_64" ]; then
-                ARCH="amd64"
-            fi
-        else
-            ARCH=`dpkg --print-architecture`
-        fi
         VERSION="v0.8.2"
         URL_BASE=https://github.com/docker/buildx/releases/download/$VERSION
         FILENAME=buildx-$VERSION.$OS-$ARCH
         CHECKSUM=$URL_BASE/checksums.txt
-        curl --location --fail $URL_BASE/$FILENAME -o $FILENAME
-        curl --location --fail $CHECKSUM -o checksums.txt
-        grep $FILENAME checksums.txt | sha256sum -c
+        curl -O -L $URL_BASE/$FILENAME -o $FILENAME
+        if [ $OS == "darwin" ]; then
+            echo "95303b8b017d6805d35768244e66b41739745f81cb3677c0aefea231e484e227  buildx-v0.8.2.darwin-amd64" | sha256sum -c
+        else
+            curl -O -L $CHECKSUM -o checksums.txt
+            grep $FILENAME checksums.txt | sha256sum -c
+        fi
         chmod +x $FILENAME
-        mv $FILENAME /usr/local/lib/docker/cli-plugins/docker-buildx
+        if [ -d "/usr/local/lib/docker" ]; then
+            if [ ! -d "/usr/local/lib/docker/cli-plugins" ]; then
+                sudo mkdir -p /usr/local/lib/docker/cli-plugins
+            fi
+        fi
+        sudo mv $FILENAME /usr/local/lib/docker/cli-plugins/docker-buildx
         rm -rf checksums.txt
-        sudo apt-get update
-        sudo apt install qemu-user
         docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
         if ! docker buildx ls | grep -q container-builder; then
             docker buildx create --platform ${PLATFORMS} --name container-builder --use;
@@ -107,7 +111,8 @@ build() {
         -t xanimo/libdogecoin:$TARGET_HOST_TRIPLET \
         --build-arg TARGET_HOST=$TARGET_HOST_TRIPLET \
         --build-arg IMG_ARCH=$IMG_ARCH \
-         --no-cache --target artifact --output type=local,dest=../../ .
+        --build-arg FLAVOR=$FLAVOR \
+        --no-cache --target artifact --output type=local,dest=../../ .
     popd
 }
 
@@ -120,33 +125,33 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
         case "$TARGET_HOST_TRIPLET" in
             "arm-linux-gnueabihf")
                 TARGET_ARCH="armhf"
-                IMG_ARCH="arm32v7"
+                FLAVOR="jammy"
             ;;
             "aarch64-linux-gnu")
                 TARGET_ARCH="arm64"
-                IMG_ARCH="arm64v8"
+                FLAVOR="jammy"
             ;;
             "x86_64-w64-mingw32")
                 TARGET_ARCH="amd64"
-                IMG_ARCH="amd64"
+                FLAVOR="jammy"
             ;;
             "i686-w64-mingw32")
                 TARGET_ARCH="i386"
-                IMG_ARCH="386"
+                FLAVOR="bionic"
             ;;
             "x86_64-apple-darwin14")
                 TARGET_ARCH="amd64"
-                IMG_ARCH="amd64"
+                FLAVOR="jammy"
             ;;
             "x86_64-pc-linux-gnu")
                 TARGET_ARCH="amd64"
-                IMG_ARCH="amd64"
+                FLAVOR="jammy"
             ;;
             "i686-pc-linux-gnu")
                 TARGET_ARCH="i386"
-                IMG_ARCH="i386"
+                FLAVOR="bionic"
             ;;
         esac
-        build `pwd`
+        build
     done
 fi
