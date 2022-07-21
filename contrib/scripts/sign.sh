@@ -94,7 +94,7 @@ fi
 
 
 help() {
-    echo "Usage: sign 
+    echo "Usage: ./sign.sh --input such
                [ -i | --input ]
                [ -h | --help  ]"
     exit 2
@@ -137,8 +137,6 @@ do
       ;;
   esac
 done
-
-SIGN="--armor --detach-sign --yes $output $input"
 
 if [ ! $input ]; then
     echo "Please provide an input to sign."

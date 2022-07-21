@@ -2,7 +2,7 @@
 export LC_ALL=C
 set -e -o pipefail
 
-# use this script to install docker-buildx
+# use this script to install docker buildx
 if [ $# -eq 0 ]; then
     echo "No arguments provided"
     exit 1
@@ -39,29 +39,47 @@ case $machine in
 esac
 
 PLATFORMS=linux/amd64,linux/arm64,linux/arm/v7,linux/386
-if ! command -v docker buildx &> /dev/null
+if ! command -v docker &> /dev/null
 then
-    ARCH=`dpkg --print-architecture`
-    VERSION="v0.8.2"
-    URL_BASE=https://github.com/docker/buildx/releases/download/$VERSION
-    FILENAME=buildx-$VERSION.$OS-$ARCH
-    CHECKSUM=$URL_BASE/checksums.txt
-    curl --location --fail $URL_BASE/$FILENAME -o $FILENAME
-    curl --location --fail $CHECKSUM -o checksums.txt
-    grep $FILENAME checksums.txt | sha256sum -c
-    chmod +x $FILENAME
-    mv $FILENAME /usr/local/lib/docker/cli-plugins/docker-buildx
-    rm -rf checksums.txt
-    sudo apt-get update
-    sudo apt install qemu-user
-    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    if ! docker buildx ls | grep -q container-builder; then
-        docker buildx create --platform ${PLATFORMS} --name container-builder --use;
+    if [ $OS == "mac" ]; then
+        curl -O -L https://gist.githubusercontent.com/xanimo/a966f04e0b87adf0803e33b724e07f0c/raw/08efcdcfe31a26cb333097e49162cef43e1e1ea3/init-docker-macos.sh
+        chmod +x init-docker-macos.sh
+        ./init-docker-macos.sh
+    else
+        curl -O -L https://gist.githubusercontent.com/xanimo/5fd1e8091909f85547de8a5d8268d522/raw/9d10ff5fb1700d4adcf6038397c2638d4d950ce7/docker-init.sh
+        chmod +x docker-init.sh
+        ./docker-init.sh
     fi
-else
-    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-    if ! docker buildx ls | grep -q container-builder; then
-        docker buildx create --platform ${PLATFORMS} --name container-builder --node container-builder --use;
+    if ! command -v docker buildx &> /dev/null
+    then
+        if [ $OS == "mac" ]; then
+            if [ "$(uname -m)" == "x86_64" ]; then
+                ARCH="amd64"
+            fi
+        else
+            ARCH=`dpkg --print-architecture`
+        fi
+        VERSION="v0.8.2"
+        URL_BASE=https://github.com/docker/buildx/releases/download/$VERSION
+        FILENAME=buildx-$VERSION.$OS-$ARCH
+        CHECKSUM=$URL_BASE/checksums.txt
+        curl --location --fail $URL_BASE/$FILENAME -o $FILENAME
+        curl --location --fail $CHECKSUM -o checksums.txt
+        grep $FILENAME checksums.txt | sha256sum -c
+        chmod +x $FILENAME
+        mv $FILENAME /usr/local/lib/docker/cli-plugins/docker-buildx
+        rm -rf checksums.txt
+        sudo apt-get update
+        sudo apt install qemu-user
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+        if ! docker buildx ls | grep -q container-builder; then
+            docker buildx create --platform ${PLATFORMS} --name container-builder --use;
+        fi
+    else
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+        if ! docker buildx ls | grep -q container-builder; then
+            docker buildx create --platform ${PLATFORMS} --name container-builder --node container-builder --use;
+        fi
     fi
 fi
 

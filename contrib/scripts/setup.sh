@@ -73,7 +73,7 @@ if has_param '--host' "$@"; then
             if [ $DEPENDS ]; then
                 ARCH_PACKAGES+="g++-mingw-w64 "
             fi
-            ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt"
+            ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt zip"
             TARGET_ARCH="i386"
             $USE_SUDO dpkg --add-architecture $TARGET_ARCH
         ;;
@@ -83,7 +83,7 @@ if has_param '--host' "$@"; then
             TARGET_ARCH="amd64"
         ;;
         "x86_64-pc-linux-gnu") 
-            ARCH_PACKAGES="python3-dev python3-dbg python2-minimal"
+            ARCH_PACKAGES="python3-dev python3-dbg python2-minimal zip"
             TARGET_ARCH="amd64"
         ;;
         "i686-pc-linux-gnu")

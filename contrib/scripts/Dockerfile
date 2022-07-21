@@ -9,7 +9,6 @@ RUN cd libdogecoin && git checkout 0.1-dev-docker && ./contrib/scripts/setup.sh 
 RUN cd libdogecoin && ./contrib/scripts/build.sh --host ${TARGET_HOST} --depends
 COPY pack.sh libdogecoin/contrib/scripts/pack.sh
 RUN cd libdogecoin && ./contrib/scripts/pack.sh --host=${TARGET_HOST} --prefix=build --docker
-RUN cd libdogecoin && ./contrib/scripts/archive.sh --host ${TARGET_HOST}
 RUN cp -r libdogecoin/output/* /build \
     && rm -rf libdogecoin
 
