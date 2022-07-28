@@ -62,7 +62,8 @@ void broadcasting_menu(int txindex, int is_testnet) {
     int length = HASH_COUNT(transactions);
     while (running) {
         printf("length: %d\n", length);
-        for (int i = 0; i <= length; i++) {
+        int i = 0;
+        for (; i <= length; i++) {
             printf("\n--------------------------------\n");
             printf("transaction to broadcast: %s\n", raw_hexadecimal_tx);
             selected == i ? printf("confirm:         [X]\n") : 0;
@@ -259,7 +260,8 @@ void transaction_input_menu(int txindex, int is_testnet) {
         char* script_pubkey;
         int input_to_sign;
         char* private_key_wif;
-        for (int i = 0; i < length; i++) {
+        int i = 0;
+        for (; i < length; i++) {
             printf("\n--------------------------------\n");
             printf("input index:      %d\n", i);
             dogecoin_tx_in* tx_in = vector_idx(tx->transaction->vin, i);
@@ -352,7 +354,8 @@ void transaction_output_menu(int txindex, int is_testnet) {
         working_transaction* tx = find_transaction(txindex);
         int length = tx->transaction->vout->len;
         int selected = -1;
-        for (int i = 0; i < length; i++) {
+        int i = 0;
+        for (; i < length; i++) {
             dogecoin_tx_out* tx_out = vector_idx(tx->transaction->vout, i);
             tx_out_total += tx_out->value;
             printf("\n--------------------------------\n");

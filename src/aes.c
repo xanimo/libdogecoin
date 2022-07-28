@@ -45,7 +45,8 @@ int aes256_cbc_encrypt(const unsigned char aes_key[32], const unsigned char iv[A
 
     // Write all but the last block
     while (written + AES_BLOCK_SIZE <= size) {
-        for (int i = 0; i != AES_BLOCK_SIZE; i++)
+        int i = 0;
+        for (; i != AES_BLOCK_SIZE; i++)
             mixed[i] ^= *data++;
         AES256_encrypt(&aes_ctx, 1, out + written, mixed);
         memcpy_safe(mixed, out + written, AES_BLOCK_SIZE);
@@ -54,9 +55,10 @@ int aes256_cbc_encrypt(const unsigned char aes_key[32], const unsigned char iv[A
     if (pad) {
         // For all that remains, pad each byte with the value of the remaining
         // space. If there is none, pad by a full block.
-        for (int i = 0; i != padsize; i++)
+        int i = 0;
+        for (; i != padsize; i++)
             mixed[i] ^= *data++;
-        for (int i = padsize; i != AES_BLOCK_SIZE; i++)
+        for (i = padsize; i != AES_BLOCK_SIZE; i++)
             mixed[i] ^= AES_BLOCK_SIZE - padsize;
         AES256_encrypt(&aes_ctx, 1, out + written, mixed);
         written += AES_BLOCK_SIZE;
@@ -84,7 +86,8 @@ int aes256_cbc_decrypt(const unsigned char aes_key[32], const unsigned char iv[A
     // Decrypt all data. Padding will be checked in the output.
     while (written != size) {
         AES256_decrypt(&aes_ctx, 1, out, data + written);
-        for (int i = 0; i != AES_BLOCK_SIZE; i++)
+        int i = 0;
+        for (; i != AES_BLOCK_SIZE; i++)
             *out++ ^= prev[i];
         prev = data + written;
         written += AES_BLOCK_SIZE;
@@ -101,7 +104,8 @@ int aes256_cbc_decrypt(const unsigned char aes_key[32], const unsigned char iv[A
         padsize *= !fail;
 
         // All padding must equal the last byte otherwise it's not well-formed
-        for (int i = AES_BLOCK_SIZE; i != 0; i--)
+        int i = AES_BLOCK_SIZE;
+        for (; i != 0; i--)
             fail |= ((i > AES_BLOCK_SIZE - padsize) & (*out-- != padsize));
 
         written -= padsize;
