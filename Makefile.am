@@ -1,9 +1,17 @@
+# Pattern rule to print variables, e.g. make print-top_srcdir
+print-%: FORCE
+	@echo '$*'='$($*)'
+
 ACLOCAL_AMFLAGS = -I build-aux/m4
 AUTOMAKE_OPTIONS = serial-tests
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
 DIST_SUBDIRS = src/secp256k1
+
+AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS) $(HARDENED_LDFLAGS)
+AM_CXXFLAGS = $(HARDENED_CXXFLAGS) $(ERROR_CXXFLAGS)
+AM_CPPFLAGS = $(HARDENED_CPPFLAGS)
 
 LIBSECP256K1=src/secp256k1/libsecp256k1.la
 
@@ -152,7 +160,42 @@ sendtx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS
 sendtx_CPPFLAGS = -I$(top_srcdir)/src
 sendtx_LDFLAGS = -static
 endif
+
+bin_PROGRAMS = such sendtx
 endif
 
 clean-local:
 	-$(MAKE) -C src/secp256k1 clean
+
+empty :=
+space := $(empty) $(empty)
+
+OSX_VOLNAME = $(subst $(space),-,$(PACKAGE_NAME))
+OSX_DMG = $(OSX_VOLNAME).dmg
+
+osx_volname:
+	echo $(OSX_VOLNAME) >$@
+
+if TARGET_DARWIN
+deploy: $(OSX_DMG)
+endif
+
+CLEANFILES = $(OSX_DMG)
+DIST_DOCS = $(wildcard doc/*.md)
+
+OSX_PACKAGING = $(top_srcdir)/contrib/macdeploy/detached-sig-apply.sh \
+  $(top_srcdir)/contrib/macdeploy/detached-sig-create.sh
+
+.PHONY: FORCE check-symbols check-security
+
+check-symbols: $(bin_PROGRAMS)
+if GLIBC_BACK_COMPAT
+	@echo "Checking glibc back compat..."
+	$(AM_V_at) READELF=$(READELF) CPPFILT=$(CPPFILT) $(top_srcdir)/contrib/devtools/symbol-check.py < $(bin_PROGRAMS)
+endif
+
+check-security: $(bin_PROGRAMS)
+if HARDEN
+	@echo "Checking binary security..."
+	$(AM_V_at) READELF=$(READELF) OBJDUMP=$(OBJDUMP) $(top_srcdir)/contrib/devtools/security-check.py < $(bin_PROGRAMS)
+endif

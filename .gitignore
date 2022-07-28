@@ -130,3 +130,5 @@ build/*
 **/CMakeScripts
 **/compile_commands.json
 Testing/
+
+/guix-build-*

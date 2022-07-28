@@ -1,5 +1,33 @@
 .NOTPARALLEL :
 
+# Pattern rule to print variables, e.g. make print-top_srcdir
+print-%: FORCE
+	@echo '$*'='$($*)'
+
+# When invoking a sub-make, keep only the command line variable definitions
+# matching the pattern in the filter function.
+#
+# e.g. invoking:
+#   $ make A=1 C=1 print-MAKEOVERRIDES print-MAKEFLAGS
+#
+# with the following in the Makefile:
+#   MAKEOVERRIDES := $(filter A=% B=%,$(MAKEOVERRIDES))
+#
+# will print:
+#   MAKEOVERRIDES = A=1
+#   MAKEFLAGS = -- A=1
+#
+# this is because as the GNU make manual says:
+#   The command line variable definitions really appear in the variable
+#   MAKEOVERRIDES, and MAKEFLAGS contains a reference to this variable.
+#
+# and since the GNU make manual also says:
+#   variables defined on the command line are passed to the sub-make through
+#   MAKEFLAGS
+#
+# this means that sub-makes will be invoked as if:
+#   $(MAKE) A=1 blah blah
+MAKEOVERRIDES := $(filter V=%,$(MAKEOVERRIDES))
 SOURCES_PATH ?= $(BASEDIR)/sources
 BASE_CACHE ?= $(BASEDIR)/built
 SDK_PATH ?= $(BASEDIR)/SDKs
@@ -7,7 +35,11 @@ NO_QT ?=
 NO_WALLET ?=
 NO_UPNP ?=
 MULTIPROCESS ?=
+LTO ?=
 FALLBACK_DOWNLOAD_PATH ?= https://bitcoincore.org/depends-sources
+
+C_STANDARD ?= c11
+CXX_STANDARD ?= c++17
 
 BUILD = $(shell ./config.guess)
 HOST ?= $(BUILD)
@@ -99,8 +131,8 @@ include packages/packages.mk
 #     2. Before including packages/*.mk (excluding packages/packages.mk), since
 #        they rely on the build_id variables
 #
-build_id:=$(shell env CC='$(build_CC)' CXX='$(build_CXX)' AR='$(build_AR)' RANLIB='$(build_RANLIB)' STRIP='$(build_STRIP)' SHA256SUM='$(build_SHA256SUM)' DEBUG='$(DEBUG)' ./gen_id '$(BUILD_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
-$(host_arch)_$(host_os)_id:=$(shell env CC='$(host_CC)' CXX='$(host_CXX)' AR='$(host_AR)' RANLIB='$(host_RANLIB)' STRIP='$(host_STRIP)' SHA256SUM='$(build_SHA256SUM)' DEBUG='$(DEBUG)' ./gen_id '$(HOST_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
+build_id:=$(shell env CC='$(build_CC)' C_STANDARD='$(C_STANDARD)' CXX='$(build_CXX)' CXX_STANDARD='$(CXX_STANDARD)' AR='$(build_AR)' RANLIB='$(build_RANLIB)' STRIP='$(build_STRIP)' SHA256SUM='$(build_SHA256SUM)' DEBUG='$(DEBUG)' LTO='$(LTO)' ./gen_id '$(BUILD_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
+$(host_arch)_$(host_os)_id:=$(shell env CC='$(host_CC)' C_STANDARD='$(C_STANDARD)' CXX='$(host_CXX)' CXX_STANDARD='$(CXX_STANDARD)' AR='$(host_AR)' RANLIB='$(host_RANLIB)' STRIP='$(host_STRIP)' SHA256SUM='$(build_SHA256SUM)' DEBUG='$(DEBUG)' LTO='$(LTO)' ./gen_id '$(HOST_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
 
 qrencode_packages_$(NO_QR) = $(qrencode_packages)
 
@@ -166,13 +198,16 @@ $(host_prefix)/.stamp_$(final_build_id): $(native_packages) $(packages)
 # not hurt.
 $(host_prefix)/share/config.site : config.site.in $(host_prefix)/.stamp_$(final_build_id)
 	$(AT)@mkdir -p $(@D)
-	$(AT)sed -e 's|@HOST@|$(host)|' \
+	sed -e 's|@HOST@|$(host)|' \
             -e 's|@CC@|$(host_CC)|' \
             -e 's|@CXX@|$(host_CXX)|' \
             -e 's|@AR@|$(host_AR)|' \
             -e 's|@RANLIB@|$(host_RANLIB)|' \
             -e 's|@NM@|$(host_NM)|' \
             -e 's|@STRIP@|$(host_STRIP)|' \
+            -e 's|@OTOOL@|$(host_OTOOL)|' \
+            -e 's|@INSTALL_NAME_TOOL@|$(host_INSTALL_NAME_TOOL)|' \
+            -e 's|@DSYMUTIL@|$(host_DSYMUTIL)|' \
             -e 's|@build_os@|$(build_os)|' \
             -e 's|@host_os@|$(host_os)|' \
             -e 's|@CFLAGS@|$(strip $(host_CFLAGS) $(host_$(release_type)_CFLAGS))|' \
@@ -187,6 +222,7 @@ $(host_prefix)/share/config.site : config.site.in $(host_prefix)/.stamp_$(final_
             -e 's|@no_upnp@|$(NO_UPNP)|' \
             -e 's|@no_natpmp@|$(NO_NATPMP)|' \
             -e 's|@multiprocess@|$(MULTIPROCESS)|' \
+            -e 's|@lto@|$(LTO)|' \
             -e 's|@debug@|$(DEBUG)|' \
             $< > $@
 	$(AT)touch $@
@@ -236,3 +272,5 @@ download: download-osx download-linux download-win
 $(foreach package,$(all_packages),$(eval $(call ext_add_stages,$(package))))
 
 .PHONY: install cached clean clean-all download-one download-osx download-linux download-win download check-packages check-sources
+.PHONY: FORCE
+$(V).SILENT:
