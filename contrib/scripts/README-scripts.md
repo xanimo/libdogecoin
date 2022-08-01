@@ -73,3 +73,17 @@ Option flag to purge cached dependencies and previously built files:
 ```
 
 Note that if building on linux, the preceeding examples can be used to cross compile every supported host platform triplet with exception to being capable of running tests on `x86_64-apple-darwin14`.
+
+#### Packaging / Signing 
+
+To import the existing signing keys run the following command:
+
+```
+find ./contrib/signing-keys -name "*.pgp" -exec gpg --import {} +
+```
+
+To setup, build, test, package and sign every arch run:
+
+```
+./contrib/scripts/run.sh --host --all --setup --build --depends --clean --test --package
+```

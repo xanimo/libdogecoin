@@ -45,22 +45,75 @@ if [[ "$TARGET_HOST_TRIPLET" == "" && "$ALL_HOST_TRIPLETS" != "" ]]; then
     do
     :
         TARGET_HOST_TRIPLET="${ALL_HOST_TRIPLETS[$i]}"
+        CLEAN=""
+        # clean previously built files in libdogecoin and libsecp256k1
+        if has_param '--clean' "$@"; then
+            FILE=Makefile
+            if test -f "$FILE"; then
+                make clean
+                make clean-local
+            fi
+            CLEAN=1
+        fi
+        
+        # clean MacOS SDKs
         if [ "$DEPENDS" = "1" ]; then
-            if has_param '--clean' "$@"; then
-                FILE=Makefile
-                if test -f "$FILE"; then
-                    make clean
-                    make clean-local
-                fi
+            if [ "$CLEAN" = "1" ]; then
                 git clean -xdff --exclude='/depends/SDKs/*'
             fi
-            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET --depends
-            ./contrib/scripts/build.sh --host $TARGET_HOST_TRIPLET --depends
-            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET --depends
-        else
-            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET
-            ./contrib/scripts/build.sh --host $TARGET_HOST_TRIPLET
-            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET
+            DEPENDS="--depends"
+        fi
+
+        DOCKER=""
+        if has_param '--docker' "$@"; then
+            DOCKER="--docker"
+        fi
+
+        if has_param '--setup' "$@"; then
+            ./contrib/scripts/setup.sh --host $TARGET_HOST_TRIPLET $DEPENDS $DOCKER
+        fi
+
+        if has_param '--build' "$@"; then
+            ./contrib/scripts/build.sh --host $TARGET_HOST_TRIPLET $DEPENDS
+            ./contrib/scripts/combine.sh --target .libs/libdogecoin.a --append "src/secp256k1/.libs/libsecp256k1.a src/secp256k1/.libs/libsecp256k1_precomputed.a"
+        fi
+        
+        if has_param '--test' "$@"; then
+            GO=""
+            CYTHON=""
+            VALGRIND=""
+            EXTENDED=""
+            if has_param '--go' "$@"; then
+                GO="--go"
+            fi
+            if has_param '--cython' "$@"; then
+                CYTHON="--cython"
+            fi
+            if has_param '--valgrind' "$@"; then
+                VALGRIND="--valgrind"
+            fi
+            if has_param '--extended' "$@"; then
+                EXTENDED="--extended"
+            fi
+            ./contrib/scripts/test.sh --host $TARGET_HOST_TRIPLET $EXTENDED $VALGRIND $CYTHON $GO $DOCKER
+        fi
+
+        PACKAGE=""
+        if has_param '--package' "$@"; then
+            SIGN=""
+            if has_param '--sign' "$@"; then
+                SIGN="--sign"
+            fi
+            RELEASE=""
+            if has_param '--release' "$@"; then
+                RELEASE="--release"
+                if [ "$TAG" = "" ]; then
+                    echo "Please provide a tag if using the release flag! e.g. TAG=0.1"
+                    exit 1
+                fi
+            fi
+            PACKAGE="--package"
+            ./contrib/scripts/package.sh --host $TARGET_HOST_TRIPLET $RELEASE $SIGN $PACKAGE $DOCKER
         fi
     done
 fi
