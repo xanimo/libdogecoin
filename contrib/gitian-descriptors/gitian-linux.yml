@@ -143,8 +143,9 @@ script: |
   # Build and archive each architecture
   for i in ${HOSTS}; do
     export PATH=${BASEPREFIX}/${i}/native/bin:${ORIGPATH}
-    ./contrib/scripts/build.sh --host ${i} --depends
+    ./contrib/scripts/build.sh --host ${i} --depends --clean
     ./contrib/scripts/pack.sh --host=${i} --prefix=build --commit="0.1.0"
+    ./contrib/scripts/archive.sh --host ${i}
   done
 
   # Move them to gitian-builder/build/out/src

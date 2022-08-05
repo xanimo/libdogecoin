@@ -192,16 +192,3 @@ fi
 
 cp `pwd`/contrib/examples/example.c "$BUILD_PREFIX/$BUILD_SUFFIX/examples/example.c"
 cp `pwd`/LICENSE "$BUILD_PREFIX/$BUILD_SUFFIX/LICENSE"
-
-./contrib/scripts/archive.sh --host $HOST
-
-if [ -f `pwd`/$BUILD_PREFIX/*.tar.gz ]; then
-    cp -r `pwd`/$BUILD_PREFIX/*.tar.gz `pwd`/output
-fi
-
-if [ -f `pwd`/$BUILD_PREFIX/*.zip ]; then
-    cp -r `pwd`/$BUILD_PREFIX/*.zip `pwd`/output
-fi
-
-# clean up
-rm -rf $BUILD_PREFIX

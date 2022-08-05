@@ -107,4 +107,15 @@ if [ "$TARGET_DIRECTORY" != "" ]; then
             find $targetdir -not -name "*.dbg" | sort | tar --no-recursion --mode='u+rw,go+r-w,a+X' --owner=0 --group=0 -c -T - | gzip -9n > $targetdir.tar.gz
         popd
     fi
+
+    if [ -f `pwd`/$basedir/$targetdir.tar.gz ]; then
+        cp -r `pwd`/$basedir/$targetdir.tar.gz `pwd`/output
+    fi
+
+    if [ -f `pwd`/$basedir/$targetdir.zip ]; then
+        cp -r `pwd`/$basedir/$targetdir.zip `pwd`/output
+    fi
+
+    # clean up
+    rm -rf $basedir
 fi

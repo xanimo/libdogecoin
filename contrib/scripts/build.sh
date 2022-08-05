@@ -28,22 +28,28 @@ TARGET_ARCH=""
 CONFIGURE_OPTIONS=""
 PREFIX=""
 
-if [ -f "`pwd`/such*" ]; then
-    rm "`pwd`/such*"
-fi
+# clean repository
+if has_param '--clean' "$@"; then
+    if [ -f "`pwd`/such*" ]; then
+        rm "`pwd`/such*"
+    fi
 
-if [ -f "`pwd`/sendtx*" ]; then
-    rm "`pwd`/sendtx*"
-fi
+    if [ -f "`pwd`/sendtx*" ]; then
+        rm "`pwd`/sendtx*"
+    fi
 
-if [ -f "`pwd`/tests*" ]; then
-    rm "`pwd`/tests*"
-fi
+    if [ -f "`pwd`/tests*" ]; then
+        rm "`pwd`/tests*"
+    fi
 
-if [ -d "`pwd`/.libs" ]; then
-    rm -rf "`pwd`/.libs"
-    make clean
-    make clean-local
+    if [ -d "`pwd`/.libs" ]; then
+        rm -rf "`pwd`/.libs"
+        make clean
+        make clean-local
+    fi
+    if has_param '--nuke' "$@"; then
+        git clean -xdff --exclude='/depends/SDKs/*' --exclude='/contrib/gitian/*'
+    fi
 fi
 
 if has_param '--host' "$@"; then
@@ -82,15 +88,17 @@ if has_param '--depends' "$@"; then
     export PKG_CONFIG_PATH+="`pwd`/depends/$TARGET_HOST_TRIPLET/lib/pkgconfig"
 fi
 
-./autogen.sh
-if [ "$DEPENDS" ]; then
-    ./configure \
-    --prefix="${PREFIX}" \
-    --disable-maintainer-mode \
-    --disable-dependency-tracking \
-    --enable-static \
-    --disable-shared
-else
-    ./configure
+if ! has_param '--ci' "$@"; then
+    ./autogen.sh
+    if [ "$DEPENDS" ]; then
+        ./configure \
+        --prefix="${PREFIX}" \
+        --disable-maintainer-mode \
+        --disable-dependency-tracking \
+        --enable-static \
+        --disable-shared
+    else
+        ./configure
+    fi
 fi
-make
+make -j"$(getconf _NPROCESSORS_ONLN)" SPEED=slow V=1

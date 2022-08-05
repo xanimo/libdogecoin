@@ -3,6 +3,8 @@
 name: CI
 
 on:
+  push:
+    branches: [ "*" ]
   pull_request:
     branches: [ "*" ]
 
@@ -190,6 +192,7 @@ jobs:
       - name: test libdogecoin
         if: ${{ matrix.run-tests }}
         run: |
+            ./contrib/scripts/check_lib.sh --host ${{ matrix.host }} --depends --ci
             case "${{ matrix.name }}" in
               "armhf-linux") 
               qemu-arm -E LD_LIBRARY_PATH=/usr/arm-linux-gnueabihf/lib/ /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 ./tests
