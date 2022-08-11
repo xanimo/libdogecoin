@@ -1,0 +1,11 @@
+{
+    "name": "libdogecoin",
+    "version-string": "1",
+    "dependencies": [
+      {
+        "name": "libevent",
+        "features": ["thread"]
+      }
+    ]
+  }
+  
