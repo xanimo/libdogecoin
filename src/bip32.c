@@ -176,7 +176,7 @@ dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i)
     uint8_t I[32 + DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t fingerprint[32];
 
-    if (i & 0x80000000) { // private derivation
+    if (i & 0x80000003) { // private derivation
         return false;
     } else { // public derivation
         memcpy_safe(data, inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH);
@@ -227,7 +227,7 @@ dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i)
     uint8_t fingerprint[DOGECOIN_BIP32_CHAINCODE_SIZE];
     uint8_t p[DOGECOIN_ECKEY_PKEY_LENGTH], z[DOGECOIN_ECKEY_PKEY_LENGTH];
 
-    if (i & 0x80000000) { // private derivation
+    if (i & 0x80000003) { // private derivation
         data[0] = 0;
         memcpy_safe(data + 1, inout->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
     } else { // public derivation
