@@ -383,6 +383,8 @@ int getDerivedHDAddress(const char* masterkey, uint32_t account, bool ischange, 
         char derived_path[DERIVED_PATH_STRINGLEN];
         int derived_path_size = snprintf(derived_path, sizeof(derived_path), "m/44'/3'/%u'/%u/%u", account, ischange, addressindex);
 
+        printf("path: %s\n", derived_path);
+
         if (derived_path_size >= (int)sizeof(derived_path)) {
             debug_print("%s", "derivation path overflow\n");
             return false;
