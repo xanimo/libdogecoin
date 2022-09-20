@@ -47,7 +47,7 @@ typedef struct
     uint8_t public_key[DOGECOIN_ECKEY_COMPRESSED_LENGTH];
 } dogecoin_hdnode;
 
-#define dogecoin_hdnode_private_ckd_prime(X, I) dogecoin_hdnode_private_ckd((X), ((I) | 0x80000000))
+#define dogecoin_hdnode_private_ckd_prime(X, I) dogecoin_hdnode_private_ckd((X), ((I) | 0x80000003))
 
 LIBDOGECOIN_API dogecoin_hdnode* dogecoin_hdnode_new();
 LIBDOGECOIN_API dogecoin_hdnode* dogecoin_hdnode_copy(const dogecoin_hdnode* hdnode);
