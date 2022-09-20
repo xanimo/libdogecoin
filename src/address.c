@@ -348,14 +348,22 @@ int getDerivedHDAddressByPath(const char* masterkey, const char* derived_path, c
     if (!dogecoin_hdnode_deserialize(masterkey, chain, &node)) {
         ret = false;
     }
-    
+    // dogecoin_hdnode_has_privkey
     /* derive child key, use pubckd or privckd */
-    if (!dogecoin_hd_generate_key(&nodenew, derived_path, outprivkey ? node.private_key : node.public_key, node.chain_code, !outprivkey)) {
+    // if (!dogecoin_hd_generate_key(&nodenew, derived_path, outprivkey ? node.private_key : node.public_key, node.chain_code, !outprivkey)) {
+    //     ret = false;
+    // }
+    bool pubckd = !dogecoin_hdnode_has_privkey(&node);
+    //derive child key, use pubckd or privckd
+    if (!dogecoin_hd_generate_key(&nodenew, derived_path, pubckd ? node.public_key : node.private_key, node.chain_code, pubckd))
         ret = false;
-    }
-
-    if (outprivkey) dogecoin_hdnode_serialize_private(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
-    else dogecoin_hdnode_serialize_public(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
+    if (!outprivkey)
+        dogecoin_hdnode_serialize_public(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
+    else
+        dogecoin_hdnode_serialize_private(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
+    // if (outprivkey) dogecoin_hdnode_serialize_private(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
+    // else dogecoin_hdnode_serialize_public(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
+    
     return ret;
 }
 
