@@ -3,13 +3,18 @@ AUTOMAKE_OPTIONS = serial-tests
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
-DIST_SUBDIRS = src/secp256k1
+DIST_SUBDIRS = src/secp256k1 src/libevent
 
 LIBSECP256K1=src/secp256k1/libsecp256k1.la
 
 $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 
+LIBEVENT=src/libevent/libevent.la
+
+$(LIBEVENT): $(wildcard src/libevent/src/*) $(wildcard src/libevent/include/*)
+
+	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 lib_LTLIBRARIES = libdogecoin.la
 include_HEADERS = include/dogecoin/libdogecoin.h
 noinst_HEADERS = \
@@ -125,7 +130,7 @@ libdogecoin_la_SOURCES += \
     src/net.c \
     src/protocol.c
 
-libdogecoin_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+libdogecoin_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBEVENT)
 libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 
 if USE_TESTS
@@ -152,7 +157,7 @@ such_LDFLAGS = -static
 
 if WITH_NET
 inst_PROGRAMS += sendtx
-sendtx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBSECP256K1)
+sendtx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBSECP256K1) $(LIBEVENT)
 sendtx_SOURCES = \
     src/cli/sendtx.c
 sendtx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
@@ -164,4 +169,4 @@ endif
 libdogecoin_la_LDFLAGS = -no-undefined -version-info $(LIB_VERSION_CURRENT):$(LIB_VERSION_REVISION):$(LIB_VERSION_AGE)
 
 clean-local:
-	-$(MAKE) -C src/secp256k1 clean
+	-$(MAKE) -C src/secp256k1 clean && $(MAKE) -C src/libevent clean 
