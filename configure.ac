@@ -50,6 +50,7 @@ LT_INIT([pic-only win32-dll])
 build_windows=no
 
 CFLAGS="$CFLAGS -W"
+LIBEVENT_CONFIG_OPTS="--disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking "
 case $host in
   *mingw*)
     build_windows=yes    
@@ -67,12 +68,14 @@ case $host in
     # In libtool-speak, it's -all-static.
     AX_CHECK_LINK_FLAG([[-static]],[LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -all-static -no-undefined"])
     LDFLAGS="-s -static --static $LDFLAGS"
+    LIBEVENT_CONFIG_OPTS="-D_WIN32_WINNT=0x0601"
   ;;
   *darwin*)
     TARGET_OS=darwin
   ;;
   *linux*)
     TARGET_OS=linux
+    LIBEVENT_CONFIG_OPTS="--with-pic"
   ;;
 esac
 warn_CFLAGS="-std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings"
@@ -141,13 +144,15 @@ if test "x$enable_debug" = xyes; then
 fi
 
 if test x$with_net = "xyes"; then
-  AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
-  AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
-  AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
+  ac_configure_args="${ac_configure_args} ${LIBEVENT_CONFIG_OPTS}"
+  AC_CONFIG_SUBDIRS([src/libevent])
+  # AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
+  # AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
+  # AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
   LIBS="$LIBS -levent -levent_core"
-  if test "$host" = "mingw"; then
-    AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-  fi
+  # if test "$host" = "mingw"; then
+  #   AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
+  # fi
 fi
 
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
@@ -163,7 +168,8 @@ AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
 AC_SUBST(LIB_VERSION_REVISION, _LIB_VERSION_REVISION)
 AC_SUBST(LIB_VERSION_AGE, _LIB_VERSION_AGE)
 
-ac_configure_args="${ac_configure_args} --disable-shared --with-pic --with-bignum=no --enable-module-recovery"
+LIBSECP256K1_CONFIG_OPTS="--disable-shared --with-pic --with-bignum=no --enable-module-recovery"
+ac_configure_args="${ac_configure_args} ${LIBSECP256K1_CONFIG_OPTS}"
 AC_CONFIG_SUBDIRS([src/secp256k1])
 
 AC_OUTPUT
