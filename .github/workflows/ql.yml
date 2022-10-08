@@ -38,7 +38,7 @@ jobs:
     - name: update system
       run: |
         sudo apt-get update --yes
-        sudo apt-get install autoconf automake libtool build-essential libevent-dev python3 --yes
+        sudo apt-get install autoconf automake libtool build-essential python3 --yes
 
     - name: init codeql
       uses: github/codeql-action/init@v2
@@ -47,8 +47,13 @@ jobs:
 
     - name: build libdogecoin
       run: |
+       pushd src/libevent
+         ./autogen.sh
+         ./configure --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking --with-pic
+         make -j3 VERBOSE=1
+       popd
        ./autogen.sh
-       ./configure
+       ./configure --with-libevent=`pwd`/src/libevent
        make check -j3 VERBOSE=1
 
     - name: perform codeql analysis

@@ -50,7 +50,6 @@ LT_INIT([pic-only win32-dll])
 build_windows=no
 
 CFLAGS="$CFLAGS -W"
-LIBEVENT_CONFIG_OPTS="--disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking "
 case $host in
   *mingw*)
     build_windows=yes    
@@ -75,7 +74,6 @@ case $host in
   ;;
   *linux*)
     TARGET_OS=linux
-    LIBEVENT_CONFIG_OPTS="--with-pic"
   ;;
 esac
 warn_CFLAGS="-std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings"
@@ -157,6 +155,10 @@ if test x$with_net = "xyes"; then
           owd=`pwd`
           if cd $withval; then withval=`pwd`; cd $owd; fi
           EVENT_LIBS="-L$withval/lib -levent"
+      elif test -f $withval/.libs/libevent.a; then
+          owd=`pwd`
+          if cd $withval; then withval=`pwd`; cd $owd; fi
+          EVENT_LIBS="-L$withval/.libs -levent"
       elif test -f $withval/libevent.a; then
           owd=`pwd`
           if cd $withval; then withval=`pwd`; cd $owd; fi
