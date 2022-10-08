@@ -92,6 +92,7 @@ INSTALL(FILES
     include/dogecoin/buffer.h
     include/dogecoin/byteswap.h
     include/dogecoin/chainparams.h
+    include/dogecoin/common.h
     include/dogecoin/cstr.h
     include/dogecoin/ctaes.h
     include/dogecoin/dogecoin.h
