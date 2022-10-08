@@ -144,15 +144,48 @@ if test "x$enable_debug" = xyes; then
 fi
 
 if test x$with_net = "xyes"; then
-  ac_configure_args="${ac_configure_args} ${LIBEVENT_CONFIG_OPTS}"
-  AC_CONFIG_SUBDIRS([src/libevent])
+  AC_MSG_CHECKING(for libevent)
+  AC_ARG_WITH(libevent,
+  [  --with-libevent=DIR     use libevent in DIR],
+  [ case "$withval" in
+    yes|no)
+      AC_MSG_RESULT(no)
+      ;;
+    *)
+      AC_MSG_RESULT($withval)
+      if test -f $withval/lib/libevent.a; then
+          owd=`pwd`
+          if cd $withval; then withval=`pwd`; cd $owd; fi
+          EVENT_LIBS="-L$withval/lib -levent"
+      elif test -f $withval/libevent.a; then
+          owd=`pwd`
+          if cd $withval; then withval=`pwd`; cd $owd; fi
+          EVENT_LIBS="-L$withval -levent"
+      else
+          AC_ERROR(event.h or libevent.a not found in $withval)
+      fi
+      ;;
+    esac ],
+  [ if test -f ${prefix}/lib/libevent.a;
+  then
+      EVENT_LIBS="-L${prefix}/lib -levent"
+    else
+      AC_MSG_RESULT(no)
+      AC_ERROR(libevent not found)
+    fi
+    AC_MSG_RESULT(yes) ]
+  )
+  AC_MSG_RESULT($EVENT_LIBS)
+  # ac_configure_args="${ac_configure_args} ${LIBEVENT_CONFIG_OPTS}"
+  # AC_CONFIG_SUBDIRS([src/libevent])
   # AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
   # AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
   # AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
-  LIBS="$LIBS -levent -levent_core"
-  # if test "$host" = "mingw"; then
-  #   AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-  # fi
+  # LIBS="$LIBS -levent -levent_core"
+  LIBS="$LIBS $EVENT_LIBS"
+  if test "$host" = "mingw"; then
+    AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
+  fi
 fi
 
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
