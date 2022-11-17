@@ -90,8 +90,8 @@ void test_address()
     char* child_key_test=dogecoin_char_vla(masterkeylen);
     char* str=dogecoin_char_vla(pubkeylen);
     /* test child key derivation ability */
-    u_assert_int_eq(generateDerivedHDPubkey(masterkey_main, NULL), true)
-    u_assert_int_eq(generateDerivedHDPubkey(NULL, NULL), false)
+    u_assert_int_eq(generateDerivedHDPubkey(masterkey_main, NULL), true);
+    u_assert_int_eq(generateDerivedHDPubkey(NULL, NULL), false);
     u_assert_int_eq(generateDerivedHDPubkey(masterkey_main, child_key_main), true);
     u_assert_int_eq(generateDerivedHDPubkey(masterkey_test, child_key_test), true);
     u_assert_int_eq(generateDerivedHDPubkey("dgpv51eADS3spNJhA6LG5QycrFmQQtxg7ztFJQuamYiytZ4x4FUC7pG5B7fUTHBDB7g6oGaCVwuGF2i75r1DQKyFSauAHUGBAi89NaggpdUP3yK", str), true)
@@ -159,6 +159,13 @@ void test_address()
     res = getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/1'/1/1", extout, false);
     u_assert_int_eq(res, true);
     u_assert_str_eq(extout, "dgub8wfrZMXz8ojFcPziSubEoQ65sB4PYPyYTMo3PqFwf2Vx5zZ6ia17Nk2Py25c3dvq1e7ZnfBrurCS5wuagzRoBCXhJ2NeGU54NBytvuUuRyA");
+
+    // derived hd address to p2pkh example:
+    res = getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout, true);
+    u_assert_int_eq(res, true);
+    u_assert_str_eq(extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+    u_assert_int_eq(generateDerivedHDPubkey(extout, str), true);
+    u_assert_str_eq("DCm7oSg95sxwn3sWxYUDHgKKbB2mDmuR3B", str);
 
     /*free up VLAs*/
     free(masterkey_main);

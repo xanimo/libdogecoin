@@ -356,8 +356,18 @@ int getDerivedHDAddressByPath(const char* masterkey, const char* derived_path, c
         ret = false;
     }
 
+
     if (outprivkey) dogecoin_hdnode_serialize_private(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
     else dogecoin_hdnode_serialize_public(&nodenew, chain, outaddress, HD_MASTERKEY_STRINGLEN);
+    
+    printf("chain_code:     %s\n", utils_uint8_to_hex(nodenew.chain_code, sizeof(nodenew.chain_code)));
+    printf("private_key:    %s\n", utils_uint8_to_hex(nodenew.private_key, sizeof(nodenew.private_key)));
+    printf("public_key:     %s\n", utils_uint8_to_hex(nodenew.public_key, sizeof(nodenew.public_key)));
+    // get a p2pkh:
+    char str[53];
+    generateDerivedHDPubkey(outaddress, str);
+    printf("p2pkh:          %s\n\n", str);
+
     return ret;
 }
 
