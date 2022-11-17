@@ -219,7 +219,7 @@ int dogecoin_script_hash_to_p2pkh(dogecoin_tx_out* txout, char* p2pkh, int is_te
             case (char)OP_CHECKSIG:
                 break;
             default:
-                copy->script_pubkey->str[2] = is_testnet ? 0x1e : 0x71;
+                copy->script_pubkey->str[2] = is_testnet ?  0x71 : 0x1e;
                 memccpy(stripped_array, &copy->script_pubkey->str[2], 2, 21);
                 break;
         }
@@ -261,10 +261,26 @@ int dogecoin_script_hash_to_p2pkh(dogecoin_tx_out* txout, char* p2pkh, int is_te
  */
  
  char* scripthex_to_p2pkh(char* scripthex, int is_testnet) {
+    // size_t outlen;
+    // cstring* script_data_p2pk = cstr_new_sz(strlen(scripthex) / 2);
+    // utils_hex_to_bin(scripthex, (unsigned char*)script_data_p2pk->str, strlen(scripthex), &outlen);
+    // script_data_p2pk->len = outlen;
+    // printf("script public key:  %lu\n", script_data_p2pk->len);
+    // printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)script_data_p2pk->str, script_data_p2pk->len));
+    // dogecoin_tx_out* tx_out_tmp = dogecoin_tx_out_new();
+    // dogecoin_tx_out_serialize(script_data_p2pk, tx_out_tmp);
+
+
+    // dogecoin_tx_out* copy = dogecoin_tx_out_new();
+    // dogecoin_tx_out_copy(copy, txout);
+    // size_t length = 2;
+    // uint8_t* stripped_array = dogecoin_uint8_vla(txout->script_pubkey->len);
+    // dogecoin_mem_zero(stripped_array, txout->script_pubkey->len * sizeof(stripped_array[0]));
+
     uint8_t* hexbytes=utils_hex_to_uint8(scripthex);
     char* p2pkh="";
     size_t length=2;
-    uint8_t* stripped_array = dogecoin_uint8_vla(sizeof(hexbytes));
+    uint8_t* stripped_array = dogecoin_uint8_vla(sizeof(hexbytes) / 2);
     dogecoin_mem_zero(stripped_array, strlen(scripthex) * sizeof(stripped_array[0]));
     // loop through 20 bytes of the script hash while stripping op codes
     // and copy from index 2 to 21 after prefixing with version

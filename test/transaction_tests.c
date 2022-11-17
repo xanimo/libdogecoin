@@ -394,6 +394,20 @@ void test_transaction()
     u_assert_str_eq(res, utxo_scriptpubkey);
     dogecoin_free(res);
 
+    // add example of script hex to p2pkh:
+    char* script_p2pk = "47304402206598d424407abd04e2bc958eaba648b20fe49f31709e53b31ef9bd004d33eb0902206c743faacfca1bef59577027d1088f01ab7eac4624bcfc8794f88224337985ae0121035d507078aa3425e59e6a4d96cb4105d8d73363890adbe854e09905dae1cfb126";
+    size_t outlen;
+    uint8_t* script_data_p2pk = dogecoin_uint8_vla(strlen(script_p2pk) / 2);
+    utils_hex_to_bin(script_p2pk, script_data_p2pk, strlen(script_p2pk), &outlen);
+    struct const_buffer buf = {script_data_p2pk, outlen};
+    dogecoin_tx_out* tx_out_tmp = dogecoin_tx_out_new();
+    dogecoin_tx_out_deserialize(tx_out_tmp, &buf);
+    char p2pkh[36];
+    dogecoin_mem_zero(p2pkh, sizeof(p2pkh));
+    dogecoin_script_hash_to_p2pkh(tx_out_tmp, p2pkh, 0);
+    printf("script public key:  %s\n", p2pkh);
+    free(script_data_p2pk);
+
     // ----------------------------------------------------------------
     // test remove_all - *not noticeable unless running valgrind ./tests*
     // remove working transaction object from hashmap
