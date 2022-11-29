@@ -47,6 +47,7 @@ extern void test_buffer();
 extern void test_cstr();
 extern void test_ecc();
 extern void test_hash();
+extern void test_json_out();
 extern void test_key();
 extern void test_koinu();
 extern void test_memory();
@@ -108,6 +109,7 @@ int main()
     u_run_test(test_cstr);
     u_run_test(test_ecc);
     u_run_test(test_hash);
+    u_run_test(test_json_out);
     u_run_test(test_key);
     u_run_test(test_koinu);
     u_run_test(test_memory);

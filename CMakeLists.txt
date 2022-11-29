@@ -98,6 +98,7 @@ INSTALL(FILES
     include/dogecoin/ecc.h
     include/dogecoin/eckey.h
     include/dogecoin/hash.h
+    include/dogecoin/json_out.h
     include/dogecoin/key.h
     include/dogecoin/koinu.h
     include/dogecoin/mem.h
@@ -145,6 +146,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/ctaes.c
     src/ecc.c
     src/eckey.c
+    src/json_out.c
     src/key.c
     src/koinu.c
     src/mem.c
@@ -218,6 +220,7 @@ IF(USE_TESTS)
         test/cstr_tests.c
         test/ecc_tests.c
         test/hash_tests.c
+        test/json_tests.c
         test/key_tests.c
         test/koinu_tests.c
         test/mem_tests.c

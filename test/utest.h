@@ -91,6 +91,15 @@
         };                                    \
     } while (0)
 
+#define u_failed(MSG)                                            \
+    do {                                                         \
+        char* msg_ = (MSG);                                      \
+        printf("FAILED - %s() - Line %d\n", __func__, __LINE__); \
+        printf("\t%s\n", msg_);                                  \
+        U_TESTS_FAIL++;                                          \
+        return;                                                  \
+    } while (0)
+
 #define u_assert_int_eq(R, E)                                            \
     {                                                                    \
         int r_ = (R);                                                    \
