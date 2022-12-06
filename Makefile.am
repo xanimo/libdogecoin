@@ -17,6 +17,7 @@ noinst_HEADERS = \
     include/dogecoin/aes.h \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \
+    include/dogecoin/bip39.h \
     include/dogecoin/block.h \
     include/dogecoin/buffer.h \
     include/dogecoin/byteswap.h \
@@ -29,6 +30,7 @@ noinst_HEADERS = \
     include/dogecoin/key.h \
     include/dogecoin/koinu.h \
     include/dogecoin/mem.h \
+    include/dogecoin/options.h \
     include/dogecoin/portable_endian.h \
     include/dogecoin/random.h \
     include/dogecoin/rmd160.h \
@@ -51,6 +53,7 @@ libdogecoin_la_SOURCES = \
     src/aes.c \
     src/base58.c \
     src/bip32.c \
+    src/bip39.c \
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
