@@ -48,6 +48,8 @@ extern void test_key();
 extern void test_koinu();
 extern void test_memory();
 extern void test_op_return();
+extern void test_pbkdf2_hmac_sha256();
+extern void test_pbkdf2_hmac_sha512();
 extern void test_random();
 extern void test_rmd160();
 extern void test_serialize();
@@ -99,6 +101,8 @@ int main()
     u_run_test(test_koinu);
     u_run_test(test_memory);
     u_run_test(test_op_return);
+    u_run_test(test_pbkdf2_hmac_sha256);
+    u_run_test(test_pbkdf2_hmac_sha512);
     u_run_test(test_random);
     u_run_test(test_rmd160);
     u_run_test(test_serialize);
