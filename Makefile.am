@@ -18,6 +18,7 @@ noinst_HEADERS = \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
+    include/dogecoin/bip39_english.h \
     include/dogecoin/block.h \
     include/dogecoin/buffer.h \
     include/dogecoin/byteswap.h \
@@ -85,6 +86,7 @@ tests_SOURCES = \
     test/aes_tests.c \
     test/base58_tests.c \
     test/bip32_tests.c \
+    test/bip39_tests.c \
     test/block_tests.c \
     test/buffer_tests.c \
     test/cstr_tests.c \

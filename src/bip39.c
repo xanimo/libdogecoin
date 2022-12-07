@@ -29,6 +29,7 @@
 #include <dogecoin/options.h>
 #include <dogecoin/random.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/bip39_english.h>
 
 #if USE_BIP39_CACHE
 
@@ -84,8 +85,8 @@ const char *mnemonic_from_data(const uint8_t *data, int len) {
       idx <<= 1;
       idx += (bits[(i * 11 + j) / 8] & (1 << (7 - ((i * 11 + j) % 8)))) > 0;
     }
-    strcpy(p, BIP39_WORDLIST_ENGLISH[idx]);
-    p += strlen(BIP39_WORDLIST_ENGLISH[idx]);
+    strcpy(p, wordlist[idx]);
+    p += strlen(wordlist[idx]);
     *p = (i < mlen - 1) ? ' ' : 0;
     p++;
   }
@@ -238,7 +239,7 @@ int mnemonic_find_word(const char *word) {
   int lo = 0, hi = BIP39_WORD_COUNT - 1;
   while (lo <= hi) {
     int mid = lo + (hi - lo) / 2;
-    int cmp = strcmp(word, BIP39_WORDLIST_ENGLISH[mid]);
+    int cmp = strcmp(word, wordlist[mid]);
     if (cmp == 0) {
       return mid;
     }
@@ -256,8 +257,8 @@ const char *mnemonic_complete_word(const char *prefix, int len) {
   // because we want to return the first match
   int i;
   for (i = 0; i < BIP39_WORD_COUNT; i++) {
-    if (strncmp(BIP39_WORDLIST_ENGLISH[i], prefix, len) == 0) {
-      return BIP39_WORDLIST_ENGLISH[i];
+    if (strncmp(wordlist[i], prefix, len) == 0) {
+      return wordlist[i];
     }
   }
   return NULL;
@@ -265,7 +266,7 @@ const char *mnemonic_complete_word(const char *prefix, int len) {
 
 const char *mnemonic_get_word(int index) {
   if (index >= 0 && index < BIP39_WORD_COUNT) {
-    return BIP39_WORDLIST_ENGLISH[index];
+    return wordlist[index];
   } else {
     return NULL;
   }
@@ -278,7 +279,7 @@ uint32_t mnemonic_word_completion_mask(const char *prefix, int len) {
   uint32_t res = 0;
   int i;
   for (i = 0; i < BIP39_WORD_COUNT; i++) {
-    const char *word = BIP39_WORDLIST_ENGLISH[i];
+    const char *word = wordlist[i];
     if (strncmp(word, prefix, len) == 0 && word[len] >= 'a' &&
         word[len] <= 'z') {
       res |= 1 << (word[len] - 'a');
