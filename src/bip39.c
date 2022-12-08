@@ -29,7 +29,6 @@
 #include <dogecoin/options.h>
 #include <dogecoin/random.h>
 #include <dogecoin/sha2.h>
-#include <dogecoin/bip39_english.h>
 
 #if USE_BIP39_CACHE
 
@@ -48,6 +47,93 @@ void bip39_cache_clear(void) {
 }
 
 #endif
+
+/*
+ * This function reads the language file once and loads an array of words for
+ * repeated use.
+ */
+char *wordlist[BIP39_WORD_COUNT];
+
+void get_words(char *lang) {
+
+    char *source = NULL;
+    const char *filepath = NULL;
+
+    if (strcmp(lang,"spa") == 0) {
+        filepath = "src/bip39/spanish.txt";
+    } else if (strcmp(lang,"eng") == 0) {
+        filepath = "src/bip39/english.txt";
+    } else if (strcmp(lang,"jpn") == 0) {
+        filepath = "src/bip39/japanese.txt";
+    } else if (strcmp(lang,"ita") == 0) {
+        filepath = "src/bip39/italian.txt";
+    } else if (strcmp(lang,"fra") == 0) {
+        filepath = "src/bip39/french.txt";
+    } else if (strcmp(lang,"kor") == 0) {
+        filepath = "src/bip39/korean.txt";
+    } else if (strcmp(lang,"sc") == 0) {
+        filepath = "src/bip39/chinese_simplified.txt";
+    } else if (strcmp(lang,"tc") == 0) {
+        filepath = "src/bip39/chinese_traditional.txt";
+    } else if (strcmp(lang,"cze") == 0) {
+        filepath = "src/bip39/czech.txt";
+    } else if (strcmp(lang,"por") == 0) {
+        filepath = "src/bip39/portuguese.txt";
+    } else {
+        fprintf(stderr, "Language or language file does not exist.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    FILE *fp = fopen(filepath, "r");
+
+    if (fp != NULL) {
+
+        /* Go to the end of the file. */
+        if (fseek(fp, 0L, SEEK_END) == 0) {
+
+            /* Get the size of the file. */
+            long bufsize = ftell(fp);
+
+            if (bufsize == -1) {
+                fprintf(stderr,
+                        "ERROR: File size?\n");
+            }
+
+            /* Allocate our buffer to that size. */
+            source = malloc(sizeof(char) * (bufsize + 1));
+
+            /* Go back to the start of the file. */
+            if (fseek(fp, 0L, SEEK_SET) != 0) {
+                fprintf(stderr,
+                        "ERROR: File seek beginning of file.\n");
+            }
+
+            /* Read the entire file into memory. */
+            size_t newLen;
+            newLen = fread(source, sizeof(char), (size_t) bufsize, fp);
+            if ( ferror( fp ) != 0 ) {
+                fprintf(stderr,
+                        "ERROR: File read.\n");
+            } else {
+                source[newLen++] = '\0'; /* Just to be safe. */
+            }
+        }
+        fclose(fp);
+    }
+
+    char * word;
+    word = strtok(source,"\n");
+    int i = 0;
+    while (word != NULL)
+    {
+        wordlist[i] = malloc(strlen(word) + 1);
+        strcpy(wordlist[i], word);
+        i++;
+        word = strtok (NULL, "\n");
+    }
+
+    free(source);
+}
 
 const char *mnemonic_generate(int strength) {
   if (strength % 32 || strength < 128 || strength > 256) {
@@ -286,4 +372,32 @@ uint32_t mnemonic_word_completion_mask(const char *prefix, int len) {
     }
   }
   return res;
+}
+
+/**
+ * @brief This funciton generates a mnemonic for
+ * a given entropy size and language
+ *
+ * @param entropy_size The 128, 160, 192, 224, or 256 bits of entropy
+ * @param language The ISO 639-2 code for the mnemonic language
+ *
+ * @return mnemonic code words
+*/
+const char* dogecoin_generate_mnemonic (const char* entropy_size, char* language)
+{
+    static char words[] = "";
+
+    if (entropy_size != NULL && language != NULL) {
+        /* load word file into memory */
+        get_words(language);
+
+        /* convert string value to long */
+        long entropyBits = strtol(entropy_size, NULL, 10);
+
+        /* actual program call */
+        mnemonic_generate(entropyBits);
+
+    }
+
+    return words;
 }
