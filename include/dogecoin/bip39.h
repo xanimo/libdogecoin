@@ -1,6 +1,9 @@
 /**
  * Copyright (c) 2013-2014 Tomas Dzetkulic
  * Copyright (c) 2013-2014 Pavol Rusnak
+ * Copyright (c) 2022 edtubbs
+ * Copyright (c) 2022 bluezr
+ * Copyright (c) 2022 The Dogecoin Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the "Software"),
@@ -39,7 +42,7 @@ LIBDOGECOIN_BEGIN_DECL
 void bip39_cache_clear(void);
 #endif
 
-void get_words(char* lang);
+void get_words(const char* lang);
 
 const char *mnemonic_generate(int strength);  // strength in bits
 const char *mnemonic_from_data(const uint8_t *data, int len);
@@ -59,6 +62,19 @@ int mnemonic_find_word(const char *word);
 const char *mnemonic_complete_word(const char *prefix, int len);
 const char *mnemonic_get_word(int index);
 uint32_t mnemonic_word_completion_mask(const char *prefix, int len);
+
+/* Generate a mnemonic for a given entropy size and language */
+/* 128, 160, 192, 224, or 256 bits of entropy */
+/* ISO 639-2 code for the mnemonic language */
+/* en.wikipedia.org/wiki/List_of_ISO_639-2_codes */
+LIBDOGECOIN_API const char* dogecoin_generate_mnemonic (const char* entropy_size, const char* language);
+//void dogecoin_generate_mnemonic (const char* entropy_size, const char* language);
+
+/* Derive the seed from the mnemonic */
+/* mnemonic code words */
+/* passphrase (optional) */
+/* 512-bit seed */
+LIBDOGECOIN_API void dogecoin_seed_from_mnemonic (const char* mnemonic, const char* passphrase, uint8_t seed[64]);
 
 LIBDOGECOIN_END_DECL
 

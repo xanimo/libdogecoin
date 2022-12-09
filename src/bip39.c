@@ -1,6 +1,9 @@
 /**
  * Copyright (c) 2013-2014 Tomas Dzetkulic
  * Copyright (c) 2013-2014 Pavol Rusnak
+ * Copyright (c) 2022 edtubbs
+ * Copyright (c) 2022 bluezr
+ * Copyright (c) 2022 The Dogecoin Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the "Software"),
@@ -21,8 +24,16 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
+#include <limits.h>
 #include <string.h>
+#include <ctype.h>
+#include <unicode/utypes.h>
+#include <unicode/ustring.h>
+#include <unicode/unorm2.h>
 
 #include <dogecoin/bip39.h>
 #include <dogecoin/utils.h>
@@ -54,7 +65,7 @@ void bip39_cache_clear(void) {
  */
 char *wordlist[BIP39_WORD_COUNT];
 
-void get_words(char *lang) {
+void get_words(const char *lang) {
 
     char *source = NULL;
     const char *filepath = NULL;
@@ -132,7 +143,7 @@ void get_words(char *lang) {
         word = strtok (NULL, "\n");
     }
 
-    free(source);
+    dogecoin_free(source);
 }
 
 const char *mnemonic_generate(int strength) {
@@ -268,11 +279,75 @@ int mnemonic_check(const char *mnemonic) {
   return 0;
 }
 
+const char *nfkd(const char *input) {
+    UErrorCode status = U_ZERO_ERROR;
+    const UNormalizer2 *nfkd = unorm2_getNFKDInstance(&status);
+    if (U_FAILURE(status)) {
+        fprintf(stderr, "Error getting NFKD instance: %s\n", u_errorName(status));
+        return NULL;
+    }
+
+    UChar *input_u = calloc(strlen(input) + 1, sizeof(UChar));
+    if (input_u == NULL) {
+        fprintf(stderr, "Error allocating memory for input UChar\n");
+        return NULL;
+    }
+    u_strFromUTF8(input_u, strlen(input) + 1, NULL, input, strlen(input), &status);
+    if (U_FAILURE(status)) {
+        fprintf(stderr, "Error converting input to UChar: %s\n", u_errorName(status));
+        free(input_u);
+        return NULL;
+    }
+
+    int32_t normalized_length = unorm2_normalize(nfkd, input_u, -1, NULL, 0, &status);
+    if (status != U_BUFFER_OVERFLOW_ERROR) {
+        fprintf(stderr, "Error getting length of normalized UChar: %s\n", u_errorName(status));
+        free(input_u);
+        return NULL;
+    }
+    status = U_ZERO_ERROR;
+
+    UChar *normalized_u = calloc(normalized_length + 1, sizeof(UChar));
+    if (normalized_u == NULL) {
+        fprintf(stderr, "Error allocating memory for normalized UChar\n");
+        free(input_u);
+        return NULL;
+    }
+
+    unorm2_normalize(nfkd, input_u, -1, normalized_u, normalized_length + 1, &status);
+    if (U_FAILURE(status)) {
+        fprintf(stderr, "Error normalizing UChar: %s\n", u_errorName(status));
+        free(input_u);
+        free(normalized_u);
+        return NULL;
+    }
+    free(input_u);
+
+    int8_t *normalized_utf8 = calloc(normalized_length * 4 + 1, sizeof(int8_t));
+    if (normalized_utf8 == NULL) {
+        fprintf(stderr, "Error allocating memory for normalized UTF-8\n");
+        free(normalized_u);
+        return NULL;
+    }
+    u_strToUTF8((char*)normalized_utf8, normalized_length * 4 + 1, NULL, normalized_u, normalized_length, &status);
+    if (U_FAILURE(status)) {
+        fprintf(stderr, "Error converting normalized UChar to UTF-8: %s\n", u_errorName(status));
+        free(normalized_u);
+        free(normalized_utf8);
+        return NULL;
+    }
+
+free(normalized_u);
+
+return (const char *)normalized_utf8;
+}
+
 // passphrase must be at most 256 characters otherwise it would be truncated
 void mnemonic_to_seed(const char *mnemonic, const char *passphrase,
                       uint8_t seed[512 / 8],
                       void (*progress_callback)(uint32_t current,
                                                 uint32_t total)) {
+  mnemonic = nfkd(mnemonic);
   int mnemoniclen = strlen(mnemonic);
   int passphraselen = strnlen(passphrase, 256);
 #if USE_BIP39_CACHE
@@ -383,7 +458,7 @@ uint32_t mnemonic_word_completion_mask(const char *prefix, int len) {
  *
  * @return mnemonic code words
 */
-const char* dogecoin_generate_mnemonic (const char* entropy_size, char* language)
+const char* dogecoin_generate_mnemonic (const char* entropy_size, const char* language)
 {
     static char words[] = "";
 

@@ -1,7 +1,7 @@
 /**********************************************************************
  * Copyright (c) 2015 Jonas Schnelli                                  *
- * Copyright (c) 2022 bluezr                                          *
  * Copyright (c) 2022 edtubbs                                         *
+ * Copyright (c) 2022 bluezr                                          *
  * Copyright (c) 2022 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
@@ -9,9 +9,6 @@
 
 #include "utest.h"
 #include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include <dogecoin/bip39.h>
 #include <dogecoin/utils.h>
@@ -96,7 +93,7 @@ void test_mnemonic()
 		0,
 	};
 
-       get_words("eng");
+	get_words("eng");
 	const char **a, **b, **c, *m;
 	uint8_t seed[64];
 
@@ -198,7 +195,7 @@ void test_mnemonic_check()
 		0,
 	};
 
-       get_words("eng");
+	get_words("eng");
 	const char **m;
 	int r;
 	m = vectors_ok;
@@ -217,21 +214,20 @@ void test_mnemonic_check()
 
 void test_bip39()
 {
-    const char* mnemonic;
     const char* test_mnemonic_12 = "chief prevent advice search broccoli dish pride grow evidence bicycle cushion lady";
     const char* test_mnemonic_15 = "engine link summer museum gift sphere half void where long copper mandate push valve enhance";
     const char* test_mnemonic_18 = "outside clarify pizza swim section menu current kite step nothing actor smoke swarm chronic ritual vanish cinnamon cotton";
     const char* test_mnemonic_21 = "turtle shock bar amount damp ostrich door quick smart woman tell hobby mansion duty common calm curious audit exist napkin verb";
     const char* test_mnemonic_24 = "depth artist same second negative vehicle van owner strong catch wreck salute fall lady nest sense champion foil switch become mule notable fame aerobic";
 
-    const char* test_mnemonic_12_jpn = "しむけるちょさくけんすこしあゆむはんていにせものひつぎかろうやすみほしょうふこうこころ";
-    const char* test_seed_12_jpn = "0b5199ac0e6cfd51c59fdd89709bdee63f43c36ee668fff669a4b1cce568f044457a78a661bf2d12b69c5206ebab734b2255ac1883425fadf3df87fcf58af975";
+    const char* test_mnemonic_12_jpn = "ねんいり　でんち　くうぼ　そよかぜ　ななおし　さかな　るいせき　なのか　こえる　たいら　ねんまつ　くのう";
+    const char* test_seed_12_jpn = "5b503adf88021a6438989c35647458d531cac635f0b5783990db2934bf5216ab6df09ec0cf81221c3bbecfebdf1bb7ea45c20cf68a4536cfbd745fe1e0bcd10a";
 
-    const char* test_mnemonic_15_jpn = "あいうえお かきくけこ さしすせそ たちつてと なにぬねの";
-    const char* test_seed_15_jpn = "9f5e5f5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e";
+    const char* test_mnemonic_15_jpn = "りかい　めんどう　はそん　せつび　はにかむ　あんぜん　こちょう　けんない　つたえる　しゃれい　せんか　えいぶん　ゆたか　そらまめ　たまる";
+    const char* test_seed_15_jpn = "be5a9e28d6963f510b25e68e080bc937c0a006dc3e703b324d6296f519ed9dc6efb92958690ea03b2e10a22946abdf9285cb824bcfb737cf08e99d031e414816";
 
-    const char* test_mnemonic_18_jpn = "けとる　わしつ　らくだ　こつぶ　てんごく　つたえる　せつりつ　といれ　しごと　ほうもん　ろんぶん　さのう　ぐこう　いけん　してつ　ねんぐ　くねくね　おうたい";
-    const char* test_seed_18_jpn = "4eb4f75691fd51a35ed3e4b113525179c830ccd2673d36e9f2bdfe7dc443706bf0a91a08c5b7286836549932710e2abb3078708c0076967fd03ac5a2c660b407";
+    const char* test_mnemonic_18_jpn = "なふだ　のみもの　えんちょう　にんそう　ふっかつ　はろうぃん　つわもの　てんかい　さんみ　うったえる　ともる　ばかり　しひょう　すうせん　せこう　さつまいも　たぼう　すろっと";
+    const char* test_seed_18_jpn = "e7dde84dad6e16e4d7dbd89d8f428e97d8501fa4e8ca8debbfdc5790134d405688e750847e883c2b9eceaab532029e78125c184e2158e640e313966154b89863";
 
     const char* test_mnemonic_21_jpn = "ぐんたい　てぬき　ひさしぶり　ていさつ　しまう　ひりつ　ひやす　ゆちゃく　りれき　きのう　たおす　ぬぐいとる　しむける　ねんりょう　むりょう　とつにゅう　おもたい　せまい　がっこう　ぜんぶ　おもたい";
     const char* test_seed_21_jpn = "ffbf25e2b5cee4838ae30694a86f2bc8e867641adececdde182e164908632a9966e3733f5e28849434ff9a898fe3a2ed6d05c25cd7654edd9d625a7a231b211f";
@@ -370,7 +366,6 @@ void test_bip39()
 
     uint8_t seed [64] = "";
     uint8_t seed_test [512 / 8];
-    char mnemonic_generated_1[64];
 
     /* generate mnemonic(s) */
     /* todo: stub entropy and generate test mnemonics */
@@ -470,37 +465,37 @@ void test_bip39()
     assert(memcmp(seed, seed_test, 64) == 0);
 
     /* Japanese */
-    // mnemonic_to_seed(test_mnemonic_12_jpn, "", seed, 0);
-    // memcpy_safe(seed_test,
-    //        utils_hex_to_uint8(test_seed_12_jpn),
-    //        64);
-    // assert(memcmp(seed, seed_test, 64) == 0);
+    mnemonic_to_seed(test_mnemonic_12_jpn, "", seed, 0);
+    memcpy_safe(seed_test,
+           utils_hex_to_uint8(test_seed_12_jpn),
+           64);
+    assert(memcmp(seed, seed_test, 64) == 0);
 
 
-    // mnemonic_to_seed(test_mnemonic_15_jpn, "", seed, 0);
-    // memcpy_safe(seed_test,
-    //        utils_hex_to_uint8(test_seed_15_jpn),
-    //        64);
-    // assert(memcmp(seed, seed_test, 64) == 0);
+    mnemonic_to_seed(test_mnemonic_15_jpn, "", seed, 0);
+    memcpy_safe(seed_test,
+           utils_hex_to_uint8(test_seed_15_jpn),
+           64);
+    assert(memcmp(seed, seed_test, 64) == 0);
 
 
-    // mnemonic_to_seed(test_mnemonic_18_jpn, "", seed, 0);
-    // memcpy_safe(seed_test,
-    //        utils_hex_to_uint8(test_seed_18_jpn),
-    //        64);
-    // assert(memcmp(seed, seed_test, 64) == 0);
+    mnemonic_to_seed(test_mnemonic_18_jpn, "", seed, 0);
+    memcpy_safe(seed_test,
+           utils_hex_to_uint8(test_seed_18_jpn),
+           64);
+    assert(memcmp(seed, seed_test, 64) == 0);
 
-    // mnemonic_to_seed(test_mnemonic_21_jpn, "", seed, 0);
-    // memcpy_safe(seed_test,
-    //        utils_hex_to_uint8(test_seed_21_jpn),
-    //        64);
-    // assert(memcmp(seed, seed_test, 64) == 0);
+    mnemonic_to_seed(test_mnemonic_21_jpn, "", seed, 0);
+    memcpy_safe(seed_test,
+           utils_hex_to_uint8(test_seed_21_jpn),
+           64);
+    assert(memcmp(seed, seed_test, 64) == 0);
 
-    // mnemonic_to_seed(test_mnemonic_24_jpn, "", seed, 0);
-    // memcpy_safe(seed_test,
-    //        utils_hex_to_uint8(test_seed_24_jpn),
-    //        64);
-    // assert(memcmp(seed, seed_test, 64) == 0);
+    mnemonic_to_seed(test_mnemonic_24_jpn, "", seed, 0);
+    memcpy_safe(seed_test,
+           utils_hex_to_uint8(test_seed_24_jpn),
+           64);
+    assert(memcmp(seed, seed_test, 64) == 0);
 
    /* Spanish */
     mnemonic_to_seed(test_mnemonic_12_spa, "", seed, 0);
@@ -752,5 +747,4 @@ void test_bip39()
            utils_hex_to_uint8(test_seed_24_por),
            64);
     assert(memcmp(seed, seed_test, 64) == 0);
-
 }
