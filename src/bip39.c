@@ -63,11 +63,14 @@ void bip39_cache_clear(void) {
  * This function reads the language file once and loads an array of words for
  * repeated use.
  */
-char *wordlist[BIP39_WORD_COUNT];
+char * wordlist[BIP39_WORD_COUNT] = {0};
 
 void get_words(const char *lang) {
-
-    char *source = NULL;
+    int i = 0;
+    FILE * fp;
+    char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
     const char *filepath = NULL;
 
     if (strcmp(lang,"spa") == 0) {
@@ -95,55 +98,19 @@ void get_words(const char *lang) {
         exit(EXIT_FAILURE);
     }
 
-    FILE *fp = fopen(filepath, "r");
+    fp = fopen(filepath, "r");
+    if (fp == NULL)
+        exit(EXIT_FAILURE);
 
-    if (fp != NULL) {
-
-        /* Go to the end of the file. */
-        if (fseek(fp, 0L, SEEK_END) == 0) {
-
-            /* Get the size of the file. */
-            long bufsize = ftell(fp);
-
-            if (bufsize == -1) {
-                fprintf(stderr,
-                        "ERROR: File size?\n");
-            }
-
-            /* Allocate our buffer to that size. */
-            source = malloc(sizeof(char) * (bufsize + 1));
-
-            /* Go back to the start of the file. */
-            if (fseek(fp, 0L, SEEK_SET) != 0) {
-                fprintf(stderr,
-                        "ERROR: File seek beginning of file.\n");
-            }
-
-            /* Read the entire file into memory. */
-            size_t newLen;
-            newLen = fread(source, sizeof(char), (size_t) bufsize, fp);
-            if ( ferror( fp ) != 0 ) {
-                fprintf(stderr,
-                        "ERROR: File read.\n");
-            } else {
-                source[newLen++] = '\0'; /* Just to be safe. */
-            }
-        }
-        fclose(fp);
-    }
-
-    char * word;
-    word = strtok(source,"\n");
-    int i = 0;
-    while (word != NULL)
-    {
-        wordlist[i] = malloc(strlen(word) + 1);
-        strcpy(wordlist[i], word);
+    while ((read = getline(&line, &len, fp)) != -1) {
+        strtok(line, "\n");
+        wordlist[i] = malloc(read + 1);
+        strcpy(wordlist[i], line);
         i++;
-        word = strtok (NULL, "\n");
     }
 
-    dogecoin_free(source);
+    fclose(fp);
+    if (line) dogecoin_free(line);
 }
 
 const char *mnemonic_generate(int strength) {
