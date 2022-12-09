@@ -34,6 +34,7 @@
 #include <unicode/utypes.h>
 #include <unicode/ustring.h>
 #include <unicode/unorm2.h>
+#include <bip39/index.h>
 
 #include <dogecoin/bip39.h>
 #include <dogecoin/utils.h>
@@ -63,40 +64,14 @@ void bip39_cache_clear(void) {
  * This function reads the language file once and loads an array of words for
  * repeated use.
  */
-char * wordlist[BIP39_WORD_COUNT] = {0};
+char * wordlist[2049] = {0};
 
-void get_words(const char *lang) {
+void get_custom_wordlist(const char *filepath) {
     int i = 0;
     FILE * fp;
     char * line = NULL;
     size_t len = 0;
     ssize_t read;
-    const char *filepath = NULL;
-
-    if (strcmp(lang,"spa") == 0) {
-        filepath = "src/bip39/spanish.txt";
-    } else if (strcmp(lang,"eng") == 0) {
-        filepath = "src/bip39/english.txt";
-    } else if (strcmp(lang,"jpn") == 0) {
-        filepath = "src/bip39/japanese.txt";
-    } else if (strcmp(lang,"ita") == 0) {
-        filepath = "src/bip39/italian.txt";
-    } else if (strcmp(lang,"fra") == 0) {
-        filepath = "src/bip39/french.txt";
-    } else if (strcmp(lang,"kor") == 0) {
-        filepath = "src/bip39/korean.txt";
-    } else if (strcmp(lang,"sc") == 0) {
-        filepath = "src/bip39/chinese_simplified.txt";
-    } else if (strcmp(lang,"tc") == 0) {
-        filepath = "src/bip39/chinese_traditional.txt";
-    } else if (strcmp(lang,"cze") == 0) {
-        filepath = "src/bip39/czech.txt";
-    } else if (strcmp(lang,"por") == 0) {
-        filepath = "src/bip39/portuguese.txt";
-    } else {
-        fprintf(stderr, "Language or language file does not exist.\n");
-        exit(EXIT_FAILURE);
-    }
 
     fp = fopen(filepath, "r");
     if (fp == NULL)
@@ -110,7 +85,36 @@ void get_words(const char *lang) {
     }
 
     fclose(fp);
-    if (line) dogecoin_free(line);
+    if (line) free(line);
+}
+
+void get_words(const char *lang) {
+    int i = 0;
+    for (; i <= 2049; i++) {
+      if (strcmp(lang,"spa") == 0) {
+          wordlist[i]=(char*)wordlist_spa[i];
+      } else if (strcmp(lang,"eng") == 0) {
+          wordlist[i]=(char*)wordlist_eng[i];
+      } else if (strcmp(lang,"jpn") == 0) {
+          wordlist[i]=(char*)wordlist_jpn[i];
+      } else if (strcmp(lang,"ita") == 0) {
+          wordlist[i]=(char*)wordlist_ita[i];
+      } else if (strcmp(lang,"fra") == 0) {
+          wordlist[i]=(char*)wordlist_fra[i];
+      } else if (strcmp(lang,"kor") == 0) {
+          wordlist[i]=(char*)wordlist_kor[i];
+      } else if (strcmp(lang,"sc") == 0) {
+          wordlist[i]=(char*)wordlist_sc[i];
+      } else if (strcmp(lang,"tc") == 0) {
+          wordlist[i]=(char*)wordlist_tc[i];
+      } else if (strcmp(lang,"cze") == 0) {
+          wordlist[i]=(char*)wordlist_cze[i];
+      } else if (strcmp(lang,"por") == 0) {
+          wordlist[i]=(char*)wordlist_por[i];
+      } else {
+          fprintf(stderr, "Language or language file does not exist.\n");
+      }
+    }
 }
 
 const char *mnemonic_generate(int strength) {
