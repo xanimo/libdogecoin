@@ -435,6 +435,169 @@ int utf8_encode(char *out, uint32_t utf)
   }
 }
 
+void print_string_as_hex( const char *str )
+{
+    while ( *str != '\0' )
+    {
+        printf( "%02X\n", (unsigned char)*str );
+        str++;
+    }
+}
+
+typedef unsigned char byte;
+typedef unsigned int codepoint;
+/**
+ * Reads the next UTF-8-encoded character from the byte array ranging
+ * from {@code *pstart} up to, but not including, {@code end}. If the
+ * conversion succeeds, the {@code *pstart} iterator is advanced,
+ * the codepoint is stored into {@code *pcp}, and the function returns
+ * 0. Otherwise the conversion fails, {@code errno} is set to
+ * {@code EILSEQ} and the function returns -1.
+ */
+int
+from_utf8(const byte **pstart, const byte *end, codepoint *pcp) {
+        size_t len, i;
+        codepoint cp, min;
+        const byte *buf;
+
+        buf = *pstart;
+        if (buf == end)
+                goto error;
+
+        if (buf[0] < 0x80) {
+                len = 1;
+                min = 0;
+                cp = buf[0];
+        } else if (buf[0] < 0xC0) {
+                goto error;
+        } else if (buf[0] < 0xE0) {
+                len = 2;
+                min = 1 << 7;
+                cp = buf[0] & 0x1F;
+        } else if (buf[0] < 0xF0) {
+                len = 3;
+                min = 1 << (5 + 6);
+                cp = buf[0] & 0x0F;
+        } else if (buf[0] < 0xF8) {
+                len = 4;
+                min = 1 << (4 + 6 + 6);
+                cp = buf[0] & 0x07;
+        } else {
+                goto error;
+        }
+
+        if (buf + len > end)
+                goto error;
+
+        for (i = 1; i < len; i++) {
+                if ((buf[i] & 0xC0) != 0x80)
+                        goto error;
+                cp = (cp << 6) | (buf[i] & 0x3F);
+        }
+
+        if (cp < min)
+                goto error;
+
+        if (0xD800 <= cp && cp <= 0xDFFF)
+                goto error;
+
+        if (0x110000 <= cp)
+                goto error;
+
+        *pstart += len;
+        *pcp = cp;
+        return 0;
+
+error:
+        errno = EILSEQ;
+        return -1;
+}
+
+static void
+assert_valid(const byte **buf, const byte *end, codepoint expected) {
+        codepoint cp;
+
+        if (from_utf8(buf, end, &cp) == -1) {
+                fprintf(stderr, "invalid unicode sequence for codepoint %u\n", expected);
+                exit(EXIT_FAILURE);
+        }
+
+        if (cp != expected) {
+                fprintf(stderr, "expected %u, got %u\n", expected, cp);
+                exit(EXIT_FAILURE);
+        }
+}
+
+static void
+assert_invalid(const char *name, const byte **buf, const byte *end) {
+        const byte *p;
+        codepoint cp;
+
+        p = *buf + 1;
+        if (from_utf8(&p, end, &cp) == 0) {
+                fprintf(stderr, "unicode sequence \"%s\" unexpectedly converts to %#x.\n", name, cp);
+                exit(EXIT_FAILURE);
+        }
+        *buf += (*buf)[0] + 1;
+}
+
+static const byte valid[] = {
+        0x00, /* first ASCII */
+        0x7F, /* last ASCII */
+        0xC2, 0x80, /* first two-byte */
+        0xDF, 0xBF, /* last two-byte */
+        0xE0, 0xA0, 0x80, /* first three-byte */
+        0xED, 0x9F, 0xBF, /* last before surrogates */
+        0xEE, 0x80, 0x80, /* first after surrogates */
+        0xEF, 0xBF, 0xBF, /* last three-byte */
+        0xF0, 0x90, 0x80, 0x80, /* first four-byte */
+        0xF4, 0x8F, 0xBF, 0xBF /* last codepoint */
+};
+
+static const byte invalid[] = {
+        1, 0x80,
+        1, 0xC0,
+        1, 0xC1,
+        2, 0xC0, 0x80,
+        2, 0xC2, 0x00,
+        2, 0xC2, 0x7F,
+        2, 0xC2, 0xC0,
+        3, 0xE0, 0x80, 0x80,
+        3, 0xE0, 0x9F, 0xBF,
+        3, 0xED, 0xA0, 0x80,
+        3, 0xED, 0xBF, 0xBF,
+        4, 0xF0, 0x80, 0x80, 0x80,
+        4, 0xF0, 0x8F, 0xBF, 0xBF,
+        4, 0xF4, 0x90, 0x80, 0x80
+};
+
+static size_t code_to_utf8(unsigned char *const buffer, const unsigned int code)
+{
+    if (code <= 0x7F) {
+        buffer[0] = code;
+        return 1;
+    }
+    if (code <= 0x7FF) {
+        buffer[0] = 0xC0 | (code >> 6);            /* 110xxxxx */
+        buffer[1] = 0x80 | (code & 0x3F);          /* 10xxxxxx */
+        return 2;
+    }
+    if (code <= 0xFFFF) {
+        buffer[0] = 0xE0 | (code >> 12);           /* 1110xxxx */
+        buffer[1] = 0x80 | ((code >> 6) & 0x3F);   /* 10xxxxxx */
+        buffer[2] = 0x80 | (code & 0x3F);          /* 10xxxxxx */
+        return 3;
+    }
+    if (code <= 0x10FFFF) {
+        buffer[0] = 0xF0 | (code >> 18);           /* 11110xxx */
+        buffer[1] = 0x80 | ((code >> 12) & 0x3F);  /* 10xxxxxx */
+        buffer[2] = 0x80 | ((code >> 6) & 0x3F);   /* 10xxxxxx */
+        buffer[3] = 0x80 | (code & 0x3F);          /* 10xxxxxx */
+        return 4;
+    }
+    return 0;
+}
+
 const char *nfkd(const char *input) {
 //     UErrorCode status = U_ZERO_ERROR;
 //     const UNormalizer2 *nfkd = unorm2_getNFKDInstance(&status);
@@ -521,37 +684,46 @@ const char *nfkd(const char *input) {
   printf("isblank: %d\n", u8chrisblank(enc));
   printf("mbslen: %ld\n", wcslen(input));
   printf("mbslen: %d\n", strlen(input));
+  printf("u8len: %d\n", u8chrisvalid(encoding));
   int l, z;
   char* output = dogecoin_char_vla(strlen(input) + 1);
   char* out ;
-  if (len > 1) {
+  if (!u8chrisvalid(encoding)) {
     for(i=0; i<strlen(input) && input[i]!='\0'; ) {
       if(!isunicode(input[i])) i++;
       else {
           l = 0;
           z = utf8_decode(&input[i],&l);
-          printf("z: %d\n", z);
           char* codepoint = dogecoin_char_vla(l);
           sprintf(codepoint, "0x%04X", z);
-          // int o = utf8_encode(output, (uint32_t)codepoint);
-          printf("output: %s\n", codepoint);
+          printf("hex codepoint:  %s\n", codepoint);
 
 
           uint32_t h;
           sscanf(codepoint, "%x", &h);
+          u8chr_t u8ch = u8encode(h);
+          printf("h (dec codept): %d\n", h);
+          printf("u8ch:           %04x\n", u8ch);
 
-          printf("h: %d\n", h);
-          int o = utf8_encode(&out, h);
-          printf("o: %d\n", o);
-          printf("o: %s\n", &out);
-          printf("o: %d\n", u8length(&out));
+          int len = utf8_encode(&out, h);
+          printf("len:            %d\n", len);
+          printf("u8length(&out): %d\n", u8length(&out));
+          printf("out:            %s\n", &out);
+
+          print_string_as_hex(&out);
+          
           sprintf(&output[i], "%s", &out);
+          
           printf("output: %s\n", output);
           printf("output: %zu\n", strlen(output));
           printf("Unicode value at %d is U+%04X and it\'s %d bytes.\n",i,z,l);
           i += l;
       }
     }
+    printf("input:      %s\n", input);
+    printf("input len:  %zu\n", strlen(input));
+    printf("output:     %s\n", output);
+    printf("output len: %zu\n", strlen(output));
     return output;
   }
   return input;
