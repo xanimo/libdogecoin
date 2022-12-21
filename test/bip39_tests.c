@@ -235,7 +235,6 @@ void test_bip39()
     const char* test_mnemonic_24_jpn = "ぜっく　へらす　くのう　けんちく　えんげき　でっぱ　しあわせ　せっかく　いれい　こんかい　ていおん　ぞんび　せんえい　おうたい　りせい　たんにん　こうすい　ゆれる　てんさい　いりょう　すはだ　ばんぐみ　うつる　ほいく";
     const char* test_seed_24_jpn = "b68f2864826537e17f61bc5fe6d142d711b853f4aedf033b5d6e38d2a554fdbac1143287cfb2bfd650b89472692c5c1fc0b25d491846004fd01be8f4ab5c7439";
 
-
     const char* test_mnemonic_12_spa = "suelo tribu filtro probar mortal limón risa pueblo plaza oreja tutor mambo";
     const char* test_seed_12_spa = "356b6fc9e52ac2b872d9f56048f58346ff1526c014dd5019e64f45f4fee43873f570a1c181ddd81bfa91dd442da13282eb031833efb50554f387446e3c10c455";
 

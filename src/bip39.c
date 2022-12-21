@@ -28,6 +28,7 @@
 #include <uchar.h>
 #include <unistr.h>
 #include <wchar.h>
+#include <wctype.h>
 #include <uninorm.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <locale.h>
 #include <unicode/utypes.h>
 #include <unicode/ustring.h>
 #include <unicode/unorm2.h>
@@ -597,6 +599,87 @@ static size_t code_to_utf8(unsigned char *const buffer, const unsigned int code)
     }
     return 0;
 }
+static const unsigned int offsetsFromUTF8[6] = 
+{
+    0x00000000UL, 0x00003080UL, 0x000E2080UL,
+    0x03C82080UL, 0xFA082080UL, 0x82082080UL
+};
+
+static const unsigned char trailingBytesForUTF8[256] = {
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, 3,3,3,3,3,3,3,3,4,4,4,4,5,5,5,5
+};
+
+int bbx_utf8_skip(const char *utf8)
+{
+  return trailingBytesForUTF8[(unsigned char) *utf8] + 1;
+}
+
+int bbx_utf8_getch(const char *utf8)
+{
+    int ch;
+    int nb;
+
+    nb = trailingBytesForUTF8[(unsigned char)*utf8];
+    ch = 0;
+    switch (nb) 
+    {
+            /* these fall through deliberately */
+        case 3: ch += (unsigned char)*utf8++; ch <<= 6;
+        case 2: ch += (unsigned char)*utf8++; ch <<= 6;
+        case 1: ch += (unsigned char)*utf8++; ch <<= 6;
+        case 0: ch += (unsigned char)*utf8++;
+    }
+    ch -= offsetsFromUTF8[nb];
+
+    return ch;
+}
+
+int bbx_utf8_putch(char *out, int ch)
+{
+  char *dest = out;
+  if (ch < 0x80) 
+  {
+     *dest++ = (char)ch;
+  }
+  else if (ch < 0x800) 
+  {
+    *dest++ = (ch>>6) | 0xC0;
+    *dest++ = (ch & 0x3F) | 0x80;
+  }
+  else if (ch < 0x10000) 
+  {
+     *dest++ = (ch>>12) | 0xE0;
+     *dest++ = ((ch>>6) & 0x3F) | 0x80;
+     *dest++ = (ch & 0x3F) | 0x80;
+  }
+  else if (ch < 0x110000) 
+  {
+     *dest++ = (ch>>18) | 0xF0;
+     *dest++ = ((ch>>12) & 0x3F) | 0x80;
+     *dest++ = ((ch>>6) & 0x3F) | 0x80;
+     *dest++ = (ch & 0x3F) | 0x80;
+  }
+  else
+    return 0;
+  return dest - out;
+}
+
+int classify(int codepoint)
+{
+  int ret = false;
+  if (codepoint >= 12352 && codepoint <= 12543) {
+    // most likely hiragana and katakana
+    ret = true;
+  }
+  return ret;
+}
 
 const char *nfkd(const char *input) {
 //     UErrorCode status = U_ZERO_ERROR;
@@ -686,44 +769,55 @@ const char *nfkd(const char *input) {
   printf("mbslen: %d\n", strlen(input));
   printf("u8len: %d\n", u8chrisvalid(encoding));
   int l, z;
-  char* output = dogecoin_char_vla(strlen(input) + 1);
+  // create super large buffer for each which should be pinpointed in future:
+  char* output = dogecoin_char_vla((strlen(input) * 7) + 1);
+  char* output2 = dogecoin_char_vla((strlen(input) * 7) + 1);
+  unsigned char *const bleh = dogecoin_uchar_vla(4);
   char* out ;
   if (!u8chrisvalid(encoding)) {
-    for(i=0; i<strlen(input) && input[i]!='\0'; ) {
-      if(!isunicode(input[i])) i++;
-      else {
-          l = 0;
-          z = utf8_decode(&input[i],&l);
-          char* codepoint = dogecoin_char_vla(l);
-          sprintf(codepoint, "0x%04X", z);
-          printf("hex codepoint:  %s\n", codepoint);
-
-
-          uint32_t h;
-          sscanf(codepoint, "%x", &h);
-          u8chr_t u8ch = u8encode(h);
-          printf("h (dec codept): %d\n", h);
-          printf("u8ch:           %04x\n", u8ch);
-
-          int len = utf8_encode(&out, h);
-          printf("len:            %d\n", len);
-          printf("u8length(&out): %d\n", u8length(&out));
-          printf("out:            %s\n", &out);
-
-          print_string_as_hex(&out);
-          
-          sprintf(&output[i], "%s", &out);
-          
-          printf("output: %s\n", output);
-          printf("output: %zu\n", strlen(output));
-          printf("Unicode value at %d is U+%04X and it\'s %d bytes.\n",i,z,l);
-          i += l;
+    for(i=0; i<strlen(input) && input[i]!='\0';) {
+      if(!isunicode(input[i])) {
+        i++;
+        printf("input: %s\n", &input[i]);
+      } else {
+        l = 0;
+        z = utf8_decode(&input[i],&l);
+        int dec_codepoint = bbx_utf8_getch(&input[i]);
+        if (z==12288) {
+          printf("this is an ideomatic space\n");
+          z=32;
+          dec_codepoint=32;
+        }
+        printf("classify: %d\n", classify(z));
+        printf("codepoint: %d\n", dec_codepoint);
+        printf("codepoint: %d\n", z);
+        int buffer_size = l;
+        char* ch = dogecoin_char_vla(buffer_size);
+        char* ch2 = dogecoin_char_vla(buffer_size);
+        bbx_utf8_putch(ch, z);
+        bbx_utf8_putch(ch2, dec_codepoint);
+        printf("ch: %s\n", ch);
+        printf("ch: %zu\n", strlen(ch));
+        printf("ch2: %s\n", ch2);
+        printf("ch2: %zu\n", strlen(ch2));
+        append(output, ch);
+        append(output2, ch2);
+        i+=buffer_size;
       }
     }
     printf("input:      %s\n", input);
     printf("input len:  %zu\n", strlen(input));
     printf("output:     %s\n", output);
     printf("output len: %zu\n", strlen(output));
+    printf("output:     %s\n", output2);
+    printf("output len: %zu\n", strlen(output2));
+    printf("z: %d\n", z);
+    // if strlen(input) < 100 it's most likely chinese characters
+    // if z is under 5000 it's most likely korean chars
+    // this is v weak logic and needs to be refined
+    if (strlen(input) < 100 || z < 5000) {
+      return input;
+    }
     return output;
   }
   return input;
@@ -752,7 +846,8 @@ void mnemonic_to_seed(const char *mnemonic, const char *passphrase,
   }
 #endif
   uint8_t salt[8 + 256] = {0};
-  memcpy(salt, "mnemonic", 8);
+  memcpy(salt, nfkd("mnemonic"), 8);
+  printf("salt: %s\n", salt);
   memcpy(salt + 8, passphrase, passphraselen);
   static CONFIDENTIAL pbkdf2_hmac_sha512_context pctx;
   pbkdf2_hmac_sha512_init(&pctx, (const uint8_t *)mnemonic, mnemoniclen, salt,
