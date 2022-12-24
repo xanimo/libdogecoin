@@ -134,7 +134,7 @@ int main()
 
 #ifdef WITH_NET
     // u_run_test(test_net_basics_plus_download_block);
-    // u_run_test(test_protocol);
+    u_run_test(test_protocol);
 #endif
 
     dogecoin_ecc_stop();
