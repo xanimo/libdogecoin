@@ -259,6 +259,16 @@ int mnemonic_check(const char *mnemonic) {
 
 typedef uint32_t u8chr_t;
 
+int u8strlen(const char *s)
+{
+  int len=0;
+  while (*s) {
+    if ((*s & 0xC0) != 0x80) len++ ;
+    s++;
+  }
+  return len;
+}
+
 // Avoids truncating multibyte UTF-8 encoding at the end.
 char *u8strncpy(char *dest, const char *src, size_t n)
 {
@@ -437,168 +447,6 @@ int utf8_encode(char *out, uint32_t utf)
   }
 }
 
-void print_string_as_hex( const char *str )
-{
-    while ( *str != '\0' )
-    {
-        printf( "%02X\n", (unsigned char)*str );
-        str++;
-    }
-}
-
-typedef unsigned char byte;
-typedef unsigned int codepoint;
-/**
- * Reads the next UTF-8-encoded character from the byte array ranging
- * from {@code *pstart} up to, but not including, {@code end}. If the
- * conversion succeeds, the {@code *pstart} iterator is advanced,
- * the codepoint is stored into {@code *pcp}, and the function returns
- * 0. Otherwise the conversion fails, {@code errno} is set to
- * {@code EILSEQ} and the function returns -1.
- */
-int
-from_utf8(const byte **pstart, const byte *end, codepoint *pcp) {
-        size_t len, i;
-        codepoint cp, min;
-        const byte *buf;
-
-        buf = *pstart;
-        if (buf == end)
-                goto error;
-
-        if (buf[0] < 0x80) {
-                len = 1;
-                min = 0;
-                cp = buf[0];
-        } else if (buf[0] < 0xC0) {
-                goto error;
-        } else if (buf[0] < 0xE0) {
-                len = 2;
-                min = 1 << 7;
-                cp = buf[0] & 0x1F;
-        } else if (buf[0] < 0xF0) {
-                len = 3;
-                min = 1 << (5 + 6);
-                cp = buf[0] & 0x0F;
-        } else if (buf[0] < 0xF8) {
-                len = 4;
-                min = 1 << (4 + 6 + 6);
-                cp = buf[0] & 0x07;
-        } else {
-                goto error;
-        }
-
-        if (buf + len > end)
-                goto error;
-
-        for (i = 1; i < len; i++) {
-                if ((buf[i] & 0xC0) != 0x80)
-                        goto error;
-                cp = (cp << 6) | (buf[i] & 0x3F);
-        }
-
-        if (cp < min)
-                goto error;
-
-        if (0xD800 <= cp && cp <= 0xDFFF)
-                goto error;
-
-        if (0x110000 <= cp)
-                goto error;
-
-        *pstart += len;
-        *pcp = cp;
-        return 0;
-
-error:
-        errno = EILSEQ;
-        return -1;
-}
-
-static void
-assert_valid(const byte **buf, const byte *end, codepoint expected) {
-        codepoint cp;
-
-        if (from_utf8(buf, end, &cp) == -1) {
-                fprintf(stderr, "invalid unicode sequence for codepoint %u\n", expected);
-                exit(EXIT_FAILURE);
-        }
-
-        if (cp != expected) {
-                fprintf(stderr, "expected %u, got %u\n", expected, cp);
-                exit(EXIT_FAILURE);
-        }
-}
-
-static void
-assert_invalid(const char *name, const byte **buf, const byte *end) {
-        const byte *p;
-        codepoint cp;
-
-        p = *buf + 1;
-        if (from_utf8(&p, end, &cp) == 0) {
-                fprintf(stderr, "unicode sequence \"%s\" unexpectedly converts to %#x.\n", name, cp);
-                exit(EXIT_FAILURE);
-        }
-        *buf += (*buf)[0] + 1;
-}
-
-static const byte valid[] = {
-        0x00, /* first ASCII */
-        0x7F, /* last ASCII */
-        0xC2, 0x80, /* first two-byte */
-        0xDF, 0xBF, /* last two-byte */
-        0xE0, 0xA0, 0x80, /* first three-byte */
-        0xED, 0x9F, 0xBF, /* last before surrogates */
-        0xEE, 0x80, 0x80, /* first after surrogates */
-        0xEF, 0xBF, 0xBF, /* last three-byte */
-        0xF0, 0x90, 0x80, 0x80, /* first four-byte */
-        0xF4, 0x8F, 0xBF, 0xBF /* last codepoint */
-};
-
-static const byte invalid[] = {
-        1, 0x80,
-        1, 0xC0,
-        1, 0xC1,
-        2, 0xC0, 0x80,
-        2, 0xC2, 0x00,
-        2, 0xC2, 0x7F,
-        2, 0xC2, 0xC0,
-        3, 0xE0, 0x80, 0x80,
-        3, 0xE0, 0x9F, 0xBF,
-        3, 0xED, 0xA0, 0x80,
-        3, 0xED, 0xBF, 0xBF,
-        4, 0xF0, 0x80, 0x80, 0x80,
-        4, 0xF0, 0x8F, 0xBF, 0xBF,
-        4, 0xF4, 0x90, 0x80, 0x80
-};
-
-static size_t code_to_utf8(unsigned char *const buffer, const unsigned int code)
-{
-    if (code <= 0x7F) {
-        buffer[0] = code;
-        return 1;
-    }
-    if (code <= 0x7FF) {
-        buffer[0] = 0xC0 | (code >> 6);            /* 110xxxxx */
-        buffer[1] = 0x80 | (code & 0x3F);          /* 10xxxxxx */
-        return 2;
-    }
-    if (code <= 0xFFFF) {
-        buffer[0] = 0xE0 | (code >> 12);           /* 1110xxxx */
-        buffer[1] = 0x80 | ((code >> 6) & 0x3F);   /* 10xxxxxx */
-        buffer[2] = 0x80 | (code & 0x3F);          /* 10xxxxxx */
-        return 3;
-    }
-    if (code <= 0x10FFFF) {
-        buffer[0] = 0xF0 | (code >> 18);           /* 11110xxx */
-        buffer[1] = 0x80 | ((code >> 12) & 0x3F);  /* 10xxxxxx */
-        buffer[2] = 0x80 | ((code >> 6) & 0x3F);   /* 10xxxxxx */
-        buffer[3] = 0x80 | (code & 0x3F);          /* 10xxxxxx */
-        return 4;
-    }
-    return 0;
-}
 static const unsigned int offsetsFromUTF8[6] = 
 {
     0x00000000UL, 0x00003080UL, 0x000E2080UL,
@@ -671,77 +519,43 @@ int bbx_utf8_putch(char *out, int ch)
   return dest - out;
 }
 
-int classify(int codepoint)
+char* cat[] = {
+  "hangol_jamo",
+  "jp_punctuation", 
+  "jp_hiragana", 
+  "jp_katakana", 
+  "fw_roman_hw_katakana", 
+  "cjk_unified_common", 
+  "cjk_unified_rare", 
+  "cjk_unified_very_rare"
+  };
+
+int classify(int codepoint, char* cat)
 {
-  int ret = false;
-  if (codepoint >= 12352 && codepoint <= 12543) {
-    // most likely hiragana and katakana
-    ret = true;
+  printf("codepoint: %d\n", codepoint);
+  if (strcmp(cat, "hangol_jamo")==0) {
+    return codepoint >= 0x1100 && codepoint <= 0x11FF;
+  } else if (strcmp(cat, "jp_punctuation")==0) {
+    return codepoint >= 0x3000 && codepoint <= 0x303F;
+  } else if (strcmp(cat, "jp_hiragana")==0) {
+    return codepoint >= 0x3040 && codepoint <= 0x309F;
+  } else if (strcmp(cat, "jp_katakana")==0) {
+    return codepoint >= 0x30A0 && codepoint <= 0x30FF;
+  } else if (strcmp(cat, "fw_roman_hw_katakana")==0) {
+    return codepoint >= 0xFF00 && codepoint <= 0xFFEF;
+  } else if (strcmp(cat, "cjk_unified_common")==0) {
+    return codepoint >= 0x4E00 && codepoint <= 0x9FAF;
+  } else if (strcmp(cat, "cjk_unifed_rare")==0) {
+    return codepoint >= 0x3400 && codepoint <= 0x4DBF;
+  } else if (strcmp(cat, "cjk_unified_very_rare")==0) {
+    return codepoint >= 0x20000 && codepoint <= 0x2A6DF;
+  } else {
+    printf("Unrecognized category!\n");
+    return false;
   }
-  return ret;
 }
 
 const char *nfkd(const char *input) {
-//     UErrorCode status = U_ZERO_ERROR;
-//     const UNormalizer2 *nfkd = unorm2_getNFKDInstance(&status);
-//     if (U_FAILURE(status)) {
-//         fprintf(stderr, "Error getting NFKD instance: %s\n", u_errorName(status));
-//         return NULL;
-//     }
-
-//     UChar *input_u = calloc(strlen(input) + 1, sizeof(UChar));
-//     if (input_u == NULL) {
-//         fprintf(stderr, "Error allocating memory for input UChar\n");
-//         return NULL;
-//     }
-//     u_strFromUTF8(input_u, strlen(input) + 1, NULL, input, strlen(input), &status);
-//     if (U_FAILURE(status)) {
-//         fprintf(stderr, "Error converting input to UChar: %s\n", u_errorName(status));
-//         free(input_u);
-//         return NULL;
-//     }
-
-//     int32_t normalized_length = unorm2_normalize(nfkd, input_u, -1, NULL, 0, &status);
-//     if (status != U_BUFFER_OVERFLOW_ERROR) {
-//         fprintf(stderr, "Error getting length of normalized UChar: %s\n", u_errorName(status));
-//         free(input_u);
-//         return NULL;
-//     }
-//     status = U_ZERO_ERROR;
-
-//     UChar *normalized_u = calloc(normalized_length + 1, sizeof(UChar));
-//     if (normalized_u == NULL) {
-//         fprintf(stderr, "Error allocating memory for normalized UChar\n");
-//         free(input_u);
-//         return NULL;
-//     }
-
-//     unorm2_normalize(nfkd, input_u, -1, normalized_u, normalized_length + 1, &status);
-//     if (U_FAILURE(status)) {
-//         fprintf(stderr, "Error normalizing UChar: %s\n", u_errorName(status));
-//         free(input_u);
-//         free(normalized_u);
-//         return NULL;
-//     }
-//     free(input_u);
-
-//     UChar *normalized_utf8 = calloc(normalized_length * 4 + 1, sizeof(UChar));
-//     if (normalized_utf8 == NULL) {
-//         fprintf(stderr, "Error allocating memory for normalized UTF-8\n");
-//         free(normalized_u);
-//         return NULL;
-//     }
-//     u_strToUTF8((char*)normalized_utf8, normalized_length * 4 + 1, NULL, normalized_u, normalized_length, &status);
-//     if (U_FAILURE(status)) {
-//         fprintf(stderr, "Error converting normalized UChar to UTF-8: %s\n", u_errorName(status));
-//         free(normalized_u);
-//         free(normalized_utf8);
-//         return NULL;
-//     }
-
-// free(normalized_u);
-
-// return (const char *)normalized_utf8;
   u8chr_t encoding = 0;
   int len = u8length(input);
   printf("u8len: %d\n", len);
@@ -749,75 +563,53 @@ const char *nfkd(const char *input) {
   for (; i<len && input[i] != '\0'; i++) {
     encoding = (encoding << 8) | input[i];
   }
-  printf("encoding: %d\n", encoding);
-  printf("chisvalid: %d\n", u8chrisvalid(encoding));
   errno = 0;
   if (len == 0 || !u8chrisvalid(encoding)) {
     encoding = input[0];
     len = 1;
     errno = EINVAL;
   }
-  printf("ret: %d\n", encoding ? len : 0);
-  printf("errno: %d\n", errno);
-  printf("errno: %s\n", strerror(errno));
-  uint32_t dec = u8decode(encoding);
-  printf("dec: %u\n", dec);
-  u8chr_t enc = u8encode(dec);
-  printf("enc: %d\n", enc);
-  printf("isblank: %d\n", u8chrisblank(enc));
-  printf("mbslen: %ld\n", wcslen(input));
-  printf("mbslen: %d\n", strlen(input));
-  printf("u8len: %d\n", u8chrisvalid(encoding));
-  int l, z;
-  // create super large buffer for each which should be pinpointed in future:
-  char* output = dogecoin_char_vla((strlen(input) * 7) + 1);
-  char* output2 = dogecoin_char_vla((strlen(input) * 7) + 1);
-  unsigned char *const bleh = dogecoin_uchar_vla(4);
-  char* out ;
+
+  int l, z, first_char, jp_hiragana = 0, cjk_unified_common = 0, hangol_jamo = 0;
+
+  // grab first char for language detection:
+  first_char = utf8_decode(&input[0], &l);
+
+  jp_hiragana = classify(first_char, "jp_hiragana");
+  cjk_unified_common = classify(first_char, "cjk_unified_common");
+  hangol_jamo = classify(first_char, "hangol_jamo");
+  
+  // jp_hiragana seems to be only problematic char set so
+  // return input as-is for hangol_jamo and cjk_unified_common:
+  if (hangol_jamo || cjk_unified_common) return input;
+  char* output = dogecoin_calloc(1, strlen(input));
   if (!u8chrisvalid(encoding)) {
-    for(i=0; i<strlen(input) && input[i]!='\0';) {
-      if(!isunicode(input[i])) {
-        i++;
-        printf("input: %s\n", &input[i]);
-      } else {
-        l = 0;
-        z = utf8_decode(&input[i],&l);
-        int dec_codepoint = bbx_utf8_getch(&input[i]);
-        if (z==12288) {
-          printf("this is an ideomatic space\n");
-          z=32;
-          dec_codepoint=32;
+    for(i = 0; i < strlen(input) && input[i] != '\0';) {
+        if (!isunicode(input[i])) {
+          printf("input[i]: %s\n", &input[i]);
+          i++;
+        } else {
+          l = 0;
+          z = utf8_decode(&input[i], &l);
+          printf("isunicode: %s\n", &input[i]);
+          printf("z: %d\n", z);
+          printf("length: %d\n", l);
+          char* out;
+          if (z==12288 && jp_hiragana) z=32;
+          out = dogecoin_calloc(1, l);
+          printf("out: %d\n", bbx_utf8_putch(out, z));
+          printf("out: %s\n", out);
+          printf("out: %zu\n", strlen(out));
+          append(output, out);
+          free(out);
+          i += l;
         }
-        printf("classify: %d\n", classify(z));
-        printf("codepoint: %d\n", dec_codepoint);
-        printf("codepoint: %d\n", z);
-        int buffer_size = l;
-        char* ch = dogecoin_char_vla(buffer_size);
-        char* ch2 = dogecoin_char_vla(buffer_size);
-        bbx_utf8_putch(ch, z);
-        bbx_utf8_putch(ch2, dec_codepoint);
-        printf("ch: %s\n", ch);
-        printf("ch: %zu\n", strlen(ch));
-        printf("ch2: %s\n", ch2);
-        printf("ch2: %zu\n", strlen(ch2));
-        append(output, ch);
-        append(output2, ch2);
-        i+=buffer_size;
-      }
     }
     printf("input:      %s\n", input);
     printf("input len:  %zu\n", strlen(input));
     printf("output:     %s\n", output);
     printf("output len: %zu\n", strlen(output));
-    printf("output:     %s\n", output2);
-    printf("output len: %zu\n", strlen(output2));
-    printf("z: %d\n", z);
-    // if strlen(input) < 100 it's most likely chinese characters
-    // if z is under 5000 it's most likely korean chars
-    // this is v weak logic and needs to be refined
-    if (strlen(input) < 100 || z < 5000) {
-      return input;
-    }
+    // return properly parsed string:
     return output;
   }
   return input;

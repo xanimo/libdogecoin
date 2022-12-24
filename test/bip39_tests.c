@@ -686,7 +686,7 @@ void test_bip39()
     assert(memcmp(seed, seed_test, 64) == 0);
 
 
-  /* Czech */
+       /* Czech */
     mnemonic_to_seed(test_mnemonic_12_cze, "", seed, 0);
     memcpy_safe(seed_test,
            utils_hex_to_uint8(test_seed_12_cze),
