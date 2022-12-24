@@ -464,7 +464,6 @@ void test_bip39()
     assert(memcmp(seed, seed_test, 64) == 0);
 
     /* Japanese */
-    printf("start japanese\n");
     mnemonic_to_seed(test_mnemonic_12_jpn, "", seed, 0);
     memcpy_safe(seed_test,
            utils_hex_to_uint8(test_seed_12_jpn),
@@ -496,7 +495,6 @@ void test_bip39()
            utils_hex_to_uint8(test_seed_24_jpn),
            64);
     assert(memcmp(seed, seed_test, 64) == 0);
-    printf("end japanese\n");
 
    /* Spanish */
     mnemonic_to_seed(test_mnemonic_12_spa, "", seed, 0);

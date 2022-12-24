@@ -532,7 +532,6 @@ char* cat[] = {
 
 int classify(int codepoint, char* cat)
 {
-  printf("codepoint: %d\n", codepoint);
   if (strcmp(cat, "hangol_jamo")==0) {
     return codepoint >= 0x1100 && codepoint <= 0x11FF;
   } else if (strcmp(cat, "jp_punctuation")==0) {
@@ -550,7 +549,7 @@ int classify(int codepoint, char* cat)
   } else if (strcmp(cat, "cjk_unified_very_rare")==0) {
     return codepoint >= 0x20000 && codepoint <= 0x2A6DF;
   } else {
-    printf("Unrecognized category!\n");
+    printf("unrecognized category!\n");
     return false;
   }
 }
@@ -558,7 +557,6 @@ int classify(int codepoint, char* cat)
 const char *nfkd(const char *input) {
   u8chr_t encoding = 0;
   int len = u8length(input);
-  printf("u8len: %d\n", len);
   int i=0;
   for (; i<len && input[i] != '\0'; i++) {
     encoding = (encoding << 8) | input[i];
@@ -582,35 +580,25 @@ const char *nfkd(const char *input) {
   // jp_hiragana seems to be only problematic char set so
   // return input as-is for hangol_jamo and cjk_unified_common:
   if (hangol_jamo || cjk_unified_common) return input;
-  char* output = dogecoin_calloc(1, strlen(input));
   if (!u8chrisvalid(encoding)) {
-    for(i = 0; i < strlen(input) && input[i] != '\0';) {
-        if (!isunicode(input[i])) {
-          printf("input[i]: %s\n", &input[i]);
-          i++;
-        } else {
+    char* output = dogecoin_calloc(1, strlen(input) - 1);
+    for(i = 0; i < strlen(input) - 1 && input[i] != '\0';) {
+        if (!isunicode(input[i])) i++;
+        else {
           l = 0;
           z = utf8_decode(&input[i], &l);
-          printf("isunicode: %s\n", &input[i]);
-          printf("z: %d\n", z);
-          printf("length: %d\n", l);
           char* out;
           if (z==12288 && jp_hiragana) z=32;
-          out = dogecoin_calloc(1, l);
-          printf("out: %d\n", bbx_utf8_putch(out, z));
-          printf("out: %s\n", out);
-          printf("out: %zu\n", strlen(out));
+          out = dogecoin_calloc(1, l + 1);
+          bbx_utf8_putch(out, z);
           append(output, out);
-          free(out);
+          dogecoin_free(out);
           i += l;
         }
     }
-    printf("input:      %s\n", input);
-    printf("input len:  %zu\n", strlen(input));
-    printf("output:     %s\n", output);
-    printf("output len: %zu\n", strlen(output));
     // return properly parsed string:
-    return output;
+    input=output;
+    free(output);
   }
   return input;
 }
@@ -639,7 +627,6 @@ void mnemonic_to_seed(const char *mnemonic, const char *passphrase,
 #endif
   uint8_t salt[8 + 256] = {0};
   memcpy(salt, nfkd("mnemonic"), 8);
-  printf("salt: %s\n", salt);
   memcpy(salt + 8, passphrase, passphraselen);
   static CONFIDENTIAL pbkdf2_hmac_sha512_context pctx;
   pbkdf2_hmac_sha512_init(&pctx, (const uint8_t *)mnemonic, mnemoniclen, salt,
