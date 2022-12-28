@@ -13,17 +13,7 @@ $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/includ
 lib_LTLIBRARIES = libdogecoin.la
 include_HEADERS = include/dogecoin/libdogecoin.h
 noinst_HEADERS = \
-    include/bip39/chinese_simplified.h \
-    include/bip39/chinese_traditional.h \
-    include/bip39/czech.h \
-    include/bip39/english.h \
-    include/bip39/french.h \
     include/bip39/index.h \
-    include/bip39/italian.h \
-    include/bip39/japanese.h \
-    include/bip39/korean.h \
-    include/bip39/portuguese.h \
-    include/bip39/spanish.h \
     include/dogecoin/address.h \
     include/dogecoin/aes.h \
     include/dogecoin/base58.h \
@@ -63,10 +53,7 @@ libdogecoin_la_SOURCES = \
     src/aes.c \
     src/base58.c \
     src/bip32.c \
-    src/bip39/bip39c.c \
-    src/bip39/bip39.c \
-    src/bip39/crypto.c \
-    src/bip39/conversion.c \
+    src/bip39.c \
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
@@ -88,7 +75,7 @@ libdogecoin_la_SOURCES = \
     src/vector.c
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -fPIC
-libdogecoin_la_LIBADD = $(LIBSECP256K1)
+libdogecoin_la_LIBADD = $(LIBSECP256K1) -licuuc
 
 if USE_TESTS
 noinst_PROGRAMS = tests
@@ -121,7 +108,7 @@ tests_SOURCES = \
 
 tests_CFLAGS = $(libdogecoin_la_CFLAGS) -O0
 tests_CPPFLAGS = -I$(top_srcdir)/src
-tests_LDADD += $(LIBSECP256K1) -licuuc
+tests_LDADD += $(LIBSECP256K1)
 tests_LDFLAGS = -static
 TESTS = tests
 endif
