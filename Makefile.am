@@ -19,6 +19,7 @@ noinst_HEADERS = \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
+    include/dogecoin/bip44.h \
     include/dogecoin/block.h \
     include/dogecoin/buffer.h \
     include/dogecoin/byteswap.h \
@@ -54,6 +55,7 @@ libdogecoin_la_SOURCES = \
     src/base58.c \
     src/bip32.c \
     src/bip39.c \
+    src/bip44.c \
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
@@ -86,6 +88,7 @@ tests_SOURCES = \
     test/base58_tests.c \
     test/bip32_tests.c \
     test/bip39_tests.c \
+    test/bip44_tests.c \
     test/block_tests.c \
     test/buffer_tests.c \
     test/cstr_tests.c \
