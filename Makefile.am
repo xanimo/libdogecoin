@@ -86,7 +86,7 @@ libdogecoin_la_SOURCES = \
     src/vector.c
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -fPIC
-libdogecoin_la_LIBADD = $(LIBSECP256K1) -licuuc
+libdogecoin_la_LIBADD = $(LIBSECP256K1)
 
 if USE_TESTS
 noinst_PROGRAMS = tests

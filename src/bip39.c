@@ -38,9 +38,6 @@
 #include <ctype.h>
 #include <errno.h>
 #include <locale.h>
-#include <unicode/utypes.h>
-#include <unicode/ustring.h>
-#include <unicode/unorm2.h>
 #include <bip39/index.h>
 
 #include <dogecoin/bip39.h>
