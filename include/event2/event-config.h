@@ -338,13 +338,21 @@
    calls it, or to nothing if 'inline' is not supported under any name.  */
 #define EVENT__inline __inline
 
-/* Define to `unsigned' if <sys/types.h> does not define. */
-/* #undef EVENT__size_t */
-
 /* Define to unsigned int if you dont have it */
 #define EVENT__socklen_t unsigned int
 
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#ifdef _WIN32
+#ifndef WINVER
+#define WINVER 0x0600
+#endif
 /* Define to `int' if <sys/types.h> does not define. */
 #define EVENT__ssize_t SSIZE_T
+#else
+/* Define to `unsigned' if <sys/types.h> does not define. */
+#define EVENT__size_t SSIZE_T
+#endif
 
 #endif
