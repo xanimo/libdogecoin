@@ -1,4 +1,4 @@
-dnl require autoconf 2.68 (AS_ECHO/AS_ECHO_N)
+dnl require autoconf 2.71 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.71])
 
 # The package (a.k.a. release) version is based on semantic versioning 2.0.0 of
@@ -132,7 +132,7 @@ if test "x$random_device" = x"/dev/random"; then
 fi
 
 if test "x$with_tools" = xyes; then
-AC_DEFINE_UNQUOTED([WITH_TOOLS],[1],[Define to 1 to enable wallet compilation])
+  AC_DEFINE_UNQUOTED([WITH_TOOLS],[1],[Define to 1 to enable wallet compilation])
 fi
 
 if test "x$with_net" = xyes; then
@@ -144,55 +144,6 @@ if test "x$enable_debug" = xyes; then
   CXXFLAGS="$CXXFLAGS -g3 -O0 -DDEBUG"
   AC_DEFINE_UNQUOTED([ENABLE_DEBUG],[1],[Define to 1 to enable debug output])
 fi
-
-# if test x$with_net = "xyes"; then
-#   AC_MSG_CHECKING(for libevent)
-#   AC_ARG_WITH(libevent,
-#   [  --with-libevent=DIR     use libevent in DIR],
-#   [ case "$withval" in
-#     yes|no)
-#       AC_MSG_RESULT(no)
-#       ;;
-#     *)
-#       AC_MSG_RESULT($withval)
-#       if test -f $withval/lib/libevent.a; then
-#           owd=`pwd`
-#           if cd $withval; then withval=`pwd`; cd $owd; fi
-#           EVENT_LIBS="-L$withval/lib -levent"
-#       elif test -f $withval/.libs/libevent.a; then
-#           owd=`pwd`
-#           if cd $withval; then withval=`pwd`; cd $owd; fi
-#           EVENT_LIBS="-L$withval/.libs -levent"
-#       elif test -f $withval/libevent.a; then
-#           owd=`pwd`
-#           if cd $withval; then withval=`pwd`; cd $owd; fi
-#           EVENT_LIBS="-L$withval -levent"
-#       else
-#           AC_MSG_ERROR(event.h or libevent.a not found in $withval)
-#       fi
-#       ;;
-#     esac ],
-#   [ if test -f ${prefix}/lib/libevent.a;
-#   then
-#       EVENT_LIBS="-L${prefix}/lib -levent"
-#     else
-#       AC_MSG_RESULT(no)
-#       AC_MSG_ERROR(libevent not found)
-#     fi
-#     AC_MSG_RESULT(yes) ]
-#   )
-#   AC_MSG_RESULT($EVENT_LIBS)
-#   # ac_configure_args="${ac_configure_args} ${LIBEVENT_CONFIG_OPTS}"
-#   # AC_CONFIG_SUBDIRS([src/libevent])
-#   # AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
-#   # AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
-#   # AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
-#   # LIBS="$LIBS -levent -levent_core"
-#   LIBS="$LIBS $EVENT_LIBS"
-#   if test "$host" = "mingw"; then
-#     AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-#   fi
-# fi
 
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
@@ -212,8 +163,10 @@ LIBSECP256K1_CONFIG_OPTS="--disable-shared --with-pic --with-bignum=no --enable-
 ac_configure_args="${ac_configure_args} ${LIBSECP256K1_CONFIG_OPTS}"
 AC_CONFIG_SUBDIRS([src/secp256k1])
 LIBEVENT_CONFIG_OPTS="--disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking --with-pic"
-ac_configure_args="${LIBEVENT_CONFIG_OPTS}"
-AC_CONFIG_SUBDIRS([src/libevent])
+ax_configure_args="${LIBEVENT_CONFIG_OPTS}"
+AX_SUBDIRS_CONFIGURE(
+      [src/libevent], [], [], [],
+      [])
 AC_OUTPUT
 
 echo 

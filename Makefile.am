@@ -3,12 +3,16 @@ AUTOMAKE_OPTIONS = serial-tests
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
-DIST_SUBDIRS = src/secp256k1 src/libevent
+DIST_SUBDIRS = src/secp256k1
 
 LIBSECP256K1=src/secp256k1/libsecp256k1.la
 
 $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
+
+if WITH_NET
+DIST_SUBDIRS += src/libevent
+endif
 
 LIBEVENT=src/libevent/libevent.la
 
@@ -81,7 +85,7 @@ libdogecoin_la_SOURCES = \
     src/utils.c \
     src/vector.c
 
-libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -fPIC
+libdogecoin_la_CFLAGS = -I$(top_srcdir)/include
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(LIBUNISTRING)
 
 if USE_TESTS
@@ -122,6 +126,13 @@ TESTS = tests
 endif
 
 if WITH_NET
+libeventincludedir = $(includedir)/libevent
+libeventinclude_HEADERS = \
+    include/event2/event.h \
+    include/event2/util.h \
+    include/event2/buffer.h \
+    include/event2/bufferevent.h
+
 noinst_HEADERS += \
     include/dogecoin/protocol.h \
     include/dogecoin/net.h
@@ -131,7 +142,7 @@ libdogecoin_la_SOURCES += \
     src/protocol.c
 
 libdogecoin_la_LIBADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBEVENT)
-libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+libdogecoin_la_CFLAGS += -I$(top_srcdir)/src/libevent/include $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 
 if USE_TESTS
 tests_SOURCES += \
@@ -140,6 +151,8 @@ tests_SOURCES += \
 tests_LDADD += $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
 endif
 endif
+
+libdogecoin_la_CFLAGS += -fPIC
 
 if WITH_TOOLS
 if USE_TESTS
@@ -157,10 +170,10 @@ such_LDFLAGS = -static
 
 if WITH_NET
 inst_PROGRAMS += sendtx
-sendtx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBSECP256K1) $(LIBEVENT)
+sendtx_LDADD = libdogecoin.la $(LIBSECP256K1) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBEVENT)
 sendtx_SOURCES = \
     src/cli/sendtx.c
-sendtx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+sendtx_CFLAGS = $(libdogecoin_la_CFLAGS)
 sendtx_CPPFLAGS = -I$(top_srcdir)/src
 sendtx_LDFLAGS = -static
 endif
