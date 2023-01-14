@@ -19,7 +19,7 @@ on:
 jobs:
   analyze:
     name: analyze
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       actions: read
       contents: read
@@ -33,12 +33,12 @@ jobs:
 
     steps:
     - name: checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: update system
       run: |
         sudo apt-get update --yes
-        sudo apt-get install autoconf automake libtool build-essential python3 --yes
+        sudo apt-get install autotools-dev autoconf automake libtool build-essential python3 --yes
 
     - name: init codeql
       uses: github/codeql-action/init@v2
@@ -47,13 +47,9 @@ jobs:
 
     - name: build libdogecoin
       run: |
-       pushd src/libevent
-         ./autogen.sh
-         ./configure --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking --with-pic
-         make -j3 VERBOSE=1
-       popd
        ./autogen.sh
-       ./configure --with-libevent=`pwd`/src/libevent
+       autoupdate
+       ./configure
        make check -j3 VERBOSE=1
 
     - name: perform codeql analysis
