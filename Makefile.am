@@ -13,8 +13,8 @@ $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/includ
 LIBEVENT=src/libevent/libevent.la
 
 $(LIBEVENT): $(wildcard src/libevent/src/*) $(wildcard src/libevent/include/*)
-
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
+
 lib_LTLIBRARIES = libdogecoin.la
 include_HEADERS = include/dogecoin/libdogecoin.h
 noinst_HEADERS = \
@@ -162,4 +162,4 @@ endif
 libdogecoin_la_LDFLAGS = -no-undefined -version-info $(LIB_VERSION_CURRENT):$(LIB_VERSION_REVISION):$(LIB_VERSION_AGE)
 
 clean-local:
-	-$(MAKE) -C src/secp256k1 clean && $(MAKE) -C src/libevent clean 
+	-$(MAKE) -C src/secp256k1 clean && $(MAKE) -C src/libevent clean
