@@ -48,7 +48,6 @@ jobs:
     - name: build libdogecoin
       run: |
        ./autogen.sh
-       autoupdate
        ./configure
        make check -j3 VERBOSE=1
 
