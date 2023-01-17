@@ -3,16 +3,12 @@ AUTOMAKE_OPTIONS = serial-tests
 .PHONY: gen
 .INTERMEDIATE: $(GENBIN)
 
-DIST_SUBDIRS = src/secp256k1
+DIST_SUBDIRS = src/secp256k1 src/libevent
 
 LIBSECP256K1=src/secp256k1/libsecp256k1.la
 
 $(LIBSECP256K1): $(wildcard src/secp256k1/src/*) $(wildcard src/secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
-
-if WITH_NET
-DIST_SUBDIRS += src/libevent
-endif
 
 LIBEVENT=src/libevent/libevent.la
 
@@ -128,10 +124,10 @@ endif
 if WITH_NET
 libeventincludedir = $(includedir)/libevent
 libeventinclude_HEADERS = \
-    include/event2/event.h \
-    include/event2/util.h \
-    include/event2/buffer.h \
-    include/event2/bufferevent.h
+    src/libevent/include/event2/event.h \
+    src/libevent/include/event2/util.h \
+    src/libevent/include/event2/buffer.h \
+    src/libevent/include/event2/bufferevent.h
 
 noinst_HEADERS += \
     include/dogecoin/protocol.h \
