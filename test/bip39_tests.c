@@ -232,7 +232,7 @@ void test_bip39()
     dogecoin_generate_mnemonic ("224", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
     debug_print ("%lu bytes \n", length);
     dogecoin_generate_mnemonic ("256", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print("%lu bytes \n", length);
 
     /* test custom word lists (random) */
     debug_print ("\nTests with custom word lists\n", NULL);

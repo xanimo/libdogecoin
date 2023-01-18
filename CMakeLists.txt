@@ -74,6 +74,7 @@ INSTALL(FILES
     include/dogecoin/tool.h
     include/dogecoin/transaction.h
     include/dogecoin/tx.h
+    include/dogecoin/qrengine.h
     include/uthash/uthash.h
     include/dogecoin/utils.h
     include/dogecoin/vector.h
@@ -104,6 +105,8 @@ INSTALL(FILES
     include/event2/util.h 
     include/event2/visibility.h 
     include/event2/event-config.h
+    include/qr/qr.h
+    include/qr/png.h
     contrib/getopt/wingetopt.h
     contrib/wintime/wingettime.h
     DESTINATION include/dogecoin
@@ -135,6 +138,9 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/vector.c
     src/bip44.c
     src/bip39.c
+    src/qr.c
+    src/png.c
+    src/qrengine.c
     contrib/getopt/wingetopt.c
     contrib/wintime/wingettime.c
 )
@@ -198,7 +204,7 @@ IF(USE_TESTS)
         test/vector_tests.c
         test/bip39_tests.c
         test/bip44_tests.c
-)
+        test/qr_tests.c)
     TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} )
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
 ENDIF()
