@@ -1,5 +1,5 @@
-dnl require autoconf 2.71 (AS_ECHO/AS_ECHO_N)
-AC_PREREQ([2.71])
+dnl require autoconf 2.68 (AS_ECHO/AS_ECHO_N)
+AC_PREREQ([2.68])
 
 # The package (a.k.a. release) version is based on semantic versioning 2.0.0 of
 # the API. All changes in experimental modules are treated as
@@ -148,15 +148,15 @@ if test x$with_net = "xyes"; then
   AC_MSG_CHECKING(for libevent)
   pushd src/libevent
     ./autogen.sh
-    ./configure --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking --with-pic
+    ./configure --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking ${LIBEVENT_CONFIG_OPTS}
     make
   popd
-  EVENT_LIBS="-L./src/libevent/.libs -levent"
-  LIBS="$LIBS $EVENT_LIBS"
-  AC_MSG_RESULT($LIBS)
+  EVENT_LIBS="-L./src/libevent/.libs"
   if test "$host" = "mingw"; then
     AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
   fi
+  LIBS="$LIBS $EVENT_LIBS $EVENT_PTHREADS_LIBS"
+  AC_MSG_RESULT($LIBS)
 fi
 
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
