@@ -141,14 +141,15 @@ if test "x$enable_debug" = xyes; then
   CXXFLAGS="$CXXFLAGS -g3 -O0 -DDEBUG"
   AC_DEFINE_UNQUOTED([ENABLE_DEBUG],[1],[Define to 1 to enable debug output])
 fi
+
 if test x$with_net = "xyes"; then
   AC_MSG_CHECKING(for libevent)
   pushd src/libevent
     ./autogen.sh
-    ./configure --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking ${LIBEVENT_CONFIG_OPTS}
+    ./configure --host=$host_alias --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking $LIBEVENT_CONFIG_OPTS
     make
   popd
-  EVENT_LIBS="-L./src/libevent/.libs"
+  EVENT_LIBS=-L$(top_srcdir)/src/libevent/.libs
   if test "$host" = "mingw"; then
     AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
   fi
@@ -180,6 +181,7 @@ echo "  with tools    = $with_tools"
 echo "  with net      = $with_net"
 echo
 echo "  target os     = $TARGET_OS"
+echo "  host alias    = $host_alias"
 echo
 echo "  CC            = $CC"
 echo "  CFLAGS        = $CFLAGS"
