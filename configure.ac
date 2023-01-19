@@ -140,6 +140,20 @@ if test "x$enable_debug" = xyes; then
   CXXFLAGS="$CXXFLAGS -g3 -O0 -DDEBUG"
   AC_DEFINE_UNQUOTED([ENABLE_DEBUG],[1],[Define to 1 to enable debug output])
 fi
+if test x$with_net = "xyes"; then
+  AC_MSG_CHECKING(for libevent)
+  pushd src/libevent
+    ./autogen.sh
+    ./configure --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking --with-pic
+    make
+  popd
+  EVENT_LIBS="-L./src/libevent/.libs -levent"
+  LIBS="$LIBS $EVENT_LIBS"
+  AC_MSG_RESULT($LIBS)
+  if test "$host" = "mingw"; then
+    AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
+  fi
+fi
 
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
@@ -157,11 +171,6 @@ AC_SUBST(LIB_VERSION_AGE, _LIB_VERSION_AGE)
 LIBSECP256K1_CONFIG_OPTS="--disable-shared --with-pic --with-bignum=no --enable-module-recovery"
 ac_configure_args="${ac_configure_args} ${LIBSECP256K1_CONFIG_OPTS}"
 AC_CONFIG_SUBDIRS([src/secp256k1])
-LIBEVENT_CONFIG_OPTS="--disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking --with-pic"
-ax_configure_args="${LIBEVENT_CONFIG_OPTS}"
-AX_SUBDIRS_CONFIGURE(
-      [src/libevent], [], [], [],
-      [])
 AC_OUTPUT
 
 echo 
