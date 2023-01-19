@@ -68,7 +68,7 @@ case $host in
     # In libtool-speak, it's -all-static.
     AX_CHECK_LINK_FLAG([[-static]],[LIBTOOL_APP_LDFLAGS="$LIBTOOL_APP_LDFLAGS -all-static -no-undefined"])
     LDFLAGS="-s -static --static $LDFLAGS"
-    LIBEVENT_CONFIG_OPTS="-D_WIN32_WINNT=0x0601"
+    LIBEVENT_CONFIG_OPTS="libevent_cppflags_mingw32=-D_WIN32_WINNT=0x0601"
   ;;
   *darwin*)
     TARGET_OS=darwin
@@ -152,7 +152,7 @@ if test x$with_net = "xyes"; then
     ./configure --host=$host_alias --disable-shared --disable-openssl --disable-libevent-regress --disable-samples --disable-dependency-tracking --enable-option-checking $LIBEVENT_CONFIG_OPTS
     make
   popd
-  EVENT_LIBS=-L$(top_srcdir)/src/libevent/.libs
+  EVENT_LIBS=-L$top_srcdir/src/libevent/.libs
   if test "$host" = "mingw"; then
     AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
   fi
