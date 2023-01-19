@@ -1,4 +1,4 @@
-packages:=libevent
+packages:=
 native_packages := native_ccache
 
 wallet_packages=
