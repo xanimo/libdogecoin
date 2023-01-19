@@ -190,8 +190,7 @@ jobs:
         run: |
           depends/${{ matrix.host }}/native/bin/ccache --max-size=$CCACHE_SIZE
           ./autogen.sh
-          ./configure --enable-static --disable-shared ${{ matrix.config-opts }} HOST=${{ matrix.host }} 
-        # ./configure --prefix=`pwd`/depends/${{ matrix.host }} ${{ matrix.config-opts }} HOST=${{ matrix.host }} || ( cat config.log && false)
+          ./configure --host=${{ matrix.host }} --enable-static --disable-shared ${{ matrix.config-opts }} || ( cat config.log && false)
 
       - name: build libdogecoin
         run: |
