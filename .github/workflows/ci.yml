@@ -109,10 +109,13 @@ jobs:
           - name: i686-linux
             host: i686-pc-linux-gnu
             os: ubuntu-22.04
-            packages: g++-multilib bc
+            packages: gcc-9-i686-linux-gnu g++-9-i686-linux-gnu bc
+            postinstall: |
+              sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/i686-linux-gnu-gcc-9 10
+              sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/i686-linux-gnu-g++-9 10
+              sudo update-alternatives --set gcc /usr/bin/i686-linux-gnu-gcc-9
+              sudo update-alternatives --set g++ /usr/bin/i686-linux-gnu-g++-9
             run-tests: true
-            # dep-opts: "SPEED=slow V=1"
-            # config-opts: "--enable-static --disable-shared"
             dep-opts: ""
             config-opts: ""
             goal: install
