@@ -141,3 +141,4 @@ Testing/
 /contrib/libevent/build/.vs/libevent
 /contrib/libevent/out/build/x64-Debug
 /contrib/libevent/build
+*.tcl

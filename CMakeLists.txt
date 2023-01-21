@@ -7,6 +7,59 @@ SET(CMAKE_C_STANDARD_REQUIRED TRUE)
 SET(LIBDOGECOIN_NAME dogecoin)
 PROJECT(lib${LIBDOGECOIN_NAME} VERSION 0.1)
 
+IF(WIN32)
+    set(CMAKE_SYSTEM_NAME Windows)
+    set(CMAKE_SYSTEM_VERSION 10.0)
+    set(CMAKE_SYSTEM_PROCESSOR AMD64)
+
+    set(CMAKE_C_COMPILER "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/Llvm/bin/clang-cl")
+    set(CMAKE_CXX_COMPILER "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/Llvm/bin/clang-cl")
+    set(CMAKE_LINKER "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/Llvm/bin/lld-link")
+
+    set(MSVC_BASE "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/MSVC/14.33.31629")
+    set(MSVC_INCLUDE "${MSVC_BASE}/include")
+    set(MSVC_LIB "${MSVC_BASE}/lib")
+
+    set(WINSDK_BASE "/mnt/c/Program\ Files\ \(x86\)/Windows\ Kits/10")
+    set(WINSDK_VER "10.0.19041.0")
+    set(WINSDK_INCLUDE "${WINSDK_BASE}/Include/${WINSDK_VER}")
+    set(WINSDK_LIB "${WINSDK_BASE}/Lib/${WINSDK_VER}")
+
+    set(COMPILE_FLAGS
+        -D_CRT_SECURE_NO_WARNINGS
+        -imsvc "'${MSVC_INCLUDE}'"
+        -imsvc "'${WINSDK_INCLUDE}/cppwinrt'"
+        -imsvc "'${WINSDK_INCLUDE}/ucrt'"
+        -imsvc "'${WINSDK_INCLUDE}/shared'"
+        -imsvc "'${WINSDK_INCLUDE}/um'"
+        -imsvc "'${WINSDK_INCLUDE}/winrt'"
+    )
+
+    set(LINK_FLAGS
+        /manifest:no
+        -libpath:"${MSVC_LIB}/x64"
+        -libpath:"${WINSDK_LIB}/ucrt/x64"
+        -libpath:"${WINSDK_LIB}/ucrt_enclave/x64"
+        -libpath:"${WINSDK_LIB}/um/x64"
+    )
+
+    string(REPLACE ";" " " LINK_FLAGS "${LINK_FLAGS}")
+
+    set(_CMAKE_EXE_LINKER_FLAGS_INITIAL "${CMAKE_EXE_LINKER_FLAGS}" CACHE STRING "")
+    set(CMAKE_EXE_LINKER_FLAGS "${_CMAKE_EXE_LINKER_FLAGS_INITIAL} ${LINK_FLAGS}" CACHE STRING "" FORCE)
+
+    set(_CMAKE_MODULE_LINKER_FLAGS_INITIAL "${CMAKE_MODULE_LINKER_FLAGS}" CACHE STRING "")
+    set(CMAKE_MODULE_LINKER_FLAGS "${_CMAKE_MODULE_LINKER_FLAGS_INITIAL} ${LINK_FLAGS}" CACHE STRING "" FORCE)
+
+    set(_CMAKE_SHARED_LINKER_FLAGS_INITIAL "${CMAKE_SHARED_LINKER_FLAGS}" CACHE STRING "")
+    set(CMAKE_SHARED_LINKER_FLAGS "${_CMAKE_SHARED_LINKER_FLAGS_INITIAL} ${LINK_FLAGS}" CACHE STRING "" FORCE)
+
+    set(CMAKE_C_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_STANDARD_LIBRARIES "" CACHE STRING "" FORCE)
+
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_NO_WARNINGS ON)
+ENDIF()
+
 INCLUDE(CTest)
 SET(USE_TESTS ${CMAKE_TESTING_ENABLED})
 SET(WITH_TOOLS TRUE CACHE BOOL "enable dogecoin tool cli application")
@@ -18,11 +71,31 @@ IF(WITH_NET)
         FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
-    ELSE()
-        FIND_LIBRARY(LIBEVENT event REQUIRED)
+    ELSE()        
+        add_subdirectory(${PROJECT_SOURCE_DIR}/src/libevent)
+        execute_process(COMMAND ${PROJECT_SOURCE_DIR}/contrib/scripts/setup_cmake_subdir.sh --path ${PROJECT_SOURCE_DIR}/src/libevent)
+        set(LIBEVENT_EXTRA_PREFIXES ./src/libevent)
+        foreach(prefix ${LIBEVENT_EXTRA_PREFIXES})
+        list(APPEND LIBEVENT_INCLUDE_PATHS "${prefix}/include/event2" "${prefix}/build/include/event2")
+        list(APPEND LIBEVENT_PATHS "${prefix}/build/lib")
+        endforeach()
+
+        find_path(LIBEVENT_INCLUDE_DIR event.h PATHS ${LIBEVENT_INCLUDE_PATHS})
+        find_library(LIBEVENT event PATHS ${LIBEVENT_PATHS} REQUIRED)
+        find_library(LIBEVENT_CORE event_core PATHS ${LIBEVENT_PATHS} REQUIRED)
+
+        set(LIBUNISTRING_PREFIXES ${PROJECT_SOURCE_DIR}/depends/${HOST})
+        foreach(prefix ${LIBUNISTRING_PREFIXES})
+        list(APPEND LIBUNISTRING_INCLUDE_PATHS "${prefix}/include")
+        list(APPEND LIBUNISTRING_PATHS "${prefix}/lib")
+        endforeach()
+
+        find_path(LIBUNISTRING_INCLUDE_DIR uninorm.h PATHS ${LIBUNISTRING_INCLUDE_PATHS})
+        find_library(LIBUNISTRING unistring PATHS ${LIBUNISTRING_PATHS} REQUIRED)
     ENDIF()
 ENDIF()
 
+MESSAGE(STATUS "${HOST}")
 MESSAGE(STATUS "")
 MESSAGE(STATUS "Options used to compile and link:")
 MESSAGE(STATUS "  WITH_TOOLS    = ${WITH_TOOLS}")
@@ -78,36 +151,17 @@ INSTALL(FILES
     include/dogecoin/utils.h
     include/dogecoin/vector.h
     include/dogecoin/wow.h
-    include/event2/buffer.h 
-    include/event2/bufferevent.h 
-    include/event2/bufferevent_compat.h 
-    include/event2/bufferevent_ssl.h 
-    include/event2/bufferevent_struct.h 
-    include/event2/buffer_compat.h 
-    include/event2/dns.h
-    include/event2/dns_compat.h 
-    include/event2/dns_struct.h 
-    include/event2/event.h 
-    include/event2/event_compat.h 
-    include/event2/event_struct.h 
-    include/event2/http.h 
-    include/event2/http_compat.h 
-    include/event2/http_struct.h 
-    include/event2/keyvalq_struct.h 
-    include/event2/listener.h 
-    include/event2/rpc.h 
-    include/event2/rpc_compat.h 
-    include/event2/rpc_struct.h 
-    include/event2/tag.h 
-    include/event2/tag_compat.h 
-    include/event2/thread.h 
-    include/event2/util.h 
-    include/event2/visibility.h 
-    include/event2/event-config.h
+    ${PROJECT_SOURCE_DIR}/depends/${HOST}/include/uninorm.h
+    DESTINATION include/dogecoin
+)
+
+IF(WIN32)
+INSTALL(FILES
     contrib/getopt/wingetopt.h
     contrib/wintime/wingettime.h
     DESTINATION include/dogecoin
 )
+ENDIF()
 
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/address.c
@@ -135,9 +189,14 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/vector.c
     src/bip44.c
     src/bip39.c
+)
+
+IF(WIN32)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     contrib/getopt/wingetopt.c
     contrib/wintime/wingettime.c
 )
+ENDIF()
 
 FILE(GLOB SECP256K1 RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
     src/secp256k1/src/*.c)
@@ -162,7 +221,7 @@ ADD_DEFINITIONS(
     -DENABLE_MODULE_RECOVERY
     -DECMULT_WINDOW_SIZE=15
     -DECMULT_GEN_PREC_BITS=4)
-TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE ${SECP256K1})
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE ${SECP256K1} ${LIBUNISTRING})
 
 INCLUDE_DIRECTORIES(
     include
@@ -199,11 +258,14 @@ IF(USE_TESTS)
         test/bip39_tests.c
         test/bip44_tests.c
 )
-    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} )
+    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
 ENDIF()
 
 IF(WITH_NET)
+    INCLUDE_DIRECTORIES(
+        src/libevent
+        src/libevent/include)
     INSTALL(FILES
         include/dogecoin/protocol.h
         include/dogecoin/net.h
@@ -214,7 +276,7 @@ IF(WITH_NET)
         src/protocol.c
     )
 
-    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS} )
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS} ${LIBUNISTRING})
 
     IF(USE_TESTS)
         TARGET_SOURCES(tests PRIVATE
@@ -233,14 +295,14 @@ IF(WITH_TOOLS)
 
     ADD_EXECUTABLE(such src/cli/such.c)
     INSTALL(TARGETS such RUNTIME)
-    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} )
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING} )
 
     TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
     IF(WITH_NET)
         ADD_EXECUTABLE(sendtx src/cli/sendtx.c)
         INSTALL(TARGETS sendtx RUNTIME)
-        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME} )
+        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME} ${LIBUNISTRING} )
 
         TARGET_INCLUDE_DIRECTORIES(sendtx PRIVATE src)
     ENDIF()
