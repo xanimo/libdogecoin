@@ -29,6 +29,6 @@ void test_qr()
 
     printf("Attempting to write PNG...\n", NULL);
     char* testfile = "qrtest.png";
-    qrgen_string_to_qr_pngfile(testfile, test_addr);
+    qrgen_string_to_qr_pngfile(testfile, test_addr,10);
 
 }
