@@ -12,16 +12,16 @@ IF(WIN32)
     set(CMAKE_SYSTEM_VERSION 10.0)
     set(CMAKE_SYSTEM_PROCESSOR AMD64)
 
-    set(CMAKE_C_COMPILER "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/Llvm/bin/clang-cl")
-    set(CMAKE_CXX_COMPILER "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/Llvm/bin/clang-cl")
-    set(CMAKE_LINKER "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/Llvm/bin/lld-link")
+    set(CMAKE_C_COMPILER "C://Program Files (x86)//Microsoft Visual Studio//2022//BuildTools//VC//Tools//Llvm//bin//clang-cl")
+    set(CMAKE_CXX_COMPILER "C://Program Files (x86)//Microsoft Visual Studio//2022//BuildTools//VC//Tools//Llvm//bin//clang-cl")
+    set(CMAKE_LINKER "C://Program Files (x86)//Microsoft Visual Studio//2022//BuildTools//VC//Tools//Llvm//bin//lld-link")
 
-    set(MSVC_BASE "/mnt/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2022/BuildTools/VC/Tools/MSVC/14.33.31629")
+    set(MSVC_BASE "C://Program// Files// //(x86//)/Microsoft// Visual// Studio//2022//BuildTools//VC//Tools//MSVC//14.*.*")
     set(MSVC_INCLUDE "${MSVC_BASE}/include")
     set(MSVC_LIB "${MSVC_BASE}/lib")
 
-    set(WINSDK_BASE "/mnt/c/Program\ Files\ \(x86\)/Windows\ Kits/10")
-    set(WINSDK_VER "10.0.19041.0")
+    set(WINSDK_BASE "C://Program// Files// //(x86//)//Windows// Kits//10")
+    set(WINSDK_VER "10.0.*.*")
     set(WINSDK_INCLUDE "${WINSDK_BASE}/Include/${WINSDK_VER}")
     set(WINSDK_LIB "${WINSDK_BASE}/Lib/${WINSDK_VER}")
 
@@ -67,9 +67,9 @@ SET(WITH_NET TRUE CACHE BOOL "enable net functions")
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
 IF(WITH_NET)
-    IF(_WIN32)
-        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
-        #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
+    IF(WIN32)
+        execute_process(COMMAND sh ..//contrib//scripts//setup_cmake_subdir.sh --path ..//src//libevent)
+        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}//src//libevent")
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
     ELSE()
         execute_process(COMMAND ${PROJECT_SOURCE_DIR}/contrib/scripts/setup_cmake_subdir.sh --path ${PROJECT_SOURCE_DIR}/src/libevent)
@@ -166,6 +166,7 @@ INSTALL(FILES
 
 IF(WIN32)
 INSTALL(FILES
+    include/dogecoin/winunistd.h
     contrib/getopt/wingetopt.h
     contrib/wintime/wingettime.h
     DESTINATION include/dogecoin
@@ -287,7 +288,7 @@ IF(WITH_NET)
         src/protocol.c
     )
 
-    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS} ${LIBUNISTRING})
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBUNISTRING})
 
     IF(USE_TESTS)
         TARGET_SOURCES(tests PRIVATE

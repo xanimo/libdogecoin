@@ -18,24 +18,37 @@ has_param() {
     return 1
 }
 
+case $(uname | tr '[:upper:]' '[:lower:]') in
+  linux*)
+    export OS_NAME=linux
+    ;;
+  darwin*)
+    export OS_NAME=osx
+    ;;
+  msys*)
+    export OS_NAME=windows
+    ;;
+  *)
+    export OS_NAME=notset
+    ;;
+esac
+
 if has_param '--path' "$@"; then
     echo $2
     # check if build dir exists
-    if test -d $2/build; then
+
+    if test -d $2//build; then
         echo "exists"
     else
         echo "doesn't exist"
-        mkdir -p $2/build
+        mkdir -p $2//build
     fi
-    pushd $2/build
-        cmake \
-        -DEVENT_DISABLE_SHARED=ON \
-        -DEVENT__DISABLE_OPENSSL=ON \
-        -DEVENT__DISABLE_LIBEVENT_REGRESS=ON \
-        -DEVENT__DISABLE_SAMPLES=ON \
-        -DEVENT__DISABLE_DEPENDENCY_TRACKING=ON \
-        -DEVENT__ENABLE_OPTION_CHECKING=ON \
-        ../.
+    if [ $OS_NAME == "windows" ]; then
+        echo $OS_NAME
+        config=' -DEVENT__DISABLE_SHARED=ON -DEVENT__DISABLE_LIBEVENT_REGRESS=ON -DEVENT__DISABLE_DEPENDENCY_TRACKING=ON -DEVENT__ENABLE_OPTION_CHECKING=ON'
+    fi
+    pushd $2//build
+        cmake -DEVENT__DISABLE_OPENSSL=ON -DEVENT__DISABLE_SAMPLES=ON ${config} ..
         cmake --build .
     popd
 fi
