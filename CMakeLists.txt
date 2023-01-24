@@ -71,8 +71,7 @@ IF(WITH_NET)
         FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
-    ELSE()        
-        add_subdirectory(${PROJECT_SOURCE_DIR}/src/libevent)
+    ELSE()
         execute_process(COMMAND ${PROJECT_SOURCE_DIR}/contrib/scripts/setup_cmake_subdir.sh --path ${PROJECT_SOURCE_DIR}/src/libevent)
         set(LIBEVENT_EXTRA_PREFIXES ./src/libevent)
         foreach(prefix ${LIBEVENT_EXTRA_PREFIXES})
@@ -85,12 +84,16 @@ IF(WITH_NET)
         find_library(LIBEVENT_CORE event_core PATHS ${LIBEVENT_PATHS} REQUIRED)
 
         set(LIBUNISTRING_PREFIXES ${PROJECT_SOURCE_DIR}/depends/${HOST})
+        MESSAGE(STATUS "LIBUNISTRING_PREFIXES: ${LIBUNISTRING_PREFIXES}")
         foreach(prefix ${LIBUNISTRING_PREFIXES})
-        list(APPEND LIBUNISTRING_INCLUDE_PATHS "${prefix}/include")
+        MESSAGE(STATUS "prefix: ${prefix}")
+        list(APPEND LIBUNISTRING_INCLUDE_PATHS "${prefix}/include" "${prefix}/include/unistring")
+        MESSAGE(STATUS "LIBUNISTRING_INCLUDE_PATHS: ${LIBUNISTRING_INCLUDE_PATHS}")
         list(APPEND LIBUNISTRING_PATHS "${prefix}/lib")
         endforeach()
 
-        find_path(LIBUNISTRING_INCLUDE_DIR uninorm.h PATHS ${LIBUNISTRING_INCLUDE_PATHS})
+        find_path(LIBUNISTRING_INCLUDE_DIR uninorm.h PATHS ${LIBUNISTRING_INCLUDE_PATHS} REQUIRED)
+        execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/depends/${HOST}/include ${PROJECT_SOURCE_DIR})
         find_library(LIBUNISTRING unistring PATHS ${LIBUNISTRING_PATHS} REQUIRED)
     ENDIF()
 ENDIF()
@@ -151,7 +154,6 @@ INSTALL(FILES
     include/dogecoin/utils.h
     include/dogecoin/vector.h
     include/dogecoin/wow.h
-    ${PROJECT_SOURCE_DIR}/depends/${HOST}/include/uninorm.h
     DESTINATION include/dogecoin
 )
 
