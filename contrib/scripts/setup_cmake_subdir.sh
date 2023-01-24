@@ -34,21 +34,18 @@ case $(uname | tr '[:upper:]' '[:lower:]') in
 esac
 
 if has_param '--path' "$@"; then
-    echo $2
     # check if build dir exists
-
-    if test -d $2//build; then
-        echo "exists"
-    else
-        echo "doesn't exist"
+    if ! test -d $2//build; then
         mkdir -p $2//build
     fi
     if [ $OS_NAME == "windows" ]; then
-        echo $OS_NAME
-        config=' -DEVENT__DISABLE_SHARED=ON -DEVENT__DISABLE_LIBEVENT_REGRESS=ON -DEVENT__DISABLE_DEPENDENCY_TRACKING=ON -DEVENT__ENABLE_OPTION_CHECKING=ON'
+        config='-DEVENT__LIBRARY_TYPE=STATIC -DEVENT__DISABLE_TESTS=ON -DEVENT__DISABLE_THREAD_SUPPORT=OFF -DEVENT__DISABLE_MM_REPLACEMENT=ON -DEVENT__DISABLE_REGRESS=ON'
+    else
+        config='-DEVENT__DISABLE_SHARED=ON -DEVENT__DISABLE_LIBEVENT_REGRESS=ON -DEVENT__DISABLE_DEPENDENCY_TRACKING=ON -DEVENT__ENABLE_OPTION_CHECKING=ON'
     fi
+    config+=' -DEVENT__DISABLE_OPENSSL=ON -DEVENT__DISABLE_SAMPLES=ON'
     pushd $2//build
-        cmake -DEVENT__DISABLE_OPENSSL=ON -DEVENT__DISABLE_SAMPLES=ON ${config} ..
+        cmake .. $config
         cmake --build .
     popd
 fi

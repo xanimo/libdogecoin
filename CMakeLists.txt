@@ -5,7 +5,7 @@ SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_C_STANDARD_REQUIRED TRUE)
 
 SET(LIBDOGECOIN_NAME dogecoin)
-PROJECT(lib${LIBDOGECOIN_NAME} VERSION 0.1)
+PROJECT(lib${LIBDOGECOIN_NAME} VERSION 0.1.2)
 
 IF(WIN32)
     set(CMAKE_SYSTEM_NAME Windows)
@@ -16,31 +16,33 @@ IF(WIN32)
     set(CMAKE_CXX_COMPILER "C://Program Files (x86)//Microsoft Visual Studio//2022//BuildTools//VC//Tools//Llvm//bin//clang-cl")
     set(CMAKE_LINKER "C://Program Files (x86)//Microsoft Visual Studio//2022//BuildTools//VC//Tools//Llvm//bin//lld-link")
 
-    set(MSVC_BASE "C://Program// Files// //(x86//)/Microsoft// Visual// Studio//2022//BuildTools//VC//Tools//MSVC//14.*.*")
-    set(MSVC_INCLUDE "${MSVC_BASE}/include")
-    set(MSVC_LIB "${MSVC_BASE}/lib")
+    # msvc version may need to be updated to your installed version
+    set(MSVC_BASE "C://Program Files (x86)//Microsoft Visual Studio//2022//BuildTools//VC//Tools//MSVC//14.33.31629")
+    set(MSVC_INCLUDE "${MSVC_BASE}//include")
+    set(MSVC_LIB "${MSVC_BASE}//lib")
 
-    set(WINSDK_BASE "C://Program// Files// //(x86//)//Windows// Kits//10")
-    set(WINSDK_VER "10.0.*.*")
-    set(WINSDK_INCLUDE "${WINSDK_BASE}/Include/${WINSDK_VER}")
-    set(WINSDK_LIB "${WINSDK_BASE}/Lib/${WINSDK_VER}")
+    set(WINSDK_BASE "C://Program Files (x86)//Windows Kits//10")
+    # winsdk version may need to be updated to your installed version
+    set(WINSDK_VER "10.0.19041.0")
+    set(WINSDK_INCLUDE "${WINSDK_BASE}//Include//${WINSDK_VER}")
+    set(WINSDK_LIB "${WINSDK_BASE}//Lib//${WINSDK_VER}")
 
     set(COMPILE_FLAGS
         -D_CRT_SECURE_NO_WARNINGS
         -imsvc "'${MSVC_INCLUDE}'"
-        -imsvc "'${WINSDK_INCLUDE}/cppwinrt'"
-        -imsvc "'${WINSDK_INCLUDE}/ucrt'"
-        -imsvc "'${WINSDK_INCLUDE}/shared'"
-        -imsvc "'${WINSDK_INCLUDE}/um'"
-        -imsvc "'${WINSDK_INCLUDE}/winrt'"
+        -imsvc "'${WINSDK_INCLUDE}//cppwinrt'"
+        -imsvc "'${WINSDK_INCLUDE}//ucrt'"
+        -imsvc "'${WINSDK_INCLUDE}//shared'"
+        -imsvc "'${WINSDK_INCLUDE}//um'"
+        -imsvc "'${WINSDK_INCLUDE}//winrt'"
     )
 
     set(LINK_FLAGS
         /manifest:no
-        -libpath:"${MSVC_LIB}/x64"
-        -libpath:"${WINSDK_LIB}/ucrt/x64"
-        -libpath:"${WINSDK_LIB}/ucrt_enclave/x64"
-        -libpath:"${WINSDK_LIB}/um/x64"
+        -libpath:"${MSVC_LIB}//x64"
+        -libpath:"${WINSDK_LIB}//ucrt//x64"
+        -libpath:"${WINSDK_LIB}//ucrt_enclave//x64"
+        -libpath:"${WINSDK_LIB}//um//x64"
     )
 
     string(REPLACE ";" " " LINK_FLAGS "${LINK_FLAGS}")
@@ -68,10 +70,18 @@ SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random dat
 
 IF(WITH_NET)
     IF(WIN32)
+        # build libevent
         execute_process(COMMAND sh ..//contrib//scripts//setup_cmake_subdir.sh --path ..//src//libevent)
-        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}//src//libevent")
-        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
+        execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/src/libevent/build/include ${PROJECT_SOURCE_DIR})
+        execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/src/libevent/include ${PROJECT_SOURCE_DIR})
+
+        find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include" REQUIRED)
+        find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
+        FIND_LIBRARY(LIBEVENT NAMES event event_core event_extra libevent HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/" "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/Debug" "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/Release" REQUIRED)
+        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/")
+        set(WINLIBS ws2_32 shell32 AdvAPI32 gdi32 User32)
     ELSE()
+        # build libevent
         execute_process(COMMAND ${PROJECT_SOURCE_DIR}/contrib/scripts/setup_cmake_subdir.sh --path ${PROJECT_SOURCE_DIR}/src/libevent)
         set(LIBEVENT_EXTRA_PREFIXES ./src/libevent)
         foreach(prefix ${LIBEVENT_EXTRA_PREFIXES})
@@ -83,6 +93,7 @@ IF(WITH_NET)
         find_library(LIBEVENT event PATHS ${LIBEVENT_PATHS} REQUIRED)
         find_library(LIBEVENT_CORE event_core PATHS ${LIBEVENT_PATHS} REQUIRED)
 
+        # find libunistring
         set(LIBUNISTRING_PREFIXES ${PROJECT_SOURCE_DIR}/depends/${HOST})
         MESSAGE(STATUS "LIBUNISTRING_PREFIXES: ${LIBUNISTRING_PREFIXES}")
         foreach(prefix ${LIBUNISTRING_PREFIXES})
@@ -93,12 +104,12 @@ IF(WITH_NET)
         endforeach()
 
         find_path(LIBUNISTRING_INCLUDE_DIR uninorm.h PATHS ${LIBUNISTRING_INCLUDE_PATHS} REQUIRED)
+        # copy from depends to project source includes directory
         execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/depends/${HOST}/include ${PROJECT_SOURCE_DIR})
         find_library(LIBUNISTRING unistring PATHS ${LIBUNISTRING_PATHS} REQUIRED)
     ENDIF()
 ENDIF()
 
-MESSAGE(STATUS "${HOST}")
 MESSAGE(STATUS "")
 MESSAGE(STATUS "Options used to compile and link:")
 MESSAGE(STATUS "  WITH_TOOLS    = ${WITH_TOOLS}")
@@ -120,7 +131,6 @@ IF(WITH_NET)
     ADD_DEFINITIONS(-DWITH_NET=1)
 ENDIF()
 FILE(TOUCH src/libdogecoin-config.h)
-
 
 ADD_LIBRARY(${LIBDOGECOIN_NAME})
 
@@ -268,7 +278,7 @@ IF(USE_TESTS)
         test/utils_tests.c
         test/vector_tests.c
 )
-    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
+    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING} ${WINLIBS})
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
     execute_process(COMMAND mkdir -p ${PROJECT_SOURCE_DIR}/build/test/wordlist)
     execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/test/wordlist ${PROJECT_SOURCE_DIR}/build/test)
@@ -288,7 +298,7 @@ IF(WITH_NET)
         src/protocol.c
     )
 
-    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBUNISTRING})
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBUNISTRING} ${WINLIBS})
 
     IF(USE_TESTS)
         TARGET_SOURCES(tests PRIVATE
@@ -307,14 +317,14 @@ IF(WITH_TOOLS)
 
     ADD_EXECUTABLE(such src/cli/such.c)
     INSTALL(TARGETS such RUNTIME)
-    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING} )
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING} ${WINLIBS})
 
     TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
     IF(WITH_NET)
         ADD_EXECUTABLE(sendtx src/cli/sendtx.c)
         INSTALL(TARGETS sendtx RUNTIME)
-        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME} ${LIBUNISTRING} )
+        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME} ${LIBUNISTRING} ${WINLIBS})
 
         TARGET_INCLUDE_DIRECTORIES(sendtx PRIVATE src)
     ENDIF()
