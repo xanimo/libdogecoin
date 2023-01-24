@@ -67,7 +67,7 @@ SET(WITH_NET TRUE CACHE BOOL "enable net functions")
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
 IF(WITH_NET)
-    IF(WIN32)
+    IF(_WIN32)
         FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
@@ -129,6 +129,8 @@ INSTALL(FILES
     include/dogecoin/aes.h
     include/dogecoin/base58.h
     include/dogecoin/bip32.h
+    include/dogecoin/bip39.h
+    include/dogecoin/bip44.h
     include/dogecoin/block.h
     include/dogecoin/buffer.h
     include/dogecoin/byteswap.h
@@ -157,6 +159,11 @@ INSTALL(FILES
     DESTINATION include/dogecoin
 )
 
+INSTALL(FILES
+    include/bip39/index.h
+    DESTINATION include/bip39
+)
+
 IF(WIN32)
 INSTALL(FILES
     contrib/getopt/wingetopt.h
@@ -170,6 +177,8 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/aes.c
     src/base58.c
     src/bip32.c
+    src/bip44.c
+    src/bip39.c
     src/block.c
     src/buffer.c
     src/chainparams.c
@@ -189,8 +198,6 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/tx.c
     src/utils.c
     src/vector.c
-    src/bip44.c
-    src/bip39.c
 )
 
 IF(WIN32)
@@ -238,6 +245,8 @@ IF(USE_TESTS)
         test/aes_tests.c
         test/base58_tests.c
         test/bip32_tests.c
+        test/bip39_tests.c
+        test/bip44_tests.c
         test/block_tests.c
         test/buffer_tests.c
         test/cstr_tests.c
@@ -257,11 +266,11 @@ IF(USE_TESTS)
         test/unittester.c
         test/utils_tests.c
         test/vector_tests.c
-        test/bip39_tests.c
-        test/bip44_tests.c
 )
     TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
+    execute_process(COMMAND mkdir -p ${PROJECT_SOURCE_DIR}/build/test/wordlist)
+    execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/test/wordlist ${PROJECT_SOURCE_DIR}/build/test)
 ENDIF()
 
 IF(WITH_NET)

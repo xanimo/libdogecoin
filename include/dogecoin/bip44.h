@@ -8,6 +8,8 @@
 #ifndef __LIBDOGECOIN_BIP44_H__
 #define __LIBDOGECOIN_BIP44_H__
 
+#include <dogecoin/dogecoin.h>
+
 #include <dogecoin/bip32.h>
 
 /* BIP 44 string constants */
@@ -44,4 +46,5 @@ int derive_bip44_extended_private_key(const dogecoin_hdnode *master_key, const u
 /* BIP 44 extended public key generated */
 /* return 0 (success), -1 (fail) */
 int derive_bip44_extended_public_key(const dogecoin_hdnode *master_key, const uint32_t account, const uint32_t* address_index, const char* change_level, const int hardened, char* keypath, dogecoin_hdnode *bip44_key);
+
 #endif // __LIBDOGECOIN_BIP44_H__

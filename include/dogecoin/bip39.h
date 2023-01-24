@@ -13,10 +13,6 @@
 
 #include <dogecoin/dogecoin.h>
 
-LIBDOGECOIN_BEGIN_DECL
-
-LIBDOGECOIN_API
-
 /*
  * Defines
  */
@@ -104,8 +100,6 @@ int dogecoin_generate_mnemonic (const char* entropy_size, const char* language, 
 /* 512-bit seed */
 /* returns 0 (success), -1 (fail) */
 int dogecoin_seed_from_mnemonic (const char* mnemonic, const char* passphrase, uint8_t seed[64]);
-
-LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_BIP39_H__
 

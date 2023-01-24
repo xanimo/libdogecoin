@@ -142,3 +142,5 @@ Testing/
 /contrib/libevent/out/build/x64-Debug
 /contrib/libevent/build
 *.tcl
+include/uni*.h
+include/unistring/
