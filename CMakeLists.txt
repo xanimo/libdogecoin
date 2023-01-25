@@ -15,6 +15,24 @@ SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random dat
 
 IF(WITH_NET)
     IF(WIN32)
+        # build libevent
+        execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        execute_process(COMMAND cmake .. 
+
+            -DEVENT__DISABLE_OPENSSL=ON
+            -DEVENT__DISABLE_SAMPLES=ON
+            -DEVENT__LIBRARY_TYPE=STATIC 
+            -DEVENT__DISABLE_TESTS=ON 
+            -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
+            -DEVENT__DISABLE_MM_REPLACEMENT=ON 
+            -DEVENT__DISABLE_REGRESS=ON
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        execute_process(COMMAND cmake --build .
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/include" DESTINATION "${PROJECT_SOURCE_DIR}")
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include" DESTINATION "${PROJECT_SOURCE_DIR}")
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}/event.lib" DESTINATION "${PROJECT_SOURCE_DIR}")
+        ###
         FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
