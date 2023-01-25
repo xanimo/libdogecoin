@@ -71,9 +71,20 @@ SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random dat
 IF(WITH_NET)
     IF(WIN32)
         # build libevent
-        execute_process(COMMAND sh ..//contrib//scripts//setup_cmake_subdir.sh --path ..//src//libevent)
-        execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/src/libevent/build/include ${PROJECT_SOURCE_DIR})
-        execute_process(COMMAND cp -r ${PROJECT_SOURCE_DIR}/src/libevent/include ${PROJECT_SOURCE_DIR})
+        execute_process(COMMAND mkdir -p ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        execute_process(COMMAND cmake .. 
+            -DEVENT__DISABLE_OPENSSL=ON
+            -DEVENT__DISABLE_SAMPLES=ON
+            -DEVENT__LIBRARY_TYPE=STATIC 
+            -DEVENT__DISABLE_TESTS=ON 
+            -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
+            -DEVENT__DISABLE_MM_REPLACEMENT=ON 
+            -DEVENT__DISABLE_REGRESS=ON
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        execute_process(COMMAND cmake --build .
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/include" DESTINATION "${PROJECT_SOURCE_DIR}")
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include" DESTINATION "${PROJECT_SOURCE_DIR}")
 
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
