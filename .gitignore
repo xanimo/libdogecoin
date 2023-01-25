@@ -71,6 +71,7 @@ build-aux/m4/ltversion.m4
 build-aux/missing
 build-aux/compile
 build-aux/test-driver
+src/**/build-aux
 config.log
 config.status
 configure
@@ -87,7 +88,7 @@ m4/ltsugar.m4
 m4/ltversion.m4
 m4/lt~obsolete.m4
 src/stamp-h1
-libbtc256k1.pc
+libsecp256k1.pc
 .deps/
 .dirstamp
 
@@ -136,7 +137,13 @@ Testing/
 /.vs
 /out/build/x64-Debug/.cmake/api/v1
 /out/build/x64-Debug
-/contrib/libevent/.vs
-/contrib/libevent/build/.vs/libevent
-/contrib/libevent/out/build/x64-Debug
-/contrib/libevent/build
+/src/libevent/.vs
+/src/libevent/build/.vs/libevent
+/src/libevent/out/build/x64-Debug
+/src/libevent/build
+*.tcl
+include/uni*.h
+include/unistring/
+include/ev*.h
+include/event2/
+include/include.am
