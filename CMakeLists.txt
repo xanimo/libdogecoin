@@ -13,6 +13,22 @@ SET(WITH_TOOLS TRUE CACHE BOOL "enable dogecoin tool cli application")
 SET(WITH_NET TRUE CACHE BOOL "enable net functions")
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
+# Set a default build type if none was specified
+set(default_build_type "Release")
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    MESSAGE(STATUS "git dir ${CMAKE_SOURCE_DIR}")
+    set(default_build_type "Debug")
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 IF(WITH_NET)
     IF(WIN32)
         # build libevent
@@ -30,9 +46,8 @@ IF(WITH_NET)
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/include" DESTINATION "${PROJECT_SOURCE_DIR}")
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include" DESTINATION "${PROJECT_SOURCE_DIR}")
-        # file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}/event.lib" DESTINATION "${PROJECT_SOURCE_DIR}")
         ###
-        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}" "${PROJECT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/src/libevent" "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/Debug")
+        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}")
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
     ELSE()
