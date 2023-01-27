@@ -38,18 +38,19 @@ IF(WITH_NET)
             -DEVENT__DISABLE_SAMPLES=ON 
             -DEVENT__LIBRARY_TYPE=STATIC 
             -DEVENT__DISABLE_TESTS=ON 
-            -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
+            -DEVENT__DISABLE_THREAD_SUPPORT=ON 
             -DEVENT__DISABLE_MM_REPLACEMENT=ON 
-            -DEVENT__DISABLE_REGRESS=ON
+            -DEVENT__DISABLE_REGRESS=ON 
+            -DEVENT__DISABLE_BENCHMARK=ON 
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
         execute_process(COMMAND cmake --build .
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/include" DESTINATION "${PROJECT_SOURCE_DIR}")
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include" DESTINATION "${PROJECT_SOURCE_DIR}")
         ###
-        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}")
+        FIND_LIBRARY(LIBEVENT NAMES event event_core libevent HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
-        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
+        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)
     ELSE()
         FIND_LIBRARY(LIBEVENT event REQUIRED)
     ENDIF()
