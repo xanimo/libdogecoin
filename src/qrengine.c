@@ -109,7 +109,7 @@ uint8_t* bytesToRgb(uint8_t* qrBytes, size_t multiplier)
     size_t pixelRunLength = side * side;
     uint8_t darkPixel[3] = {0, 0, 0};
     uint8_t litePixel[3] = {255, 255, 255};
-    int border = 4; //unused variable
+    // int border = 4; //unused variable
     int step = 3;
 
     uint8_t* outRgb = (uint8_t*)calloc(pixelRunLength * step * multiplier * multiplier, sizeof(uint8_t));
