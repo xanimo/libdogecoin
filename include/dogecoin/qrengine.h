@@ -10,7 +10,7 @@
 #include <dogecoin/dogecoin.h>
 
 // internal funcs not exported
-static void printQr(const uint8_t qrcode[]);
+void printQr(const uint8_t qrcode[]);
 int outputQRStringFromQRBytes(const uint8_t* inQrBytes, char* outString);
 int stringToQrArray(const char* inString, uint8_t* outQrBytes);
 

@@ -80,7 +80,7 @@ void qrgen_p2pkh_consoleprint_to_qr(char* in_p2pkh)
 }
 
 //Internal: print a QR byte array to the console in scannable ASCII text.
-static void printQr(const uint8_t qrcode[])
+void printQr(const uint8_t qrcode[])
 {
     int size = qrcodegen_getSize(qrcode);
 
