@@ -68,7 +68,6 @@ extern void test_tx_sign();
 extern void test_scripts();
 extern void test_utils();
 extern void test_vector();
-extern void test_moon();
 
 #ifdef WITH_TOOLS
 extern void test_tool();
@@ -122,7 +121,6 @@ int main()
     u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
     u_run_test(test_vector);
-    u_run_test(test_moon);    
 
 #ifdef WITH_TOOLS
     u_run_test(test_tool);
