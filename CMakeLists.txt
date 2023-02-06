@@ -78,6 +78,7 @@ INSTALL(FILES
     include/dogecoin/utils.h
     include/dogecoin/vector.h
     include/dogecoin/wow.h
+    include/dogecoin/moon.h
     include/event2/buffer.h 
     include/event2/bufferevent.h 
     include/event2/bufferevent_compat.h 
@@ -135,6 +136,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/vector.c
     src/bip44.c
     src/bip39.c
+    src/moon.c
     contrib/getopt/wingetopt.c
     contrib/wintime/wingettime.c
 )

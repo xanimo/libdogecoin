@@ -44,7 +44,8 @@ noinst_HEADERS = \
     include/uthash/uthash.h \
     include/dogecoin/utils.h \
     include/dogecoin/vector.h \
-    include/dogecoin/wow.h
+    include/dogecoin/wow.h \
+    include/dogecoin/moon.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdogecoin.pc
@@ -74,7 +75,8 @@ libdogecoin_la_SOURCES = \
     src/transaction.c \
     src/tx.c \
     src/utils.c \
-    src/vector.c
+    src/vector.c \
+    src/moon.c
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -fPIC
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(LIBUNISTRING)
@@ -107,7 +109,8 @@ tests_SOURCES = \
     test/utest.h \
     test/unittester.c \
     test/utils_tests.c \
-    test/vector_tests.c
+    test/vector_tests.c \
+    test/moon_tests.c
 
 tests_CFLAGS = $(libdogecoin_la_CFLAGS)
 tests_CPPFLAGS = -I$(top_srcdir)/src

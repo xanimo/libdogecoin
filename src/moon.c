@@ -75,4 +75,5 @@ void *moon()
     case 7:
       return "🐶";               // Show Doge wen no moon
   }
+
 }
