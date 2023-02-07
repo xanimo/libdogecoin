@@ -28,12 +28,14 @@
 #include <string.h>
 #include <time.h>
 
+#include <dogecoin/dogecoin.h>
+
 #include <src/moon.c>
 
 LIBDOGECOIN_BEGIN_DECL
 
 /* get the moon */
-LIBDOGECOIN_API char *moon();
+LIBDOGECOIN_API char* moon();
 
 LIBDOGECOIN_END_DECL
 

@@ -28,11 +28,11 @@
 #include <time.h>
 
 /**
- * @brief Calling the moon, it returns the current moon fase
+ * @brief Calling the moon, it returns the current moon phase
  * @return moon icon
  */
 
-void *moon()
+char* moon()
 {
   int D,c,e;
   double jd;                      // Julian days
@@ -75,5 +75,5 @@ void *moon()
     case 7:
       return "🐶";               // Show Doge wen no moon
   }
-
+  return 0;
 }
