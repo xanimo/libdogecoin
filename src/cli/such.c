@@ -3,7 +3,7 @@
  The MIT License (MIT)
 
  Copyright (c) 2016 Jonas Schnelli
- Copyright (c) 2022 bluezr
+ Copyright (c) 2023 bluezr
  Copyright (c) 2023 edtubbs
  Copyright (c) 2023 The Dogecoin Foundation
 
@@ -58,6 +58,8 @@
 #include <dogecoin/chainparams.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/koinu.h>
+#include <dogecoin/qrengine.h>
+#include <qr/qr.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/tool.h>
 #include <dogecoin/transaction.h>
@@ -629,8 +631,21 @@ static void print_version()
 static void print_usage()
     {
     print_version();
-    printf("Usage: such (-m|-derived_path <bip_derived_path>) (-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase <pass_phrase>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-t[--testnet]) (-r[--regtest]) -c <command>\n");
-    printf("Available commands: generate_public_key (requires -p <wif>), p2pkh (requires -k <public key hex>), generate_private_key, bip32_extended_master_key, generate_mnemonic (-e <hex_entropy>, optional), mnemonic_to_addresses (requires -n <seed_phrase>, -o <account_int> optional, -g <change_level> optional, -i <address_index> optional, -a <pass_phrase> optional), print_keys (requires -p <private key hex>), derive_child_keys (requires -m <custom path> -p <private key>) \n");
+    printf("Usage: such -c <cmd> (-m|-derived_path <bip_derived_path>) (-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase <pass_phrase>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-t[--testnet]) (-r[--regtest]) -c <command>\n");
+    printf("Available commands:\n");
+    printf("generate_public_key (requires -p <wif>),\n");
+    printf("p2pkh (requires -k <public key hex>),\n");
+    printf("generate_private_key,\n");
+    printf("bip32_extended_master_key,\n");
+    printf("generate_mnemonic (-e <hex_entropy>, optional),\n");
+    printf("mnemonic_to_addresses (requires -n <seed_phrase>, -o <account_int> optional, -g <change_level> optional, -i <address_index> optional, -a <pass_phrase> optional),\n");
+    printf("print_keys (requires -p <private key hex>),\n");
+    printf("derive_child_keys (requires -m <custom path> -p <private key>),\n");
+    printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
+    printf("comp2der (-s <compact signature>),\n");
+    printf("bip32maintotest (-p <extended hd master key>),\n");
+    printf("qr (-k <address>),\n");
+    printf("transaction\n");
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
     printf("> such -c generate_private_key\n\n");
@@ -1030,6 +1045,17 @@ int main(int argc, char* argv[])
         }
 
         printf("Address: %s\n", hd_pubkey_address);
+    }
+    else if (strcmp(cmd, "qr") == 0) {
+            // ./such -c qr -k <address>
+            if (!pubkey) {
+                return showError("Missing address (use -k)\n");
+                }
+
+            printf("Attempting to write PNG...\n");
+            char* testfile = "qrtest.png";
+            qrgen_string_to_qr_pngfile(testfile, pubkey, 20);
+            printf("File has been written to %s\n", testfile);
     }
     else if (strcmp(cmd, "transaction") == 0) {
         main_menu();
