@@ -6,6 +6,7 @@
   - [Introduction](#introduction)
     - [Simple Addresses](#simple-addresses)
     - [HD Addresses](#hd-addresses)
+    - [Seed phrases](#seed-phrases)
   - [Simple Address Generation Process](#simple-address-generation-process)
   - [Essential Address API](#essential-address-api)
     - [**generatePrivPubKeypair:**](#generateprivpubkeypair)
@@ -14,6 +15,11 @@
     - [**verifyPrivPubKeypair**](#verifyprivpubkeypair)
     - [**verifyHDMasterPubKeypair**](#verifyhdmasterpubkeypair)
     - [**verifyP2pkhAddress**](#verifyp2pkhaddress)
+    - [**getDerivedHDAddress**](#getderivedhdaddress)
+    - [**getDerivedHDAddressByPath**](#getderivedhdaddressbypath)
+  - [Advanced Address API](#advanced-address-api)
+    - [**generateRandomEnglishMnemonic:**](#generateRandomEnglishMnemonic)
+    - [**getDerivedHDAddressFromMnemonic:**](#getDerivedHDAddressFromMnemonic)
 
 ## Introduction
 
@@ -28,6 +34,18 @@ These are the most common form of Dogecoin address, a single private key with a 
 ### HD Addresses
 
 HD, or _Hierarchical Deterministic_ addresses, unlike simple addresses are created from a seed key-phrase, usually twelve random unique words rather than a 256-bit private key. The key-phrase is then used (with the addition of a simple, incrementing number) to generate an unlimited supply of public Dogecoin addresses which the holder of the key-phrase can sign.
+
+### Seed phrases
+
+Seed phrases, also known as mnemonic phrases, are a commonly used method to create and backup HD addresses. These phrases consist of 12 or 24 random words, generated from a 128 or 256-bit entropy source, respectively. Seed phrases can then be used to generate an HD address.
+
+When using seed phrases to generate HD addresses, it is essential to ensure the security of the seed phrase. Seed phrases should be treated with extreme caution and must be stored safely in a secure location. There are several steps that you can take to ensure that your seed phrase remains secure:
+- Do not type your seed phrase into any device connected to the internet, as it could be compromised by malware or keyloggers.
+- Store your seed phrase offline in a secure and tamper-evident location, such as a hardware wallet, paper wallet or encrypted digital storage device.
+- Do not share your seed phrase with anyone, as it grants access to all the funds in your wallet.
+- Use a strong, unique and memorable passphrase to protect your seed phrase from unauthorized access.
+
+When embedding libdogecoin in your project, it is important to consider the wallet type you are using. HD wallets, which use seed phrases to generate addresses, are generally considered more secure than simple wallets, which use a single private key for all addresses. Hot wallets, which are connected to the internet, are more convenient to use but are also more vulnerable to attacks. Cold wallets, which are kept offline, are more secure but may be less convenient to use for frequent transactions. You should carefully consider your security needs and choose the appropriate wallet type for your project.
 
 ## Simple Address Generation Process
 
@@ -52,6 +70,12 @@ These steps can be very confusing, so Libdogecoin does all of them for you when 
 ## Essential Address API
 
 These functions implement the core functionality of Libdogecoin for address generation and validation, and are described in depth below. You can access them through a C program, by including the `libdogecoin.h` header in the source code and including the `libdogecoin.a` library at compile time. Or, you may implement either set of wrappers if you are more inclined towards a high-level language. For more details about wrapper installation and setup, see [bindings.md](bindings.md).
+
+When using functions from either the Essential or Advanced Address API, include the -lunistring flag during the linking process. This is because the Advanced Address API uses the GNU libunistring library for Unicode string manipulation. To include the -lunistring flag during linking, simply add it to the linker command when building your project:
+
+`gcc -o example example.c -ldogecoin -lunistring`
+
+Ensure that the `libunistring` library is installed on your system before linking.
 
 ---
 ### **generatePrivPubKeypair:**
@@ -100,7 +124,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -160,7 +184,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -225,7 +249,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -293,7 +317,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -362,7 +386,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -431,7 +455,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -444,5 +468,153 @@ func main() {
 		fmt.Println("Address is invalid.")
 	}
 	libdogecoin.W_context_stop()
+}
+```
+
+---
+### **getDerivedHDAddress**
+
+`int getDerivedHDAddress(const char* masterkey, uint32_t account, bool ischange, uint32_t addressindex, char* outaddress, bool outprivkey)`
+
+This function derives a hierarchical deterministic address by way of providing the extended master key, account, ischange and addressindex.
+It will return 1 if the function is successful and 0 if not.
+
+_C usage:_
+```C
+#include "libdogecoin.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main() {
+  size_t extoutsize = 112;
+  char* extout = dogecoin_char_vla(extoutsize);
+  char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
+  dogecoin_ecc_start();
+  int res = getDerivedHDAddress(masterkey_main_ext, 0, false, 0, extout, true);
+  u_assert_int_eq(res, true);
+  u_assert_str_eq(extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+  dogecoin_ecc_stop();
+  free(extout);
+}
+```
+
+---
+### **getDerivedHDAddressByPath**
+
+`int getDerivedHDAddressByPath(const char* masterkey, const char* derived_path, char* outaddress, bool outprivkey)`
+
+This function derives an extended HD address by custom path in string format (derived_path).
+It returns 1 if the address is valid and 0 if it is not.
+
+_C usage:_
+```C
+#include "libdogecoin.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main() {
+  size_t extoutsize = 112;
+  char* extout = dogecoin_char_vla(extoutsize);
+  char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
+  dogecoin_ecc_start();
+  res = getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout, true);
+  u_assert_int_eq(res, true);
+  u_assert_str_eq(extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+  dogecoin_ecc_stop();
+  free(extout);
+}
+```
+
+## Advanced Address API
+
+These functions implement advanced functionality of Libdogecoin for address generation and validation, and are described in depth below. You can access them through a C program, by including the `libdogecoin.h` header in the source code and including the `libdogecoin.a` library at compile time. Or, you may implement either set of wrappers if you are more inclined towards a high-level language. For more details about wrapper installation and setup, see [bindings.md](bindings.md).
+
+---
+### **generateRandomEnglishMnemonic**
+
+`int generateRandomEnglishMnemonic(const ENTROPY_SIZE size, MNEMONIC mnemonic);`
+
+This function generates a random English mnemonic phrase (seed phrase). The function returns 0 on success and -1 on failure.
+
+_C usage:_
+```C
+#include "libdogecoin.h"
+#include <stdio.h>
+
+int main () {
+  MNEMONIC seed_phrase;
+
+  dogecoin_ecc_start();
+  generateRandomEnglishMnemonic("256", seed_phrase);
+  dogecoin_ecc_stop();
+
+  printf("%s\n", seed_phrase);
+}
+```
+_C++ usage:_
+```C++
+extern "C" {
+#include "libdogecoin.h"
+}
+#include <iostream>
+using namespace std;
+
+int main () {
+  MNEMONIC seed_phrase;
+
+  dogecoin_ecc_start();
+  generateRandomEnglishMnemonic("256", seed_phrase);
+  dogecoin_ecc_stop();
+
+  cout << seed_phrase << endl;
+}
+```
+---
+### **getDerivedHDAddressFromMnemonic**
+`int getDerivedHDAddressFromMnemonic(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, const MNEMONIC mnemonic, const PASS pass, char* p2pkh_pubkey, const bool is_testnet);`
+
+This function generates a new dogecoin address from a mnemonic and a slip44 key path.  The function returns 0 on success and -1 on failure.
+
+_C usage:_
+```C
+#include "libdogecoin.h"
+#include <stdio.h>
+
+int main () {
+  int addressLen = 53;
+
+  MNEMONIC seed_phrase;
+  char address [addressLen];
+
+  dogecoin_ecc_start();
+  generateRandomEnglishMnemonic("256", seed_phrase);
+  getDerivedHDAddressFromMnemonic(0, 0, "0", seed_phrase, NULL, address, false);
+  dogecoin_ecc_stop();
+
+  printf("%s\n", seed_phrase);
+  printf("%s\n", address);
+}
+```
+_C++ usage:_
+```C++
+extern "C" {
+#include "libdogecoin.h"
+}
+#include <iostream>
+using namespace std;
+
+int main () {
+  int addressLen = 53;
+
+  MNEMONIC seed_phrase;
+  char address [addressLen];
+
+  dogecoin_ecc_start();
+  generateRandomEnglishMnemonic("256", seed_phrase);
+  getDerivedHDAddressFromMnemonic(0, 0, "0", seed_phrase, NULL, address, false);
+  dogecoin_ecc_stop();
+
+  cout << seed_phrase << endl;
+  cout << address << endl;
 }
 ```

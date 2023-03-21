@@ -42,7 +42,7 @@ static const struct blockheadertest block_header_tests[] =
 
 void test_block_header()
 {
-    int outlen;
+    size_t outlen;
     char hexbuf[161];
     unsigned int i;
     for (i = 0; i < (sizeof(block_header_tests) / sizeof(block_header_tests[0])); i++) {
@@ -142,7 +142,7 @@ void test_block_header()
 
     uint256 checkhash;
     dogecoin_block_header_hash(&bheader, (uint8_t *)&checkhash);
-    char hashhex[sizeof(checkhash)*2];
+    char hashhex[sizeof(checkhash) * 2 + 1];
     utils_bin_to_hex(checkhash, sizeof(checkhash), hashhex);
     utils_reverse_hex(hashhex, strlen(hashhex));
     u_assert_str_eq(blockheader_hash_h371338, hashhex);

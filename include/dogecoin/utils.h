@@ -30,9 +30,12 @@
 #ifndef __LIBDOGECOIN_UTILS_H__
 #define __LIBDOGECOIN_UTILS_H__
 
+#include <stdbool.h>
+
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
+#include <dogecoin/vector.h>
 
 #define TO_UINT8_HEX_BUF_LEN 2048
 #define VARINT_LEN 20
@@ -42,14 +45,14 @@
 LIBDOGECOIN_BEGIN_DECL
 
 LIBDOGECOIN_API void utils_clear_buffers(void);
-LIBDOGECOIN_API void utils_hex_to_bin(const char* str, unsigned char* out, int inLen, int* outLen);
+LIBDOGECOIN_API void utils_hex_to_bin(const char* str, unsigned char* out, size_t inLen, size_t* outLen);
 LIBDOGECOIN_API void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out);
 LIBDOGECOIN_API uint8_t* utils_hex_to_uint8(const char* str);
 LIBDOGECOIN_API char* utils_uint8_to_hex(const uint8_t* bin, size_t l);
-LIBDOGECOIN_API void utils_reverse_hex(char* h, int len);
+LIBDOGECOIN_API void utils_reverse_hex(char* h, size_t len);
 LIBDOGECOIN_API void utils_uint256_sethex(char* psz, uint8_t* out);
 LIBDOGECOIN_API void* safe_malloc(size_t size);
-LIBDOGECOIN_API void dogecoin_cheap_random_bytes(uint8_t* buf, uint32_t len);
+LIBDOGECOIN_API void dogecoin_cheap_random_bytes(uint8_t* buf, size_t len);
 LIBDOGECOIN_API void dogecoin_get_default_datadir(cstring* path_out);
 LIBDOGECOIN_API void dogecoin_file_commit(FILE* file);
 LIBDOGECOIN_API void print_image(FILE *fptr);
@@ -60,6 +63,15 @@ LIBDOGECOIN_API void prepend(char* s, const char* t);
 LIBDOGECOIN_API void append(char* s, char* t);
 LIBDOGECOIN_API void text_to_hex(char* in, char* out);
 LIBDOGECOIN_API const char* get_build();
+LIBDOGECOIN_API void dogecoin_str_reverse(char s[]);
+LIBDOGECOIN_API void dogecoin_uitoa(int n, char s[]);
+LIBDOGECOIN_API bool dogecoin_network_enabled();
+
+unsigned int base64_int(unsigned int ch);
+unsigned int base64_encoded_size(unsigned int in_size);
+unsigned int base64_decoded_size(unsigned int in_size);
+unsigned int base64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out);
+unsigned int base64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out);
 
 /* support substitute for GNU only tdestroy */
 /* let's hope the node struct is always compatible */

@@ -22,7 +22,7 @@
 
 ## Introduction
 
-The high level 'essential' API provided by libdogecoin for working with simple transactions revolve around a structure defined as a `working_transaction` which is comprised of an index as an integer meant for retrieval, a dogecoin_tx 'transaction' structure as seen above, and finally a UT_hash_handle which stores our working_transaction struct in a hash table (using Troy D. Hanson's uthash library: see ./contrib/uthash/uthash.h and visit https://troydhanson.github.io/uthash/ for more information) which allow us to generate multiple transactions per "session". This `working_transaction` structure is defined as such:
+The high level 'essential' API provided by libdogecoin for working with simple transactions revolve around a structure defined as a `working_transaction` which is comprised of an index as an integer meant for retrieval, a dogecoin_tx 'transaction' structure as seen above, and finally a UT_hash_handle which stores our working_transaction struct in a hash table (using Troy D. Hanson's uthash library: see ./include/dogecoin/uthash.h and visit https://troydhanson.github.io/uthash/ for more information) which allow us to generate multiple transactions per "session". This `working_transaction` structure is defined as such:
 ```C
 typedef struct working_transaction {
     int index;
@@ -131,7 +131,7 @@ _Golang usage:_
 ```go
 package main
 
-import "github.com/jaxlotl/go-libdogecoin-sandbox"
+import "github.com/jaxlotl/go-libdogecoin"
 
 func main() {
     index := libdogecoin.W_start_transaction()
@@ -180,7 +180,7 @@ _Golang usage:_
 ```go
 package main
 
-import "github.com/jaxlotl/go-libdogecoin-sandbox"
+import "github.com/jaxlotl/go-libdogecoin"
 
 func main() {
     previous_output_txid := "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074"
@@ -238,7 +238,7 @@ _Golang usage:_
 ```go
 package main
 
-import "github.com/jaxlotl/go-libdogecoin-sandbox"
+import "github.com/jaxlotl/go-libdogecoin"
 
 func main() {
     prev_output_txid := "42113bdc65fc2943cf0359ea1a24ced0b6b0b5290db4c63a3329c6601c4616e2"
@@ -312,7 +312,7 @@ package main
 
 import (
     "fmt"
-    "github.com/jaxlotl/go-libdogecoin-sandbox"
+    "github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -369,7 +369,7 @@ package main
 
 import (
     "fmt"
-    "github.com/jaxlotl/go-libdogecoin-sandbox"
+    "github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -415,7 +415,7 @@ package main
 
 import (
     "fmt"
-    "github.com/jaxlotl/go-libdogecoin-sandbox"
+    "github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -428,9 +428,9 @@ func main() {
 ---
 ### **sign_raw_transaction**
 
-`int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, int sighashtype, char* amount, char* privkey)`
+`int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, int sighashtype, char* privkey)`
 
-This function takes in an index denoting which of the current transaction's inputs to sign (inputindex), the raw hexadecimal representation of the transaction to sign (incomingrawtx), the pubkey script in hexadecimal format (scripthex), the signature hash type (sighashtype), the amount included in the input to sign (amount), and the WIF-encoded private key used to sign the input (privkey). Signature hash type in normal use cases is set to 1 to denote that anyone can pay. In C, the function returns a boolean denoting success, but the actual signed transaction hex is passed back through incomingrawtx. From the wrappers, the transaction is simply returned as a string unless the signing fails, which results in a return of zero (Python) or an empty string (Go). **Important:** `sign_raw_transaction` must be run within a secp256k1 context, which can be created by calling `dogecoin_ecc_start()` and `dogecoin_ecc_stop()` as shown below.
+This function takes in an index denoting which of the current transaction's inputs to sign (inputindex), the raw hexadecimal representation of the transaction to sign (incomingrawtx), the pubkey script in hexadecimal format (scripthex), the signature hash type (sighashtype) and the WIF-encoded private key used to sign the input (privkey). Signature hash type in normal use cases is set to 1 to denote that anyone can pay. In C, the function returns a boolean denoting success, but the actual signed transaction hex is passed back through incomingrawtx. From the wrappers, the transaction is simply returned as a string unless the signing fails, which results in a return of zero (Python) or an empty string (Go). **Important:** `sign_raw_transaction` must be run within a secp256k1 context, which can be created by calling `dogecoin_ecc_start()` and `dogecoin_ecc_stop()` as shown below.
 
 _C usage:_
 ```C
@@ -500,7 +500,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/jaxlotl/go-libdogecoin-sandbox"
+	"github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -533,9 +533,9 @@ func main() {
 ---
 ### **sign_transaction**
 
-`int sign_transaction(int txindex, char* amounts[], char* script_pubkey, char* privkey)`
+`int sign_transaction(int txindex, char* script_pubkey, char* privkey)`
 
-This function takes in a working transaction structure's index as an integer (txindex), an array of all the input amounts (amounts), the pubkey in script hex form (script_pubkey), and the WIF-encoded private key (privkey). Each input is then signed using the specified private key, and the final signed transaction is saved to the hash table, which can be retrieved using `get_raw_transaction()`. The return value of `sign_transaction()` is a boolean denoting whether the signing was successful, but the output from `get_raw_transaction()` is a fully signed transaction that--if all information is valid--can be broadcast to miners and incorporated into the blockchain. **Important:** `sign_transaction` must also be run within a secp256k1 context, which can be created by calling `dogecoin_ecc_start()` and `dogecoin_ecc_stop()` as shown below.
+This function takes in a working transaction structure's index as an integer (txindex), the pubkey in script hex form (script_pubkey) and the WIF-encoded private key (privkey). Each input is then signed using the specified private key, and the final signed transaction is saved to the hash table, which can be retrieved using `get_raw_transaction()`. The return value of `sign_transaction()` is a boolean denoting whether the signing was successful, but the output from `get_raw_transaction()` is a fully signed transaction that--if all information is valid--can be broadcast to miners and incorporated into the blockchain. **Important:** `sign_transaction` must also be run within a secp256k1 context, which can be created by calling `dogecoin_ecc_start()` and `dogecoin_ecc_stop()` as shown below.
 
 _Note: Golang does not currently support the use of char*s, so depending on architecture, using Go wrappers may result in loss of precision._
 
@@ -605,7 +605,7 @@ package main
 
 import (
     "fmt"
-    "github.com/jaxlotl/go-libdogecoin-sandbox"
+    "github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {
@@ -668,7 +668,7 @@ package main
 
 import (
     "fmt"
-    "github.com/jaxlotl/go-libdogecoin-sandbox"
+    "github.com/jaxlotl/go-libdogecoin"
 )
 
 func main() {

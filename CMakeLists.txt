@@ -1,4 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.13) # 3.13: concise relative source paths
+add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
 
 SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_C_STANDARD_REQUIRED TRUE)
@@ -12,10 +13,47 @@ SET(WITH_TOOLS TRUE CACHE BOOL "enable dogecoin tool cli application")
 SET(WITH_NET TRUE CACHE BOOL "enable net functions")
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
+# Set a default build type if none was specified
+set(default_build_type "Release")
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    MESSAGE(STATUS "git dir ${CMAKE_SOURCE_DIR}")
+    set(default_build_type "Debug")
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 IF(WITH_NET)
-    FIND_LIBRARY(LIBEVENT event REQUIRED)
     IF(WIN32)
-        FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
+        # build libevent
+        execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        execute_process(COMMAND cmake .. 
+            -DEVENT__DISABLE_OPENSSL=ON 
+            -DEVENT__DISABLE_SAMPLES=ON 
+            -DEVENT__LIBRARY_TYPE=STATIC 
+            -DEVENT__DISABLE_TESTS=ON 
+            -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
+            -DEVENT__DISABLE_MM_REPLACEMENT=ON 
+            -DEVENT__DISABLE_REGRESS=ON 
+            -DEVENT__DISABLE_BENCHMARK=ON 
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        execute_process(COMMAND cmake --build .
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/include" DESTINATION "${PROJECT_SOURCE_DIR}")
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include" DESTINATION "${PROJECT_SOURCE_DIR}")
+        find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include" REQUIRED)
+        find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
+        FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)
+    ELSE()
+        FIND_LIBRARY(LIBEVENT event REQUIRED)
+        FIND_LIBRARY(LIBUNISTRING unistring REQUIRED)
     ENDIF()
 ENDIF()
 
@@ -41,7 +79,6 @@ IF(WITH_NET)
 ENDIF()
 FILE(TOUCH src/libdogecoin-config.h)
 
-
 ADD_LIBRARY(${LIBDOGECOIN_NAME})
 
 INSTALL(FILES
@@ -49,6 +86,8 @@ INSTALL(FILES
     include/dogecoin/aes.h
     include/dogecoin/base58.h
     include/dogecoin/bip32.h
+    include/dogecoin/bip39.h
+    include/dogecoin/bip44.h
     include/dogecoin/block.h
     include/dogecoin/buffer.h
     include/dogecoin/byteswap.h
@@ -57,51 +96,82 @@ INSTALL(FILES
     include/dogecoin/ctaes.h
     include/dogecoin/dogecoin.h
     include/dogecoin/ecc.h
+    include/dogecoin/eckey.h
     include/dogecoin/hash.h
     include/dogecoin/key.h
     include/dogecoin/koinu.h
     include/dogecoin/mem.h
+    include/dogecoin/moon.h
     include/dogecoin/portable_endian.h
     include/dogecoin/random.h
     include/dogecoin/rmd160.h
     include/dogecoin/script.h
     include/dogecoin/serialize.h
     include/dogecoin/sha2.h
+    include/dogecoin/sign.h
     include/dogecoin/tool.h
     include/dogecoin/transaction.h
     include/dogecoin/tx.h
-    include/uthash/uthash.h
+    include/dogecoin/qrengine.h
+    include/dogecoin/uthash.h
     include/dogecoin/utils.h
     include/dogecoin/vector.h
     include/dogecoin/wow.h
+    include/qr/qr.h
+    include/qr/png.h
+    include/qr/jpeg.h
     DESTINATION include/dogecoin
 )
+
+IF(WIN32)
+    INSTALL(FILES
+    include/dogecoin/winunistd.h
+    contrib/getopt/wingetopt.h
+    contrib/wintime/wingettime.h
+    DESTINATION include/dogecoin)
+ENDIF()
 
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/address.c
     src/aes.c
     src/base58.c
     src/bip32.c
+    src/bip39.c
+    src/bip44.c
     src/block.c
     src/buffer.c
     src/chainparams.c
     src/cstr.c
     src/ctaes.c
     src/ecc.c
+    src/eckey.c
     src/key.c
     src/koinu.c
     src/mem.c
+    src/moon.c
+    src/qr.c
+    src/qrengine.c
+    src/png.c
+    src/jpeg.c
     src/random.c
     src/rmd160.c
     src/script.c
     src/serialize.c
     src/sha2.c
+    src/sign.c
     src/cli/tool.c
     src/transaction.c
     src/tx.c
     src/utils.c
     src/vector.c
 )
+
+IF(WIN32)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    contrib/getopt/wingetopt.c
+    contrib/wintime/wingettime.c
+)
+ENDIF()
 
 FILE(GLOB SECP256K1 RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
     src/secp256k1/src/*.c)
@@ -141,6 +211,8 @@ IF(USE_TESTS)
         test/aes_tests.c
         test/base58_tests.c
         test/bip32_tests.c
+        test/bip39_tests.c
+        test/bip44_tests.c
         test/block_tests.c
         test/buffer_tests.c
         test/cstr_tests.c
@@ -149,20 +221,29 @@ IF(USE_TESTS)
         test/key_tests.c
         test/koinu_tests.c
         test/mem_tests.c
+        test/moon_tests.c
         test/opreturn_tests.c
+        test/qr_tests.c
         test/random_tests.c
         test/rmd160_tests.c
         test/serialize_tests.c
         test/sha2_tests.c
+        test/signmsg_tests.c
         test/transaction_tests.c
         test/tx_tests.c
         test/utest.h
         test/unittester.c
         test/utils_tests.c
         test/vector_tests.c
-    )
-    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} m)
+)
+    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
+    # move test/wordlist to build
+    FILE(GLOB_RECURSE WORDLISTS "${PROJECT_SOURCE_DIR}/test/wordlist/*.txt")
+    FOREACH(wordlist ${WORDLISTS})
+        GET_FILENAME_COMPONENT(wordlist_name ${wordlist} NAME)
+        CONFIGURE_FILE(${wordlist} "${CMAKE_CURRENT_BINARY_DIR}/test/wordlist/${wordlist_name}" COPYONLY)
+    ENDFOREACH()
 ENDIF()
 
 IF(WITH_NET)
@@ -176,7 +257,7 @@ IF(WITH_NET)
         src/protocol.c
     )
 
-    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS} m)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS} ${LIBUNISTRING})
 
     IF(USE_TESTS)
         TARGET_SOURCES(tests PRIVATE
@@ -195,13 +276,15 @@ IF(WITH_TOOLS)
 
     ADD_EXECUTABLE(such src/cli/such.c)
     INSTALL(TARGETS such RUNTIME)
-    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} m)
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
+
     TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
     IF(WITH_NET)
         ADD_EXECUTABLE(sendtx src/cli/sendtx.c)
         INSTALL(TARGETS sendtx RUNTIME)
-        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME} m)
+        TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME})
+
         TARGET_INCLUDE_DIRECTORIES(sendtx PRIVATE src)
     ENDIF()
 ENDIF()

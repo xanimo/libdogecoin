@@ -63,13 +63,12 @@ void test_key()
     dogecoin_key_sign_hash_compact_recoverable(&key, hash, sigcmp_rec, &outlencmp_rec, &recid);
     dogecoin_key_sign_recover_pubkey(sigcmp_rec, hash, recid, &pubkey_rec);
     u_assert_int_eq(dogecoin_pubkey_verify_sig(&pubkey, hash, sig, outlen), true);
-    u_assert_int_eq(dogecoin_pubkey_verify_sig(&pubkey, hash, sig, outlen), true);
     u_assert_mem_eq(pubkey.pubkey, pubkey_rec.pubkey, sizeof(pubkey.pubkey));
-    size_t size = 66;
-    char str[66];
+    char str[66 + 1];
+    size_t size = sizeof(str);
     int r = dogecoin_pubkey_get_hex(&pubkey, str, &size);
     u_assert_int_eq(r, true);
-    u_assert_int_eq(size, 66);
+    u_assert_uint32_eq(size, 66);
     size = 50;
     r = dogecoin_pubkey_get_hex(&pubkey, str, &size);
     u_assert_int_eq(r, false);

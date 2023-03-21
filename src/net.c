@@ -26,7 +26,12 @@
  */
 
 #ifdef _WIN32
+#ifdef _MSC_VER
+#include <../contrib/getopt/wingetopt.h>
+#else
 #include <getopt.h>
+#endif
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
@@ -42,13 +47,22 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+//MLUMIN:MSVC
+#ifdef _MSC_VER
+#define HAVE_STRUCT_TIMESPEC
+#include <../../contrib/winpthreads/include/pthread.h>
+#else
 #include <pthread.h>
+#endif
+//MLUMIN:MSVC
+
 #include <time.h>
 
 #include <event2/event.h>
 #include <event2/util.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+
 
 #include <dogecoin/buffer.h>
 #include <dogecoin/chainparams.h>
@@ -724,9 +738,9 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
  * @param port The port to connect to.
  * @param family The address family of the socket. AF_INET or AF_INET6.
  * 
- * @return int
+ * @return size_t
  */
-int dogecoin_get_peers_from_dns(const char* seed, vector* ips_out, int port, int family)
+size_t dogecoin_get_peers_from_dns(const char* seed, vector* ips_out, int port, int family)
 {
     if (!seed || !ips_out || (family != AF_INET && family != AF_INET6) || port > 99999) {
         return 0;

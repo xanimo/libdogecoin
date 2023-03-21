@@ -30,14 +30,20 @@
 
 #include <assert.h>
 #ifdef HAVE_CONFIG_H
-#  include "libdogecoin-config.h"
+#include "libdogecoin-config.h"
 #endif
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#if defined _WIN32
+#ifdef _MSC_VER
+#include <dogecoin/winunistd.h>
+#endif
+#else
 #include <unistd.h>
+#endif
 #if defined _WIN32 && ! defined __CYGWIN__
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>

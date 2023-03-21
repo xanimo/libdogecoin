@@ -146,7 +146,7 @@ dogecoin_bool dogecoin_hdnode_from_seed(const uint8_t* seed, int seed_len, dogec
     out->depth = 0;
     out->fingerprint = 0x00000000;
     out->child_num = 0;
-    hmac_sha512((const uint8_t*)"Dogecoin seed", 12, seed, seed_len, I);
+    hmac_sha512((const uint8_t*)"Bitcoin seed", 12, seed, seed_len, I);
     memcpy_safe(out->private_key, I, DOGECOIN_ECKEY_PKEY_LENGTH);
 
     if (!dogecoin_ecc_verify_privatekey(out->private_key)) {
@@ -300,7 +300,7 @@ void dogecoin_hdnode_fill_public_key(dogecoin_hdnode* node)
  * 
  * @return Nothing.
  */
-static void dogecoin_hdnode_serialize(const dogecoin_hdnode* node, uint32_t version, char use_public, char* str, int strsize)
+static void dogecoin_hdnode_serialize(const dogecoin_hdnode* node, uint32_t version, char use_public, char* str, size_t strsize)
 {
     uint8_t node_data[78];
     write_be(node_data, version);
@@ -329,7 +329,7 @@ static void dogecoin_hdnode_serialize(const dogecoin_hdnode* node, uint32_t vers
  * 
  * @return Nothing.
  */
-void dogecoin_hdnode_serialize_public(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, int strsize)
+void dogecoin_hdnode_serialize_public(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, size_t strsize)
 {
     dogecoin_hdnode_serialize(node, chain->b58prefix_bip32_pubkey, 1, str, strsize);
 }
@@ -346,7 +346,7 @@ void dogecoin_hdnode_serialize_public(const dogecoin_hdnode* node, const dogecoi
  * 
  * @return Nothing.
  */
-void dogecoin_hdnode_serialize_private(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, int strsize)
+void dogecoin_hdnode_serialize_private(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, size_t strsize)
 {
     dogecoin_hdnode_serialize(node, chain->b58prefix_bip32_privkey, 0, str, strsize);
 }
@@ -382,7 +382,7 @@ void dogecoin_hdnode_get_hash160(const dogecoin_hdnode* node, uint160 hash160_ou
  * 
  * @return Nothing.
  */
-void dogecoin_hdnode_get_p2pkh_address(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, int strsize)
+void dogecoin_hdnode_get_p2pkh_address(const dogecoin_hdnode* node, const dogecoin_chainparams* chain, char* str, size_t strsize)
 {
     uint8_t hash160[sizeof(uint160) + 1];
     hash160[0] = chain->b58prefix_pubkey_address;

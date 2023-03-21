@@ -15,11 +15,15 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - generate_public_key
 - p2pkh
 - bip32_extended_master_key
-- bip32maintotest
 - derive_child_keys
+- generate_mnemonic
+- mnemonic_to_addresses
 - print_keys
 - sign
 - comp2der
+- bip32maintotest
+- signmessage
+- verify_message
 - transaction
 
 So an example run of `such` could be something like this:
@@ -33,6 +37,12 @@ Most of these commands require a flag following them to denote things like exist
 | -p, --privkey  | private_key         | yes | generate_public_key -p <private_key> |
 | -k, --pubkey  | public_key          | yes | p2pkh -k <public_key> |
 | -m, --derived_path | derived_path        | yes | derive_child_key -p <extended_private_key> -m <derived_path> |
+| -e, --entropy  | hex_entropy | yes | generate_mnemonic -e <hex_entropy> |
+| -n, --mnemonic  | seed_phrase | yes | mnemonic_to_addresses -n <seed_phrase> |
+| -a, --pass_phrase  | pass_phrase | yes | mnemonic_to_addresses -n <seed_phrase> -a <pass_phrase> |
+| -o, --account_int  | account_int | yes | mnemonic_to_addresses -n <seed_phrase> -o <account_int> |
+| -g, --change_level  | change_level | yes | mnemonic_to_addresses -n <seed_phrase> -g <change_level> |
+| -i, --address_index  | address_index | yes | mnemonic_to_addresses -n <seed_phrase> -i <address_index> |
 | -t, --testnet  | designate_testnet   | no  | generate_private_key -t |
 | -s  | script_hex          | yes | comp2der -s <compact_signature> |
 | -x  | transaction_hex     | yes | sign -x <transaction_hex> -s <pubkey_script> -i <index_of_utxo_to_sign> -h <sig_hash_type> |
@@ -49,9 +59,13 @@ Below is a list of all the commands and the flags that they require. As a remind
 | bip32_extended_master_key | None                   | -t   | Generate an extended master private key from a secp256k1 context for either mainnet or testnet. |
 | bip32maintotest           | -p                     | None | Convert a mainnet private key into an equivalent testnet key. |
 | derive_child_keys         | -p, -m                 | -t   | Generates a child key derived from the specified private key using the specified derivation path. 
+| generate_mnemonic         | None                   | -e   | Generates a seed phrase randomly or from optional hex entropy. |
+| mnemonic_to_addresses     | -n      | -a, -o, g, -i, -t   | Generates an address from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
 | print_keys                | -p                     | -t   | Print all keys associated with the provided private key.
 | sign                      | -x, -s, -i, -h, -p     | -t   | See the definition of sign_raw_transaction in the Transaction API.
 | comp2der                  | -s                     | None | Convert a compact signature to a DER signature.
+| signmessage               | -x, -p                 | None | Sign a message and output a base64 encoded signature and address.
+| verify_message             | -x, -s, -k             | None | Verify a message by public key recovery of base64 decoded signature and comparison of addresses.
 | transaction               | None                   | None | Start the interactive transaction app. [Usage instructions below.]() |
 
 Lastly, to display the version of `such`, simply run the following command, which overrides any previous ones specified:
@@ -88,22 +102,57 @@ Below are some examples on how to use the `such` tool in practice.
 ##### Print HD node
 
     ./such -c print_keys -privkey dgpv51eADS3spNJh9qLpW8S7B7uZmusTpNE85NgXsYD7eGuVhebMDfEsj6fNR6DHgpSBCmYdAvw9YRSqRWnFxtYn1bM8AdNipwdi9dDXFCY8vkY
-    > ext key: dgpv51eADS3spNJh9qLpW8S7B7uZmusTpNE85NgXsYD7eGuVhebMDfEsj6fNR6DHgpSBCmYdAvw9YRSqRWnFxtYn1bM8AdNipwdi9dDXFCY8vkY
-    > privatekey WIF: QTtXPXYWc4G6WuA6qNRYeQ3TAdsBUUqrLwN1eWVFEvfHdd8M1ed5
-    > depth: 0
-    > child index: 0
-    > p2pkh address: D79Q3spkucaM2DvLxUZjgV1X4cQcWDLuyt
-    > pubkey hex: 025368ca428b4c4e0c48631c5f8510d704858a52c7264d4ba74f34b2bcee374220
-    > extended pubkey: dgub8kXBZ7ymNWy2SgzyYN45HyTAEUF6eVFqMyTk2ec6SPxWFhi3dRneNQ51zJadLERvA1ns9uvMGKM9wYKTSnCP9QrSPJMCKjdfSv4qmT3PkP2
+    > ext key:             dgpv51eADS3spNJh9qLpW8S7B7uZmusTpNE85NgXsYD7eGuVhebMDfEsj6fNR6DHgpSBCmYdAvw9YRSqRWnFxtYn1bM8AdNipwdi9dDXFCY8vkY
+    > extended pubkey:     dgub8kXBZ7ymNWy2SgzyYN45HyTAEUF6eVFqMyTk2ec6SPxWFhi3dRneNQ51zJadLERvA1ns9uvMGKM9wYKTSnCP9QrSPJMCKjdfSv4qmT3PkP2
+    > pubkey hex:          025368ca428b4c4e0c48631c5f8510d704858a52c7264d4ba74f34b2bcee374220
+    > privatekey WIF:      QTtXPXYWc4G6WuA6qNRYeQ3TAdsBUUqrLwN1eWVFEvfHdd8M1ed5
+    > depth:               0
+    > child index:         0
+    > p2pkh address:       D79Q3spkucaM2DvLxUZjgV1X4cQcWDLuyt
 
 ##### Derive child key (second child key at level 1 in this case)
 
-    ./such -c derive_child_keys -keypath m/1h -privkey dgpv51eADS3spNJh9qLpW8S7B7uZmusTpNE85NgXsYD7eGuVhebMDfEsj6fNR6DHgpSBCmYdAvw9YRSqRWnFxtYn1bM8AdNipwdi9dDXFCY8vkY
-    > ext key: dgpv53gfwGVYiKVgf3hybqGjXuxrW2s2iCArhBURxAWaFszfqfP6wc23KFVyCuGj4fGzAX6oC8QmvhvkWz18v4VcdhzYCxoTR3XQizrVtjMwQHS
-    > depth: 1
-    > p2pkh address: DFqonEEA56VE8zEGvhXNgjiPT3PaPFNQQu
-    > pubkey hex: 023973b755fdaf5b2b7b20ac134c936ec7882b1ce0a3a75857fc490c12cdf4fb4f
-    > extended pubkey: dgub8nZhGxRSGUA1wuN8e4themWSxbEfYKCZynFe7GuZ413gPiVoMNZoxYucn8DQ5doeqt1cmZnxZ4Ms9SdsraiSbUkZSYbx1GzpGbrAqmFdSSL
+    ./such -c derive_child_keys -m m/1h -privkey dgpv51eADS3spNJh9qLpW8S7B7uZmusTpNE85NgXsYD7eGuVhebMDfEsj6fNR6DHgpSBCmYdAvw9YRSqRWnFxtYn1bM8AdNipwdi9dDXFCY8vkY
+    > ext key:             dgpv53gfwGVYiKVgf3hybqGjXuxrW2s2iCArhBURxAWaFszfqfP6wc23KFVyCuGj4fGzAX6oC8QmvhvkWz18v4VcdhzYCxoTR3XQizrVtjMwQHS
+    > extended pubkey:     dgub8nZhGxRSGUA1wuN8e4themWSxbEfYKCZynFe7GuZ413gPiVoMNZoxYucn8DQ5doeqt1cmZnxZ4Ms9SdsraiSbUkZSYbx1GzpGbrAqmFdSSL
+    > pubkey hex:          023973b755fdaf5b2b7b20ac134c936ec7882b1ce0a3a75857fc490c12cdf4fb4f
+    > privatekey WIF:      QQUwLsFpWWXsHFLCxjvBMn8Qd4Pgqji5QUXz6zN8vkiKMPvv7mpZ
+    > depth:               1
+    > child index:         -2147483647
+    > p2pkh address:       DFqonEEA56VE8zEGvhXNgjiPT3PaPFNQQu
+
+#### Generate a random BIP39 seed phrase
+#### See "Seed phrases" in address.md, for additional guidance
+
+    ./such -c generate_mnemonic
+    > they nuclear observe moral twenty gym hedgehog damage reveal syrup negative beach best silk alone feel vapor deposit belt host purity run clever deer
+
+#### Geneate an HD address from the seed phrase for a given account (2), change level (1, internal) and index (0) for testnet
+
+    ./such -c mnemonic_to_addresses -n "they nuclear observe moral twenty gym hedgehog damage reveal syrup negative beach best silk alone feel vapor deposit belt host purity run clever deer" -o 2 -g 1 -i 0 -t
+    > Address: nW7ndt4HZh8XwLYN6v6N2S4mZCbpZPuFxh
+
+#### Generate a BIP39 seed phrase from hex entropy
+
+    ./such -c generate_mnemonic -e "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+    > zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote
+
+#### Geneate an HD address from the seed phrase and default path (m/44'/3'/0'/0/0) for mainnet
+
+    ./such -c mnemonic_to_addresses -n "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote"
+    > Address: DTdKu8YgcxoXyjFCDtCeKimaZzsK27rcwT
+
+#### Sign an arbitrary message
+
+    ./such -c signmessage -x bleh -p QWCcckTzUBiY1g3GFixihAscwHAKXeXY76v7Gcxhp3HUEAcBv33i
+    message: bleh
+    content: ICrbftD0KamyaB68IoXbeke3w4CpcIvv+Q4pncBNpMk8fF5+xsR9H9gqmfM0JrjlfzZZA3E8AJ0Nug1KWeoVw3g=
+    address: D8mQ2sKYpLbFCQLhGeHCPBmkLJRi6kRoSg
+
+#### Verify an arbitrary message
+
+    ./such -c verifymessage -x bleh -s ICrbftD0KamyaB68IoXbeke3w4CpcIvv+Q4pncBNpMk8fF5+xsR9H9gqmfM0JrjlfzZZA3E8AJ0Nug1KWeoVw3g= -k D8mQ2sKYpLbFCQLhGeHCPBmkLJRi6kRoSg
+    Message is verified!
 
 ### Interactive Transaction Building with `such`
 

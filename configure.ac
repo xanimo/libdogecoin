@@ -6,7 +6,7 @@ AC_PREREQ([2.68])
 # backwards-compatible and therefore at most increase the minor version.
 define(_PKG_VERSION_MAJOR, 0)
 define(_PKG_VERSION_MINOR, 1)
-define(_PKG_VERSION_BUILD, 0)
+define(_PKG_VERSION_BUILD, 2)
 define(_PKG_VERSION_IS_RELEASE, true)
 
 # The library version is based on libtool versioning of the ABI. The set of
@@ -14,10 +14,10 @@ define(_PKG_VERSION_IS_RELEASE, true)
 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 # All changes in experimental modules are treated as if they don't affect the
 # interface and therefore only increase the revision.
-define(_LIB_VERSION_CURRENT, 0)
-define(_LIB_VERSION_REVISION, 1)
+define(_LIB_VERSION_CURRENT, 1)
+define(_LIB_VERSION_REVISION, 0)
 define(_LIB_VERSION_AGE, 0)
-AC_INIT([libdogecoin],m4_join([.], _PKG_VERSION_MAJOR, _PKG_VERSION_MINOR, _PKG_VERSION_BUILD)m4_if(_PKG_VERSION_IS_RELEASE, [true], [], [-pre]),[https://github.com/dogecoinfoundation/libdogecoin/issues],[libdogecoin],[https://github.com/dogecoinfoundation/libdogecoin])
+AC_INIT([libdogecoin],m4_join([.], _PKG_VERSION_MAJOR, _PKG_VERSION_MINOR, _PKG_VERSION_BUILD)m4_if(_PKG_VERSION_IS_RELEASE, [true], [], [-dev]),[https://github.com/dogecoinfoundation/libdogecoin/issues],[libdogecoin],[https://github.com/dogecoinfoundation/libdogecoin])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 
@@ -127,7 +127,7 @@ if test "x$random_device" = x"/dev/random"; then
 fi
 
 if test "x$with_tools" = xyes; then
-AC_DEFINE_UNQUOTED([WITH_TOOLS],[1],[Define to 1 to enable wallet compilation])
+  AC_DEFINE_UNQUOTED([WITH_TOOLS],[1],[Define to 1 to enable wallet compilation])
 fi
 
 if test "x$with_net" = xyes; then
@@ -140,15 +140,13 @@ if test "x$enable_debug" = xyes; then
   AC_DEFINE_UNQUOTED([ENABLE_DEBUG],[1],[Define to 1 to enable debug output])
 fi
 
-if test x$with_net = "xyes"; then
+if test "x$with_net" = xyes; then
   AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
-  AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
   AC_CHECK_LIB([event_core],[main],EVENT_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing))
-  LIBS="$LIBS -levent -levent_core"
-  if test "$host" = "mingw"; then
-    AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-  fi
+  LIBS="$LIBS $EVENT_LIBS"
 fi
+
+AC_CHECK_LIB([unistring],[main],LIBUNISTRING=-lunistring,AC_MSG_ERROR(libunistring missing))
 
 AC_CONFIG_HEADERS([src/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
@@ -156,6 +154,7 @@ AC_SUBST(LIBTOOL_APP_LDFLAGS)
 AC_SUBST(BUILD_EXEEXT)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
+AC_SUBST(LIBUNISTRING)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
@@ -173,6 +172,7 @@ echo "Options used to compile and link:"
 echo "  with tools    = $with_tools"
 echo "  with net      = $with_net"
 echo
+echo "  host          = $host"
 echo "  target os     = $TARGET_OS"
 echo
 echo "  CC            = $CC"

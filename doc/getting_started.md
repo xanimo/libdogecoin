@@ -13,12 +13,13 @@ For Ubuntu and Debian Linux, you will need to install the following dependencies
 - automake
 - libtool
 - libevent-dev
+- libunistring-dev
 - build-essential
 
 This can be done in the following commands using Linux CLI:
 ```
 sudo apt-get update
-sudo apt-get install autoconf automake libtool libevent-dev build-essential
+sudo apt-get install autoconf automake libtool libevent-dev libunistring-dev build-essential
 ```
 
 ### Step 2: Build Libraries
@@ -160,7 +161,7 @@ pip3 install libdogecoin
 ```
 Or download the Golang wrappers through `go get`:
 ```
-go get -u github.com/jaxlotl/go-libdogecoin-sandbox
+go get -u github.com/jaxlotl/go-libdogecoin
 go mod tidy
 ```
 

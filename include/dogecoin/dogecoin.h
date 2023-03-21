@@ -1,8 +1,8 @@
 /*
 
  The MIT License (MIT)
- Copyright (c) 2022 bluezr
- Copyright (c) 2022 The Dogecoin Foundation
+ Copyright (c) 2023 bluezr
+ Copyright (c) 2023 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(HAVE_CONFIG_H)
+#include "src/libdogecoin-config.h"
+#endif
 
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
@@ -77,6 +81,16 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
     // other warnings you want to deactivate...
     #include <BaseTsd.h>
     typedef SSIZE_T ssize_t;
+
+    //MLUMIN:MSVC - need winsock for msvc 
+    #pragma comment(lib, "Ws2_32.lib")
+    #pragma comment(lib, "wsock32.lib")
+    //MLUMIN:MSVC - need Iphlpapi.lib for __imp_f_nametoindex in msvc
+    #pragma comment(lib, "Iphlpapi.lib")
+    //MLUMIN:MSVC - need strtok_r redefined as strtok_s in msvc
+    #define strtok_r strtok_s
+
+
 #elif defined(__GNUC__) || defined(__clang__)
     #define DO_PRAGMA(X) _Pragma(#X)
     #define DISABLE_WARNING_PUSH           DO_PRAGMA(GCC diagnostic push)
@@ -96,10 +110,12 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
 #endif
 
-#define DEBUG 0
-#ifdef DEBUG
+#ifndef ENABLE_DEBUG
+#define ENABLE_DEBUG 0
+#endif
+#ifdef ENABLE_DEBUG
 #define debug_print(fmt, ...) \
-        do { if (DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
+        do { if (ENABLE_DEBUG) fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
                                 __LINE__, __func__, __VA_ARGS__); } while (0)
 #endif
 

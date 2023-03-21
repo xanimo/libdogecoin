@@ -119,6 +119,7 @@ dist/
 !wrappers/golang/libdogecoin/go.mod
 contrib/gitian/
 contrib/gitian/*
+example
 
 # CMake files
 build/*
@@ -133,3 +134,20 @@ build/*
 **/CMakeScripts
 **/compile_commands.json
 Testing/
+/.vs
+/out/build/x64-Debug/.cmake/api/v1
+/out/build/x64-Debug
+/src/libevent/.vs
+/src/libevent/build/.vs/libevent
+/src/libevent/out/build/x64-Debug
+/src/libevent/build
+*.tcl
+include/uni*.h
+include/unistring/
+include/ev*.h
+include/event2/*
+include/include.am
+
+# QR
+qrtest.png
+qrtest.jpg

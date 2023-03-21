@@ -2,7 +2,7 @@ package libdogecoin
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/../../.. -I${SRCDIR}/../../../include -I${SRCDIR}/../../../include/dogecoin -I${SRCDIR}/../../../include/dogecoin/ -I${SRCDIR}/../../../src/secp256k1/include -I${SRCDIR}/../../../src/secp256k1/src -I${SRCDIR}/../../../depends/x86_64-pc-linux-gnu/include -fPIC
-#cgo LDFLAGS: -L${SRCDIR}/../../../.libs -L${SRCDIR}/../../../src/secp256k1/.libs -L${SRCDIR}/../../../depends/x86_64-pc-linux-gnu/lib -ldogecoin -levent_core -levent -lpthread -lsecp256k1 -lsecp256k1_precomputed -lm -Wl,-rpath=${SRCDIR}/../../../.libs
+#cgo LDFLAGS: -L${SRCDIR}/../../../.libs -L${SRCDIR}/../../../src/secp256k1/.libs -L${SRCDIR}/../../../depends/x86_64-pc-linux-gnu/lib -ldogecoin -levent_core -levent -lpthread -lsecp256k1 -lsecp256k1_precomputed -lm -lunistring -Wl,-rpath=${SRCDIR}/../../../.libs
 #include "libdogecoin.h"
 */
 import "C"
@@ -80,7 +80,7 @@ func W_verify_hd_master_pub_keypair(wif_privkey_master string, p2pkh_pubkey_mast
 func W_verify_p2pkh_address(p2pkh_pubkey string) (result bool) {
 	c_p2pkh_pubkey := C.CString(p2pkh_pubkey)
 	len := len(p2pkh_pubkey)
-	c_len := C.uchar(len)
+	c_len := C.size_t(len)
 	if C.verifyP2pkhAddress(c_p2pkh_pubkey, c_len) == 1 {
 		result = true
 	} else {

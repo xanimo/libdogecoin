@@ -82,7 +82,7 @@ dogecoin_bool dogecoin_script_copy_without_op_codeseperator(const cstring* scrip
             if (!deser_u32(&v32, &buf))
                 goto err_out;
             cstr_append_buf(script_out, &opcode, 1);
-            cstr_append_buf(script_out, &v32, 5); // todo: find out why this is 5 not 4
+            cstr_append_buf(script_out, &v32, 4);
             data_len = v32;
         } else if (opcode == OP_CODESEPARATOR)
             continue;
@@ -90,7 +90,10 @@ dogecoin_bool dogecoin_script_copy_without_op_codeseperator(const cstring* scrip
         if (data_len > 0) {
             assert(data_len < 16777215); //limit max push to 0xFFFFFF
             unsigned char* bufpush = (unsigned char*)dogecoin_calloc(1, data_len);
-            deser_bytes(bufpush, &buf, data_len);
+            if (!deser_bytes(bufpush, &buf, data_len)) {
+                dogecoin_free(bufpush);
+                goto err_out;
+            }
             cstr_append_buf(script_out, bufpush, data_len);
             dogecoin_free(bufpush);
         } else
@@ -547,11 +550,11 @@ void dogecoin_script_append_pushdata(cstring* script_in, const unsigned char* da
         cstr_append_buf(script_in, (unsigned char*)&datalen, 1);
     } else if (datalen <= 0xffff) {
         dogecoin_script_append_op(script_in, OP_PUSHDATA2);
-        uint16_t v = htole16(datalen);
+        uint16_t v = htole16((uint16_t)datalen);
         cstr_append_buf(script_in, &v, sizeof(v));
     } else {
         dogecoin_script_append_op(script_in, OP_PUSHDATA4);
-        uint32_t v = htole32(datalen);
+        uint32_t v = htole32((uint32_t)datalen);
         cstr_append_buf(script_in, &v, sizeof(v));
     }
     cstr_append_buf(script_in, data, datalen);
