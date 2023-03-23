@@ -81,7 +81,26 @@ void test_psbt() {
         assert(psbt_isnull(psbt));
 
         char* psbt_hex = (char*)&valid_psbts[i];
-        printf("%s\n", psbt_hex);
+        printf("\npsbt_hex:               %s\n", psbt_hex);
+        printf("memcmp:                 %d\n", memcmp(PSBT_MAGIC_BYTES, utils_hex_to_uint8(psbt_hex), 5)==0);
+
+        assert(memcmp(PSBT_MAGIC_BYTES, utils_hex_to_uint8(psbt_hex), 5)==0);
+
+        char* psbt_tx = &psbt_hex[10];
+        printf("psbt_tx:                %s\n", psbt_tx);
+
+        size_t outlen, psbt_tx_len = strlen(psbt_tx);
+        uint8_t tx_data[psbt_tx_len + 1];
+        utils_hex_to_bin(psbt_tx, tx_data, psbt_tx_len, &outlen);
+
+        if (!dogecoin_tx_deserialize(tx_data, outlen, psbt->tx, NULL)) {
+            printf("tx_data failed to deserialize!\n");
+        }
+
+        printf("psbt->tx->version:      %d\n", psbt->tx->version);
+        printf("psbt->tx->vin->len:     %ld\n", psbt->tx->vin->len);
+        printf("psbt->tx->vout->len:    %ld\n", psbt->tx->vout->len);
+        printf("psbt->tx->locktime:     %u\n", psbt->tx->locktime);
 
         dogecoin_psbt_output_free(output);
         dogecoin_psbt_input_free(input);
