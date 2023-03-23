@@ -39,6 +39,33 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+// {
+//   "global": {
+//     "magic": "psbt",
+//     "separator": "ff",
+//     "unsigned_tx": "00"
+//   },
+//   "input": {
+//     "bip32_derivation": "06",
+//     "final_scriptsig": "07",
+//     "final_scriptwitness": "08",
+//     "non_witness_utxo": "00",
+//     "partial_sig": "02",
+//     "redeem_script": "04",
+//     "sighash_type": "03",
+//     "witness_script": "05",
+//     "witness_utxo": "01"
+//   },
+//   "output": {
+//     "bip32_derivation": "02",
+//     "redeem_script": "00",
+//     "tap_bip32_derivation": "07",
+//     "tap_internal_key": "05",
+//     "tap_tree": "06",
+//     "witness_script": "01"
+//   }
+// }
+
 // Magic bytes
 static const uint8_t PSBT_MAGIC_BYTES[5] = {'p', 's', 'b', 't', 0xff};
 
