@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['u_0',['u',['../structsecp256k1__modinv64__trans2x2.html#a4539266706b69144b7585b4a90d37e90',1,'secp256k1_modinv64_trans2x2::u()'],['../structsecp256k1__modinv32__trans2x2.html#a14a20e308210496dfacb9d85032f0ae7',1,'secp256k1_modinv32_trans2x2::u()']]],
+  ['uint256_1',['uint256',['../dogecoin_8h.html#a7b1e8040e3117539e0382dbdfb55f942',1,'dogecoin.h']]],
+  ['underlying_2',['underlying',['../structbufferevent__filtered.html#a65dc1705707235e88bf3cb239a03ec41',1,'bufferevent_filtered::underlying()'],['../structbufferevent__openssl.html#a2c3728f5b11a3919989bf312c9ef86d8',1,'bufferevent_openssl::underlying()']]],
+  ['unknown_5fchunks_5fdata_3',['unknown_chunks_data',['../structLodePNGInfo.html#a8347476da7fc2fc6af4ec7ed44b638c6',1,'LodePNGInfo']]],
+  ['unknown_5fchunks_5fsize_4',['unknown_chunks_size',['../structLodePNGInfo.html#a25a81d760759bd0383ae5a81ba83911d',1,'LodePNGInfo']]],
+  ['unlink_5',['unlink',['../structbufferevent__ops.html#a150554a192bdb0dde684004284cbe734',1,'bufferevent_ops']]],
+  ['unlinked_5fpartner_6',['unlinked_partner',['../structbufferevent__pair.html#a515b93cc48124cb651a281b3d64c7886',1,'bufferevent_pair']]],
+  ['uri_5fchars_7',['uri_chars',['../http_8c.html#a5fe68c89694ff69f6112196e7b932f54',1,'http.c']]],
+  ['use_5flz77_8',['use_lz77',['../structLodePNGCompressSettings.html#a37a87bd874376f0298efad2870e70e7e',1,'LodePNGCompressSettings']]],
+  ['user_5fcallback_9',['user_callback',['../structevdns__server__port.html#a63b4b3769c8a5381b59830be4678a05a',1,'evdns_server_port::user_callback()'],['../structdeferred__reply__callback.html#ad901a53d70fb724e0ae6c314c4965b77',1,'deferred_reply_callback::user_callback()'],['../structrequest.html#a7a91a784b412ef10384facd1e88c20a2',1,'request::user_callback()']]],
+  ['user_5fcanceled_10',['user_canceled',['../structevdns__getaddrinfo__request.html#a86f5b3ff30b44ee86764f80209347188',1,'evdns_getaddrinfo_request']]],
+  ['user_5fcb_11',['user_cb',['../structevdns__getaddrinfo__request.html#ad9f262b21875356d3152b365c5b7f6a7',1,'evdns_getaddrinfo_request']]],
+  ['user_5fdata_12',['user_data',['../structevdns__server__port.html#adafd8cc118fdc731571fe42e60fd461f',1,'evdns_server_port::user_data()'],['../structevdns__getaddrinfo__request.html#acff7e0ffacc5a7f6fda20a709450fc27',1,'evdns_getaddrinfo_request::user_data()'],['../structevconnlistener.html#acf56068416b2203b9f3f8e069ec77e0a',1,'evconnlistener::user_data()']]],
+  ['user_5fpointer_13',['user_pointer',['../structrequest.html#a5758b92c74f3943c8af86264d9b9b4f4',1,'request']]],
+  ['useragent_14',['useragent',['../structdogecoin__p2p__version__msg__.html#a22ce14fbf83c30b5ca9213f4e37c865f',1,'dogecoin_p2p_version_msg_']]],
+  ['userinfo_15',['userinfo',['../structevhttp__uri.html#a693362c6ed54c9b19268da06cda4020d',1,'evhttp_uri']]]
+];
