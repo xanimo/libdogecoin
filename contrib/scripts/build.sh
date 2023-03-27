@@ -64,6 +64,9 @@ if has_param '--host' "$@"; then
         "x86_64-apple-darwin14")
             TARGET_ARCH="amd64"
         ;;
+        "arm64-apple-darwin")
+            TARGET_ARCH="arm64"
+        ;;
         "x86_64-pc-linux-gnu")
             TARGET_ARCH="amd64"
         ;;

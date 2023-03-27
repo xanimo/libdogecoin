@@ -98,6 +98,8 @@ if [ "$HOST" ]; then
         ;;
         "x86_64-apple-darwin14")
         ;;
+        "arm64-apple-darwin")
+        ;;
         "x86_64-pc-linux-gnu")
         ;;
         "i686-pc-linux-gnu")

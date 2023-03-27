@@ -26,7 +26,7 @@ remotes:
 - "url": "${URL}"
   "dir": "libdogecoin"
 files:
-- "Xcode-12.1-12A7403-extracted-SDK-with-libcxx-headers.tar.gz"
+- "Xcode-12.2-12B45b-extracted-SDK-with-libcxx-headers.tar.gz"
 script: |
   WRAP_DIR=$HOME/wrapped
   HOSTS="x86_64-apple-darwin14"
@@ -80,7 +80,7 @@ script: |
   BASEPREFIX=`pwd`/depends
 
   mkdir -p ${BASEPREFIX}/SDKs
-  tar -C ${BASEPREFIX}/SDKs -xf ${BUILD_DIR}/Xcode-12.1-12A7403-extracted-SDK-with-libcxx-headers.tar.gz
+  tar -C ${BASEPREFIX}/SDKs -xf ${BUILD_DIR}/Xcode-12.2-12B45b-extracted-SDK-with-libcxx-headers.tar.gz
 
   # Build dependencies for each host
   for i in $HOSTS; do
