@@ -73,6 +73,10 @@ if has_param '--host' "$@"; then
             TARGET_HOST_TRIPLET=$2
             shift 2
         ;;
+        "arm64-apple-darwin")
+            TARGET_HOST_TRIPLET=$2
+            shift 2
+        ;;
         "x86_64-pc-linux-gnu")
             TARGET_HOST_TRIPLET=$2
             shift 2

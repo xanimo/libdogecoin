@@ -11,6 +11,7 @@ These scripts are partitioned to support different phases of the development pro
  - x86_64-w64-mingw32
  - i686-w64-mingw32
  - x86_64-apple-darwin14
+ - arm64-apple-darwin
 
 Please take note of these target host triplets as they're required when using these scripts!
 
@@ -89,4 +90,4 @@ Optional flag to purge cached dependencies and previously built files:
 --clean
 ```
 
-Note that if building on linux, the preceeding examples can be used to cross compile every supported host platform triplet with exception to being capable of running tests on `x86_64-apple-darwin14`.
+Note that if building on linux, the preceeding examples can be used to cross compile every supported host platform triplet with exception to being capable of running tests on `x86_64-apple-darwin14` and `arm64-apple-darwin`.
