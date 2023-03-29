@@ -41,11 +41,11 @@ static const uint8_t PSET_MAGIC[5] = {'p', 's', 'e', 't', 0xff};
 
 #define TR_MAX_MERKLE_PATH_LEN 128u
 
-static int tx_clone_alloc(const struct dogecoin_tx *src, struct dogecoin_tx **dst) {
-    return dogecoin_tx_clone_alloc(src, 0, dst);
+static int tx_clone_alloc(const struct libdogecoin_tx *src, struct libdogecoin_tx **dst) {
+    return libdogecoin_tx_clone_alloc(src, 0, dst);
 }
 
-static bool is_matching_txid(const struct dogecoin_tx *tx,
+static bool is_matching_txid(const struct libdogecoin_tx *tx,
                              const unsigned char *txid, size_t txid_len)
 {
     unsigned char src_txid[DOGECOIN_TXHASH_LEN];
@@ -54,7 +54,7 @@ static bool is_matching_txid(const struct dogecoin_tx *tx,
     if (!tx || !txid || txid_len != DOGECOIN_TXHASH_LEN)
         return false;
 
-    if (dogecoin_tx_get_txid(tx, src_txid, sizeof(src_txid)) != DOGECOIN_OK)
+    if (libdogecoin_tx_get_txid(tx, src_txid, sizeof(src_txid)) != DOGECOIN_OK)
         return false;
 
     ret = memcmp(src_txid, txid, txid_len) == 0;
@@ -85,12 +85,12 @@ static bool psbt_can_modify(const struct dogecoin_psbt *psbt, uint32_t flags)
 }
 
 #ifdef BUILD_ELEMENTS
-static bool utxo_has_explicit_value(const struct dogecoin_tx_output *utxo)
+static bool utxo_has_explicit_value(const struct libdogecoin_tx_output *utxo)
 {
     return utxo && utxo->value && utxo->value_len && utxo->value[0] == 1u;
 }
 
-static bool utxo_has_explicit_asset(const struct dogecoin_tx_output *utxo)
+static bool utxo_has_explicit_asset(const struct libdogecoin_tx_output *utxo)
 {
     return utxo && utxo->asset && utxo->asset_len && utxo->asset[0] == 1u;
 }
@@ -112,7 +112,7 @@ static struct dogecoin_psbt_output *psbt_get_output(const struct dogecoin_psbt *
     return &psbt->outputs[index];
 }
 
-static const struct dogecoin_tx_output *utxo_from_input(const struct dogecoin_psbt *psbt,
+static const struct libdogecoin_tx_output *utxo_from_input(const struct dogecoin_psbt *psbt,
                                                      const struct dogecoin_psbt_input *input)
 {
     if (psbt && input) {
@@ -257,27 +257,23 @@ int dogecoin_psbt_input_is_finalized(const struct dogecoin_psbt_input *input,
     return DOGECOIN_OK;
 }
 
-SET_STRUCT(dogecoin_psbt_input, utxo, dogecoin_tx,
-           tx_clone_alloc, dogecoin_tx_free)
-int dogecoin_psbt_input_set_witness_utxo(struct dogecoin_psbt_input *input, const struct dogecoin_tx_output *utxo)
+SET_STRUCT(dogecoin_psbt_input, utxo, libdogecoin_tx,
+           tx_clone_alloc, libdogecoin_tx_free)
+int dogecoin_psbt_input_set_witness_utxo(struct dogecoin_psbt_input *input, const struct libdogecoin_tx_output *utxo)
 {
     int ret = DOGECOIN_OK;
-    struct dogecoin_tx_output *new_utxo = NULL;
+    struct libdogecoin_tx_output *new_utxo = NULL;
     if (!input)
         return DOGECOIN_EINVAL;
-#ifdef BUILD_ELEMENTS
-    if (input->has_amount && utxo_has_explicit_value(utxo))
-        return DOGECOIN_EINVAL; /* UTXO value is already explicit */
-#endif
-    if (utxo && (ret = dogecoin_tx_output_clone_alloc(utxo, &new_utxo)) != DOGECOIN_OK)
+    if (utxo && (ret = libdogecoin_tx_output_clone_alloc(utxo, &new_utxo)) != DOGECOIN_OK)
         return ret;
-    dogecoin_tx_output_free(input->witness_utxo);
+    libdogecoin_tx_output_free(input->witness_utxo);
     input->witness_utxo = new_utxo;
     return ret;
 }
 
 int dogecoin_psbt_input_set_witness_utxo_from_tx(struct dogecoin_psbt_input *input,
-                                              const struct dogecoin_tx *utxo, uint32_t index)
+                                              const struct libdogecoin_tx *utxo, uint32_t index)
 {
     if (!utxo || index >= utxo->num_outputs)
         return DOGECOIN_EINVAL;
@@ -286,8 +282,8 @@ int dogecoin_psbt_input_set_witness_utxo_from_tx(struct dogecoin_psbt_input *inp
 MAP_INNER_FIELD(input, redeem_script, PSBT_IN_REDEEM_SCRIPT, psbt_fields)
 MAP_INNER_FIELD(input, witness_script, PSBT_IN_WITNESS_SCRIPT, psbt_fields)
 MAP_INNER_FIELD(input, final_scriptsig, PSBT_IN_FINAL_SCRIPTSIG, psbt_fields)
-SET_STRUCT(dogecoin_psbt_input, final_witness, dogecoin_tx_witness_stack,
-           dogecoin_tx_witness_stack_clone_alloc, dogecoin_tx_witness_stack_free)
+SET_STRUCT(dogecoin_psbt_input, final_witness, libdogecoin_tx_witness_stack,
+           libdogecoin_tx_witness_stack_clone_alloc, libdogecoin_tx_witness_stack_free)
 SET_MAP(dogecoin_psbt_input, keypath,)
 ADD_KEYPATH(dogecoin_psbt_input)
 SET_MAP(dogecoin_psbt_input, signature, _internal)
@@ -482,220 +478,6 @@ static int psbt_map_output_field_verify(const unsigned char *key, size_t key_len
     return key ? DOGECOIN_EINVAL : psbt_output_field_verify(key_len, val, val_len);
 }
 
-#ifdef BUILD_ELEMENTS
-static int pset_input_field_verify(uint32_t field_type,
-                                   const unsigned char *val, size_t val_len)
-{
-    if (!val || !val_len)
-        return DOGECOIN_EINVAL;
-    switch (field_type) {
-    case PSET_IN_ISSUANCE_VALUE_COMMITMENT:
-    case PSET_IN_ISSUANCE_INFLATION_KEYS_COMMITMENT:
-        /* 33 byte commitments */
-        if (confidential_value_length_from_bytes(val) != DOGECOIN_TX_ASSET_CT_LEN)
-            return DOGECOIN_EINVAL;
-        break;
-    case PSET_IN_ISSUANCE_VALUE_RANGEPROOF:
-    case PSET_IN_ISSUANCE_INFLATION_KEYS_RANGEPROOF:
-    case PSET_IN_PEG_IN_TXOUT_PROOF:
-    case PSET_IN_PEG_IN_CLAIM_SCRIPT:
-    case PSET_IN_UTXO_RANGEPROOF:
-    case PSET_IN_ISSUANCE_BLIND_VALUE_PROOF:
-    case PSET_IN_ISSUANCE_BLIND_INFLATION_KEYS_PROOF:
-    case PSET_IN_VALUE_PROOF:
-    case PSET_IN_ASSET_PROOF:
-        /* Byte sequences of varying lengths */
-        break;
-    case PSET_IN_PEG_IN_GENESIS_HASH:
-    case PSET_IN_ISSUANCE_BLINDING_NONCE:
-    case PSET_IN_ISSUANCE_ASSET_ENTROPY:
-    case PSET_IN_EXPLICIT_ASSET:
-        /* 32 byte hash, entropy, or asset */
-        if (val_len != SHA256_LEN)
-            return DOGECOIN_EINVAL;
-        break;
-    default:
-        return DOGECOIN_EINVAL;
-    }
-    return DOGECOIN_OK;
-}
-
-static int pset_map_input_field_verify(const unsigned char *key, size_t key_len,
-                                       const unsigned char *val, size_t val_len)
-{
-    return key ? DOGECOIN_EINVAL : pset_input_field_verify(key_len, val, val_len);
-}
-
-static int pset_output_field_verify(uint32_t field_type,
-                                    const unsigned char *val, size_t val_len)
-{
-    size_t len;
-    if (!val || !val_len)
-        return DOGECOIN_EINVAL;
-    switch (field_type) {
-    case PSET_OUT_ASSET:
-        /* 32 byte asset id */
-        if (val_len != ASSET_TAG_LEN)
-            return DOGECOIN_EINVAL;
-        break;
-    case PSET_OUT_VALUE_COMMITMENT:
-        len = confidential_value_length_from_bytes(val);
-        if (len != DOGECOIN_TX_ASSET_CT_VALUE_LEN && len != DOGECOIN_TX_ASSET_CT_VALUE_UNBLIND_LEN)
-            return DOGECOIN_EINVAL;
-        break;
-    case PSET_OUT_ASSET_COMMITMENT:
-        /* 33 byte commitments */
-        if (confidential_asset_length_from_bytes(val) != DOGECOIN_TX_ASSET_CT_LEN)
-            return DOGECOIN_EINVAL;
-        break;
-    case PSET_OUT_BLINDING_PUBKEY:
-    case PSET_OUT_ECDH_PUBKEY:
-        /* 33 byte compressed pubkeys */
-        if (val_len != EC_PUBLIC_KEY_LEN)
-            return DOGECOIN_EINVAL; /* Uncompressed keys are not allowed */
-        return dogecoin_ec_public_key_verify(val, val_len);
-        break;
-    case PSET_OUT_VALUE_RANGEPROOF:
-    case PSET_OUT_ASSET_SURJECTION_PROOF:
-    case PSET_OUT_BLIND_VALUE_PROOF:
-    case PSET_OUT_BLIND_ASSET_PROOF:
-        /* Byte sequences of varying lengths */
-        break;
-    default:
-        return DOGECOIN_EINVAL;
-    }
-    return DOGECOIN_OK;
-}
-
-static int pset_map_output_field_verify(const unsigned char *key, size_t key_len,
-                                        const unsigned char *val, size_t val_len)
-{
-    return key ? DOGECOIN_EINVAL : pset_output_field_verify(key_len, val, val_len);
-}
-
-int dogecoin_psbt_input_set_amount(struct dogecoin_psbt_input *input, uint64_t amount)
-{
-    if (!input)
-        return DOGECOIN_EINVAL;
-    if (utxo_has_explicit_value(input->witness_utxo))
-        return DOGECOIN_EINVAL; /* UTXO value is already explicit */
-    input->amount = amount;
-    input->has_amount = 1u;
-    return DOGECOIN_OK;
-}
-
-#ifdef BUILD_ELEMENTS
-int dogecoin_psbt_input_generate_explicit_proofs(
-    struct dogecoin_psbt_input *input,
-    uint64_t satoshi,
-    const unsigned char *asset, size_t asset_len,
-    const unsigned char *abf, size_t abf_len,
-    const unsigned char *vbf, size_t vbf_len,
-    const unsigned char *entropy, size_t entropy_len)
-{
-    const struct dogecoin_tx_output *utxo = input ? input->witness_utxo : 0;
-    unsigned char proof[ASSET_SURJECTIONPROOF_MAX_LEN]; /* > ASSET_EXPLICIT_RANGEPROOF_MAX_LEN */
-    size_t proof_len;
-    int ret;
-
-    if (!utxo || utxo_has_explicit_value(utxo) || utxo_has_explicit_asset(utxo))
-        return DOGECOIN_EINVAL; /* No UTXO, or UTXO value/asset already explicit */
-
-    /* Generate the explicit proofs and set them in the input */
-    ret = dogecoin_explicit_rangeproof(satoshi, entropy, entropy_len,
-                                    vbf, vbf_len,
-                                    utxo->value, utxo->value_len,
-                                    utxo->asset, utxo->asset_len,
-                                    proof, sizeof(proof), &proof_len);
-    if (ret == DOGECOIN_OK) {
-        if (proof_len > sizeof(proof))
-            ret = DOGECOIN_ERROR; /* Should never happen */
-        else
-            ret = dogecoin_psbt_input_set_amount_rangeproof(input, proof, proof_len);
-        if (ret == DOGECOIN_OK)
-            ret = dogecoin_psbt_input_set_amount(input, satoshi);
-    }
-    if (ret == DOGECOIN_OK) {
-        proof_len = ASSET_EXPLICIT_SURJECTIONPROOF_LEN;
-        ret = dogecoin_explicit_surjectionproof(asset, asset_len,
-                                             abf, abf_len,
-                                             utxo->asset, utxo->asset_len,
-                                             proof, proof_len);
-    }
-    if (ret == DOGECOIN_OK) {
-        ret = dogecoin_psbt_input_set_asset_surjectionproof(input, proof, proof_len);
-        if (ret == DOGECOIN_OK)
-            ret = dogecoin_psbt_input_set_asset(input, asset, asset_len);
-    }
-
-    if (ret != DOGECOIN_OK) {
-        input->amount = 0;
-        input->has_amount = 0;
-        dogecoin_psbt_input_clear_amount_rangeproof(input);
-        dogecoin_psbt_input_clear_asset(input);
-        dogecoin_psbt_input_clear_asset_surjectionproof(input);
-    }
-    dogecoin_clear(proof, sizeof(proof));
-    return ret;
-}
-#endif /* BUILD_ELEMENTS */
-
-int dogecoin_psbt_input_clear_amount(struct dogecoin_psbt_input *input)
-{
-    if (!input)
-        return DOGECOIN_EINVAL;
-    input->amount = 0;
-    input->has_amount = 0;
-    return DOGECOIN_OK;
-}
-
-int dogecoin_psbt_input_set_issuance_amount(struct dogecoin_psbt_input *input,
-                                         uint64_t amount)
-{
-    if (!input)
-        return DOGECOIN_EINVAL;
-    input->issuance_amount = amount;
-    return DOGECOIN_OK;
-}
-
-int dogecoin_psbt_input_set_inflation_keys(struct dogecoin_psbt_input *input,
-                                        uint64_t amount)
-{
-    if (!input)
-        return DOGECOIN_EINVAL;
-    input->inflation_keys = amount;
-    return DOGECOIN_OK;
-}
-
-int dogecoin_psbt_input_set_pegin_amount(struct dogecoin_psbt_input *input, uint64_t amount)
-{
-    if (!input)
-        return DOGECOIN_EINVAL;
-    input->pegin_amount = amount;
-    return DOGECOIN_OK;
-}
-
-SET_STRUCT(dogecoin_psbt_input, pegin_tx, dogecoin_tx, tx_clone_alloc, dogecoin_tx_free)
-SET_STRUCT(dogecoin_psbt_input, pegin_witness, dogecoin_tx_witness_stack,
-           dogecoin_tx_witness_stack_clone_alloc, dogecoin_tx_witness_stack_free)
-
-MAP_INNER_FIELD(input, issuance_amount_commitment, PSET_IN_ISSUANCE_VALUE_COMMITMENT, pset_fields)
-MAP_INNER_FIELD(input, issuance_amount_rangeproof, PSET_IN_ISSUANCE_VALUE_RANGEPROOF, pset_fields)
-MAP_INNER_FIELD(input, issuance_blinding_nonce, PSET_IN_ISSUANCE_BLINDING_NONCE, pset_fields)
-MAP_INNER_FIELD(input, issuance_asset_entropy, PSET_IN_ISSUANCE_ASSET_ENTROPY, pset_fields)
-MAP_INNER_FIELD(input, issuance_amount_blinding_rangeproof, PSET_IN_ISSUANCE_BLIND_VALUE_PROOF, pset_fields)
-MAP_INNER_FIELD(input, pegin_claim_script, PSET_IN_PEG_IN_CLAIM_SCRIPT, pset_fields)
-MAP_INNER_FIELD(input, pegin_genesis_blockhash, PSET_IN_PEG_IN_GENESIS_HASH, pset_fields)
-MAP_INNER_FIELD(input, pegin_txout_proof, PSET_IN_PEG_IN_TXOUT_PROOF, pset_fields)
-MAP_INNER_FIELD(input, inflation_keys_commitment, PSET_IN_ISSUANCE_INFLATION_KEYS_COMMITMENT, pset_fields)
-MAP_INNER_FIELD(input, inflation_keys_rangeproof, PSET_IN_ISSUANCE_INFLATION_KEYS_RANGEPROOF, pset_fields)
-MAP_INNER_FIELD(input, inflation_keys_blinding_rangeproof, PSET_IN_ISSUANCE_BLIND_INFLATION_KEYS_PROOF, pset_fields)
-MAP_INNER_FIELD(input, amount_rangeproof, PSET_IN_VALUE_PROOF, pset_fields)
-MAP_INNER_FIELD(input, asset, PSET_IN_EXPLICIT_ASSET, pset_fields)
-MAP_INNER_FIELD(input, asset_surjectionproof, PSET_IN_ASSET_PROOF, pset_fields)
-MAP_INNER_FIELD(input, utxo_rangeproof, PSET_IN_UTXO_RANGEPROOF, pset_fields)
-#endif /* BUILD_ELEMENTS */
-
 static void psbt_input_init(struct dogecoin_psbt_input *input)
 {
     dogecoin_clear(input, sizeof(*input));
@@ -708,17 +490,14 @@ static void psbt_input_init(struct dogecoin_psbt_input *input)
     dogecoin_map_init(0, NULL /* FIXME */, &input->taproot_leaf_scripts);
     dogecoin_map_init(0, map_leaf_hashes_verify, &input->taproot_leaf_hashes);
     dogecoin_map_init(0, dogecoin_keypath_xonly_public_key_verify, &input->taproot_leaf_paths);
-#ifdef BUILD_ELEMENTS
-    dogecoin_map_init(0, pset_map_input_field_verify, &input->pset_fields);
-#endif /* BUILD_ELEMENTS */
 }
 
 static int psbt_input_free(struct dogecoin_psbt_input *input, bool free_parent)
 {
     if (input) {
-        dogecoin_tx_free(input->utxo);
-        dogecoin_tx_output_free(input->witness_utxo);
-        dogecoin_tx_witness_stack_free(input->final_witness);
+        libdogecoin_tx_free(input->utxo);
+        libdogecoin_tx_output_free(input->witness_utxo);
+        libdogecoin_tx_witness_stack_free(input->final_witness);
         dogecoin_map_clear(&input->keypaths);
         dogecoin_map_clear(&input->signatures);
         dogecoin_map_clear(&input->unknowns);
@@ -728,11 +507,7 @@ static int psbt_input_free(struct dogecoin_psbt_input *input, bool free_parent)
         dogecoin_map_clear(&input->taproot_leaf_scripts);
         dogecoin_map_clear(&input->taproot_leaf_hashes);
         dogecoin_map_clear(&input->taproot_leaf_paths);
-#ifdef BUILD_ELEMENTS
-        dogecoin_tx_free(input->pegin_tx);
-        dogecoin_tx_witness_stack_free(input->pegin_witness);
-        dogecoin_map_clear(&input->pset_fields);
-#endif /* BUILD_ELEMENTS */
+
         dogecoin_clear(input, sizeof(*input));
         if (free_parent)
             dogecoin_free(input);
@@ -877,7 +652,7 @@ static bool pset_check_proof(const struct dogecoin_psbt *psbt,
      */
     if (is_utxo_value || is_utxo_asset) {
         /* Get explicit value and commitments from the inputs UTXO */
-        const struct dogecoin_tx_output *utxo = utxo_from_input(psbt, in);
+        const struct libdogecoin_tx_output *utxo = utxo_from_input(psbt, in);
         has_value = is_utxo_value && in->has_amount;
         value = in->amount;
         if (utxo) {
@@ -1095,7 +870,7 @@ int dogecoin_psbt_free(struct dogecoin_psbt *psbt)
 {
     size_t i;
     if (psbt) {
-        dogecoin_tx_free(psbt->tx);
+        libdogecoin_tx_free(psbt->tx);
         for (i = 0; i < psbt->num_inputs; ++i)
             psbt_input_free(&psbt->inputs[i], false);
 
@@ -1114,7 +889,7 @@ int dogecoin_psbt_free(struct dogecoin_psbt *psbt)
     return DOGECOIN_OK;
 }
 
-int dogecoin_psbt_get_global_tx_alloc(const struct dogecoin_psbt *psbt, struct dogecoin_tx **output)
+int dogecoin_psbt_get_global_tx_alloc(const struct dogecoin_psbt *psbt, struct libdogecoin_tx **output)
 {
     OUTPUT_CHECK;
     if (!psbt || psbt->version != PSBT_0)
@@ -1259,9 +1034,9 @@ int dogecoin_psbt_is_finalized(const struct dogecoin_psbt *psbt,
     return DOGECOIN_OK;
 }
 
-static int psbt_set_global_tx(struct dogecoin_psbt *psbt, struct dogecoin_tx *tx, bool do_clone)
+static int psbt_set_global_tx(struct dogecoin_psbt *psbt, struct libdogecoin_tx *tx, bool do_clone)
 {
-    struct dogecoin_tx *new_tx = NULL;
+    struct libdogecoin_tx *new_tx = NULL;
     struct dogecoin_psbt_input *new_inputs = NULL;
     struct dogecoin_psbt_output *new_outputs = NULL;
     size_t i;
@@ -1293,7 +1068,7 @@ static int psbt_set_global_tx(struct dogecoin_psbt *psbt, struct dogecoin_tx *tx
         (psbt->outputs_allocation_len < tx->num_outputs && !new_outputs)) {
         dogecoin_free(new_inputs);
         dogecoin_free(new_outputs);
-        dogecoin_tx_free(new_tx);
+        libdogecoin_tx_free(new_tx);
         return DOGECOIN_ENOMEM;
     }
 
@@ -1313,9 +1088,9 @@ static int psbt_set_global_tx(struct dogecoin_psbt *psbt, struct dogecoin_tx *tx
     return DOGECOIN_OK;
 }
 
-int dogecoin_psbt_set_global_tx(struct dogecoin_psbt *psbt, const struct dogecoin_tx *tx)
+int dogecoin_psbt_set_global_tx(struct dogecoin_psbt *psbt, const struct libdogecoin_tx *tx)
 {
-    return psbt_set_global_tx(psbt, (struct dogecoin_tx *)tx, true);
+    return psbt_set_global_tx(psbt, (struct libdogecoin_tx *)tx, true);
 }
 
 #ifdef BUILD_ELEMENTS
@@ -1343,7 +1118,7 @@ static int add_commitment_amount(const unsigned char *value, size_t value_len,
         return DOGECOIN_OK; /* Empty or null commitment */
     if (*value == 0x1) {
         /* Asset isn't blinded: add the explicit value and mark it present */
-        if (dogecoin_tx_confidential_value_to_satoshi(value, value_len, amount) != DOGECOIN_OK)
+        if (libdogecoin_tx_confidential_value_to_satoshi(value, value_len, amount) != DOGECOIN_OK)
             return DOGECOIN_EINVAL;
         *has_amount = *value != 0;
         return DOGECOIN_OK;
@@ -1351,7 +1126,7 @@ static int add_commitment_amount(const unsigned char *value, size_t value_len,
     return dogecoin_map_add_integer(map_in, ft_commitment, value, value_len);
 }
 
-static int psbt_input_from_tx_input_issuance(const struct dogecoin_tx_input *txin,
+static int psbt_input_from_tx_input_issuance(const struct libdogecoin_tx_input *txin,
                                              struct dogecoin_psbt_input *dst)
 {
     uint32_t has_amount;
@@ -1381,7 +1156,7 @@ static int psbt_input_from_tx_input_issuance(const struct dogecoin_tx_input *txi
     return ret;
 }
 
-static int psbt_input_from_tx_input_pegin(const struct dogecoin_tx_input *txin,
+static int psbt_input_from_tx_input_pegin(const struct libdogecoin_tx_input *txin,
                                           struct dogecoin_psbt_input *dst)
 {
     (void)txin;
@@ -1391,7 +1166,7 @@ static int psbt_input_from_tx_input_pegin(const struct dogecoin_tx_input *txin,
 #endif /* BUILD_ELEMENTS */
 
 static int psbt_input_from_tx_input(struct dogecoin_psbt *psbt,
-                                    const struct dogecoin_tx_input *txin,
+                                    const struct libdogecoin_tx_input *txin,
                                     bool is_pset, struct dogecoin_psbt_input *dst)
 {
     int ret = DOGECOIN_OK;
@@ -1421,9 +1196,9 @@ static int psbt_input_from_tx_input(struct dogecoin_psbt *psbt,
 
 int dogecoin_psbt_add_tx_input_at(struct dogecoin_psbt *psbt,
                                uint32_t index, uint32_t flags,
-                               const struct dogecoin_tx_input *txin)
+                               const struct libdogecoin_tx_input *txin)
 {
-    struct dogecoin_tx_input txin_copy;
+    struct libdogecoin_tx_input txin_copy;
     size_t is_pset;
     int ret = DOGECOIN_OK;
 
@@ -1452,7 +1227,7 @@ int dogecoin_psbt_add_tx_input_at(struct dogecoin_psbt *psbt,
     }
 
     if (psbt->version == PSBT_0)
-        ret = dogecoin_tx_add_input_at(psbt->tx, index, &txin_copy);
+        ret = libdogecoin_tx_add_input_at(psbt->tx, index, &txin_copy);
 
     if (ret == DOGECOIN_OK) {
         struct dogecoin_psbt_input tmp, *dst = psbt->inputs + index;
@@ -1467,7 +1242,7 @@ int dogecoin_psbt_add_tx_input_at(struct dogecoin_psbt *psbt,
     }
 
     if (ret != DOGECOIN_OK && psbt->version == PSBT_0)
-        dogecoin_tx_remove_input(psbt->tx, index);
+        libdogecoin_tx_remove_input(psbt->tx, index);
     dogecoin_clear(&txin_copy, sizeof(txin_copy));
     return ret;
 }
@@ -1484,7 +1259,7 @@ int dogecoin_psbt_remove_input(struct dogecoin_psbt *psbt, uint32_t index)
         return DOGECOIN_EINVAL; /* FIXME: DOGECOIN_PSBT_TXMOD_SINGLE */
 
     if (psbt->version == PSBT_0)
-        ret = dogecoin_tx_remove_input(psbt->tx, index);
+        ret = libdogecoin_tx_remove_input(psbt->tx, index);
     if (ret == DOGECOIN_OK) {
         struct dogecoin_psbt_input *to_remove = psbt->inputs + index;
         bool need_single = false;
@@ -1508,7 +1283,7 @@ int dogecoin_psbt_remove_input(struct dogecoin_psbt *psbt, uint32_t index)
 }
 
 static int psbt_output_from_tx_output(struct dogecoin_psbt *psbt,
-                                      const struct dogecoin_tx_output *txout,
+                                      const struct libdogecoin_tx_output *txout,
                                       bool is_pset, struct dogecoin_psbt_output *dst)
 {
     int ret;
@@ -1552,7 +1327,7 @@ static int psbt_output_from_tx_output(struct dogecoin_psbt *psbt,
 
 int dogecoin_psbt_add_tx_output_at(struct dogecoin_psbt *psbt,
                                 uint32_t index, uint32_t flags,
-                                const struct dogecoin_tx_output *txout)
+                                const struct libdogecoin_tx_output *txout)
 {
     size_t is_pset;
     int ret = DOGECOIN_OK;
@@ -1574,7 +1349,7 @@ int dogecoin_psbt_add_tx_output_at(struct dogecoin_psbt *psbt,
         return ret;
 
     if (psbt->version == PSBT_0)
-        ret = dogecoin_tx_add_output_at(psbt->tx, index, txout);
+        ret = libdogecoin_tx_add_output_at(psbt->tx, index, txout);
 
     if (ret == DOGECOIN_OK) {
         struct dogecoin_psbt_output tmp, *dst = psbt->outputs + index;
@@ -1589,7 +1364,7 @@ int dogecoin_psbt_add_tx_output_at(struct dogecoin_psbt *psbt,
     }
 
     if (ret != DOGECOIN_OK && psbt->version == PSBT_0)
-        dogecoin_tx_remove_output(psbt->tx, index);
+        libdogecoin_tx_remove_output(psbt->tx, index);
     return ret;
 }
 
@@ -1605,7 +1380,7 @@ int dogecoin_psbt_remove_output(struct dogecoin_psbt *psbt, uint32_t index)
         return DOGECOIN_EINVAL; /* FIXME: DOGECOIN_PSBT_TXMOD_SINGLE */
 
     if (psbt->version == PSBT_0)
-        ret = dogecoin_tx_remove_output(psbt->tx, index);
+        ret = libdogecoin_tx_remove_output(psbt->tx, index);
     if (ret == DOGECOIN_OK) {
         struct dogecoin_psbt_output *to_remove = psbt->outputs + index;
         psbt_output_free(to_remove, false);
@@ -1720,7 +1495,7 @@ static int pull_preimage(const unsigned char **cursor, size_t *max,
 }
 
 static int pull_tx(const unsigned char **cursor, size_t *max,
-                   uint32_t tx_flags, struct dogecoin_tx **tx_out)
+                   uint32_t tx_flags, struct libdogecoin_tx **tx_out)
 {
     const unsigned char *val;
     size_t val_len;
@@ -1729,7 +1504,7 @@ static int pull_tx(const unsigned char **cursor, size_t *max,
     if (*tx_out)
         ret = DOGECOIN_EINVAL; /* Duplicate */
     pull_subfield_start(cursor, max, pull_varint(cursor, max), &val, &val_len);
-    ret = dogecoin_tx_from_bytes(val, val_len, tx_flags, tx_out);
+    ret = libdogecoin_tx_from_bytes(val, val_len, tx_flags, tx_out);
     pull_subfield_end(cursor, max, val, val_len);
     return ret;
 }
@@ -1757,7 +1532,7 @@ static bool pull_commitment(const unsigned char **cursor, size_t *max,
 #endif /* BUILD_ELEMENTS */
 
 static int pull_tx_output(const unsigned char **cursor, size_t *max,
-                          bool is_pset, struct dogecoin_tx_output **txout_out)
+                          bool is_pset, struct libdogecoin_tx_output **txout_out)
 {
     const unsigned char *val, *script;
     size_t val_len, script_len;
@@ -1784,7 +1559,7 @@ static int pull_tx_output(const unsigned char **cursor, size_t *max,
 
         /* Note unlike non-Elements, script can be empty for fee outputs */
         pull_varint_buff(&val, &val_len, &script, &script_len);
-        ret = dogecoin_tx_elements_output_init_alloc(script, script_len, asset, asset_len,
+        ret = libdogecoin_tx_elements_output_init_alloc(script, script_len, asset, asset_len,
                                                   value, value_len, nonce, nonce_len,
                                                   NULL, 0, NULL, 0, txout_out);
         subfield_nomore_end(cursor, max, val, val_len);
@@ -1795,13 +1570,13 @@ static int pull_tx_output(const unsigned char **cursor, size_t *max,
     pull_varint_buff(&val, &val_len, &script, &script_len);
     if (!script || !script_len)
         return DOGECOIN_EINVAL;
-    ret = dogecoin_tx_output_init_alloc(satoshi, script, script_len, txout_out);
+    ret = libdogecoin_tx_output_init_alloc(satoshi, script, script_len, txout_out);
     subfield_nomore_end(cursor, max, val, val_len);
     return ret;
 }
 
 static int pull_witness(const unsigned char **cursor, size_t *max,
-                        struct dogecoin_tx_witness_stack **witness_out)
+                        struct libdogecoin_tx_witness_stack **witness_out)
 {
     const unsigned char *val;
     size_t val_len;
@@ -1813,13 +1588,13 @@ static int pull_witness(const unsigned char **cursor, size_t *max,
 
     pull_subfield_start(cursor, max, pull_varint(cursor, max), &val, &val_len);
     num_witnesses = pull_varint(&val, &val_len);
-    ret = dogecoin_tx_witness_stack_init_alloc(num_witnesses, witness_out);
+    ret = libdogecoin_tx_witness_stack_init_alloc(num_witnesses, witness_out);
 
     for (i = 0; ret == DOGECOIN_OK && i < num_witnesses; ++i) {
         const unsigned char *wit;
         size_t wit_len;
         pull_varint_buff(&val, &val_len, &wit, &wit_len);
-        ret = dogecoin_tx_witness_stack_set(*witness_out, i, wit, wit_len);
+        ret = libdogecoin_tx_witness_stack_set(*witness_out, i, wit, wit_len);
     }
     subfield_nomore_end(cursor, max, val, val_len);
     return ret;
@@ -2367,7 +2142,7 @@ int dogecoin_psbt_from_bytes(const unsigned char *bytes, size_t len,
 
         /* Process based on type */
         if (is_known) {
-            struct dogecoin_tx *tx = NULL;
+            struct libdogecoin_tx *tx = NULL;
 
             if (keyset & field_bit && (!(field_bit & PSBT_GLOBAL_REPEATABLE))) {
                 ret = DOGECOIN_EINVAL; /* Duplicate value */
@@ -2384,7 +2159,7 @@ int dogecoin_psbt_from_bytes(const unsigned char *bytes, size_t len,
                 if ((ret = pull_tx(cursor, max, tx_flags | pre144flag, &tx)) == DOGECOIN_OK)
                     ret = psbt_set_global_tx(*output, tx, false);
                 if (ret != DOGECOIN_OK)
-                    dogecoin_tx_free(tx);
+                    libdogecoin_tx_free(tx);
                 break;
             case PSBT_GLOBAL_XPUB:
                 ret = pull_map_item(cursor, max, key, key_len, &(*output)->global_xpubs);
@@ -2529,26 +2304,26 @@ static void push_key(unsigned char **cursor, size_t *max,
 }
 
 static int push_length_and_tx(unsigned char **cursor, size_t *max,
-                              const struct dogecoin_tx *tx, uint32_t flags)
+                              const struct libdogecoin_tx *tx, uint32_t flags)
 {
     int ret;
     size_t tx_len;
     unsigned char *p;
 
-    if ((ret = dogecoin_tx_get_length(tx, flags, &tx_len)) != DOGECOIN_OK)
+    if ((ret = libdogecoin_tx_get_length(tx, flags, &tx_len)) != DOGECOIN_OK)
         return ret;
 
     push_varint(cursor, max, tx_len);
 
-    /* TODO: convert dogecoin_tx to use push  */
+    /* TODO: convert libdogecoin_tx to use push  */
     if (!(p = push_bytes(cursor, max, NULL, tx_len)))
         return DOGECOIN_OK; /* We catch this in caller. */
 
-    return dogecoin_tx_to_bytes(tx, flags, p, tx_len, &tx_len);
+    return libdogecoin_tx_to_bytes(tx, flags, p, tx_len, &tx_len);
 }
 
 static void push_witness_stack_impl(unsigned char **cursor, size_t *max,
-                                    const struct dogecoin_tx_witness_stack *witness)
+                                    const struct libdogecoin_tx_witness_stack *witness)
 {
     size_t i;
 
@@ -2561,7 +2336,7 @@ static void push_witness_stack_impl(unsigned char **cursor, size_t *max,
 
 static void push_witness_stack(unsigned char **cursor, size_t *max,
                                uint64_t type, bool is_pset,
-                               const struct dogecoin_tx_witness_stack *witness)
+                               const struct libdogecoin_tx_witness_stack *witness)
 {
     size_t wit_len = 0;
     push_witness_stack_impl(NULL, &wit_len, witness); /* calculate length */
@@ -2720,7 +2495,7 @@ static bool push_commitment(unsigned char **cursor, size_t *max,
 #endif /* BUILD_ELEMENTS */
 
 static int push_tx_output(unsigned char **cursor, size_t *max,
-                          bool is_pset, const struct dogecoin_tx_output *txout)
+                          bool is_pset, const struct libdogecoin_tx_output *txout)
 {
 #ifdef BUILD_ELEMENTS
     if (is_pset) {
@@ -3181,7 +2956,7 @@ done:
     return ret;
 }
 
-static int combine_txs(struct dogecoin_tx **dst, struct dogecoin_tx *src)
+static int combine_txs(struct libdogecoin_tx **dst, struct libdogecoin_tx *src)
 {
     if (!dst)
         return DOGECOIN_EINVAL;
@@ -3262,7 +3037,7 @@ static int combine_input(struct dogecoin_psbt_input *dst,
         return ret;
 
     if (!dst->witness_utxo && src->witness_utxo) {
-        ret = dogecoin_tx_output_clone_alloc(src->witness_utxo, &dst->witness_utxo);
+        ret = libdogecoin_tx_output_clone_alloc(src->witness_utxo, &dst->witness_utxo);
         if (ret != DOGECOIN_OK)
             return ret;
     }
@@ -3535,7 +3310,7 @@ int dogecoin_psbt_get_locktime(const struct dogecoin_psbt *psbt, size_t *locktim
 #define BUILD_PARAM(n) n ? n->value : NULL, n ? n->value_len : 0
 
 static int psbt_build_input(const struct dogecoin_psbt_input *src,
-                            bool is_pset, bool unblinded, struct dogecoin_tx *tx)
+                            bool is_pset, bool unblinded, struct libdogecoin_tx *tx)
 {
     if (is_pset) {
 #ifndef BUILD_ELEMENTS
@@ -3567,10 +3342,10 @@ static int psbt_build_input(const struct dogecoin_psbt_input *src,
             (unblinded || (!issuance_amount_commitment && !inflation_keys_commitment))) {
             /* We do not have issuance commitments, or the unblinded flag
              * has been given: Use the unblinded amounts */
-            if (dogecoin_tx_confidential_value_from_satoshi(src->issuance_amount,
+            if (libdogecoin_tx_confidential_value_from_satoshi(src->issuance_amount,
                                                          issuance_amount,
                                                          sizeof(issuance_amount)) != DOGECOIN_OK ||
-                dogecoin_tx_confidential_value_from_satoshi(src->inflation_keys,
+                libdogecoin_tx_confidential_value_from_satoshi(src->inflation_keys,
                                                          inflation_keys,
                                                          sizeof(inflation_keys)) != DOGECOIN_OK)
                 return DOGECOIN_EINVAL;
@@ -3578,7 +3353,7 @@ static int psbt_build_input(const struct dogecoin_psbt_input *src,
             inflation_keys_commitment = &inflation_keys_item;
         }
 
-        return dogecoin_tx_add_elements_raw_input(tx,
+        return libdogecoin_tx_add_elements_raw_input(tx,
                                                src->txhash, DOGECOIN_TXHASH_LEN,
                                                src_index, src->sequence, NULL, 0, NULL,
                                                BUILD_PARAM(issuance_blinding_nonce),
@@ -3589,12 +3364,12 @@ static int psbt_build_input(const struct dogecoin_psbt_input *src,
                                                BUILD_PARAM(inflation_keys_rangeproof), NULL, 0);
 #endif /* BUILD_ELEMENTS */
     }
-    return dogecoin_tx_add_raw_input(tx, src->txhash, DOGECOIN_TXHASH_LEN,
+    return libdogecoin_tx_add_raw_input(tx, src->txhash, DOGECOIN_TXHASH_LEN,
                                   src->index, src->sequence, NULL, 0, NULL, 0);
 }
 
 static int psbt_build_output(const struct dogecoin_psbt_output *src,
-                             bool is_pset, bool unblinded, struct dogecoin_tx *tx)
+                             bool is_pset, bool unblinded, struct libdogecoin_tx *tx)
 {
     if (is_pset) {
 #ifndef BUILD_ELEMENTS
@@ -3615,7 +3390,7 @@ static int psbt_build_output(const struct dogecoin_psbt_output *src,
         if (unblinded || (src->has_amount && !value_commitment)) {
             /* FIXME: Check the blind value proof */
             /* Use the unblinded amount */
-            if (dogecoin_tx_confidential_value_from_satoshi(src->amount,
+            if (libdogecoin_tx_confidential_value_from_satoshi(src->amount,
                                                          value, sizeof(value)) != DOGECOIN_OK)
                 return DOGECOIN_EINVAL;
             value_commitment = &value_item;
@@ -3639,7 +3414,7 @@ static int psbt_build_output(const struct dogecoin_psbt_output *src,
         if (unblinded)
             ecdh_public_key = NULL;
 
-        return dogecoin_tx_add_elements_raw_output(tx,
+        return libdogecoin_tx_add_elements_raw_output(tx,
                                                 src->script, src->script_len,
                                                 BUILD_PARAM(asset_commitment),
                                                 BUILD_PARAM(value_commitment),
@@ -3650,10 +3425,10 @@ static int psbt_build_output(const struct dogecoin_psbt_output *src,
     }
     if (!src->has_amount)
         return DOGECOIN_EINVAL;
-    return dogecoin_tx_add_raw_output(tx, src->amount, src->script, src->script_len, 0);
+    return libdogecoin_tx_add_raw_output(tx, src->amount, src->script, src->script_len, 0);
 }
 
-static int psbt_build_tx(const struct dogecoin_psbt *psbt, struct dogecoin_tx **tx,
+static int psbt_build_tx(const struct dogecoin_psbt *psbt, struct libdogecoin_tx **tx,
                          bool *is_pset, bool unblinded)
 {
     size_t is_elements, locktime, i;
@@ -3670,11 +3445,11 @@ static int psbt_build_tx(const struct dogecoin_psbt *psbt, struct dogecoin_tx **
     *is_pset = !!is_elements;
 
     if (psbt->version == PSBT_0)
-        return dogecoin_tx_clone_alloc(psbt->tx, 0, tx);
+        return libdogecoin_tx_clone_alloc(psbt->tx, 0, tx);
 
     ret = dogecoin_psbt_get_locktime(psbt, &locktime);
     if (ret == DOGECOIN_OK)
-        ret = dogecoin_tx_init_alloc(psbt->tx_version, locktime, psbt->num_inputs, psbt->num_outputs, tx);
+        ret = libdogecoin_tx_init_alloc(psbt->tx_version, locktime, psbt->num_inputs, psbt->num_outputs, tx);
 
     for (i = 0; ret == DOGECOIN_OK && i < psbt->num_inputs; ++i)
         ret = psbt_build_input(psbt->inputs + i, *is_pset, unblinded, *tx);
@@ -3683,7 +3458,7 @@ static int psbt_build_tx(const struct dogecoin_psbt *psbt, struct dogecoin_tx **
         ret = psbt_build_output(psbt->outputs + i, *is_pset, unblinded, *tx);
 
     if (ret != DOGECOIN_OK) {
-        dogecoin_tx_free(*tx);
+        libdogecoin_tx_free(*tx);
         *tx = NULL;
     }
     return ret;
@@ -3710,7 +3485,7 @@ static int psbt_v0_to_v2(struct dogecoin_psbt *psbt)
 
     for (i = 0; i < psbt->tx->num_inputs; ++i) {
         struct dogecoin_psbt_input *pi = &psbt->inputs[i];
-        const struct dogecoin_tx_input *txin = &psbt->tx->inputs[i];
+        const struct libdogecoin_tx_input *txin = &psbt->tx->inputs[i];
         memcpy(pi->txhash, txin->txhash, sizeof(pi->txhash));
         pi->index = txin->index; /* No mask, since PSET is v2 only */
         pi->sequence = txin->sequence;
@@ -3718,7 +3493,7 @@ static int psbt_v0_to_v2(struct dogecoin_psbt *psbt)
 
     for (i = 0; i < psbt->tx->num_outputs; ++i) {
         struct dogecoin_psbt_output *po = &psbt->outputs[i];
-        struct dogecoin_tx_output *txout = &psbt->tx->outputs[i];
+        struct libdogecoin_tx_output *txout = &psbt->tx->outputs[i];
         /* We steal script directly from the tx output so this can't fail */
         po->script = txout->script;
         txout->script = NULL;
@@ -3728,7 +3503,7 @@ static int psbt_v0_to_v2(struct dogecoin_psbt *psbt)
         po->has_amount = true;
     }
 
-    dogecoin_tx_free(psbt->tx);
+    libdogecoin_tx_free(psbt->tx);
     psbt->tx = NULL;
     return DOGECOIN_OK;
 }
@@ -3785,7 +3560,7 @@ int dogecoin_psbt_set_version(struct dogecoin_psbt *psbt,
 
 int dogecoin_psbt_get_id(const struct dogecoin_psbt *psbt, uint32_t flags, unsigned char *bytes_out, size_t len)
 {
-    struct dogecoin_tx *tx;
+    struct libdogecoin_tx *tx;
     size_t i;
     bool is_pset;
     int ret;
@@ -3804,8 +3579,8 @@ int dogecoin_psbt_get_id(const struct dogecoin_psbt *psbt, uint32_t flags, unsig
             for (i = 0; i < tx->num_inputs; ++i)
                 tx->inputs[i].sequence = 0;
         }
-        ret = dogecoin_tx_get_txid(tx, bytes_out, len);
-        dogecoin_tx_free(tx);
+        ret = libdogecoin_tx_get_txid(tx, bytes_out, len);
+        libdogecoin_tx_free(tx);
     }
     return ret;
 }
@@ -3918,7 +3693,7 @@ static int get_signing_script(const struct dogecoin_psbt *psbt, size_t index,
                               const unsigned char **script, size_t *script_len)
 {
     const struct dogecoin_psbt_input *inp = psbt_get_input(psbt, index);
-    const struct dogecoin_tx_output *utxo = utxo_from_input(psbt, inp);
+    const struct libdogecoin_tx_output *utxo = utxo_from_input(psbt, inp);
     const struct dogecoin_map_item *item;
 
     *script = NULL;
@@ -4075,7 +3850,7 @@ int dogecoin_psbt_get_input_scriptcode(const struct dogecoin_psbt *psbt, size_t 
 }
 
 int dogecoin_psbt_get_input_signature_hash(struct dogecoin_psbt *psbt, size_t index,
-                                        const struct dogecoin_tx *tx,
+                                        const struct libdogecoin_tx *tx,
                                         const unsigned char *script, size_t script_len,
                                         uint32_t flags,
                                         unsigned char *bytes_out, size_t len)
@@ -4101,7 +3876,7 @@ int dogecoin_psbt_get_input_signature_hash(struct dogecoin_psbt *psbt, size_t in
         if (!inp->witness_utxo)
             return DOGECOIN_EINVAL; /* Must be segwit */
 #ifdef BUILD_ELEMENTS
-        return dogecoin_tx_get_elements_signature_hash(tx, index,
+        return libdogecoin_tx_get_elements_signature_hash(tx, index,
                                                     script, script_len,
                                                     inp->witness_utxo->value,
                                                     inp->witness_utxo->value_len,
@@ -4112,7 +3887,7 @@ int dogecoin_psbt_get_input_signature_hash(struct dogecoin_psbt *psbt, size_t in
 #endif /* BUILD_ELEMENTS */
     }
     satoshi = inp->witness_utxo ? inp->witness_utxo->satoshi : 0;
-    return dogecoin_tx_get_btc_signature_hash(tx, index, script, script_len,
+    return libdogecoin_tx_get_btc_signature_hash(tx, index, script, script_len,
                                            satoshi, sighash, sig_flags,
                                            bytes_out, len);
 }
@@ -4170,7 +3945,7 @@ int dogecoin_psbt_sign_bip32(struct dogecoin_psbt *psbt,
     size_t i;
     bool is_pset;
     int ret;
-    struct dogecoin_tx *tx;
+    struct libdogecoin_tx *tx;
 
     if (!hdkey || hdkey->priv_key[0] != BIP32_FLAG_KEY_PRIVATE ||
         (flags & ~EC_FLAGS_ALL))
@@ -4218,7 +3993,7 @@ int dogecoin_psbt_sign_bip32(struct dogecoin_psbt *psbt,
         bip32_key_free(derived);
     }
 
-    dogecoin_tx_free(tx);
+    libdogecoin_tx_free(tx);
     return ret;
 }
 
@@ -4278,7 +4053,7 @@ static bool finalize_p2sh_wrapped(struct dogecoin_psbt_input *input)
             return true;
     }
     /* Failed: clear caller-created witness stack before returning */
-    dogecoin_tx_witness_stack_free(input->final_witness);
+    libdogecoin_tx_witness_stack_free(input->final_witness);
     input->final_witness = NULL;
     return false;
 }
@@ -4415,7 +4190,7 @@ int dogecoin_psbt_finalize_input(struct dogecoin_psbt *psbt, size_t index, uint3
         out_script_len = input->witness_utxo->script_len;
         is_witness = true;
     } else if (input->utxo && utxo_index < input->utxo->num_outputs) {
-        struct dogecoin_tx_output *utxo = &input->utxo->outputs[utxo_index];
+        struct libdogecoin_tx_output *utxo = &input->utxo->outputs[utxo_index];
         out_script = utxo->script;
         out_script_len = utxo->script_len;
     }
@@ -4479,9 +4254,9 @@ int dogecoin_psbt_finalize(struct dogecoin_psbt *psbt, uint32_t flags)
     return ret;
 }
 
-int dogecoin_psbt_extract(const struct dogecoin_psbt *psbt, uint32_t flags, struct dogecoin_tx **output)
+int dogecoin_psbt_extract(const struct dogecoin_psbt *psbt, uint32_t flags, struct libdogecoin_tx **output)
 {
-    struct dogecoin_tx *result;
+    struct libdogecoin_tx *result;
     size_t i;
     bool is_pset, for_final = !(flags & DOGECOIN_PSBT_EXTRACT_NON_FINAL);
     int ret;
@@ -4496,7 +4271,7 @@ int dogecoin_psbt_extract(const struct dogecoin_psbt *psbt, uint32_t flags, stru
 
     for (i = 0; for_final && i < psbt->num_inputs; ++i) {
         const struct dogecoin_psbt_input *input = &psbt->inputs[i];
-        struct dogecoin_tx_input *txin = &result->inputs[i];
+        struct libdogecoin_tx_input *txin = &result->inputs[i];
         const struct dogecoin_map_item *final_scriptsig;
 
         final_scriptsig = dogecoin_map_get_integer(&input->psbt_fields, PSBT_IN_FINAL_SCRIPTSIG);
@@ -4525,7 +4300,7 @@ int dogecoin_psbt_extract(const struct dogecoin_psbt *psbt, uint32_t flags, stru
                 ret = DOGECOIN_EINVAL;
                 break;
             }
-            ret = dogecoin_tx_witness_stack_clone_alloc(input->final_witness,
+            ret = libdogecoin_tx_witness_stack_clone_alloc(input->final_witness,
                                                      &txin->witness);
             if (ret != DOGECOIN_OK)
                 break;
@@ -4535,7 +4310,7 @@ int dogecoin_psbt_extract(const struct dogecoin_psbt *psbt, uint32_t flags, stru
     if (ret == DOGECOIN_OK)
         *output = result;
     else
-        dogecoin_tx_free(result);
+        libdogecoin_tx_free(result);
     return ret;
 }
 
@@ -4611,7 +4386,7 @@ int dogecoin_psbt_blind(struct dogecoin_psbt *psbt,
     for (i = 0; ret == DOGECOIN_OK && i < psbt->num_inputs; ++i) {
         /* TODO: Handle issuance */
         const struct dogecoin_psbt_input *in = psbt->inputs + i;
-        const struct dogecoin_tx_output *utxo = utxo_from_input(psbt, in);
+        const struct libdogecoin_tx_output *utxo = utxo_from_input(psbt, in);
         unsigned char *ephemeral_input_tag = ephemeral_input_tags + i * ASSET_GENERATOR_LEN;
         const struct dogecoin_map_item *value;
 
@@ -4631,7 +4406,7 @@ int dogecoin_psbt_blind(struct dogecoin_psbt *psbt,
             uint64_t satoshi;
 
             did_find_input = true; /* This input belongs to us */
-            ret = dogecoin_tx_confidential_value_to_satoshi(value->value, value->value_len,
+            ret = libdogecoin_tx_confidential_value_to_satoshi(value->value, value->value_len,
                                                          &satoshi);
             if (ret != DOGECOIN_OK ||
                 !asset || asset->value_len != ASSET_TAG_LEN ||
@@ -5021,21 +4796,21 @@ int dogecoin_psbt_is_elements(const struct dogecoin_psbt *psbt, size_t *written)
     PSBT_SET_B(typ, name, ver)
 
 
-PSBT_GET_S(input, utxo, dogecoin_tx, tx_clone_alloc)
-PSBT_GET_S(input, witness_utxo, dogecoin_tx_output, dogecoin_tx_output_clone_alloc)
+PSBT_GET_S(input, utxo, libdogecoin_tx, tx_clone_alloc)
+PSBT_GET_S(input, witness_utxo, libdogecoin_tx_output, libdogecoin_tx_output_clone_alloc)
 int dogecoin_psbt_get_input_best_utxo_alloc(const struct dogecoin_psbt *psbt, size_t index,
-                                         struct dogecoin_tx_output **output)
+                                         struct libdogecoin_tx_output **output)
 {
     const struct dogecoin_psbt_input *p = psbt_get_input(psbt, index);
-    const struct dogecoin_tx_output *utxo = p ? utxo_from_input(psbt, p) : NULL;
+    const struct libdogecoin_tx_output *utxo = p ? utxo_from_input(psbt, p) : NULL;
     if (output) *output = NULL;
     if (!utxo || !output) return DOGECOIN_EINVAL;
-    return dogecoin_tx_output_clone_alloc(utxo, output);
+    return libdogecoin_tx_output_clone_alloc(utxo, output);
 }
 PSBT_FIELD(input, redeem_script, PSBT_0)
 PSBT_FIELD(input, witness_script, PSBT_0)
 PSBT_FIELD(input, final_scriptsig, PSBT_0)
-PSBT_GET_S(input, final_witness, dogecoin_tx_witness_stack, dogecoin_tx_witness_stack_clone_alloc)
+PSBT_GET_S(input, final_witness, libdogecoin_tx_witness_stack, libdogecoin_tx_witness_stack_clone_alloc)
 PSBT_GET_M(input, keypath)
 PSBT_GET_M(input, signature)
 PSBT_GET_M(input, unknown)
@@ -5118,15 +4893,15 @@ int dogecoin_psbt_has_input_required_lockheight(const struct dogecoin_psbt *psbt
     return DOGECOIN_OK;
 }
 
-PSBT_SET_S(input, utxo, dogecoin_tx)
-PSBT_SET_S(input, witness_utxo, dogecoin_tx_output)
+PSBT_SET_S(input, utxo, libdogecoin_tx)
+PSBT_SET_S(input, witness_utxo, libdogecoin_tx_output)
 int dogecoin_psbt_set_input_witness_utxo_from_tx(struct dogecoin_psbt *psbt, size_t index,
-                                              const struct dogecoin_tx *utxo, uint32_t utxo_index)
+                                              const struct libdogecoin_tx *utxo, uint32_t utxo_index)
 {
     struct dogecoin_psbt_input *p = psbt_get_input(psbt, index);
     return dogecoin_psbt_input_set_witness_utxo_from_tx(p, utxo, utxo_index);
 }
-PSBT_SET_S(input, final_witness, dogecoin_tx_witness_stack)
+PSBT_SET_S(input, final_witness, libdogecoin_tx_witness_stack)
 PSBT_SET_S(input, keypaths, dogecoin_map)
 PSBT_SET_S(input, signatures, dogecoin_map)
 int dogecoin_psbt_add_input_signature(struct dogecoin_psbt *psbt, size_t index,

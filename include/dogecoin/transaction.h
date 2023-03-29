@@ -161,36 +161,36 @@ LIBDOGECOIN_API int store_raw_transaction(char* incomingrawtx);
 
 struct dogecoin_map;
 #ifdef SWIG
-struct dogecoin_tx_input;
-struct dogecoin_tx_output;
-struct dogecoin_tx;
+struct libdogecoin_tx_input;
+struct libdogecoin_tx_output;
+struct libdogecoin_tx;
 #else
 /** A transaction witness item */
-struct dogecoin_tx_witness_item {
+struct libdogecoin_tx_witness_item {
     unsigned char *witness;
     size_t witness_len;
 };
 
 /** A transaction witness stack */
-struct dogecoin_tx_witness_stack {
-    struct dogecoin_tx_witness_item *items;
+struct libdogecoin_tx_witness_stack {
+    struct libdogecoin_tx_witness_item *items;
     size_t num_items;
     size_t items_allocation_len;
 };
 
 /** A transaction input */
-struct dogecoin_tx_input {
+struct libdogecoin_tx_input {
     unsigned char txhash[DOGECOIN_TXHASH_LEN];
     uint32_t index;
     uint32_t sequence;
     unsigned char *script;
     size_t script_len;
-    struct dogecoin_tx_witness_stack *witness;
+    struct libdogecoin_tx_witness_stack *witness;
     uint8_t features;
 };
 
 /** A transaction output */
-struct dogecoin_tx_output {
+struct libdogecoin_tx_output {
     uint64_t satoshi;
     unsigned char *script;
     size_t script_len;
@@ -198,13 +198,13 @@ struct dogecoin_tx_output {
 };
 
 /** A parsed bitcoin transaction */
-struct dogecoin_tx {
+struct libdogecoin_tx {
     uint32_t version;
     uint32_t locktime;
-    struct dogecoin_tx_input *inputs;
+    struct libdogecoin_tx_input *inputs;
     size_t num_inputs;
     size_t inputs_allocation_len;
-    struct dogecoin_tx_output *outputs;
+    struct libdogecoin_tx_output *outputs;
     size_t num_outputs;
     size_t outputs_allocation_len;
 };
@@ -216,9 +216,9 @@ struct dogecoin_tx {
  * :param allocation_len: The number of items to pre-allocate space for.
  * :param output: Destination for the resulting witness stack.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_init_alloc(
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_init_alloc(
     size_t allocation_len,
-    struct dogecoin_tx_witness_stack **output);
+    struct libdogecoin_tx_witness_stack **output);
 
 /**
  * Create a copy of a witness stack.
@@ -226,9 +226,9 @@ LIBDOGECOIN_API int dogecoin_tx_witness_stack_init_alloc(
  * :param stack: The witness stack to copy.
  * :param output: Destination for the resulting copy.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_clone_alloc(
-    const struct dogecoin_tx_witness_stack *stack,
-    struct dogecoin_tx_witness_stack **output);
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_clone_alloc(
+    const struct libdogecoin_tx_witness_stack *stack,
+    struct libdogecoin_tx_witness_stack **output);
 
 /**
  * Add a witness to a witness stack.
@@ -237,8 +237,8 @@ LIBDOGECOIN_API int dogecoin_tx_witness_stack_clone_alloc(
  * :param witness: The witness data to add to the stack.
  * :param witness_len: Length of ``witness`` in bytes.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_add(
-    struct dogecoin_tx_witness_stack *stack,
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_add(
+    struct libdogecoin_tx_witness_stack *stack,
     const unsigned char *witness,
     size_t witness_len);
 
@@ -248,8 +248,8 @@ LIBDOGECOIN_API int dogecoin_tx_witness_stack_add(
  * :param stack: The witness stack to add to.
  * :param flags: ``DOGECOIN_TX_DUMMY_`` Flags indicating the type of dummy to add.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_add_dummy(
-    struct dogecoin_tx_witness_stack *stack,
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_add_dummy(
+    struct libdogecoin_tx_witness_stack *stack,
     uint32_t flags);
 
 /**
@@ -260,8 +260,8 @@ LIBDOGECOIN_API int dogecoin_tx_witness_stack_add_dummy(
  * :param witness: The witness data to add to the stack.
  * :param witness_len: Length of ``witness`` in bytes.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_set(
-    struct dogecoin_tx_witness_stack *stack,
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_set(
+    struct libdogecoin_tx_witness_stack *stack,
     size_t index,
     const unsigned char *witness,
     size_t witness_len);
@@ -273,18 +273,18 @@ LIBDOGECOIN_API int dogecoin_tx_witness_stack_set(
  * :param index: Index of the item to set. The stack will grow if needed to this many items.
  * :param flags: ``DOGECOIN_TX_DUMMY_`` Flags indicating the type of dummy to set.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_set_dummy(
-    struct dogecoin_tx_witness_stack *stack,
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_set_dummy(
+    struct libdogecoin_tx_witness_stack *stack,
     size_t index,
     uint32_t flags);
 
 /**
- * Free a transaction witness stack allocated by `dogecoin_tx_witness_stack_init_alloc`.
+ * Free a transaction witness stack allocated by `libdogecoin_tx_witness_stack_init_alloc`.
  *
  * :param stack: The transaction witness stack to free.
  */
-LIBDOGECOIN_API int dogecoin_tx_witness_stack_free(
-    struct dogecoin_tx_witness_stack *stack);
+LIBDOGECOIN_API int libdogecoin_tx_witness_stack_free(
+    struct libdogecoin_tx_witness_stack *stack);
 
 /**
  * Allocate and initialize a new transaction input.
@@ -299,22 +299,22 @@ LIBDOGECOIN_API int dogecoin_tx_witness_stack_free(
  * :param witness: The witness stack for the input, or NULL if no witness is present.
  * :param output: Destination for the resulting transaction input.
  */
-LIBDOGECOIN_API int dogecoin_tx_input_init_alloc(
+LIBDOGECOIN_API int libdogecoin_tx_input_init_alloc(
     const unsigned char *txhash,
     size_t txhash_len,
     uint32_t utxo_index,
     uint32_t sequence,
     const unsigned char *script,
     size_t script_len,
-    const struct dogecoin_tx_witness_stack *witness,
-    struct dogecoin_tx_input **output);
+    const struct libdogecoin_tx_witness_stack *witness,
+    struct libdogecoin_tx_input **output);
 
 /**
- * Free a transaction input allocated by `dogecoin_tx_input_init_alloc`.
+ * Free a transaction input allocated by `libdogecoin_tx_input_init_alloc`.
  *
  * :param input: The transaction input to free.
  */
-LIBDOGECOIN_API int dogecoin_tx_input_free(struct dogecoin_tx_input *input);
+LIBDOGECOIN_API int libdogecoin_tx_input_free(struct libdogecoin_tx_input *input);
 
 /**
  * Initialize a new transaction output.
@@ -324,10 +324,10 @@ LIBDOGECOIN_API int dogecoin_tx_input_free(struct dogecoin_tx_input *input);
  * :param script_len: Size of ``script`` in bytes.
  * :param output: Transaction output to initialize.
  */
-LIBDOGECOIN_API int dogecoin_tx_output_init(uint64_t satoshi,
+LIBDOGECOIN_API int libdogecoin_tx_output_init(uint64_t satoshi,
                                         const unsigned char *script,
                                         size_t script_len,
-                                        struct dogecoin_tx_output *output);
+                                        struct libdogecoin_tx_output *output);
 
 /**
  * Allocate and initialize a new transaction output.
@@ -337,11 +337,11 @@ LIBDOGECOIN_API int dogecoin_tx_output_init(uint64_t satoshi,
  * :param script_len: Size of ``script`` in bytes.
  * :param output: Destination for the resulting transaction output.
  */
-LIBDOGECOIN_API int dogecoin_tx_output_init_alloc(
+LIBDOGECOIN_API int libdogecoin_tx_output_init_alloc(
     uint64_t satoshi,
     const unsigned char *script,
     size_t script_len,
-    struct dogecoin_tx_output **output);
+    struct libdogecoin_tx_output **output);
 
 /**
  * Create a new copy of a transaction output.
@@ -349,9 +349,9 @@ LIBDOGECOIN_API int dogecoin_tx_output_init_alloc(
  * :param tx_output_in: The transaction output to clone.
  * :param output: Destination for the resulting transaction output copy.
  */
-LIBDOGECOIN_API int dogecoin_tx_output_clone_alloc(
-    const struct dogecoin_tx_output *tx_output_in,
-    struct dogecoin_tx_output **output);
+LIBDOGECOIN_API int libdogecoin_tx_output_clone_alloc(
+    const struct libdogecoin_tx_output *tx_output_in,
+    struct libdogecoin_tx_output **output);
 
 /**
  * Create a new copy of a transaction output in place.
@@ -361,16 +361,16 @@ LIBDOGECOIN_API int dogecoin_tx_output_clone_alloc(
  *
  * .. note:: ``output`` is overwritten in place, and not cleared first.
  */
-LIBDOGECOIN_API int dogecoin_tx_output_clone(
-    const struct dogecoin_tx_output *tx_output_in,
-    struct dogecoin_tx_output *output);
+LIBDOGECOIN_API int libdogecoin_tx_output_clone(
+    const struct libdogecoin_tx_output *tx_output_in,
+    struct libdogecoin_tx_output *output);
 
 /**
- * Free a transaction output allocated by `dogecoin_tx_output_init_alloc`.
+ * Free a transaction output allocated by `libdogecoin_tx_output_init_alloc`.
  *
  * :param output: The transaction output to free.
  */
-LIBDOGECOIN_API int dogecoin_tx_output_free(struct dogecoin_tx_output *output);
+LIBDOGECOIN_API int libdogecoin_tx_output_free(struct libdogecoin_tx_output *output);
 
 /**
  * Allocate and initialize a new transaction.
@@ -381,12 +381,12 @@ LIBDOGECOIN_API int dogecoin_tx_output_free(struct dogecoin_tx_output *output);
  * :param outputs_allocation_len: The number of outputs to pre-allocate space for.
  * :param output: Destination for the resulting transaction output.
  */
-LIBDOGECOIN_API int dogecoin_tx_init_alloc(
+LIBDOGECOIN_API int libdogecoin_tx_init_alloc(
     uint32_t version,
     uint32_t locktime,
     size_t inputs_allocation_len,
     size_t outputs_allocation_len,
-    struct dogecoin_tx **output);
+    struct libdogecoin_tx **output);
 
 /**
  * Create a new copy of a transaction.
@@ -395,10 +395,10 @@ LIBDOGECOIN_API int dogecoin_tx_init_alloc(
  * :param flags: Flags controlling transaction creation. Must be 0.
  * :param output: Destination for the resulting transaction copy.
  */
-LIBDOGECOIN_API int dogecoin_tx_clone_alloc(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_clone_alloc(
+    const struct libdogecoin_tx *tx,
     uint32_t flags,
-    struct dogecoin_tx **output);
+    struct libdogecoin_tx **output);
 
 /**
  * Add a transaction input to a transaction.
@@ -406,9 +406,9 @@ LIBDOGECOIN_API int dogecoin_tx_clone_alloc(
  * :param tx: The transaction to add the input to.
  * :param input: The transaction input to add to ``tx``.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_input(
-    struct dogecoin_tx *tx,
-    const struct dogecoin_tx_input *input);
+LIBDOGECOIN_API int libdogecoin_tx_add_input(
+    struct libdogecoin_tx *tx,
+    const struct libdogecoin_tx_input *input);
 
 /**
  * Add a transaction input to a transaction at a given position.
@@ -417,10 +417,10 @@ LIBDOGECOIN_API int dogecoin_tx_add_input(
  * :param index: The zero-based index of the position to add the input at.
  * :param input: The transaction input to add to ``tx``.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_input_at(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_add_input_at(
+    struct libdogecoin_tx *tx,
     uint32_t index,
-    const struct dogecoin_tx_input *input);
+    const struct libdogecoin_tx_input *input);
 
 /**
  * Add a transaction input to a transaction.
@@ -436,15 +436,15 @@ LIBDOGECOIN_API int dogecoin_tx_add_input_at(
  * :param witness: The witness stack for the input, or NULL if no witness is present.
  * :param flags: Flags controlling input creation. Must be 0.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_raw_input(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_add_raw_input(
+    struct libdogecoin_tx *tx,
     const unsigned char *txhash,
     size_t txhash_len,
     uint32_t utxo_index,
     uint32_t sequence,
     const unsigned char *script,
     size_t script_len,
-    const struct dogecoin_tx_witness_stack *witness,
+    const struct libdogecoin_tx_witness_stack *witness,
     uint32_t flags);
 
 /**
@@ -462,8 +462,8 @@ LIBDOGECOIN_API int dogecoin_tx_add_raw_input(
  * :param witness: The witness stack for the input, or NULL if no witness is present.
  * :param flags: Flags controlling input creation. Must be 0.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_raw_input_at(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_add_raw_input_at(
+    struct libdogecoin_tx *tx,
     uint32_t index,
     const unsigned char *txhash,
     size_t txhash_len,
@@ -471,7 +471,7 @@ LIBDOGECOIN_API int dogecoin_tx_add_raw_input_at(
     uint32_t sequence,
     const unsigned char *script,
     size_t script_len,
-    const struct dogecoin_tx_witness_stack *witness,
+    const struct libdogecoin_tx_witness_stack *witness,
     uint32_t flags);
 
 /**
@@ -480,8 +480,8 @@ LIBDOGECOIN_API int dogecoin_tx_add_raw_input_at(
  * :param tx: The transaction to remove the input from.
  * :param index: The zero-based index of the input to remove.
  */
-LIBDOGECOIN_API int dogecoin_tx_remove_input(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_remove_input(
+    struct libdogecoin_tx *tx,
     size_t index);
 
 /**
@@ -492,8 +492,8 @@ LIBDOGECOIN_API int dogecoin_tx_remove_input(
  * :param script: The scriptSig for the input.
  * :param script_len: Size of ``script`` in bytes.
  */
-LIBDOGECOIN_API int dogecoin_tx_set_input_script(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_set_input_script(
+    const struct libdogecoin_tx *tx,
     size_t index,
     const unsigned char *script,
     size_t script_len);
@@ -506,10 +506,10 @@ LIBDOGECOIN_API int dogecoin_tx_set_input_script(
  * :param stack: The transaction witness stack to set.
  */
 
-LIBDOGECOIN_API int dogecoin_tx_set_input_witness(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_set_input_witness(
+    const struct libdogecoin_tx *tx,
     size_t index,
-    const struct dogecoin_tx_witness_stack *stack);
+    const struct libdogecoin_tx_witness_stack *stack);
 
 /**
  * Add a transaction output to a transaction.
@@ -517,9 +517,9 @@ LIBDOGECOIN_API int dogecoin_tx_set_input_witness(
  * :param tx: The transaction to add the output to.
  * :param output: The transaction output to add to ``tx``.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_output(
-    struct dogecoin_tx *tx,
-    const struct dogecoin_tx_output *output);
+LIBDOGECOIN_API int libdogecoin_tx_add_output(
+    struct libdogecoin_tx *tx,
+    const struct libdogecoin_tx_output *output);
 
 /**
  * Add a transaction output to a transaction at a given position.
@@ -528,10 +528,10 @@ LIBDOGECOIN_API int dogecoin_tx_add_output(
  * :param index: The zero-based index of the position to add the output at.
  * :param output: The transaction output to add to ``tx``.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_output_at(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_add_output_at(
+    struct libdogecoin_tx *tx,
     uint32_t index,
-    const struct dogecoin_tx_output *output);
+    const struct libdogecoin_tx_output *output);
 
 /**
  * Add a transaction output to a transaction.
@@ -542,8 +542,8 @@ LIBDOGECOIN_API int dogecoin_tx_add_output_at(
  * :param script_len: Size of ``script`` in bytes.
  * :param flags: Flags controlling output creation. Must be 0.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_raw_output(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_add_raw_output(
+    struct libdogecoin_tx *tx,
     uint64_t satoshi,
     const unsigned char *script,
     size_t script_len,
@@ -559,8 +559,8 @@ LIBDOGECOIN_API int dogecoin_tx_add_raw_output(
  * :param script_len: Size of ``script`` in bytes.
  * :param flags: Flags controlling output creation. Must be 0.
  */
-LIBDOGECOIN_API int dogecoin_tx_add_raw_output_at(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_add_raw_output_at(
+    struct libdogecoin_tx *tx,
     uint32_t index,
     uint64_t satoshi,
     const unsigned char *script,
@@ -573,8 +573,8 @@ LIBDOGECOIN_API int dogecoin_tx_add_raw_output_at(
  * :param tx: The transaction to remove the output from.
  * :param index: The zero-based index of the output to remove.
  */
-LIBDOGECOIN_API int dogecoin_tx_remove_output(
-    struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_remove_output(
+    struct libdogecoin_tx *tx,
     size_t index);
 
 /**
@@ -583,16 +583,16 @@ LIBDOGECOIN_API int dogecoin_tx_remove_output(
  * :param tx: The transaction to get the witnesses count from.
  * :param written: Destination for the number of witness-containing inputs.
  */
-LIBDOGECOIN_API int dogecoin_tx_get_witness_count(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_witness_count(
+    const struct libdogecoin_tx *tx,
     size_t *written);
 
 /**
- * Free a transaction allocated by `dogecoin_tx_init_alloc`.
+ * Free a transaction allocated by `libdogecoin_tx_init_alloc`.
  *
  * :param tx: The transaction to free.
  */
-// LIBDOGECOIN_API int dogecoin_tx_free(struct dogecoin_tx *tx);
+// LIBDOGECOIN_API int libdogecoin_tx_free(struct libdogecoin_tx *tx);
 
 /**
  * Return the txid of a transaction.
@@ -603,8 +603,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_witness_count(
  *
  * .. note:: The txid is expensive to compute.
  */
-LIBDOGECOIN_API int dogecoin_tx_get_txid(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_txid(
+    const struct libdogecoin_tx *tx,
     unsigned char *bytes_out,
     size_t len);
 
@@ -615,8 +615,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_txid(
  * :param flags: ``DOGECOIN_TX_FLAG_`` Flags controlling serialization options.
  * :param written: Destination for the length of the serialized bytes.
  */
-LIBDOGECOIN_API int dogecoin_tx_get_length(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_length(
+    const struct libdogecoin_tx *tx,
     uint32_t flags,
     size_t *written);
 
@@ -628,11 +628,11 @@ LIBDOGECOIN_API int dogecoin_tx_get_length(
  * :param flags: ``DOGECOIN_TX_FLAG_`` Flags controlling serialization options.
  * :param output: Destination for the resulting transaction.
  */
-LIBDOGECOIN_API int dogecoin_tx_from_bytes(
+LIBDOGECOIN_API int libdogecoin_tx_from_bytes(
     const unsigned char *bytes,
     size_t bytes_len,
     uint32_t flags,
-    struct dogecoin_tx **output);
+    struct libdogecoin_tx **output);
 
 /**
  * Create a transaction from its serialized bytes in hexadecimal.
@@ -641,10 +641,10 @@ LIBDOGECOIN_API int dogecoin_tx_from_bytes(
  * :param flags: ``DOGECOIN_TX_FLAG_`` Flags controlling serialization options.
  * :param output: Destination for the resulting transaction.
  */
-LIBDOGECOIN_API int dogecoin_tx_from_hex(
+LIBDOGECOIN_API int libdogecoin_tx_from_hex(
     const char *hex,
     uint32_t flags,
-    struct dogecoin_tx **output);
+    struct libdogecoin_tx **output);
 
 /**
  * Serialize a transaction to bytes.
@@ -655,8 +655,8 @@ LIBDOGECOIN_API int dogecoin_tx_from_hex(
  * :param len: Size of ``bytes_out`` in bytes.
  * :param written: Destination for the length of the serialized transaction.
  */
-LIBDOGECOIN_API int dogecoin_tx_to_bytes(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_to_bytes(
+    const struct libdogecoin_tx *tx,
     uint32_t flags,
     unsigned char *bytes_out,
     size_t len,
@@ -671,8 +671,8 @@ LIBDOGECOIN_API int dogecoin_tx_to_bytes(
  *
  * .. note:: The string returned should be freed using `dogecoin_free_string`.
  */
-LIBDOGECOIN_API int dogecoin_tx_to_hex(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_to_hex(
+    const struct libdogecoin_tx *tx,
     uint32_t flags,
     char **output);
 
@@ -682,8 +682,8 @@ LIBDOGECOIN_API int dogecoin_tx_to_hex(
  * :param tx: The transaction to get the weight of.
  * :param written: Destination for the weight.
  */
-LIBDOGECOIN_API int dogecoin_tx_get_weight(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_weight(
+    const struct libdogecoin_tx *tx,
     size_t *written);
 
 /**
@@ -692,8 +692,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_weight(
  * :param tx: The transaction to get the virtual size of.
  * :param written: Destination for the virtual size.
  */
-LIBDOGECOIN_API int dogecoin_tx_get_vsize(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_vsize(
+    const struct libdogecoin_tx *tx,
     size_t *written);
 
 /**
@@ -702,7 +702,7 @@ LIBDOGECOIN_API int dogecoin_tx_get_vsize(
  * :param weight: The weight to convert to a virtual size.
  * :param written: Destination for the virtual size.
  */
-LIBDOGECOIN_API int dogecoin_tx_vsize_from_weight(
+LIBDOGECOIN_API int libdogecoin_tx_vsize_from_weight(
     size_t weight,
     size_t *written);
 
@@ -712,8 +712,8 @@ LIBDOGECOIN_API int dogecoin_tx_vsize_from_weight(
  * :param tx: The transaction to compute the total from.
  * :param value_out: Destination for the output total.
  */
-LIBDOGECOIN_API int dogecoin_tx_get_total_output_satoshi(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_total_output_satoshi(
+    const struct libdogecoin_tx *tx,
     uint64_t *value_out);
 
 /**
@@ -731,8 +731,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_total_output_satoshi(
  * :param bytes_out: Destination for the signature hash.
  * FIXED_SIZED_OUTPUT(len, bytes_out, SHA256_LEN)
  */
-LIBDOGECOIN_API int dogecoin_tx_get_btc_signature_hash(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_btc_signature_hash(
+    const struct libdogecoin_tx *tx,
     size_t index,
     const unsigned char *script,
     size_t script_len,
@@ -761,8 +761,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_btc_signature_hash(
  * :param bytes_out: Destination for the resulting signature hash.
  * FIXED_SIZED_OUTPUT(len, bytes_out, SHA256_LEN)
 */
-LIBDOGECOIN_API int dogecoin_tx_get_btc_taproot_signature_hash(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_btc_taproot_signature_hash(
+    const struct libdogecoin_tx *tx,
     size_t index,
     const struct dogecoin_map *scripts,
     const uint64_t *values,
@@ -800,8 +800,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_btc_taproot_signature_hash(
  * :param bytes_out: Destination for the signature hash.
  * FIXED_SIZED_OUTPUT(len, bytes_out, SHA256_LEN)
  */
-LIBDOGECOIN_API int dogecoin_tx_get_signature_hash(
-    const struct dogecoin_tx *tx,
+LIBDOGECOIN_API int libdogecoin_tx_get_signature_hash(
+    const struct libdogecoin_tx *tx,
     size_t index,
     const unsigned char *script,
     size_t script_len,
@@ -821,8 +821,8 @@ LIBDOGECOIN_API int dogecoin_tx_get_signature_hash(
  * :param tx: The transaction to check.
  * :param written: 1 if the transaction is a coinbase transaction, otherwise 0.
  */
-// LIBDOGECOIN_API int dogecoin_tx_is_coinbase(
-//     const struct dogecoin_tx *tx,
+// LIBDOGECOIN_API int libdogecoin_tx_is_coinbase(
+//     const struct libdogecoin_tx *tx,
 //     size_t *written);
 
 LIBDOGECOIN_END_DECL

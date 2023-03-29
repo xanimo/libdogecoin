@@ -66,9 +66,9 @@ struct dogecoin_psbt_input {
     unsigned char txhash[DOGECOIN_TXHASH_LEN]; /* 'previous txid' */
     uint32_t index;
     uint32_t sequence;
-    struct dogecoin_tx *utxo;
-    struct dogecoin_tx_output *witness_utxo;
-    struct dogecoin_tx_witness_stack *final_witness;
+    struct libdogecoin_tx *utxo;
+    struct libdogecoin_tx_output *witness_utxo;
+    struct libdogecoin_tx_witness_stack *final_witness;
     struct dogecoin_map keypaths;
     struct dogecoin_map signatures;
     struct dogecoin_map unknowns;
@@ -104,7 +104,7 @@ struct dogecoin_psbt_output {
 /** A partially signed bitcoin transaction */
 struct dogecoin_psbt {
     unsigned char magic[5];
-    struct dogecoin_tx *tx;
+    struct libdogecoin_tx *tx;
     struct dogecoin_psbt_input *inputs;
     size_t num_inputs;
     size_t inputs_allocation_len;
@@ -169,7 +169,7 @@ LIBDOGECOIN_API int dogecoin_psbt_input_clear_sequence(
  */
 LIBDOGECOIN_API int dogecoin_psbt_input_set_utxo(
     struct dogecoin_psbt_input *input,
-    const struct dogecoin_tx *utxo);
+    const struct libdogecoin_tx *utxo);
 
 /**
  * Set the witness_utxo in an input.
@@ -179,7 +179,7 @@ LIBDOGECOIN_API int dogecoin_psbt_input_set_utxo(
  */
 LIBDOGECOIN_API int dogecoin_psbt_input_set_witness_utxo(
     struct dogecoin_psbt_input *input,
-    const struct dogecoin_tx_output *witness_utxo);
+    const struct libdogecoin_tx_output *witness_utxo);
 
 /**
  * Set the witness_utxo in an input from a transaction output.
@@ -190,7 +190,7 @@ LIBDOGECOIN_API int dogecoin_psbt_input_set_witness_utxo(
  */
 LIBDOGECOIN_API int dogecoin_psbt_input_set_witness_utxo_from_tx(
     struct dogecoin_psbt_input *input,
-    const struct dogecoin_tx *utxo,
+    const struct libdogecoin_tx *utxo,
     uint32_t index);
 
 /**
@@ -237,7 +237,7 @@ LIBDOGECOIN_API int dogecoin_psbt_input_set_final_scriptsig(
  */
 LIBDOGECOIN_API int dogecoin_psbt_input_set_final_witness(
     struct dogecoin_psbt_input *input,
-    const struct dogecoin_tx_witness_stack *witness);
+    const struct libdogecoin_tx_witness_stack *witness);
 
 /**
  * Set the keypaths in an input.
@@ -623,7 +623,7 @@ LIBDOGECOIN_API int dogecoin_psbt_is_finalized(
  */
 LIBDOGECOIN_API int dogecoin_psbt_set_global_tx(
     struct dogecoin_psbt *psbt,
-    const struct dogecoin_tx *tx);
+    const struct libdogecoin_tx *tx);
 
 /**
  * Set the transaction version for a PSBT.
@@ -690,7 +690,7 @@ LIBDOGECOIN_API int dogecoin_psbt_add_tx_input_at(
     struct dogecoin_psbt *psbt,
     uint32_t index,
     uint32_t flags,
-    const struct dogecoin_tx_input *input);
+    const struct libdogecoin_tx_input *input);
 
 /**
  * Remove a transaction input from a PSBT.
@@ -801,7 +801,7 @@ LIBDOGECOIN_API int dogecoin_psbt_get_input_scriptcode(
 LIBDOGECOIN_API int dogecoin_psbt_get_input_signature_hash(
     struct dogecoin_psbt *psbt,
     size_t index,
-    const struct dogecoin_tx *tx,
+    const struct libdogecoin_tx *tx,
     const unsigned char *script,
     size_t script_len,
     uint32_t flags,
@@ -820,7 +820,7 @@ LIBDOGECOIN_API int dogecoin_psbt_add_tx_output_at(
     struct dogecoin_psbt *psbt,
     uint32_t index,
     uint32_t flags,
-    const struct dogecoin_tx_output *output);
+    const struct libdogecoin_tx_output *output);
 
 /**
  * Remove a transaction output from a PSBT.
@@ -1058,7 +1058,7 @@ LIBDOGECOIN_API int dogecoin_psbt_finalize_input(
 LIBDOGECOIN_API int dogecoin_psbt_extract(
     const struct dogecoin_psbt *psbt,
     uint32_t flags,
-    struct dogecoin_tx **output);
+    struct libdogecoin_tx **output);
 
 /**
  * Determine if a PSBT is an elements PSBT.
