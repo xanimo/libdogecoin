@@ -14,7 +14,7 @@ int dogecoin_map_init(size_t allocation_len, dogecoin_map_verify_fn_t verify_fn,
 
     dogecoin_clear(output, sizeof(*output));
     if (allocation_len) {
-        output->items = dogecoin_calloc(allocation_len * sizeof(*output->items));
+        output->items = libdogecoin_calloc(allocation_len * sizeof(*output->items));
         if (!output->items)
             return DOGECOIN_ENOMEM;
     }
@@ -517,7 +517,7 @@ int dogecoin_map_keypath_get_bip32_key_from_alloc(const struct dogecoin_map *map
     }
     if (ret == DOGECOIN_OK && idx) {
         /* Found, return the matching key */
-        *output = dogecoin_calloc(sizeof(struct ext_key));
+        *output = libdogecoin_calloc(sizeof(struct ext_key));
         if (!*output)
             ret = DOGECOIN_ENOMEM;
         else
