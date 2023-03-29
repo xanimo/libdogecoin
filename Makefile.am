@@ -28,17 +28,25 @@ noinst_HEADERS = \
     include/dogecoin/buffer.h \
     include/dogecoin/byteswap.h \
     include/dogecoin/chainparams.h \
+    include/dogecoin/core.h \
+    include/dogecoin/crypto.h \
     include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \
     include/dogecoin/eckey.h \
+    include/dogecoin/endian.h \
     include/dogecoin/hash.h \
     include/dogecoin/key.h \
     include/dogecoin/koinu.h \
+    include/dogecoin/map.h \
     include/dogecoin/mem.h \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
     include/qr/png.h \
+    include/dogecoin/psbt_io.h \
+    include/dogecoin/psbt_members.h \
+    include/dogecoin/psbt.h \
+    include/dogecoin/pullpush.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
     include/dogecoin/random.h \
@@ -73,9 +81,12 @@ libdogecoin_la_SOURCES = \
     src/eckey.c \
     src/key.c \
     src/koinu.c \
+    src/map.c \
     src/mem.c \
     src/moon.c \
     src/png.c \
+    src/psbt.c \
+    src/pullpush.c \
     src/jpeg.c \
     src/qrengine.c \
     src/qr.c \

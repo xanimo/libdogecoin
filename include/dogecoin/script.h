@@ -37,6 +37,41 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/*** script-type Script type constants */
+#define DOGECOIN_SCRIPT_TYPE_UNKNOWN       0x0
+#define DOGECOIN_SCRIPT_TYPE_OP_RETURN     0x1
+#define DOGECOIN_SCRIPT_TYPE_P2PKH         0x2
+#define DOGECOIN_SCRIPT_TYPE_P2SH          0x4
+#define DOGECOIN_SCRIPT_TYPE_P2WPKH        0x8
+#define DOGECOIN_SCRIPT_TYPE_P2WSH         0x10
+#define DOGECOIN_SCRIPT_TYPE_MULTISIG      0x20
+#define DOGECOIN_SCRIPT_TYPE_P2TR          0x40
+#define DOGECOIN_SCRIPT_TYPE_CSV2OF2_1     0x80
+#define DOGECOIN_SCRIPT_TYPE_CSV2OF2_1_OPT 0x81
+
+/* Standard script lengths */
+#define DOGECOIN_SCRIPTPUBKEY_P2PKH_LEN  25 /** OP_DUP OP_HASH160 [HASH160] OP_EQUALVERIFY OP_CHECKSIG */
+#define DOGECOIN_SCRIPTPUBKEY_P2SH_LEN   23 /** OP_HASH160 [HASH160] OP_EQUAL */
+#define DOGECOIN_SCRIPTPUBKEY_P2WPKH_LEN 22 /** OP_0 [HASH160] */
+#define DOGECOIN_SCRIPTPUBKEY_P2WSH_LEN  34 /** OP_0 [SHA256] */
+#define DOGECOIN_SCRIPTPUBKEY_P2TR_LEN   34 /** OP_1 [X-ONLY-PUBKEY] */
+
+#define DOGECOIN_SCRIPTPUBKEY_OP_RETURN_MAX_LEN 83 /** OP_RETURN [80 bytes of data] */
+
+#define DOGECOIN_MAX_OP_RETURN_LEN 80 /* Maximum length of OP_RETURN data push */
+
+#define DOGECOIN_SCRIPTSIG_P2PKH_MAX_LEN 140 /** [SIG+SIGHASH] [PUBKEY] */
+#define DOGECOIN_SCRIPTSIG_MAX_LEN       520 /** MAX_SCRIPT_ELEMENT_SIZE from core */
+#define DOGECOIN_WITNESSSCRIPT_MAX_LEN   42 /** (PUSH OF)0 [Up to 40 bytes of data] */
+
+#define DOGECOIN_SCRIPT_VARINT_MAX_SIZE 9
+
+/* Script creation flags */
+#define DOGECOIN_SCRIPT_HASH160          0x1 /** hash160 input bytes before using them */
+#define DOGECOIN_SCRIPT_SHA256           0x2 /** sha256 input bytes before using them */
+#define DOGECOIN_SCRIPT_AS_PUSH          0x4 /** Return a push of the generated script */
+#define DOGECOIN_SCRIPT_MULTISIG_SORTED  0x8 /** Sort public keys (BIP67) */
+
 /** Sighash version types */
 enum dogecoin_sig_version {
     SIGVERSION_BASE = 0,
