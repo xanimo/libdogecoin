@@ -4,6 +4,10 @@
 #ifndef __LIBLOGDB_MISC_H__
 #define __LIBLOGDB_MISC_H__
 
+#include <dogecoin/dogecoin.h>
+
+LIBDOGECOIN_BEGIN_DECL
+
 /*  CONVENTIONS:  All data structures for red-black trees have the prefix */
 /*                "rb_" to prevent name conflicts. */
 /*                                                                      */
@@ -21,5 +25,7 @@
 
 void Assert(int assertion, char *error);
 void *SafeMalloc(size_t size);
+
+LIBDOGECOIN_END_DECL
 
 #endif /* __LIBLOGDB_MISC_H__ */

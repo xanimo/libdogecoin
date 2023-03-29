@@ -37,9 +37,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+LIBDOGECOIN_BEGIN_DECL
 
 /** error types */
 enum logdb_error {
@@ -52,7 +50,7 @@ enum logdb_error {
     LOGDB_ERROR_FILE_ALREADY_OPEN = 600
 };
 
-typedef struct logdb_memmapper_ logdb_memmapper; /* forware declaration */
+typedef struct logdb_memmapper_ logdb_memmapper; /* forward declaration */
 
 /** logdb handle */
 typedef struct logdb_log_db {

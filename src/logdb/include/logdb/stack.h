@@ -22,6 +22,10 @@
 #ifndef __LIBLOGDB_STACK_H__
 #define __LIBLOGDB_STACK_H__
 
+#include <dogecoin/dogecoin.h>
+
+LIBDOGECOIN_BEGIN_DECL
+
 #ifndef DATA_TYPE
 #define DATA_TYPE void *
 #endif
@@ -47,5 +51,7 @@ void StackPush(stk_stack *theStack, DATA_TYPE newInfoPointer);
 void *StackPop(stk_stack *theStack);
 int StackNotEmpty(stk_stack *);
 void StackDestroy(stk_stack *theStack,void DestFunc(void * a));
+
+LIBDOGECOIN_END_DECL
 
 #endif /* __LIBLOGDB_STACK_H__ */

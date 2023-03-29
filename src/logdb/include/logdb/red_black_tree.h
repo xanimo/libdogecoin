@@ -1,6 +1,10 @@
 #ifndef __LIBLOGDB_RED_BLACK_TREE_H__
 #define __LIBLOGDB_RED_BLACK_TREE_H__
 
+#include <dogecoin/dogecoin.h>
+
+LIBDOGECOIN_BEGIN_DECL
+
 #ifdef DMALLOC
 #include <dmalloc.h>
 #endif
@@ -83,5 +87,7 @@ void NullFunction(void *);
 void checkRep(rb_red_blk_tree *tree);
 void rbtree_it_reset(rb_red_blk_tree *tree);
 rb_red_blk_node* rbtree_enumerate_next(rb_red_blk_tree* tree);
+
+LIBDOGECOIN_END_DECL
 
 #endif /* __LIBLOGDB_RED_BLACK_TREE_H__ */
