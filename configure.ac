@@ -110,6 +110,12 @@ AC_ARG_ENABLE([logdb],
   [with_logdb=$enableval],
   [with_logdb=yes])
 
+AC_ARG_ENABLE([wallet],
+  [AS_HELP_STRING([--disable-wallet],
+  [disable wallet/database functions])],
+  [with_wallet=$enableval],
+  [with_wallet=yes])
+
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
   [use_tests=$enableval],
@@ -138,6 +144,10 @@ fi
 
 if test "x$with_net" = xyes; then
   AC_DEFINE_UNQUOTED([WITH_NET],[1],[Define to 1 to enable net compilation])
+fi
+
+if test "x$with_wallet" = xyes; then
+  AC_DEFINE_UNQUOTED([WITH_WALLET],[1],[Define to 1 to enable wallet compilation])
 fi
 
 if test "x$enable_debug" = xyes; then
@@ -169,6 +179,7 @@ AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
 AM_CONDITIONAL([WITH_LOGDB], [test "x$with_logdb" = "xyes"])
+AM_CONDITIONAL([WITH_WALLET], [test "x$with_wallet" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
 AC_SUBST(LIB_VERSION_REVISION, _LIB_VERSION_REVISION)
 AC_SUBST(LIB_VERSION_AGE, _LIB_VERSION_AGE)
@@ -184,6 +195,7 @@ echo "  with tests    = $with_tests"
 echo "  with tools    = $with_tools"
 echo "  with net      = $with_net"
 echo "  with logdb    = $with_logdb"
+echo "  with wallet   = $with_wallet"
 echo
 echo "  host          = $host"
 echo "  target os     = $TARGET_OS"
