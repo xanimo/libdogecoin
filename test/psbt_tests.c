@@ -61,20 +61,21 @@ static const struct valid_psbts valid_psbts[] = {
 void test_psbt() {
     unsigned int i;
     for (i = 0; i < (sizeof(invalid_psbts) / sizeof(invalid_psbts[0])); i++) {
+        printf("invalid from base64: %s\n", invalid_psbts[i].b64_enc);
+        char* decoded_from_base64 = dogecoin_char_vla(strlen(invalid_psbts[i].b64_enc));
+        base64_decode((unsigned char*)&invalid_psbts[i].b64_enc, strlen(invalid_psbts[i].b64_enc), decoded_from_base64);
+        printf("decoded_from_base64: %s\n", decoded_from_base64);
         psbt_input* input = new_psbt_input();
-
         psbt_output* output = new_psbt_output();
-
         psbt* psbt = new_psbt();
         assert(psbt_isnull(psbt));
         dogecoin_psbt_output_free(output);
         dogecoin_psbt_input_free(input);
-        dogecoin_psbt_free(psbt);        
+        dogecoin_psbt_free(psbt);
     }
 
     for (i = 0; i < (sizeof(valid_psbts) / sizeof(valid_psbts[0])); i++) {
         psbt_input* input = new_psbt_input();
-
         psbt_output* output = new_psbt_output();
 
         psbt* psbt = new_psbt();
