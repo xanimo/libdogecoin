@@ -125,6 +125,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/koinu.c
     src/mem.c
     src/moon.c
+    src/psbt.c
     src/qr.c
     src/qrengine.c
     src/png.c
@@ -140,6 +141,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/tx.c
     src/utils.c
     src/vector.c
+    src/yyjson.c
 )
 
 IF(WIN32)
@@ -200,6 +202,7 @@ IF(USE_TESTS)
         test/mem_tests.c
         test/moon_tests.c
         test/opreturn_tests.c
+        test/psbt_tests.c
         test/qr_tests.c
         test/random_tests.c
         test/rmd160_tests.c
@@ -220,6 +223,12 @@ IF(USE_TESTS)
     FOREACH(wordlist ${WORDLISTS})
         GET_FILENAME_COMPONENT(wordlist_name ${wordlist} NAME)
         CONFIGURE_FILE(${wordlist} "${CMAKE_CURRENT_BINARY_DIR}/test/wordlist/${wordlist_name}" COPYONLY)
+    ENDFOREACH()
+    # move test/data to build
+    FILE(GLOB_RECURSE DATAS "${PROJECT_SOURCE_DIR}/test/data/*.json")
+    FOREACH(data ${DATAS})
+        GET_FILENAME_COMPONENT(data_name ${data} NAME)
+        CONFIGURE_FILE(${data} "${CMAKE_CURRENT_BINARY_DIR}/test/data/${data_name}" COPYONLY)
     ENDFOREACH()
 ENDIF()
 

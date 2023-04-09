@@ -57,7 +57,8 @@ noinst_HEADERS = \
     include/dogecoin/tx.h \
     include/dogecoin/utils.h \
     include/dogecoin/vector.h \
-    include/dogecoin/wow.h
+    include/dogecoin/wow.h \
+    include/yyjson/yyjson.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdogecoin.pc
@@ -95,7 +96,8 @@ libdogecoin_la_SOURCES = \
     src/transaction.c \
     src/tx.c \
     src/utils.c \
-    src/vector.c
+    src/vector.c \
+    src/yyjson.c
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC
 libdogecoin_la_LIBADD = $(LIBSECP256K1)

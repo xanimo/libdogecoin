@@ -119,6 +119,7 @@ typedef struct psbt_output {
 
 typedef struct psbt {
     int idx;
+    unsigned char magic[5];
     dogecoin_tx* tx;
     psbt_input* inputs[MAX_LENGTH];
     psbt_output* outputs[MAX_LENGTH];
@@ -157,6 +158,8 @@ LIBDOGECOIN_API int start_psbt();
 LIBDOGECOIN_API bool psbt_isnull(psbt* psbt);
 LIBDOGECOIN_API bool psbt_input_isnull(psbt_input* input);
 LIBDOGECOIN_API bool psbt_output_isnull(psbt_output* output);
+
+LIBDOGECOIN_API int dogecoin_psbt_deserialize(const unsigned char* serialized, size_t inlen, psbt* psbt, size_t* consumed_length);
 
 LIBDOGECOIN_END_DECL
 

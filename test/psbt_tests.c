@@ -17,10 +17,13 @@
 #include <dogecoin/buffer.h>
 #include <dogecoin/key.h>
 #include <dogecoin/psbt.h>
+#include <dogecoin/serialize.h>
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/rmd160.h>
+
+#include <yyjson/yyjson.h>
 
 struct invalid_psbts {
     char hextx[2048];
@@ -61,17 +64,26 @@ static const struct valid_psbts valid_psbts[] = {
 void test_psbt() {
     unsigned int i;
     for (i = 0; i < (sizeof(invalid_psbts) / sizeof(invalid_psbts[0])); i++) {
-        printf("invalid from base64: %s\n", invalid_psbts[i].b64_enc);
-        char* decoded_from_base64 = dogecoin_char_vla(strlen(invalid_psbts[i].b64_enc));
-        base64_decode((unsigned char*)&invalid_psbts[i].b64_enc, strlen(invalid_psbts[i].b64_enc), decoded_from_base64);
-        printf("decoded_from_base64: %s\n", decoded_from_base64);
+        unsigned char* dec_output = dogecoin_uchar_vla(base64_decoded_size(strlen((const char*)invalid_psbts[i].b64_enc)+1)+1);
+        unsigned int dec_out_len = base64_decode((unsigned char*)invalid_psbts[i].b64_enc, strlen(invalid_psbts[i].b64_enc), dec_output);
         psbt_input* input = new_psbt_input();
         psbt_output* output = new_psbt_output();
         psbt* psbt = new_psbt();
         assert(psbt_isnull(psbt));
+
+        if (!dogecoin_psbt_deserialize(dec_output, dec_out_len, psbt, NULL)) {
+            printf("error deserializing psbt!\n");
+        }
+
+        // printf("psbt->tx->version:      %d\n", psbt->tx->version);
+        // printf("psbt->tx->vin->len:     %ld\n", psbt->tx->vin->len);
+        // printf("psbt->tx->vout->len:    %ld\n", psbt->tx->vout->len);
+        // printf("psbt->tx->locktime:     %u\n", psbt->tx->locktime);
+
         dogecoin_psbt_output_free(output);
         dogecoin_psbt_input_free(input);
         dogecoin_psbt_free(psbt);
+        dogecoin_free(dec_output);
     }
 
     for (i = 0; i < (sizeof(valid_psbts) / sizeof(valid_psbts[0])); i++) {
@@ -81,32 +93,79 @@ void test_psbt() {
         psbt* psbt = new_psbt();
         assert(psbt_isnull(psbt));
 
+        unsigned char* dec_output = dogecoin_uchar_vla(base64_decoded_size(strlen((const char*)valid_psbts[i].b64_enc)+1)+1);
+        unsigned int dec_out_len = base64_decode((unsigned char*)valid_psbts[i].b64_enc, strlen(valid_psbts[i].b64_enc), dec_output);
         char* psbt_hex = (char*)&valid_psbts[i];
-        printf("\npsbt_hex:               %s\n", psbt_hex);
-        printf("memcmp:                 %d\n", memcmp(PSBT_MAGIC_BYTES, utils_hex_to_uint8(psbt_hex), 5)==0);
 
         assert(memcmp(PSBT_MAGIC_BYTES, utils_hex_to_uint8(psbt_hex), 5)==0);
 
-        char* psbt_tx = &psbt_hex[10];
-        printf("psbt_tx:                %s\n", psbt_tx);
-
-        size_t outlen, psbt_tx_len = strlen(psbt_tx);
-        uint8_t tx_data[psbt_tx_len + 1];
-        utils_hex_to_bin(psbt_tx, tx_data, psbt_tx_len, &outlen);
-
-        if (!dogecoin_tx_deserialize(tx_data, outlen, psbt->tx, NULL)) {
-            printf("tx_data failed to deserialize!\n");
+        size_t consumed_length;
+        if (!dogecoin_psbt_deserialize(dec_output, dec_out_len, psbt, &consumed_length)) {
+            printf("error deserializing psbt!\n");
         }
 
-        printf("psbt->tx->version:      %d\n", psbt->tx->version);
-        printf("psbt->tx->vin->len:     %ld\n", psbt->tx->vin->len);
-        printf("psbt->tx->vout->len:    %ld\n", psbt->tx->vout->len);
-        printf("psbt->tx->locktime:     %u\n", psbt->tx->locktime);
+        // printf("psbt->tx->version:      %d\n", psbt->tx->version);
+        // printf("psbt->tx->vin->len:     %ld\n", psbt->tx->vin->len);
+        // printf("psbt->tx->vout->len:    %ld\n", psbt->tx->vout->len);
+        // printf("psbt->tx->locktime:     %u\n", psbt->tx->locktime);
 
         dogecoin_psbt_output_free(output);
         dogecoin_psbt_input_free(input);
         dogecoin_psbt_free(psbt);
+        dogecoin_free(dec_output);
     }
+
+    // Read JSON file, allowing comments and trailing commas
+    yyjson_read_flag flg = YYJSON_READ_ALLOW_COMMENTS | YYJSON_READ_ALLOW_TRAILING_COMMAS;
+    yyjson_read_err err;
+    yyjson_doc *doc = yyjson_read_file("test/data/psbt.json", flg, NULL, &err);
+
+    // Iterate over the root object
+    if (doc) {
+        yyjson_val *obj = yyjson_doc_get_root(doc);
+        yyjson_obj_iter iter;
+        yyjson_obj_iter_init(obj, &iter);
+        yyjson_val *key;
+        while ((key = yyjson_obj_iter_next(&iter))) {
+            yyjson_val *arr = yyjson_obj_iter_get_val(key);
+            printf("%s: %s\n", yyjson_get_str(key), yyjson_get_type_desc(arr));
+            size_t idx, max;
+            yyjson_val *val;
+            yyjson_arr_foreach(arr, idx, max, val) {
+                yyjson_val *comment = yyjson_obj_get(val, "comment");
+                if (comment) {
+                    printf("%s\n", yyjson_get_str(comment));
+                }
+                yyjson_val *enc_psbt = yyjson_obj_get(val, "psbt");
+                if (enc_psbt) {
+                    printf("%s\n", yyjson_get_str(enc_psbt));
+                    const char* psbt_hex = yyjson_get_str(enc_psbt);
+                    // do work here:
+                    unsigned char* dec_output = dogecoin_uchar_vla(base64_decoded_size(strlen(psbt_hex)+1)+1);
+                    unsigned int dec_out_len = base64_decode((unsigned char*)psbt_hex, strlen(psbt_hex), dec_output);
+                    psbt* psbt = new_psbt();
+                    assert(psbt_isnull(psbt));
+                    printf("dec_output: %s\n", utils_uint8_to_hex(dec_output, dec_out_len));
+                    size_t consumed_length;
+                    if (!dogecoin_psbt_deserialize(dec_output, dec_out_len, psbt, &consumed_length)) {
+                        printf("error deserializing psbt!\n");
+                    }
+
+                    // printf("psbt->tx->version:      %d\n", psbt->tx->version);
+                    // printf("psbt->tx->vin->len:     %ld\n", psbt->tx->vin->len);
+                    // printf("psbt->tx->vout->len:    %ld\n", psbt->tx->vout->len);
+                    // printf("psbt->tx->locktime:     %u\n", psbt->tx->locktime);
+                    dogecoin_psbt_free(psbt);
+                    dogecoin_free(dec_output);
+                }
+            }
+        }
+    } else {
+        printf("read error (%u): %s at position: %ld\n", err.code, err.msg, err.pos);
+    }
+
+    // Free the doc
+    yyjson_doc_free(doc);
 }
 
 // sign_witness(script_code, i):

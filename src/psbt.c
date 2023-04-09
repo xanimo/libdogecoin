@@ -30,6 +30,7 @@
 #include <dogecoin/base58.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/psbt.h>
+#include <dogecoin/serialize.h>
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/uthash.h>
@@ -301,4 +302,21 @@ bool psbt_isnull(psbt* psbt) {
     && psbt->tx->vin->len == 0 \
     && psbt->tx->vout->len == 0 \
     && psbt->tx->locktime == 0;
+}
+
+int dogecoin_psbt_deserialize(const unsigned char* serialized, size_t inlen, psbt* psbt, size_t* consumed_length)
+{
+    struct const_buffer buf = {serialized, inlen};
+    if (consumed_length) {
+        *consumed_length = 0;
+    }
+
+    deser_u32((uint32_t*)&psbt->magic, &buf);
+
+    dogecoin_tx_deserialize(buf.p, buf.len, psbt->tx, consumed_length);
+
+    if (consumed_length) {
+        *consumed_length = inlen - buf.len;
+    }
+    return true;
 }
