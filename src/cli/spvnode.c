@@ -266,7 +266,7 @@ int main(int argc, char* argv[]) {
         int num;
         FILE *fptr;
         if ((fptr = fopen("use_checkpoints","r")) == NULL) exit(1);
-        fscanf(fptr, "%d", &num);
+        if (!fscanf(fptr, "%d", &num)) exit(1);
         fclose(fptr);
 
         // if not equal with user input (-p | use_checkpoint) then write to file:

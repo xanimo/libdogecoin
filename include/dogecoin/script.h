@@ -40,6 +40,7 @@ LIBDOGECOIN_BEGIN_DECL
 /** Sighash version types */
 enum dogecoin_sig_version {
     SIGVERSION_BASE = 0,
+    SIGVERSION_WITNESS_V0 = 1,
 };
 
 /** Signature hash types/flags */
@@ -202,6 +203,8 @@ enum dogecoin_tx_out_type {
     DOGECOIN_TX_PUBKEYHASH,
     DOGECOIN_TX_SCRIPTHASH,
     DOGECOIN_TX_MULTISIG,
+    DOGECOIN_TX_WITNESS_V0_PUBKEYHASH,
+    DOGECOIN_TX_WITNESS_V0_SCRIPTHASH,
 };
 
 typedef struct dogecoin_script_op_ {

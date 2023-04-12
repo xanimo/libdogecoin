@@ -269,6 +269,7 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
 
     if (wallet->dbfile) {
         fclose(wallet->dbfile);
+        wallet->dbfile = NULL;
     }
 
     if (wallet->spends) {
@@ -281,6 +282,8 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
 
     dogecoin_btree_tdestroy(wallet->wtxes_rbtree, dogecoin_free);
     dogecoin_btree_tdestroy(wallet->hdkeys_rbtree, dogecoin_free);
+    if (wallet->waddr_rbtree) wallet->waddr_rbtree = NULL;
+    dogecoin_btree_tdestroy(wallet->spends_rbtree, dogecoin_free);
 
     if (wallet->waddr_vector) {
         vector_free(wallet->waddr_vector, true);
@@ -288,11 +291,10 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     }
 
     if (wallet->vec_wtxes) {
-        vector_free(wallet->vec_wtxes, true);
+        vector_free(wallet->vec_wtxes, false);
         wallet->vec_wtxes = NULL;
     }
 
-    wallet->chain = NULL;
     dogecoin_free(wallet);
 }
 
@@ -339,14 +341,14 @@ void dogecoin_wallet_add_wtx_intern_move(dogecoin_wallet *wallet, const dogecoin
             if (wtx_vec == checkwtx) {
                 vector_remove_idx(wallet->vec_wtxes, i);
             }
+            dogecoin_wallet_wtx_free(wtx_vec);
         }
         // we do not really delete transactions
         checkwtx->ignore = true;
         dogecoin_btree_tdelete(checkwtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
         dogecoin_wallet_wtx_free(checkwtx);
     }
-    dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
-    vector_add(wallet->vec_wtxes,(dogecoin_wtx *) wtx);
+    vector_add(wallet->vec_wtxes,(dogecoin_wtx *)wtx);
 }
 
 
@@ -524,8 +526,9 @@ dogecoin_wallet_addr* dogecoin_wallet_next_addr(dogecoin_wallet* wallet)
 
     //add it to the binary tree
     // tree manages memory
-    dogecoin_btree_tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
+    dogecoin_wallet_addr* checknode = dogecoin_btree_tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
     vector_add(wallet->waddr_vector, waddr);
+    dogecoin_wallet_addr_free(checknode);
 
     //serialize and store node
     cstring* record = cstr_new_sz(256);
@@ -779,6 +782,7 @@ void dogecoin_wallet_add_to_spent(dogecoin_wallet* wallet, const dogecoin_wtx* w
             // add to binary tree
             // memory is managed there (will free on tdestroy
             dogecoin_btree_tfind(outpoint, &wallet->spends_rbtree, dogecoin_tx_outpoint_compare);
+            dogecoin_free(outpoint);
         }
     }
 }

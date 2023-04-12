@@ -80,9 +80,10 @@ typedef struct dogecoin_output_ {
 
 /** wallet transaction (wtx) functions */
 LIBDOGECOIN_API dogecoin_wtx* dogecoin_wallet_wtx_new();
-LIBDOGECOIN_API void dogecoin_wallet_wtx_free(dogecoin_wtx* wtx);
+LIBDOGECOIN_API dogecoin_wtx* dogecoin_wallet_wtx_copy(dogecoin_wtx* wtx);
 LIBDOGECOIN_API void dogecoin_wallet_wtx_serialize(cstring* s, const dogecoin_wtx* wtx);
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_wtx_deserialize(dogecoin_wtx* wtx, struct const_buffer* buf);
+LIBDOGECOIN_API void dogecoin_wallet_wtx_free(dogecoin_wtx* wtx);
 /** ------------------------------------ */
 
 /** wallet addr functions */

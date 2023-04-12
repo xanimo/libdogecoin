@@ -1088,7 +1088,25 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
     dogecoin_tx_in* tx_in = vector_idx(tx_in_out->vin, inputindex);
     vector* script_pushes = vector_new(1, free);
 
+    cstring *witness_set_scriptsig = NULL; //required in order to set the P2SH-P2WPKH scriptSig
     enum dogecoin_tx_out_type type = dogecoin_script_classify(script, script_pushes);
+    enum dogecoin_sig_version sig_version = SIGVERSION_BASE;
+    if (type == DOGECOIN_TX_SCRIPTHASH) {
+        // p2sh script, need the redeem script
+        // for now, pretend to be a p2sh-p2wpkh
+        type = DOGECOIN_TX_WITNESS_V0_PUBKEYHASH;
+        uint8_t *hash160 = dogecoin_calloc(1, 20);
+        dogecoin_pubkey_get_hash160(&pubkey, hash160);
+        vector_add(script_pushes, hash160);
+
+        // set the script sig
+        witness_set_scriptsig = cstr_new_sz(22);
+        uint8_t version = 0;
+        ser_varlen(witness_set_scriptsig, 22);
+        ser_bytes(witness_set_scriptsig, &version, 1);
+        ser_varlen(witness_set_scriptsig, 20);
+        ser_bytes(witness_set_scriptsig, hash160, 20);
+    }
     if (type == DOGECOIN_TX_PUBKEYHASH && script_pushes->len == 1) {
         // check if given private key matches the script
         uint160 hash160;
@@ -1097,6 +1115,19 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         if (memcmp(hash160_in_script, hash160, sizeof(hash160)) != 0) {
             res = DOGECOIN_SIGN_NO_KEY_MATCH; //sign anyways
         }
+    } else if (type == DOGECOIN_TX_WITNESS_V0_PUBKEYHASH && script_pushes->len == 1) {
+        uint160 *hash160_in_script = vector_idx(script_pushes, 0);
+        sig_version = SIGVERSION_WITNESS_V0;
+
+        // check if given private key matches the script
+        uint160 hash160;
+        dogecoin_pubkey_get_hash160(&pubkey, hash160);
+        if (memcmp(hash160_in_script, hash160, sizeof(hash160)) != 0) {
+            res = DOGECOIN_SIGN_NO_KEY_MATCH; //sign anyways
+        }
+
+        cstr_resize(script_sign, 0);
+        dogecoin_script_build_p2pkh(script_sign, *hash160_in_script);
     } else {
         // unknown script, however, still try to create a signature (don't apply though)
         res = DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE;
@@ -1142,6 +1173,21 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         // apply pubkey
         ser_varlen(tx_in->script_sig, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
         ser_bytes(tx_in->script_sig, pubkey.pubkey, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
+    } else if (type == DOGECOIN_TX_WITNESS_V0_PUBKEYHASH) {
+        // signal witness by emtpying script sig (may be already empty)
+        cstr_resize(tx_in->script_sig, 0);
+        if (witness_set_scriptsig) {
+            // apend the script sig in case of P2SH-P2WPKH
+            cstr_append_cstr(tx_in->script_sig, witness_set_scriptsig);
+            cstr_free(witness_set_scriptsig, true);
+        }
+
+        // fill witness stack (DER sig, pubkey)
+        cstring* witness_item = cstr_new_buf(sigder_plus_hashtype, sigderlen);
+        // vector_add(tx_in->witness_stack, witness_item);
+
+        witness_item = cstr_new_buf(pubkey.pubkey, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
+        // vector_add(tx_in->witness_stack, witness_item);
     } else {
         // append nothing
         res = DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE;

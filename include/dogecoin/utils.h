@@ -101,6 +101,7 @@ static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *))
     
 end:
     if (freekey) freekey(r->key);
+    free(r);
 }
 
 /* delete node with given key */
@@ -199,7 +200,7 @@ dogecoin_btree_tsearch (const void * __restrict vkey,		/* key to be located */
       rootp = n;
     }
 
-  q = dogecoin_malloc(sizeof(dogecoin_btree_node_t));		/* T5: key not found */
+  q = dogecoin_calloc(1, sizeof(dogecoin_btree_node_t));		/* T5: key not found */
   if (!q)
     return q;
   *n = q;

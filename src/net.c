@@ -551,7 +551,8 @@ dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group)
         return true;
 
     connect_amount = connect_amount*3;
-    for (size_t i = 0; i < group->nodes->len; i++) {
+    size_t i = 0;
+    for (; i < group->nodes->len; i++) {
         dogecoin_node* node = vector_idx(group->nodes, i);
         if (
             !((node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
@@ -722,8 +723,7 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
         }
     }
 
-    if (node->nodegroup->postcmd_cb)
-        node->nodegroup->postcmd_cb(node, hdr, buf);
+    if (node->nodegroup->postcmd_cb) node->nodegroup->postcmd_cb(node, hdr, buf);
 
     return true;
 }
