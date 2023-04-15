@@ -551,7 +551,8 @@ dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group)
         return true;
 
     connect_amount = connect_amount*3;
-    for (size_t i = 0; i < group->nodes->len; i++) {
+    size_t i = 0;
+    for (; i < group->nodes->len; i++) {
         dogecoin_node* node = vector_idx(group->nodes, i);
         if (
             !((node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
