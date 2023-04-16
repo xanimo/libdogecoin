@@ -56,8 +56,8 @@
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 60;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
-static const unsigned int BLOCKS_DELTA_IN_S = 6000;
-static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 4;
+static const unsigned int BLOCKS_DELTA_IN_S = 600;
+static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -460,9 +460,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
             dogecoin_node_send(node, p2p_msg);
             cstr_free(p2p_msg, true);
-
             if (varlen >= 500) {
                 /* directly request more blocks */
+
+                dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
+                time_t lasttime = chaintip->header.timestamp;
+                client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, ctime(&lasttime));
                 /* not sure if this is clever if we want to download, as example, the complete chain */
                 dogecoin_net_spv_node_request_headers_or_blocks(node, true);
             }
@@ -494,9 +497,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (connected) {
             if (client->header_connected) { client->header_connected(client); }
             time_t lasttime = pindex->header.timestamp;
-            printf("Downloaded new block with size %d at height %d (%s)\n", hdr->data_len, pindex->height, ctime(&lasttime));
-            uint64_t start = time(NULL);
-            printf("Start parsing %d transactions...\n", (int)amount_of_txs);
+            client->nodegroup->log_write_cb("Downloaded new block with size %d at height %d from %s\n", hdr->data_len, pindex->height, ctime(&lasttime));
+            // uint64_t start = time(NULL);
+            // client->nodegroup->log_write_cb("Start parsing %d transactions...\n", (int)amount_of_txs);
 
             size_t consumedlength = 0;
             unsigned int i;
@@ -504,15 +507,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             {
                 dogecoin_tx* tx = dogecoin_tx_new();
                 if (!dogecoin_tx_deserialize(buf->p, buf->len, tx, &consumedlength)) {
-                    printf("Error deserializing transaction\n");
+                    client->nodegroup->log_write_cb("Error deserializing transaction\n");
                 }
                 deser_skip(buf, consumedlength);
-
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
-
                 dogecoin_tx_free(tx);
             }
-            printf("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
+            // client->nodegroup->log_write_cb("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
         }
 
         if (dogecoin_hash_equal(node->last_requested_inv, pindex->hash)) {

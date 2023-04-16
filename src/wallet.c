@@ -56,7 +56,7 @@ uint8_t WALLET_DB_REC_TYPE_TX = 2;
 
 static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* header magic */
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
-static const uint32_t current_version = 1;
+static const uint32_t current_version = 2;
 
 /* ====================== */
 /* compare btree callback */
@@ -271,16 +271,17 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
         fclose(wallet->dbfile);
     }
 
+    if (wallet->masterkey)
+        dogecoin_free(wallet->masterkey);
+
     if (wallet->spends) {
         vector_free(wallet->spends, true);
         wallet->spends = NULL;
     }
 
-    if (wallet->masterkey)
-        dogecoin_free(wallet->masterkey);
-
     dogecoin_btree_tdestroy(wallet->wtxes_rbtree, dogecoin_free);
     dogecoin_btree_tdestroy(wallet->hdkeys_rbtree, dogecoin_free);
+    dogecoin_btree_tdestroy(wallet->spends_rbtree, dogecoin_free);
 
     if (wallet->waddr_vector) {
         vector_free(wallet->waddr_vector, true);
@@ -882,7 +883,7 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
         dogecoin_tx_copy(wtx->tx, tx);
         dogecoin_wallet_add_wtx_move(wallet, wtx);
         int64_t amount = dogecoin_wallet_get_balance(wallet);
-        printf("amount:     %ld\n", amount);
+        printf("Wallet balance: %ld\n", (long)amount);
         printf("\nFound relevant transaction!\n");
     }
 }

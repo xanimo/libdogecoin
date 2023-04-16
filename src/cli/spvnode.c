@@ -142,7 +142,6 @@ void spv_sync_completed(dogecoin_spv_client* client) {
         }
     else {
         printf("Waiting for new blocks or relevant transactions...\n");
-        printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(client->sync_transaction_ctx));
         }
     }
 
