@@ -22,6 +22,8 @@ include_HEADERS = \
 noinst_HEADERS = \
     include/bip39/index.h \
     include/dogecoin/address.h \
+    include/dogecoin/async.h \
+    include/dogecoin/async-sem.h \
     include/dogecoin/aes.h \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \

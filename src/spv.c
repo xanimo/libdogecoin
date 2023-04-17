@@ -56,7 +56,7 @@
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 60;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
-static const unsigned int BLOCKS_DELTA_IN_S = 600;
+static const unsigned int BLOCKS_DELTA_IN_S = 6000;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
@@ -102,7 +102,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
 
     client->nodegroup = dogecoin_node_group_new(params);
     client->nodegroup->ctx = client;
-    client->nodegroup->desired_amount_connected_nodes = 25; /* TODO */
+    client->nodegroup->desired_amount_connected_nodes = 8; /* TODO */
 
     dogecoin_net_set_spv(client->nodegroup);
 
@@ -379,7 +379,8 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 }
             }
         }
-    } else if (client->stateflags == SPV_FULLBLOCK_SYNC_FLAG) {
+    }
+    if (client->stateflags == SPV_FULLBLOCK_SYNC_FLAG) {
         if (!new_headers_available && dogecoin_node_group_amount_of_connected_nodes(client->nodegroup, NODE_CONNECTED) > 0) {
             // try to fetch blocks if no new headers are available but connected nodes are reachable
             for(i = 0; i< client->nodegroup->nodes->len; i++)
@@ -462,10 +463,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             cstr_free(p2p_msg, true);
             if (varlen >= 500) {
                 /* directly request more blocks */
-
-                dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
-                time_t lasttime = chaintip->header.timestamp;
-                client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, ctime(&lasttime));
                 /* not sure if this is clever if we want to download, as example, the complete chain */
                 dogecoin_net_spv_node_request_headers_or_blocks(node, true);
             }
@@ -553,7 +550,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
                 node->state &= ~NODE_HEADERSYNC;
                 dogecoin_node_misbehave(node);
-
                 dogecoin_net_spv_request_headers(client);
             } else {
                 if (client->header_connected) { client->header_connected(client); }

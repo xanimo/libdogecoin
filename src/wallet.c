@@ -56,7 +56,7 @@ uint8_t WALLET_DB_REC_TYPE_TX = 2;
 
 static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* header magic */
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
-static const uint32_t current_version = 2;
+static const uint32_t current_version = 1;
 
 /* ====================== */
 /* compare btree callback */
@@ -195,7 +195,7 @@ dogecoin_wallet_addr* dogecoin_wallet_addr_new()
 {
     dogecoin_wallet_addr* waddr;
     waddr = dogecoin_calloc(1, sizeof(*waddr));
-    memset_safe(waddr->pubkeyhash, 1, sizeof(waddr->pubkeyhash), 1);
+    dogecoin_mem_zero(waddr->pubkeyhash, sizeof(waddr->pubkeyhash));
     return waddr;
 }
 
@@ -252,13 +252,13 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     dogecoin_wallet* wallet = dogecoin_calloc(1, sizeof(*wallet));
     wallet->masterkey = NULL;
     wallet->chain = params;
-    wallet->spends = vector_new(10, dogecoin_free);
+    wallet->spends = vector_new(1, dogecoin_free);
     wallet->wtxes_rbtree = 0;
-    wallet->vec_wtxes = vector_new(10, dogecoin_free);
+    wallet->vec_wtxes = vector_new(1, dogecoin_free);
     wallet->hdkeys_rbtree = 0;
     wallet->waddr_rbtree = 0;
     wallet->spends_rbtree = 0;
-    wallet->waddr_vector = vector_new(10, dogecoin_free);
+    wallet->waddr_vector = vector_new(1, dogecoin_free);
     return wallet;
 }
 
@@ -328,7 +328,7 @@ dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_p
 
 void dogecoin_wallet_add_wtx_intern_move(dogecoin_wallet *wallet, const dogecoin_wtx *wtx) {
     //add to spends
-    dogecoin_wallet_add_to_spent(wallet, wtx);
+    // dogecoin_wallet_add_to_spent(wallet, wtx);
 
     dogecoin_wtx* checkwtx = dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
     if (checkwtx) {
