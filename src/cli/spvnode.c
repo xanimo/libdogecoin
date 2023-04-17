@@ -72,6 +72,7 @@ static struct option long_options[] = {
         {"continuous", no_argument, NULL, 'c'},
         {"address", no_argument, NULL, 'a'},
         {"checkpoint", no_argument, NULL, 'p'},
+        {"full_sync", no_argument, NULL, 'b'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -156,10 +157,11 @@ int main(int argc, char* argv[]) {
     int maxnodes = 10;
     char* dbfile = 0;
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
-    char* address;
+    char* address = 0;
     dogecoin_bool use_checkpoint = false;
     char* mnemonic_in = 0;
     dogecoin_bool balance = false;
+    dogecoin_bool full_sync = false;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -169,11 +171,8 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:p:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:p:b:", long_options, &long_index)) != -1) {
         switch (opt) {
-                case 'b':
-                    balance = true;
-                    break;
                 case 'c':
                     quit_when_synced = false;
                     break;
@@ -200,12 +199,16 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'f':
                     dbfile = optarg;
+                    full_sync = false;
                     break;
                 case 'a':
                     address = optarg;
                     break;
                 case 'p':
                     use_checkpoint = true;
+                    break;
+                case 'b':
+                    full_sync = true;
                     break;
                 case 'v':
                     print_version();
@@ -219,7 +222,7 @@ int main(int argc, char* argv[]) {
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
-        dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint);
+        dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync);
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
         

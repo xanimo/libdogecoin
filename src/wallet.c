@@ -422,10 +422,10 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 dogecoin_hdnode_deserialize(strbuf, wallet->chain, wallet->masterkey);
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
                 dogecoin_wallet_addr *waddr= dogecoin_wallet_addr_new();
-                size_t reclen = 20+1+4;
-                unsigned char buf[reclen];
-                struct const_buffer cbuf = {buf, reclen};
-                if (fread(buf, reclen, 1, wallet->dbfile) != 1) {
+                size_t waddr_len = 20+1+4;
+                unsigned char buf[waddr_len];
+                struct const_buffer cbuf = {buf, waddr_len};
+                if (fread(buf, waddr_len, 1, wallet->dbfile) != 1) {
                     dogecoin_wallet_addr_free(waddr);
                     return false;
                 }
