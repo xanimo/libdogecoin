@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #if defined(HAVE_CONFIG_H)
 #include "libdogecoin-config.h"
@@ -49,6 +50,7 @@
 #include <dogecoin/base58.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/ecc.h>
+#include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/protocol.h>
@@ -311,30 +313,21 @@ int main(int argc, char* argv[]) {
 
         printf("vec_wtxes: %ld\n", wallet->vec_wtxes->len);
         printf("spends: %ld\n", wallet->spends->len);
-        printf("waddr_vector: %ld\n", wallet->waddr_vector->len);
+        printf("waddr_vector: %ld\n", wallet->waddr_vector->len);               
+        char* coin_amount[21];
+        dogecoin_mem_zero(coin_amount, 21);
         for (i = 0; i < wallet->vec_wtxes->len; i++) {
-            dogecoin_wtx* wtx = vector_idx(wallet->vec_wtxes, i);                
-            char* coin_amount[21];
-            dogecoin_mem_zero(coin_amount, 21);
-            uint64_t tx_out_total = 0;
+            dogecoin_wtx* wtx = vector_idx(wallet->vec_wtxes, i); 
             int length = wtx->tx->vout->len;
-            int selected = -1;
-            printf("length: %d\n", length);
             for (int j = 0; j < length; j++) {
                 dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
-                tx_out_total += tx_out->value;
                 printf("\n--------------------------------\n");
                 printf("output index:       %d\n", j);
                 printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
                 koinu_to_coins_str(tx_out->value, (char*)coin_amount);
                 printf("amount:             %s\n", (char*)coin_amount);
-                printf("total:              %s\n", (char*)tx_out_total);
             }
-            char* subtotal[21];
-            dogecoin_mem_zero(subtotal, 21);
-            koinu_to_coins_str(tx_out_total, (char*)subtotal);
-            printf("subtotal - desired fee: %s\n", (char*)subtotal);
-            }
+        }
         printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(wallet));
 #endif
         char* header_suffix = "_headers.db";
