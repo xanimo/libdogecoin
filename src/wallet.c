@@ -43,6 +43,7 @@
 #include <dogecoin/base58.h>
 #include <dogecoin/blockchain.h>
 #include <dogecoin/common.h>
+#include <dogecoin/koinu.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/wallet.h>
 #include <dogecoin/utils.h>
@@ -252,13 +253,13 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     dogecoin_wallet* wallet = dogecoin_calloc(1, sizeof(*wallet));
     wallet->masterkey = NULL;
     wallet->chain = params;
-    wallet->spends = vector_new(1, dogecoin_free);
-    wallet->wtxes_rbtree = 0;
-    wallet->vec_wtxes = vector_new(1, dogecoin_free);
     wallet->hdkeys_rbtree = 0;
-    wallet->waddr_rbtree = 0;
+    wallet->spends = vector_new(10, dogecoin_free);
     wallet->spends_rbtree = 0;
-    wallet->waddr_vector = vector_new(1, dogecoin_free);
+    wallet->vec_wtxes = vector_new(10, dogecoin_free);
+    wallet->wtxes_rbtree = 0;
+    wallet->waddr_vector = vector_new(10, dogecoin_free);
+    wallet->waddr_rbtree = 0;
     return wallet;
 }
 
@@ -328,7 +329,7 @@ dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_p
 
 void dogecoin_wallet_add_wtx_intern_move(dogecoin_wallet *wallet, const dogecoin_wtx *wtx) {
     //add to spends
-    // dogecoin_wallet_add_to_spent(wallet, wtx);
+    dogecoin_wallet_add_to_spent(wallet, wtx);
 
     dogecoin_wtx* checkwtx = dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
     if (checkwtx) {
@@ -443,6 +444,25 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 }
                 dogecoin_wtx *wtx = dogecoin_wallet_wtx_new();
                 dogecoin_wallet_wtx_deserialize(wtx, &cbuf);
+                char* coin_amount[21];
+                dogecoin_mem_zero(coin_amount, 21);
+                uint64_t tx_out_total = 0;
+                int length = wtx->tx->vout->len;
+                printf("length: %d\n", length);
+                for (int j = 0; j < length; j++) {
+                    dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
+                    tx_out_total += tx_out->value;
+                    printf("\n--------------------------------\n");
+                    printf("output index:       %d\n", j);
+                    printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
+                    koinu_to_coins_str(tx_out->value, (char*)coin_amount);
+                    printf("amount:             %s\n", (char*)coin_amount);
+                    printf("total:              %s\n", (char*)tx_out_total);
+                }
+                char* subtotal[21];
+                dogecoin_mem_zero(subtotal, 21);
+                koinu_to_coins_str(tx_out_total, (char*)subtotal);
+                printf("subtotal - desired fee: %s\n", (char*)subtotal);
                 dogecoin_wallet_add_wtx_intern_move(wallet, wtx); // hands memory management over to the binary tree
             } else {
                 fseek(wallet->dbfile , reclen, SEEK_CUR);

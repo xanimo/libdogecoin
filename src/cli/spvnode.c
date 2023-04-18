@@ -122,11 +122,15 @@ static bool showError(const char* er) {
  * @return A boolean value.
  */
 dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, dogecoin_node* node, dogecoin_blockindex* newtip) {
-    UNUSED(client);
     UNUSED(node);
     if (newtip) {
-        printf("New headers tip height %d\n", newtip->height);
+        time_t timestamp = client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp;
+        printf("New headers tip height %d from %s\n", newtip->height, ctime(&timestamp));
         }
+#if WITH_WALLET
+    dogecoin_wallet* wallet = (dogecoin_wallet*)client->sync_transaction_ctx;
+    printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(wallet));
+#endif
     return true;
     }
 
@@ -143,8 +147,6 @@ void spv_sync_completed(dogecoin_spv_client* client) {
         dogecoin_node_group_shutdown(client->nodegroup);
     } else {
         printf("Waiting for new blocks or relevant transactions...\n");
-        dogecoin_wallet* wallet = (dogecoin_wallet*)client->sync_transaction_ctx;
-        printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(wallet));
     }
 }
 
@@ -173,7 +175,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:p:b:w:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:pbw:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -224,6 +226,10 @@ int main(int argc, char* argv[]) {
             }
         }
 
+    printf("quit_when_synced: %ld\n", quit_when_synced);
+    printf("use_checkpoint: %ld\n", use_checkpoint);
+    printf("wallet_cmd: %ld\n", wallet_cmd);
+    printf("full_sync: %ld\n", full_sync);
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync);
@@ -299,6 +305,10 @@ int main(int argc, char* argv[]) {
             printf("Addr: %s\n", addr);
             }
         vector_free(addrs, true);
+
+        client->sync_transaction = dogecoin_wallet_check_transaction;
+        client->sync_transaction_ctx = wallet;
+
         printf("vec_wtxes: %ld\n", wallet->vec_wtxes->len);
         printf("spends: %ld\n", wallet->spends->len);
         printf("waddr_vector: %ld\n", wallet->waddr_vector->len);
@@ -326,9 +336,6 @@ int main(int argc, char* argv[]) {
             printf("subtotal - desired fee: %s\n", (char*)subtotal);
             }
         printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(wallet));
-
-        client->sync_transaction = dogecoin_wallet_check_transaction;
-        client->sync_transaction_ctx = wallet;
 #endif
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;
@@ -358,7 +365,7 @@ int main(int argc, char* argv[]) {
             ret = EXIT_FAILURE;
         } else {
             printf("done\n");
-            printf("Discover peers...");
+            printf("Discover peers...\n");
             dogecoin_spv_client_discover_peers(client, ips);
             printf("Connecting to the p2p network...\n");
             dogecoin_spv_client_runloop(client);
