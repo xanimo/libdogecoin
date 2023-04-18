@@ -75,7 +75,7 @@ static struct option long_options[] = {
         {"address", no_argument, NULL, 'a'},
         {"checkpoint", no_argument, NULL, 'p'},
         {"full_sync", no_argument, NULL, 'b'},
-        {"wallet", no_argument, NULL, 'w'},
+        {"wallet_cmd", no_argument, NULL, 'w'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -129,10 +129,6 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
         time_t timestamp = client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp;
         printf("New headers tip height %d from %s\n", newtip->height, ctime(&timestamp));
         }
-#if WITH_WALLET
-    dogecoin_wallet* wallet = (dogecoin_wallet*)client->sync_transaction_ctx;
-    printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(wallet));
-#endif
     return true;
     }
 
@@ -310,25 +306,6 @@ int main(int argc, char* argv[]) {
 
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
-
-        printf("vec_wtxes: %ld\n", wallet->vec_wtxes->len);
-        printf("spends: %ld\n", wallet->spends->len);
-        printf("waddr_vector: %ld\n", wallet->waddr_vector->len);               
-        char* coin_amount[21];
-        dogecoin_mem_zero(coin_amount, 21);
-        for (i = 0; i < wallet->vec_wtxes->len; i++) {
-            dogecoin_wtx* wtx = vector_idx(wallet->vec_wtxes, i); 
-            int length = wtx->tx->vout->len;
-            for (int j = 0; j < length; j++) {
-                dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
-                printf("\n--------------------------------\n");
-                printf("output index:       %d\n", j);
-                printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
-                koinu_to_coins_str(tx_out->value, (char*)coin_amount);
-                printf("amount:             %s\n", (char*)coin_amount);
-            }
-        }
-        printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(wallet));
 #endif
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;
@@ -358,11 +335,19 @@ int main(int argc, char* argv[]) {
             ret = EXIT_FAILURE;
         } else {
             printf("done\n");
-            printf("Discover peers...\n");
-            dogecoin_spv_client_discover_peers(client, ips);
-            printf("Connecting to the p2p network...\n");
-            dogecoin_spv_client_runloop(client);
-            dogecoin_spv_client_free(client);
+            if (wallet_cmd) {
+                printf("wallet_cmd\n");
+                vector* unspents = vector_new(1, free);
+                dogecoin_wallet* wallet = (dogecoin_wallet*)client->sync_transaction_ctx;
+                dogecoin_wallet_get_unspent(wallet, unspents);
+                printf("wallet unspents: %ld\n", unspents->len);
+            } else {
+                printf("Discover peers...\n");
+                dogecoin_spv_client_discover_peers(client, ips);
+                printf("Connecting to the p2p network...\n");
+                dogecoin_spv_client_runloop(client);
+                dogecoin_spv_client_free(client);
+            }
             ret = EXIT_SUCCESS;
             }
         dogecoin_ecc_stop();

@@ -398,11 +398,9 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
             }
             uint32_t reclen = 0;
             if (!deser_varlen_from_file(&reclen, wallet->dbfile)) return false;
-            printf("reclen: %ld\n", reclen);
 
             uint8_t rectype;
             if (fread(&rectype, 1, 1, wallet->dbfile) != 1) return false;
-            printf("rectype: %ld\n", rectype);
 
             if (rectype == WALLET_DB_REC_TYPE_MASTERPUBKEY) {
                 uint32_t len;
@@ -439,7 +437,6 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 vector_add(wallet->waddr_vector, waddr);
                 wallet->next_childindex = waddr->childindex+1;
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
-                printf("\nTXN\n");
                 unsigned char buf[reclen];
                 struct const_buffer cbuf = {buf, reclen};
                 if (fread(buf, reclen, 1, wallet->dbfile) != 1) {
@@ -450,9 +447,9 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 char* coin_amount[21];
                 dogecoin_mem_zero(coin_amount, 21);
                 int length = wtx->tx->vout->len;
-                for (int j = 0; j < length - 1; j++) {
+                int j = 0;
+                for (; j < length - 1; j++) {
                     dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
-                    printf("\n--------------------------------\n");
                     printf("output index:       %d\n", j);
                     printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
                     koinu_to_coins_str(tx_out->value, (char*)coin_amount);
@@ -775,7 +772,6 @@ dogecoin_bool dogecoin_wallet_is_mine(dogecoin_wallet* wallet, const dogecoin_tx
         for (i = 0; i < tx->vout->len; i++) {
             dogecoin_tx_out* tx_out = vector_idx(tx->vout, i);
             if (tx_out && dogecoin_wallet_txout_is_mine(wallet, tx_out)) {
-                printf("txout is mine\n");
                 return true;
             }
         }
@@ -904,13 +900,15 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
     (void)(pindex);
     dogecoin_wallet *wallet = (dogecoin_wallet *)ctx;
     if (dogecoin_wallet_is_mine(wallet, tx) || dogecoin_wallet_is_from_me(wallet, tx)) {
-        printf("\nFound relevant transaction!\n");
         dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
         dogecoin_tx_copy(wtx->tx, tx);
         dogecoin_wallet_add_wtx_move(wallet, wtx);
-        // dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
-        // vector_add(wallet->vec_wtxes, (dogecoin_wtx *)wtx);
+        dogecoin_tx_free(tx);
+        printf("\nFound relevant transaction!\n");
         int64_t amount = dogecoin_wallet_get_balance(wallet);
-        printf("Wallet balance: %ld\n", (long)amount);
+        char* coin_amount[21];
+        dogecoin_mem_zero(coin_amount, 21);
+        koinu_to_coins_str((uint64_t)amount, (char*)coin_amount);
+        printf("Wallet balance:             %s\n", (char*)coin_amount);
     }
 }
