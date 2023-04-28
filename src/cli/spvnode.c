@@ -26,8 +26,6 @@
 
 */
 
-#include <assert.h>
-
 #ifndef _MSC_VER
 #include <getopt.h>
 #include <unistd.h>
@@ -76,6 +74,7 @@ static struct option long_options[] = {
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
         {"wallet_cmd", no_argument, NULL, 'w'},
+        {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -260,6 +259,7 @@ int main(int argc, char* argv[]) {
     dogecoin_bool use_checkpoint = false;
     char* mnemonic_in = 0;
     dogecoin_bool full_sync = false;
+    int have_decl_daemon = 0;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -269,7 +269,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bp:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bpz:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -300,6 +300,9 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'p':
                     use_checkpoint = true;
+                    break;
+                case 'z':
+                    have_decl_daemon = 1;
                     break;
                 case 'v':
                     print_version();
@@ -332,6 +335,15 @@ int main(int argc, char* argv[]) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
         } else {
+            if (have_decl_daemon) {
+                fprintf(stdout, "libdogecoin-spvnode starting\n");
+
+                // Daemonize
+                if (daemon(1, 0)) { // don't chdir (1), do close FDs (0)
+                    fprintf(stderr, "Error: daemon() failed\n");
+                    return false;
+                }
+            }
             printf("done\n");
             printf("Discover peers...\n");
             dogecoin_spv_client_discover_peers(client, ips);
