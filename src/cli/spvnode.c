@@ -175,6 +175,7 @@ static struct option long_options[] = {
         {"address", no_argument, NULL, 'a'},
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
+        {"txindex", no_argument, NULL, 'x'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -289,6 +290,8 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
 
     dogecoin_wallet_addr* waddr;
 
+    // if passing in multiple addresses you must pass
+    // in as space separated string e.g. -a "address address"
     if (address != NULL) {
         int init_size = strlen(address);
         char delim[] = " ";
@@ -310,6 +313,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         for(;i<20;i++) {
             waddr = dogecoin_wallet_next_bip44_addr(wallet);
         }
+
         char str[P2PKH_ADDR_STRINGLEN];
         dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, str, P2PKH_ADDR_STRINGLEN);
         printf("Wallet addr: %s (child %d)\n", str, waddr->childindex);
@@ -319,7 +323,6 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         waddr = dogecoin_wallet_next_addr(wallet);
     }
 #endif
-
     /* Creating a vector of addresses and storing them in the wallet. */
     vector* addrs = vector_new(1, free);
     dogecoin_wallet_get_addresses(wallet, addrs);
@@ -370,6 +373,7 @@ int main(int argc, char* argv[]) {
     char* mnemonic_in = 0;
     dogecoin_bool full_sync = false;
     dogecoin_bool have_decl_daemon = false;
+    dogecoin_bool txindex = false;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -379,7 +383,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bpz:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bpxz:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -411,6 +415,9 @@ int main(int argc, char* argv[]) {
                 case 'p':
                     use_checkpoint = true;
                     break;
+                case 'x':
+                    txindex = true;
+                    break;
                 case 'z':
                     have_decl_daemon = true;
                     break;
@@ -432,7 +439,8 @@ int main(int argc, char* argv[]) {
 
 #if WITH_WALLET
         dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, mnemonic_in);
-        client->sync_transaction = dogecoin_wallet_check_transaction;
+        if (txindex) client->sync_transaction = dogecoin_wallet_add_transaction;
+        else client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
         char* header_suffix = "_headers.db";

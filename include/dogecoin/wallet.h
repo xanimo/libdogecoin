@@ -163,6 +163,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_get_unspent(dogecoin_wallet* walle
 
 /** checks a transaction or relevance to the wallet */
 LIBDOGECOIN_API void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex);
+LIBDOGECOIN_API void dogecoin_wallet_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex);
 
 /** returns wtx based on given hash
  * may return NULL if transaction could not be found

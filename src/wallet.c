@@ -1035,12 +1035,14 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
         dogecoin_tx_copy(wtx->tx, tx);
         dogecoin_wallet_scrape_utxos(wallet, wtx);
         dogecoin_wallet_add_wtx_move(wallet, wtx);
-        int64_t amount = dogecoin_wallet_get_balance(wallet);
-        char* coin_amount[21];
-        dogecoin_mem_zero(coin_amount, 21);
-        koinu_to_coins_str((uint64_t)amount, (char*)coin_amount);
-        printf("Wallet balance:             %s\n", (char*)coin_amount);
     }
+}
+
+void dogecoin_wallet_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex) {
+    (void)(pos);
+    dogecoin_wallet *wallet = (dogecoin_wallet *)ctx;
+    dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
+    dogecoin_wallet_add_wtx_move(wallet, wtx);
 }
 
 dogecoin_wallet* dogecoin_wallet_read(char* address) {
