@@ -427,7 +427,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 {
 
     dogecoin_spv_client *client = (dogecoin_spv_client *)node->nodegroup->ctx;
-
+    dogecoin_blockindex *pindex;
     if (strcmp(hdr->command, DOGECOIN_MSG_INV) == 0 && (node->state & NODE_BLOCKSYNC) == NODE_BLOCKSYNC)
     {
         struct const_buffer original_inv = { buf->p, buf->len };
@@ -468,7 +468,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
     if (strcmp(hdr->command, DOGECOIN_MSG_BLOCK) == 0)
     {
         dogecoin_bool connected;
-        dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
+        pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, true, &connected);
 
         if (!pindex) {
             return;
@@ -490,7 +490,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (connected) {
             if (client->header_connected) { client->header_connected(client); }
             time_t lasttime = pindex->header.timestamp;
-            printf("Downloaded new block with size %d at height %d from %s\n", hdr->data_len, pindex->height, ctime(&lasttime));
+            char blockfrom[strlen(ctime(&lasttime))];
+            strcpy(blockfrom, ctime(&lasttime));
+            printf("Downloaded new block at height %d from %s\n", pindex->height, blockfrom);
             uint64_t start = time(NULL);
             client->nodegroup->log_write_cb("Start parsing %d transactions...\n", (int)amount_of_txs);
 
@@ -507,6 +509,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_tx_free(tx);
             }
             client->nodegroup->log_write_cb("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
+        } else {
+            dogecoin_free(pindex);
+            return;
         }
 
         if (dogecoin_hash_equal(node->last_requested_inv, pindex->hash)) {
@@ -530,7 +535,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         for (i = 0; i < amount_of_headers; i++)
         {
             dogecoin_bool connected;
-            dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
+            pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
             if (!pindex)
             {
                 client->nodegroup->log_write_cb("Header deserialization failed (node %d)\n", node->nodeid);
@@ -578,5 +583,18 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, ctime(&lasttime));
             dogecoin_net_spv_node_request_headers_or_blocks(node, false);
         }
+    }
+
+    if (strcmp(hdr->command, DOGECOIN_MSG_CFILTER) == 0)
+    {
+        client->nodegroup->log_write_cb("Got DOGECOIN_MSG_CFILTER\n");
+    }
+    if (strcmp(hdr->command, DOGECOIN_MSG_CFHEADERS) == 0)
+    {
+        client->nodegroup->log_write_cb("Got DOGECOIN_MSG_CFHEADERS\n");
+    }
+    if (strcmp(hdr->command, DOGECOIN_MSG_CFCHECKPT) == 0)
+    {
+        client->nodegroup->log_write_cb("Got DOGECOIN_MSG_CFCHECKPT\n");
     }
 }

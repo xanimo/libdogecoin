@@ -157,7 +157,7 @@ void read_cb(struct bufferevent* bev, void* ctx)
             if ((node->state & NODE_CONNECTED) != NODE_CONNECTED) {
                 return;
             }
-            dogecoin_node_parse_message(node, &hdr, &cmd_data_buf);
+            if (!dogecoin_node_parse_message(node, &hdr, &cmd_data_buf)) return;
 
             buf.p = (const unsigned char*)buf.p + hdr.data_len;
             buf.len -= hdr.data_len;
@@ -433,9 +433,8 @@ dogecoin_node_group* dogecoin_node_group_new(const dogecoin_chainparams* chainpa
     else
         printf("winsock 2.2 dll was found okay\n");
 #endif
-    struct event_base *base = event_base_new();
-    node_group->event_base = base;
-    if (!base) {
+    node_group->event_base = event_base_new();
+    if (!node_group->event_base) {
         dogecoin_free(node_group);
         printf("node_group->event_base not created\n");
         return NULL;
