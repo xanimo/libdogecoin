@@ -254,9 +254,10 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
     int error;
     dogecoin_bool created;
     // prefix chain to wallet file name:
-    char* wallet_suffix = "_wallet.db";
+    char wallet_suffix[] = "_wallet.db";
     char* wallet_prefix = (char*)chain->chainname;
     char* walletfile = concat(wallet_prefix, wallet_suffix);
+    dogecoin_wallet_addr* waddr;
     dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
     dogecoin_free(walletfile);
     if (!res) {
@@ -288,12 +289,9 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         // TODO
     }
 
-    dogecoin_wallet_addr* waddr;
-
     // if passing in multiple addresses you must pass
     // in as space separated string e.g. -a "address address"
     if (address != NULL) {
-        int init_size = strlen(address);
         char delim[] = " ";
 
         char *ptr = strtok(address, delim);
@@ -305,6 +303,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
                 exit(EXIT_FAILURE);
             }
             ptr = strtok(NULL, delim);
+            dogecoin_wallet_addr_free(waddr);
         }
     } 
 #ifdef USE_UNISTRING  
@@ -355,7 +354,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         koinu_to_coins_str(wallet_total_u64, wallet_total);
         printf("Balance: %s\n", wallet_total);
     }
-    dogecoin_free(unspent);
+    vector_free(unspent, true);
     return wallet;
 }
 
@@ -492,6 +491,9 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_client_free(client);
             ret = EXIT_SUCCESS;
             }
+#if WITH_WALLET
+        dogecoin_wallet_free(wallet);
+#endif
         dogecoin_ecc_stop();
     } else if (strcmp(data, "wallet") == 0) {
 #if WITH_WALLET

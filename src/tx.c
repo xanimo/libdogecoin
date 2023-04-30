@@ -435,7 +435,9 @@ dogecoin_tx* dogecoin_tx_new()
  */
 dogecoin_bool dogecoin_tx_in_deserialize(dogecoin_tx_in* tx_in, struct const_buffer* buf)
 {
-    deser_u256(tx_in->prevout.hash, buf);
+    if (!deser_u256(tx_in->prevout.hash, buf)) {
+        return false;
+    }
     if (!deser_u32(&tx_in->prevout.n, buf)) {
         return false;
     }

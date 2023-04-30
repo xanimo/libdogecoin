@@ -208,13 +208,9 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     firstblock = false;
                 } else {
                     dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
-                    if (!connected)
-                    {
+                    if (!connected) {
                         printf("Connecting header failed (at height: %d)\n", db->chaintip->height);
-                    }
-                    else {
-                        connected_headers_count++;
-                    }
+                    } else connected_headers_count++;
                 }
             }
         }
@@ -258,10 +254,18 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
 dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected) {
     *connected = false;
 
-    dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
-    if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return NULL;
+    dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(*blockindex));
+    if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) {
+        dogecoin_block_header_free(&blockindex->header);
+        dogecoin_free(blockindex);
+        return NULL;
+    }
 
-    dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);
+    if (!dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash)) {
+        dogecoin_block_header_free(&blockindex->header);
+        dogecoin_free(blockindex);
+        return NULL;
+    }
 
     dogecoin_blockindex *connect_at = NULL;
     dogecoin_blockindex *fork_from_block = NULL;
@@ -269,8 +273,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
     if (memcmp(&blockindex->header.prev_block, db->chaintip->hash, DOGECOIN_HASH_LENGTH) == 0)
     {
         connect_at = db->chaintip;
-    }
-    else {
+    } else {
         // check if we know the prevblock
         fork_from_block = dogecoin_headersdb_find(db, blockindex->header.prev_block);
         if (fork_from_block) {
@@ -439,7 +442,6 @@ dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db) {
  * @param height The height of the block that this is a checkpoint for.
  */
 void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256 hash, uint32_t height) {
-    db->chainbottom = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
     db->chainbottom->height = height;
     memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256));
     db->chaintip = db->chainbottom;
