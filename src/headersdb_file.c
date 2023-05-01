@@ -206,11 +206,15 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     chainheader->prev = NULL;
                     db->chaintip = chainheader;
                     firstblock = false;
+                    dogecoin_block_header_free(&chainheader->header);
+                    dogecoin_free(chainheader);
                 } else {
-                    dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
+                    dogecoin_blockindex* blockindex = dogecoin_headers_db_connect_hdr(db, &cbuf_all, false, &connected);
                     if (!connected) {
                         printf("Connecting header failed (at height: %d)\n", db->chaintip->height);
                     } else connected_headers_count++;
+                    dogecoin_block_header_free(&blockindex->header);
+                    dogecoin_free(blockindex);
                 }
             }
         }

@@ -257,7 +257,6 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
     char wallet_suffix[] = "_wallet.db";
     char* wallet_prefix = (char*)chain->chainname;
     char* walletfile = concat(wallet_prefix, wallet_suffix);
-    dogecoin_wallet_addr* waddr;
     dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
     dogecoin_free(walletfile);
     if (!res) {
@@ -289,6 +288,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         // TODO
     }
 
+    dogecoin_wallet_addr* waddr = dogecoin_wallet_addr_new();
     // if passing in multiple addresses you must pass
     // in as space separated string e.g. -a "address address"
     if (address != NULL) {
@@ -298,12 +298,10 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
 
         while(ptr != NULL)
         {
-            waddr = dogecoin_wallet_addr_new();
             if (!dogecoin_p2pkh_address_to_wallet_pubkeyhash(ptr, waddr, wallet)) {
                 exit(EXIT_FAILURE);
             }
             ptr = strtok(NULL, delim);
-            dogecoin_wallet_addr_free(waddr);
         }
     } 
 #ifdef USE_UNISTRING  
@@ -322,6 +320,8 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         waddr = dogecoin_wallet_next_addr(wallet);
     }
 #endif
+    dogecoin_wallet_addr_free(waddr);
+
     /* Creating a vector of addresses and storing them in the wallet. */
     vector* addrs = vector_new(1, free);
     dogecoin_wallet_get_addresses(wallet, addrs);
@@ -489,11 +489,11 @@ int main(int argc, char* argv[]) {
             printf("Connecting to the p2p network...\n");
             dogecoin_spv_client_runloop(client);
             dogecoin_spv_client_free(client);
-            ret = EXIT_SUCCESS;
-            }
 #if WITH_WALLET
         dogecoin_wallet_free(wallet);
 #endif
+            ret = EXIT_SUCCESS;
+            }
         dogecoin_ecc_stop();
     } else if (strcmp(data, "wallet") == 0) {
 #if WITH_WALLET

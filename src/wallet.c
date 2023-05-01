@@ -82,9 +82,9 @@ int dogecoin_wallet_addr_compare(const void *l, const void *r)
     for (i = 0; i < sizeof(uint160); i++) {
         uint8_t iA = pubkeyA[i];
         uint8_t iB = pubkeyB[i];
-        if (iA > iB)
+        if (memcmp(&iA, &iB, sizeof(uint8_t)) > 0)
             return -1;
-        else if (iA < iB)
+        else if (memcmp(&iA, &iB, sizeof(uint8_t)) < 0)
             return 1;
     }
 
@@ -302,9 +302,9 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     wallet->unspent_rbtree = 0;
     wallet->spends = vector_new(1, dogecoin_free);
     wallet->spends_rbtree = 0;
-    wallet->vec_wtxes = vector_new(1, dogecoin_free);
+    wallet->vec_wtxes = vector_new(1, NULL);
     wallet->wtxes_rbtree = 0;
-    wallet->waddr_vector = vector_new(1, dogecoin_free);
+    wallet->waddr_vector = vector_new(1, NULL);
     wallet->waddr_rbtree = 0;
     return wallet;
 }
@@ -518,10 +518,10 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 }
 
                 dogecoin_wallet_addr_deserialize(waddr, wallet->chain, &cbuf);
-                // add the node to the binary tree
-                dogecoin_btree_tfind(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
                 vector_add(wallet->waddr_vector, waddr);
                 wallet->next_childindex = waddr->childindex+1;
+                // add the node to the binary tree
+                dogecoin_btree_tfind(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
                 dogecoin_free(buf);
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
                 unsigned char* buf = dogecoin_uchar_vla(reclen);
@@ -536,7 +536,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 dogecoin_wallet_add_wtx_intern_move(wallet, wtx); // hands memory management over to the binary tree
                 dogecoin_free(buf);
             } else {
-                fseek(wallet->dbfile , reclen, SEEK_CUR);
+                fseek(wallet->dbfile, reclen, SEEK_CUR);
             }
         }
     }
@@ -781,7 +781,7 @@ dogecoin_bool dogecoin_wallet_add_wtx_move(dogecoin_wallet* wallet, dogecoin_wtx
 
 dogecoin_bool dogecoin_wallet_have_key(dogecoin_wallet* wallet, uint160 hash160)
 {
-    if (!wallet)
+    if (!wallet || !hash160)
         return false;
 
     dogecoin_wallet_addr waddr_search;
