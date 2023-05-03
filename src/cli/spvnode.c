@@ -329,7 +329,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         }
     vector_free(addrs, true);
 
-    vector* unspent = vector_new(1, free);
+    vector* unspent = vector_new(1, dogecoin_free);
     dogecoin_wallet_get_unspent(wallet, unspent);
     if (unspent->len) {
         char wallet_total[21];
@@ -346,12 +346,11 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
             printf("spendable:      %d\n", utxo->spendable);
             printf("solvable:       %d\n", utxo->solvable);
             wallet_total_u64 += coins_to_koinu_str(utxo->amount);
-            dogecoin_wallet_utxo_free(utxo);
         }
         koinu_to_coins_str(wallet_total_u64, wallet_total);
         printf("Balance: %s\n", wallet_total);
     }
-    dogecoin_free(unspent);
+    vector_free(unspent, true);
     return wallet;
 }
 
@@ -482,6 +481,9 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_client_runloop(client);
             dogecoin_spv_client_free(client);
             ret = EXIT_SUCCESS;
+#if WITH_WALLET
+            dogecoin_wallet_free(wallet);
+#endif
             }
         dogecoin_ecc_stop();
     } else if (strcmp(data, "wallet") == 0) {

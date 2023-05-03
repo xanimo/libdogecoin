@@ -386,18 +386,15 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
         dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
         // populate address vector if script_pubkey exists:
         if (wallet->waddr_vector->len && tx_out->script_pubkey->len) {
-            printf("script_pubkey: %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
             char* p2pkh_from_script_pubkey = dogecoin_malloc(P2PKH_ADDR_STRINGLEN);
             if (!dogecoin_pubkey_hash_to_p2pkh_address(tx_out->script_pubkey->str, tx_out->script_pubkey->len, p2pkh_from_script_pubkey, wallet->chain)) {
                 printf("failed to convert pubkey hash to p2pkh address!\n");
             }
-            vector* addrs = vector_new(1, free);
+            vector* addrs = vector_new(1, dogecoin_free);
             dogecoin_wallet_get_addresses(wallet, addrs);
             unsigned int i;
             for (i = 0; i < addrs->len; i++) {
                 char* addr = vector_idx(addrs, i);
-                printf("p2pkh_from_pubkey: %s\n", p2pkh_from_script_pubkey);
-                printf("addr: %s\n", addr);
                 if (strncmp(p2pkh_from_script_pubkey, addr, P2PKH_ADDR_STRINGLEN - 1)==0) {
                     dogecoin_utxo* utxo = dogecoin_wallet_utxo_new();
                     dogecoin_tx_hash(wtx->tx, (uint8_t*)utxo->txid);
@@ -529,6 +526,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 dogecoin_btree_tfind(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
                 vector_add(wallet->waddr_vector, waddr);
                 wallet->next_childindex = waddr->childindex+1;
+                dogecoin_free(buf);
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
                 unsigned char* buf = dogecoin_uchar_vla(reclen);
                 struct const_buffer cbuf = {buf, reclen};
@@ -540,6 +538,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 dogecoin_wallet_wtx_deserialize(wtx, &cbuf);
                 dogecoin_wallet_scrape_utxos(wallet, wtx);
                 dogecoin_wallet_add_wtx_intern_move(wallet, wtx); // hands memory management over to the binary tree
+                dogecoin_free(buf);
             } else {
                 fseek(wallet->dbfile , reclen, SEEK_CUR);
             }
