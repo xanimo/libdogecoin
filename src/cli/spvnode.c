@@ -176,6 +176,7 @@ static struct option long_options[] = {
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
         {"daemon", no_argument, NULL, 'z'},
+        {"txindex", no_argument, NULL, 'x'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -368,6 +369,7 @@ int main(int argc, char* argv[]) {
     char* mnemonic_in = 0;
     dogecoin_bool full_sync = false;
     dogecoin_bool have_decl_daemon = false;
+    dogecoin_bool txindex = false;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -377,7 +379,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bpz:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bpz:x:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -412,6 +414,9 @@ int main(int argc, char* argv[]) {
                 case 'z':
                     have_decl_daemon = true;
                     break;
+                case 'x':
+                    txindex = true;
+                    break;
                 case 'v':
                     print_version();
                     exit(EXIT_SUCCESS);
@@ -433,6 +438,8 @@ int main(int argc, char* argv[]) {
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
+        if (txindex) client->txindex = txindex;
+
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;
         char* headersfile = concat(header_prefix, header_suffix);

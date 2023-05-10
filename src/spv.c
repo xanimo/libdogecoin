@@ -478,6 +478,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (!deser_varlen(&amount_of_txs, buf)) {
             return;
         }
+        if (client->txindex) { pindex->amount_of_txs = amount_of_txs; }
 
         // flag off the block request stall check
         node->time_last_request = time(NULL);
