@@ -31,6 +31,7 @@
 
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/block.h>
+#include <dogecoin/tx.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -42,6 +43,8 @@ typedef struct dogecoin_blockindex {
     uint256 hash;
     dogecoin_block_header header;
     struct dogecoin_blockindex* prev;
+    size_t amount_of_txs;
+    dogecoin_tx* txns[];
 } dogecoin_blockindex;
 
 LIBDOGECOIN_END_DECL
