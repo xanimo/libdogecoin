@@ -47,6 +47,23 @@ typedef struct dogecoin_blockindex {
     dogecoin_tx* txns[];
 } dogecoin_blockindex;
 
+typedef struct dogecoin_txindex_ {
+    FILE *dbfile;
+    const dogecoin_chainparams* chain;
+    struct dogecoin_blockindex* tip;
+    vector *vec_txns;
+    void* txns_rbtree;
+} dogecoin_txindex;
+
+dogecoin_txindex* dogecoin_txindex_new(const dogecoin_chainparams *params);
+void dogecoin_txindex_free(dogecoin_txindex* txindex);
+dogecoin_bool dogecoin_txindex_create(dogecoin_txindex* txindex, const char* file_path, int *error);
+dogecoin_bool dogecoin_txindex_load(dogecoin_txindex* txindex, const char* file_path, int *error, dogecoin_bool *created);
+dogecoin_bool dogecoin_txindex_flush(dogecoin_txindex* txindex);
+dogecoin_bool dogecoin_txindex_write_record(dogecoin_txindex *txindex, const cstring* record, uint8_t record_type);
+void dogecoin_txindex_add_wtx_intern_move(dogecoin_txindex *txindex, const dogecoin_blockindex *blockindex);
+void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex);
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_BLOCKCHAIN_H__
