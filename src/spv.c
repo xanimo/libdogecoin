@@ -504,10 +504,26 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (!dogecoin_tx_deserialize(buf->p, buf->len, tx, &consumedlength)) {
                     client->nodegroup->log_write_cb("Error deserializing transaction\n");
                 }
+                if (client->txindex) {
+                    consumedlength = 0;
+                    pindex->txns[i] = dogecoin_tx_new();
+                    if (!dogecoin_tx_deserialize(buf->p, buf->len, pindex->txns[i], &consumedlength)) {
+                        client->nodegroup->log_write_cb("Error deserializing transaction\n");
+                    }
+                }
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
-                if (client->txindex) { client->txindexdb(client->txindexdb_ctx, tx, i, pindex); }
-                dogecoin_tx_free(tx);
+                printf("i: %d\n", i);
+                printf("amount_of_txs - 1: %d\n", amount_of_txs - 1);
+                if (client->txindex) {
+                    // wait until we've added all txns to pindex before
+                    // adding to the txindex db
+                    if (i == amount_of_txs - 1) { 
+                        client->txindexdb(client->txindexdb_ctx, pindex);
+                    }
+                } else {
+                    dogecoin_tx_free(tx);
+                }
             }
             client->nodegroup->log_write_cb("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
         }

@@ -91,6 +91,8 @@ dogecoin_blockindex* dogecoin_blockindex_new()
     blockindex = dogecoin_calloc(1, sizeof(*blockindex));
     blockindex->height = 0;
     dogecoin_hash_clear(blockindex->hash);
+    memcpy_safe(&blockindex->header, dogecoin_block_header_new(), sizeof(blockindex->header));
+    blockindex->amount_of_txs = 0;
     return blockindex;
 }
 
@@ -125,16 +127,19 @@ void dogecoin_blockindex_serialize(cstring* s, const dogecoin_blockindex* blocki
 
 dogecoin_bool dogecoin_blockindex_deserialize(dogecoin_blockindex* blockindex, struct const_buffer* buf)
 {
+    printf("buf: %s\n", utils_uint8_to_hex(buf->p, buf->len));
     deser_u32(&blockindex->height, buf);
     deser_u256(blockindex->hash, buf);
     if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return false;
-    if (!deser_varlen((uint32_t*)&blockindex->amount_of_txs, buf)) return false;
+    if (!deser_u32((uint32_t*)&blockindex->amount_of_txs, buf)) return false;
+    printf("amount of txs: %lu\n", blockindex->amount_of_txs);
     if (blockindex->amount_of_txs > 0) {
         size_t i = 0, consumed_length = 0;
         for (; i < blockindex->amount_of_txs; i++) {
             if (!dogecoin_tx_deserialize(buf->p, buf->len, blockindex->txns[i], &consumed_length)) {
                 printf("error deserializing tx!\n");
             }
+            deser_skip(buf, consumed_length);
         }
     }
     return true;
@@ -312,7 +317,8 @@ dogecoin_bool dogecoin_txindex_add_blockindex(dogecoin_txindex* txindex, dogecoi
     if (!txindex || !blockindex)
         return false;
 
-    cstring* record = cstr_new_sz(1024);
+    printf("size: %lu\n", sizeof *blockindex);
+    cstring* record = cstr_new_sz(sizeof *blockindex + 1);
     dogecoin_blockindex_serialize(record, blockindex);
 
     if (!dogecoin_txindex_write_record(txindex, record, TXINDEX_DB_REC_TYPE_TX)) {
@@ -320,7 +326,7 @@ dogecoin_bool dogecoin_txindex_add_blockindex(dogecoin_txindex* txindex, dogecoi
         fprintf(stderr, "Writing txindex record failed\n");
     }
     cstr_free(record, true);
-    dogecoin_file_commit(txindex->dbfile);
+    dogecoin_txindex_flush(txindex);
 
     return true;
 }
@@ -328,14 +334,30 @@ dogecoin_bool dogecoin_txindex_add_blockindex(dogecoin_txindex* txindex, dogecoi
 dogecoin_bool dogecoin_txindex_add_blockindex_move(dogecoin_txindex* txindex, dogecoin_blockindex* blockindex)
 {
     dogecoin_txindex_add_blockindex(txindex, blockindex);
-    //add it to the binary tree
     dogecoin_txindex_add_blockindex_intern_move(txindex, blockindex); //hands memory management over to the binary tree
     return true;
 }
 
-void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex) {
+void dogecoin_add_transaction(void *ctx, dogecoin_blockindex *pindex) {
     dogecoin_txindex *txindexdb = (dogecoin_txindex*)ctx;
-    pindex->txns[pos] = dogecoin_tx_new();
-    dogecoin_tx_copy(pindex->txns[pos], tx);
-    dogecoin_txindex_add_blockindex_move(txindexdb, pindex);
+    // dogecoin_txindex_add_blockindex_move(txindexdb, pindex);
+    cstring* record = cstr_new_sz(sizeof *pindex + 1);
+    dogecoin_blockindex_serialize(record, pindex);
+
+    if (!dogecoin_txindex_write_record(txindexdb, record, TXINDEX_DB_REC_TYPE_TX)) {
+        printf("Writing txindex record failed\n");
+        fprintf(stderr, "Writing txindex record failed\n");
+    }
+    cstr_free(record, true);
+    dogecoin_txindex_flush(txindexdb);
+    // dogecoin_txindex_add_blockindex_intern_move(txindexdb, pindex); //hands memory management over to the binary tree
+    unsigned int j = 0;
+    for (; j < pindex->amount_of_txs; j++) {
+        unsigned int i = 0;
+        for (i = 0; i < pindex->txns[j]->vin->len; i++) {
+            dogecoin_tx_in *tx_in = vector_idx(pindex->txns[j]->vin, i); 
+            printf("tx_in prevout hash: %s\n", utils_uint8_to_hex(tx_in->prevout.hash, 32));
+        }
+        dogecoin_tx_free(pindex->txns[j]);
+    }
 }

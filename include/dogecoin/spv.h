@@ -60,10 +60,10 @@ typedef struct dogecoin_spv_client_
     void (*header_connected)(struct dogecoin_spv_client_ *client);
     void (*sync_completed)(struct dogecoin_spv_client_ *client);
     dogecoin_bool (*header_message_processed)(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip);
-    void (*sync_transaction)(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *blockindex);
+    void (*sync_transaction)(void *ctx, dogecoin_tx* tx, unsigned int pos, dogecoin_blockindex *blockindex);
     void *sync_transaction_ctx;
     dogecoin_bool txindex;
-    void (*txindexdb)(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *blockindex);
+    void (*txindexdb)(void *ctx, dogecoin_blockindex *blockindex);
     void *txindexdb_ctx;
 } dogecoin_spv_client;
 
