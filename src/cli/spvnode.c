@@ -438,7 +438,25 @@ int main(int argc, char* argv[]) {
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
-        if (txindex) client->txindex = txindex;
+        dogecoin_txindex* txindexdb = dogecoin_txindex_new(chain); 
+        if (txindex) {
+            int error = 0;
+            dogecoin_bool created;
+            client->txindex = txindex;
+            char* txindex_suffix = "_txindex.db";
+            char* txindex_prefix = (char*)chain->chainname;
+            char* txindexfile = concat(txindex_prefix, txindex_suffix);
+            dogecoin_bool res = dogecoin_txindex_load(txindexdb, txindexfile, &error, &created);
+            dogecoin_free(txindexfile);
+            if (!res) {
+                showError("Loading txindex failed\n");
+                exit(EXIT_FAILURE);
+            }
+            if (created) {
+            }
+            client->txindexdb = dogecoin_add_transaction;
+            client->txindexdb_ctx = txindexdb;
+        }
 
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;
@@ -491,6 +509,7 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
             dogecoin_wallet_free(wallet);
 #endif
+            dogecoin_txindex_free(txindexdb);
             }
         dogecoin_ecc_stop();
     } else if (strcmp(data, "wallet") == 0) {

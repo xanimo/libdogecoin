@@ -478,6 +478,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (!deser_varlen(&amount_of_txs, buf)) {
             return;
         }
+
         if (client->txindex) { pindex->amount_of_txs = amount_of_txs; }
 
         // flag off the block request stall check
@@ -505,6 +506,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 }
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
+                if (client->txindex) { client->txindexdb(client->txindexdb_ctx, tx, i, pindex); }
                 dogecoin_tx_free(tx);
             }
             client->nodegroup->log_write_cb("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
