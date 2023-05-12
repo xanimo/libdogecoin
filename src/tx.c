@@ -559,9 +559,7 @@ void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx)
     unsigned int i;
     if (tx->vin) {
         for (i = 0; i < tx->vin->len; i++) {
-            dogecoin_tx_in* tx_in;
-
-            tx_in = vector_idx(tx->vin, i);
+            dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
             dogecoin_tx_in_serialize(s, tx_in);
         }
     }

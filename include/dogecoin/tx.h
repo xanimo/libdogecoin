@@ -82,6 +82,7 @@ LIBDOGECOIN_API void dogecoin_tx_in_free(dogecoin_tx_in* tx_in);
 LIBDOGECOIN_API void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src);
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_in_deserialize(dogecoin_tx_in* tx_in, struct const_buffer* buf);
 LIBDOGECOIN_API void dogecoin_tx_in_serialize(cstring* s, const dogecoin_tx_in* tx_in);
+void dogecoin_tx_in_free_cb(void* data);
 
 //!create a new tx output
 LIBDOGECOIN_API dogecoin_tx_out* dogecoin_tx_out_new();
@@ -89,6 +90,7 @@ LIBDOGECOIN_API void dogecoin_tx_out_free(dogecoin_tx_out* tx_out);
 LIBDOGECOIN_API void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_tx_out* src);
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_out_deserialize(dogecoin_tx_out* tx_out, struct const_buffer* buf);
 LIBDOGECOIN_API void dogecoin_tx_out_serialize(cstring* s, const dogecoin_tx_out* tx_out);
+void dogecoin_tx_out_free_cb(void* data);
 
 //!create a new tx input
 LIBDOGECOIN_API dogecoin_tx* dogecoin_tx_new();
