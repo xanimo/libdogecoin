@@ -176,7 +176,7 @@ static struct option long_options[] = {
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
         {"daemon", no_argument, NULL, 'z'},
-        {"txindex", no_argument, NULL, 'x'},
+        {"txid", no_argument, NULL, 'x'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -369,7 +369,7 @@ int main(int argc, char* argv[]) {
     char* mnemonic_in = 0;
     dogecoin_bool full_sync = false;
     dogecoin_bool have_decl_daemon = false;
-    dogecoin_bool txindex = false;
+    dogecoin_bool txid = false;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -415,7 +415,7 @@ int main(int argc, char* argv[]) {
                     have_decl_daemon = true;
                     break;
                 case 'x':
-                    txindex = true;
+                    txid = true;
                     break;
                 case 'v':
                     print_version();
@@ -438,24 +438,24 @@ int main(int argc, char* argv[]) {
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
-        dogecoin_txindex* txindexdb = dogecoin_txindex_new(chain); 
-        if (txindex) {
+        dogecoin_txdb* txdb = dogecoin_txdb_new(chain); 
+        if (txid) {
             int error = 0;
             dogecoin_bool created;
-            client->txindex = txindex;
-            char* txindex_suffix = "_txindex.db";
-            char* txindex_prefix = (char*)chain->chainname;
-            char* txindexfile = concat(txindex_prefix, txindex_suffix);
-            dogecoin_bool res = dogecoin_txindex_load(txindexdb, txindexfile, &error, &created);
-            dogecoin_free(txindexfile);
+            client->txid = txid;
+            char* txid_suffix = "_txid.db";
+            char* txid_prefix = (char*)chain->chainname;
+            char* txdbfile = concat(txid_prefix, txid_suffix);
+            dogecoin_bool res = dogecoin_txdb_load(txdb, txdbfile, &error, &created);
+            dogecoin_free(txdbfile);
             if (!res) {
-                showError("Loading txindex failed\n");
+                showError("Loading txid failed\n");
                 exit(EXIT_FAILURE);
             }
             if (created) {
             }
-            client->txindexdb = dogecoin_add_transaction;
-            client->txindexdb_ctx = txindexdb;
+            client->txdb = dogecoin_add_transaction;
+            client->txdb_ctx = txdb;
         }
 
         char* header_suffix = "_headers.db";
@@ -509,7 +509,7 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
             dogecoin_wallet_free(wallet);
 #endif
-            dogecoin_txindex_free(txindexdb);
+            dogecoin_txdb_free(txdb);
             }
         dogecoin_ecc_stop();
     } else if (strcmp(data, "wallet") == 0) {

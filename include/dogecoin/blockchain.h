@@ -43,26 +43,34 @@ typedef struct dogecoin_blockindex {
     uint256 hash;
     dogecoin_block_header header;
     struct dogecoin_blockindex* prev;
-    uint32_t amount_of_txs;
-    dogecoin_tx* txns[];
 } dogecoin_blockindex;
 
-typedef struct dogecoin_txindex_ {
-    FILE *dbfile;
+typedef struct dogecoin_txid_ {
+    uint32_t height;
+    uint256 hash;
+    dogecoin_tx* tx;
+} dogecoin_txid;
+
+typedef struct dogecoin_txdb_ {
+    FILE *file;
     const dogecoin_chainparams* chain;
     struct dogecoin_blockindex* tip;
     vector *vec_txns;
     void* txns_rbtree;
-} dogecoin_txindex;
+} dogecoin_txdb;
 
-dogecoin_txindex* dogecoin_txindex_new(const dogecoin_chainparams *params);
-void dogecoin_txindex_free(dogecoin_txindex* txindex);
-dogecoin_bool dogecoin_txindex_create(dogecoin_txindex* txindex, const char* file_path, int *error);
-dogecoin_bool dogecoin_txindex_load(dogecoin_txindex* txindex, const char* file_path, int *error, dogecoin_bool *created);
-dogecoin_bool dogecoin_txindex_flush(dogecoin_txindex* txindex);
-dogecoin_bool dogecoin_txindex_write_record(dogecoin_txindex *txindex, const cstring* record, uint8_t record_type);
-void dogecoin_txindex_add_wtx_intern_move(dogecoin_txindex *txindex, const dogecoin_blockindex *blockindex);
-void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex);
+dogecoin_txid* dogecoin_txid_new();
+void dogecoin_txid_free(dogecoin_txid* txid);
+
+
+dogecoin_txdb* dogecoin_txdb_new(const dogecoin_chainparams *params);
+void dogecoin_txdb_free(dogecoin_txdb* txdb);
+dogecoin_bool dogecoin_txdb_create(dogecoin_txdb* txdb, const char* file_path, int *error);
+dogecoin_bool dogecoin_txdb_load(dogecoin_txdb* txdb, const char* file_path, int *error, dogecoin_bool *created);
+dogecoin_bool dogecoin_txdb_flush(dogecoin_txdb* txdb);
+dogecoin_bool dogecoin_txdb_write_record(dogecoin_txdb *txdb, const cstring* record, uint8_t record_type);
+void dogecoin_txdb_add_txid_intern_move(dogecoin_txdb *txdb, const dogecoin_txid *txid);
+void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_txid *txid);
 
 LIBDOGECOIN_END_DECL
 
