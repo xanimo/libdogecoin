@@ -169,6 +169,7 @@ void dogecoin_txdb_add_txid_intern_move(dogecoin_txdb *db, const dogecoin_txid *
             }
         }
         // we do not really delete transactions
+        index->ignore = true;
         dogecoin_btree_tdelete(index, &db->txns_rbtree, dogecoin_txid_compare);
         dogecoin_txid_free(index);
     }
@@ -262,7 +263,10 @@ dogecoin_bool dogecoin_txdb_load(dogecoin_txdb* db, const char* file_path, int *
 
                 dogecoin_txid *txid = dogecoin_txid_new();
                 dogecoin_txid_deserialize(txid, &cbuf);
+                printf("height: %u hash: %s\n", txid->height, utils_uint8_to_hex(txid->hash, 32));
                 dogecoin_txdb_add_txid_intern_move(db, txid); // hands memory management over to the binary tree
+                dogecoin_txid_free(txid);
+                dogecoin_free(buf);
             } else {
                 fseek(db->file, reclen, SEEK_CUR);
             }
