@@ -324,6 +324,11 @@ dogecoin_bool dogecoin_txdb_add_txid_move(dogecoin_txdb* db, dogecoin_txid* txid
 
 void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_txid *txid) {
     dogecoin_txdb *db = (dogecoin_txdb*)ctx;
+    dogecoin_tx_hash(tx, txid->hash);
+    char* hexbuf = utils_uint8_to_hex((const uint8_t*)txid->hash, DOGECOIN_HASH_LENGTH);
+    utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH*2);
+    memcpy_safe(txid->hash, utils_hex_to_uint8(hexbuf), 32);
+    printf("txid->hash: %s\n", utils_uint8_to_hex(txid->hash, 32));
     dogecoin_tx_copy(txid->tx, tx);
     dogecoin_txdb_add_txid_move(db, txid);
 }
