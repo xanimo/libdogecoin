@@ -507,7 +507,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (client->txid) { 
                     dogecoin_txid* txid = dogecoin_txid_new();
                     memcpy_safe(&txid->height, &pindex->height, 4);
-                    memcpy_safe(&txid->hash, &pindex->hash, 32);
                     client->txdb(client->txdb_ctx, tx, i, txid); 
                     dogecoin_txid_free(txid);
                 }
