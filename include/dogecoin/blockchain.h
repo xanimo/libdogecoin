@@ -49,6 +49,7 @@ typedef struct dogecoin_txid_ {
     uint32_t height;
     uint256 hash;
     dogecoin_tx* tx;
+    dogecoin_bool ignore; //if set, transaction will be ignored (soft-delete)
 } dogecoin_txid;
 
 typedef struct dogecoin_txdb_ {
