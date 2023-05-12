@@ -60,10 +60,10 @@ static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* head
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
 static const uint32_t current_version = 1;
 
-int dogecoin_blockindex_compare(const void *l, const void *r)
+int dogecoin_txid_compare(const void *l, const void *r)
 {
-    const dogecoin_blockindex *lm = l;
-    const dogecoin_blockindex *lr = r;
+    const dogecoin_txid *lm = l;
+    const dogecoin_txid *lr = r;
 
     uint8_t *hashA = (uint8_t *)lm->hash;
     uint8_t *hashB = (uint8_t *)lr->hash;
@@ -83,122 +83,102 @@ int dogecoin_blockindex_compare(const void *l, const void *r)
 
 /*
  ==========================================================
- BLOCKINDEX FUNCTIONS
+ TXINDEX FUNCTIONS
  ==========================================================
 */
-dogecoin_blockindex* dogecoin_blockindex_new()
+dogecoin_txid* dogecoin_txid_new()
 {
-    dogecoin_blockindex* blockindex;
-    blockindex = dogecoin_calloc(1, sizeof(*blockindex));
-    blockindex->height = 0;
-    dogecoin_hash_clear(blockindex->hash);
-    return blockindex;
+    dogecoin_txid* txid;
+    txid = dogecoin_calloc(1, sizeof(*txid));
+    txid->height = 0;
+    dogecoin_hash_clear(txid->hash);
+    txid->tx = dogecoin_tx_new();
+    return txid;
 }
 
-void dogecoin_blockindex_free(dogecoin_blockindex* blockindex)
+void dogecoin_txid_free(dogecoin_txid* txid)
 {
-    blockindex->height = 0;
-    dogecoin_hash_clear(blockindex->hash);
-    dogecoin_block_header_free(&blockindex->header);
-    if (blockindex->amount_of_txs > 0) {
-        size_t i = 0;
-        for (; i < blockindex->amount_of_txs; i++) {
-            dogecoin_tx_free(blockindex->txns[i]);
-        }
-        blockindex->amount_of_txs = 0;
-    }
-    dogecoin_free(blockindex);
+    txid->height = 0;
+    dogecoin_hash_clear(txid->hash);
+    dogecoin_tx_free(txid->tx);
+    dogecoin_free(txid);
 }
 
-void dogecoin_blockindex_serialize(cstring* s, const dogecoin_blockindex* blockindex)
+void dogecoin_txid_serialize(cstring* s, const dogecoin_txid* txid)
 {
-    ser_u32(s, blockindex->height);
-    ser_u256(s, blockindex->hash);
-    dogecoin_block_header_serialize(s, &blockindex->header);
-    ser_u32(s, blockindex->amount_of_txs);
-    if (blockindex->amount_of_txs > 0) {
-        size_t i = 0;
-        for (; i < blockindex->amount_of_txs; i++) {
-            dogecoin_tx_serialize(s, blockindex->txns[i]);
-        }
-    }
+    ser_u32(s, txid->height);
+    ser_u256(s, txid->hash);
+    dogecoin_tx_serialize(s, txid->tx);
 }
 
-dogecoin_bool dogecoin_blockindex_deserialize(dogecoin_blockindex* blockindex, struct const_buffer* buf)
+dogecoin_bool dogecoin_txid_deserialize(dogecoin_txid* txid, struct const_buffer* buf)
 {
-    deser_u32(&blockindex->height, buf);
-    deser_u256(blockindex->hash, buf);
-    if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return false;
-    if (!deser_u32(&blockindex->amount_of_txs, buf)) return false;
-    unsigned int i = 0;
+    deser_u32(&txid->height, buf);
+    deser_u256(txid->hash, buf);
     size_t consumed_length = 0;
-    for (; i < blockindex->amount_of_txs; i++) {
-        blockindex->txns[i] = dogecoin_tx_new();
-        if (!dogecoin_tx_deserialize(buf->p, buf->len, blockindex->txns[i], &consumed_length)) {
-            printf("tx deserialization error!\n");
-            return false;
-        }
-        deser_skip(buf, consumed_length);
+    if (!dogecoin_tx_deserialize(buf->p, buf->len, txid->tx, &consumed_length)) {
+        printf("tx deserialization error!\n");
+        return false;
     }
-    return true;
+    return deser_skip(buf, consumed_length);
 }
 
 /*
  ==========================================================
- TXINDEX FUNCTIONS
+ TXINDEXDB FUNCTIONS
  ==========================================================
 */
-dogecoin_txindex* dogecoin_txindex_new(const dogecoin_chainparams *params)
+dogecoin_txdb* dogecoin_txdb_new(const dogecoin_chainparams *params)
 {
-    dogecoin_txindex* txindex = dogecoin_calloc(1, sizeof(*txindex));
-    txindex->chain = params;
-    txindex->vec_txns = vector_new(10, dogecoin_free);
-    txindex->txns_rbtree = 0;
-    return txindex;
+    dogecoin_txdb* db = dogecoin_calloc(1, sizeof(*db));
+    db->chain = params;
+    db->vec_txns = vector_new(10, dogecoin_free);
+    db->txns_rbtree = 0;
+    return db;
 }
 
-void dogecoin_txindex_free(dogecoin_txindex* txindex)
+void dogecoin_txdb_free(dogecoin_txdb* db)
 {
-    if (!txindex)
+    if (!db)
         return;
 
-    if (txindex->dbfile) {
-        fclose(txindex->dbfile);
+    if (db->file) {
+        fclose(db->file);
     }
 
-    dogecoin_btree_tdestroy(txindex->txns_rbtree, dogecoin_free);
+    dogecoin_btree_tdestroy(db->txns_rbtree, dogecoin_free);
 
-    if (txindex->vec_txns) {
-        vector_free(txindex->vec_txns, true);
-        txindex->vec_txns = NULL;
+    if (db->vec_txns) {
+        vector_free(db->vec_txns, true);
+        db->vec_txns = NULL;
     }
 
-    dogecoin_free(txindex);
+    dogecoin_free(db);
 }
 
-void dogecoin_txindex_add_blockindex_intern_move(dogecoin_txindex *txindex, const dogecoin_blockindex *blockindex) {
-    dogecoin_blockindex* index = dogecoin_btree_tfind(blockindex, &txindex->txns_rbtree, dogecoin_blockindex_compare);
+void dogecoin_txdb_add_txid_intern_move(dogecoin_txdb *db, const dogecoin_txid *txid) {
+    dogecoin_txid* index = dogecoin_btree_tfind(txid, &db->txns_rbtree, dogecoin_txid_compare);
     if (index) {
-        // remove existing blockindex
-        index = *(dogecoin_blockindex **)index;
+        // remove existing txid
+        index = *(dogecoin_txid **)index;
         unsigned int i;
-        for (i = 0; i < txindex->vec_txns->len; i++) {
-            dogecoin_blockindex *blockindex_vec = vector_idx(txindex->vec_txns, i);
-            if (blockindex_vec == index) {
-                vector_remove_idx(txindex->vec_txns, i);
+        for (i = 0; i < db->vec_txns->len; i++) {
+            dogecoin_txid *txid_vec = vector_idx(db->vec_txns, i);
+            if (txid_vec == index) {
+                vector_remove_idx(db->vec_txns, i);
             }
         }
         // we do not really delete transactions
-        dogecoin_btree_tdelete(index, &txindex->txns_rbtree, dogecoin_blockindex_compare);
-        dogecoin_blockindex_free(index);
+        dogecoin_btree_tdelete(index, &db->txns_rbtree, dogecoin_txid_compare);
+        dogecoin_txid_free(index);
     }
-    dogecoin_btree_tfind(blockindex, &txindex->txns_rbtree, dogecoin_blockindex_compare);
-    vector_add(txindex->vec_txns, (dogecoin_blockindex *)blockindex);
+    dogecoin_btree_tfind(txid, &db->txns_rbtree, dogecoin_txid_compare);
+    vector_add(db->vec_txns, (dogecoin_txid *)txid);
 }
 
-dogecoin_bool dogecoin_txindex_create(dogecoin_txindex* txindex, const char* file_path, int *error)
+dogecoin_bool dogecoin_txdb_create(dogecoin_txdb* db, const char* file_path, int *error)
 {
-    if (!txindex)
+    if (!db)
         return false;
 
     struct stat buffer;
@@ -207,84 +187,84 @@ dogecoin_bool dogecoin_txindex_create(dogecoin_txindex* txindex, const char* fil
         return false;
     }
 
-    txindex->dbfile = fopen(file_path, "a+b");
+    db->file = fopen(file_path, "a+b");
 
     // write file-header-magic
-    if (fwrite(file_hdr_magic, 4, 1, txindex->dbfile) != 1) return false;
+    if (fwrite(file_hdr_magic, 4, 1, db->file) != 1) return false;
 
     // write version
     uint32_t v = htole32(current_version);
-    if (fwrite(&v, sizeof(v), 1, txindex->dbfile) != 1) return false;
+    if (fwrite(&v, sizeof(v), 1, db->file) != 1) return false;
 
     // write genesis
-    if (fwrite(txindex->chain->genesisblockhash, sizeof(uint256), 1, txindex->dbfile ) != 1) return false;
+    if (fwrite(db->chain->genesisblockhash, sizeof(uint256), 1, db->file ) != 1) return false;
 
-    dogecoin_file_commit(txindex->dbfile);
+    dogecoin_file_commit(db->file);
     return true;
 }
 
-dogecoin_bool dogecoin_txindex_load(dogecoin_txindex* txindex, const char* file_path, int *error, dogecoin_bool *created)
+dogecoin_bool dogecoin_txdb_load(dogecoin_txdb* db, const char* file_path, int *error, dogecoin_bool *created)
 {
     (void)(error);
-    if (!txindex) { return false; }
+    if (!db) { return false; }
 
     struct stat buffer;
     *created = true;
     if (stat(file_path, &buffer) == 0) *created = false;
 
-    txindex->dbfile = fopen(file_path, *created ? "a+b" : "r+b");
+    db->file = fopen(file_path, *created ? "a+b" : "r+b");
 
     if (*created) {
-        if (!dogecoin_txindex_create(txindex, file_path, error)) {
+        if (!dogecoin_txdb_create(db, file_path, error)) {
             return false;
         }
     }
     else {
         // check file-header-magic, version and genesis
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)+sizeof(uint256)];
-        if ((uint32_t)buffer.st_size < (uint32_t)(sizeof(buf)) || fread(buf, sizeof(buf), 1, txindex->dbfile) != 1 || memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
+        if ((uint32_t)buffer.st_size < (uint32_t)(sizeof(buf)) || fread(buf, sizeof(buf), 1, db->file) != 1 || memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
         {
-            fprintf(stderr, "txindex file: error reading database file\n");
+            fprintf(stderr, "txid file: error reading database file\n");
             return false;
         }
         if (le32toh(*(buf+sizeof(file_hdr_magic))) > current_version) {
-            fprintf(stderr, "txindex file: unsupported file version\n");
+            fprintf(stderr, "txid file: unsupported file version\n");
             return false;
         }
-        if (memcmp(buf+sizeof(file_hdr_magic)+sizeof(current_version), txindex->chain->genesisblockhash, sizeof(uint256)) != 0) {
-            fprintf(stderr, "txindex file: different network\n");
+        if (memcmp(buf+sizeof(file_hdr_magic)+sizeof(current_version), db->chain->genesisblockhash, sizeof(uint256)) != 0) {
+            fprintf(stderr, "txid file: different network\n");
             return false;
         }
         // read
-        while (!feof(txindex->dbfile))
+        while (!feof(db->file))
         {
             uint8_t buf[sizeof(file_rec_magic)];
-            if (fread(buf, sizeof(buf), 1, txindex->dbfile) != 1 ) {
+            if (fread(buf, sizeof(buf), 1, db->file) != 1 ) {
                 // no more record, break
                 break;
             }
             if (memcmp(buf, file_rec_magic, sizeof(file_rec_magic))) {
-                fprintf(stderr, "txindex file: error reading record file (invalid magic). txindex file is corrupt\n");
+                fprintf(stderr, "txid file: error reading record file (invalid magic). txid file is corrupt\n");
                 return false;
             }
             uint32_t reclen = 0;
-            if (!deser_varlen_from_file(&reclen, txindex->dbfile)) return false;
+            if (!deser_varlen_from_file(&reclen, db->file)) return false;
 
             uint8_t rectype;
-            if (fread(&rectype, 1, 1, txindex->dbfile) != 1) return false;
+            if (fread(&rectype, 1, 1, db->file) != 1) return false;
 
             if (rectype == TXINDEX_DB_REC_TYPE_TX) {
                 unsigned char* buf = dogecoin_uchar_vla(reclen);
                 struct const_buffer cbuf = {buf, reclen};
-                if (fread(buf, reclen, 1, txindex->dbfile) != 1) {
+                if (fread(buf, reclen, 1, db->file) != 1) {
                     return false;
                 }
 
-                dogecoin_blockindex *blockindex = dogecoin_blockindex_new();
-                dogecoin_blockindex_deserialize(blockindex, &cbuf);
-                dogecoin_txindex_add_blockindex_intern_move(txindex, blockindex); // hands memory management over to the binary tree
+                dogecoin_txid *txid = dogecoin_txid_new();
+                dogecoin_txid_deserialize(txid, &cbuf);
+                dogecoin_txdb_add_txid_intern_move(db, txid); // hands memory management over to the binary tree
             } else {
-                fseek(txindex->dbfile, reclen, SEEK_CUR);
+                fseek(db->file, reclen, SEEK_CUR);
             }
         }
     }
@@ -292,72 +272,58 @@ dogecoin_bool dogecoin_txindex_load(dogecoin_txindex* txindex, const char* file_
     return true;
 }
 
-dogecoin_bool dogecoin_txindex_flush(dogecoin_txindex* txindex)
+dogecoin_bool dogecoin_txdb_flush(dogecoin_txdb* db)
 {
-    dogecoin_file_commit(txindex->dbfile);
+    dogecoin_file_commit(db->file);
     return true;
 }
 
-dogecoin_bool dogecoin_txindex_write_record(dogecoin_txindex *txindex, const cstring* record, uint8_t record_type) {
+dogecoin_bool dogecoin_txdb_write_record(dogecoin_txdb *db, const cstring* record, uint8_t record_type) {
     // write record magic
-    if (fwrite(file_rec_magic, 4, 1, txindex->dbfile) != 1) return false;
+    if (fwrite(file_rec_magic, 4, 1, db->file) != 1) return false;
 
     //write record len
     cstring *cstr_len = cstr_new_sz(4);
     ser_varlen(cstr_len, record->len);
-    if (fwrite(cstr_len->str, cstr_len->len, 1, txindex->dbfile) != 1) {
+    if (fwrite(cstr_len->str, cstr_len->len, 1, db->file) != 1) {
         cstr_free(cstr_len, true);
         return false;
     }
     cstr_free(cstr_len, true);
 
-    printf("recordlen: %ld\n", record->len);
     // write record type & record payload
-    if (fwrite(&record_type, 1, 1, txindex->dbfile) != 1 ||
-        fwrite(record->str, record->len, 1, txindex->dbfile) != 1) {
+    if (fwrite(&record_type, 1, 1, db->file) != 1 ||
+        fwrite(record->str, record->len, 1, db->file) != 1) {
         return false;
     }
     return true;
 }
 
-dogecoin_bool dogecoin_txindex_add_blockindex(dogecoin_txindex* txindex, dogecoin_blockindex* blockindex) {
+dogecoin_bool dogecoin_txdb_add_txid(dogecoin_txdb* db, dogecoin_txid* txid) {
 
-    if (!txindex || !blockindex)
+    if (!db || !txid)
         return false;
 
-    printf("size blockindex: %ld\n", sizeof *blockindex);
-    printf("size blockindex txns: %ld\n", (sizeof *blockindex + (blockindex->amount_of_txs * sizeof(dogecoin_tx))) * 10);
-    cstring* record = cstr_new_sz((sizeof *blockindex + (blockindex->amount_of_txs * sizeof(dogecoin_tx))) * 10);
-    dogecoin_blockindex_serialize(record, blockindex);
+    cstring* record = cstr_new_sz(1024);
+    dogecoin_txid_serialize(record, txid);
 
-    printf("recordlen pre: %ld\n", record->len);
-
-    if (!dogecoin_txindex_write_record(txindex, record, TXINDEX_DB_REC_TYPE_TX)) {
-        printf("Writing txindex record failed\n");
-        fprintf(stderr, "Writing txindex record failed\n");
+    if (!dogecoin_txdb_write_record(db, record, TXINDEX_DB_REC_TYPE_TX)) {
+        fprintf(stderr, "Writing txid record failed\n");
     }
     cstr_free(record, true);
-    dogecoin_file_commit(txindex->dbfile);
+    dogecoin_file_commit(db->file);
     return true;
 }
 
-dogecoin_bool dogecoin_txindex_add_blockindex_move(dogecoin_txindex* txindex, dogecoin_blockindex* blockindex)
+dogecoin_bool dogecoin_txdb_add_txid_move(dogecoin_txdb* db, dogecoin_txid* txid)
 {
-    dogecoin_txindex_add_blockindex(txindex, blockindex);
-    //add it to the binary tree
-    dogecoin_txindex_add_blockindex_intern_move(txindex, blockindex); //hands memory management over to the binary tree
+    dogecoin_txdb_add_txid(db, txid);
+    dogecoin_txdb_add_txid_intern_move(db, txid); //hands memory management over to the binary tree
     return true;
 }
 
-void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex) {
-    dogecoin_txindex *txindexdb = (dogecoin_txindex*)ctx;
-    pindex->txns[pos] = dogecoin_tx_new();
-    dogecoin_tx_copy(pindex->txns[pos], tx);
-    if (pos == pindex->amount_of_txs - 1) {
-        dogecoin_txindex_add_blockindex_move(txindexdb, pindex);
-        unsigned int i = 0;
-        for (; i < pindex->amount_of_txs; i++) {
-            dogecoin_tx_free(pindex->txns[i]);
-        }
-    }
+void dogecoin_add_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_txid *txid) {
+    dogecoin_txdb *db = (dogecoin_txdb*)ctx;
+    dogecoin_tx_copy(txid->tx, tx);
+    dogecoin_txdb_add_txid_move(db, txid);
 }

@@ -236,13 +236,6 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
     ser_u256(rec, blockindex->hash);
     ser_u32(rec, blockindex->height);
     dogecoin_block_header_serialize(rec, &blockindex->header);
-    if (blockindex->amount_of_txs > 0) {
-        cstr_resize(rec, blockindex->amount_of_txs * sizeof(dogecoin_tx));
-        size_t i = 0;
-        for (; i < blockindex->amount_of_txs; i++) {
-            dogecoin_tx_serialize(rec, blockindex->txns[i]);
-        }
-    }
     size_t res = fwrite(rec->str, rec->len, 1, db->headers_tree_file);
     dogecoin_file_commit(db->headers_tree_file);
     cstr_free(rec, true);
@@ -269,18 +262,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
     if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return NULL;
 
     dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);
-
-    if (blockindex->amount_of_txs > 0) {
-        size_t i = 0, consumed_length = 0;
-        for (; i < blockindex->amount_of_txs; i++) {
-            blockindex->txns[i] = dogecoin_tx_new();
-            if (!dogecoin_tx_deserialize(buf->p, buf->len, blockindex->txns[i], &consumed_length)) {
-                printf("tx deserialization failed when connecting header!\n");
-                return NULL;
-            }
-        }
-        deser_skip(buf, consumed_length);
-    }
 
     dogecoin_blockindex *connect_at = NULL;
     dogecoin_blockindex *fork_from_block = NULL;

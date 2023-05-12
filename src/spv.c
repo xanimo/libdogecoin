@@ -479,8 +479,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             return;
         }
 
-        if (client->txindex) { pindex->amount_of_txs = amount_of_txs; }
-
         // flag off the block request stall check
         node->time_last_request = time(NULL);
 
@@ -497,7 +495,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             client->nodegroup->log_write_cb("Start parsing %d transactions...\n", (int)amount_of_txs);
 
             size_t consumedlength = 0;
-            unsigned int i;
+            uint32_t i;
             for (i = 0; i < amount_of_txs; i++)
             {
                 dogecoin_tx* tx = dogecoin_tx_new();
@@ -506,12 +504,14 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 }
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
-                if (client->txindex) { 
-                    printf("amount_of_txs: %u\n", pindex->amount_of_txs);
-                    client->txindexdb(client->txindexdb_ctx, tx, i, pindex); 
-                } else {
-                    dogecoin_tx_free(tx);
+                if (client->txid) { 
+                    dogecoin_txid* txid = dogecoin_txid_new();
+                    memcpy_safe(&txid->height, &pindex->height, 4);
+                    memcpy_safe(&txid->hash, &pindex->hash, 32);
+                    client->txdb(client->txdb_ctx, tx, i, txid); 
+                    dogecoin_txid_free(txid);
                 }
+                dogecoin_tx_free(tx);
             }
             client->nodegroup->log_write_cb("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
         }
