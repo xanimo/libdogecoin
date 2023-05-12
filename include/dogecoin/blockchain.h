@@ -43,7 +43,7 @@ typedef struct dogecoin_blockindex {
     uint256 hash;
     dogecoin_block_header header;
     struct dogecoin_blockindex* prev;
-    size_t amount_of_txs;
+    uint32_t amount_of_txs;
     dogecoin_tx* txns[];
 } dogecoin_blockindex;
 
