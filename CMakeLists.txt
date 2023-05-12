@@ -56,6 +56,7 @@ IF(WITH_NET)
             -DEVENT__DISABLE_MM_REPLACEMENT=ON 
             -DEVENT__DISABLE_REGRESS=ON 
             -DEVENT__DISABLE_BENCHMARK=ON 
+            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} 
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
         execute_process(COMMAND cmake --build .
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
