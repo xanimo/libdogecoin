@@ -110,6 +110,7 @@ MESSAGE(STATUS "  WITH_UNISTRING = ${WITH_UNISTRING}")
 MESSAGE(STATUS "  WITH_WALLET    = ${WITH_WALLET}")
 MESSAGE(STATUS "")
 message(STATUS "  library type   = ${library_type}")
+message(STATUS "  build type     = ${CMAKE_BUILD_TYPE}")
 MESSAGE(STATUS "")
 
 FILE(TOUCH config/libdogecoin-config.h)
