@@ -53,6 +53,8 @@ LIBDOGECOIN_API uint8_t* utils_hex_to_uint8(const char* str);
 LIBDOGECOIN_API char* utils_uint8_to_hex(const uint8_t* bin, size_t l);
 LIBDOGECOIN_API void utils_reverse_hex(char* h, size_t len);
 LIBDOGECOIN_API void utils_uint256_sethex(char* psz, uint8_t* out);
+LIBDOGECOIN_API uint256* uint256S(const char *str);
+LIBDOGECOIN_API vector* parse_hex(const char* psz);
 LIBDOGECOIN_API void* safe_malloc(size_t size);
 LIBDOGECOIN_API void dogecoin_cheap_random_bytes(uint8_t* buf, size_t len);
 LIBDOGECOIN_API void dogecoin_get_default_datadir(cstring* path_out);

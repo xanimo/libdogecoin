@@ -324,6 +324,31 @@ void utils_uint256_sethex(char* psz, uint8_t* out)
         }
     }
 
+uint256* uint256S(const char *str)
+{
+    return (uint256*)utils_hex_to_uint8(str);
+}
+
+vector* parse_hex(const char* psz)
+{
+    // convert hex dump to vector
+    vector* vch = vector_new(1, dogecoin_free);
+    while (true)
+    {
+        while (isspace(*psz))
+            psz++;
+        signed char c = utils_hex_digit(*psz++);
+        if (c == (signed char)-1)
+            break;
+        unsigned char n = (c << 4);
+        c = utils_hex_digit(*psz++);
+        if (c == (signed char)-1)
+            break;
+        n |= c;
+        vector_add(vch, n);
+    }
+    return vch;
+}
 
 /**
  * @brief This function executes malloc() but exits the
