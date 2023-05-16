@@ -23,6 +23,7 @@ noinst_HEADERS = \
     include/bip39/index.h \
     include/dogecoin/address.h \
     include/dogecoin/aes.h \
+    include/dogecoin/arith_uint256.h \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
@@ -43,12 +44,14 @@ noinst_HEADERS = \
     include/dogecoin/mem.h \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
+    include/dogecoin/pow.h \
     include/qr/png.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
     include/dogecoin/random.h \
     include/dogecoin/rmd160.h \
     include/dogecoin/script.h \
+    include/dogecoin/scrypt.h \
     include/dogecoin/sign.h \
     include/dogecoin/serialize.h \
     include/dogecoin/sha2.h \
@@ -65,6 +68,7 @@ pkgconfig_DATA = libdogecoin.pc
 libdogecoin_la_SOURCES = \
     src/address.c \
     src/aes.c \
+    src/arith_uint256.c \
     src/base58.c \
     src/bip32.c \
     src/bip39.c \
@@ -81,6 +85,7 @@ libdogecoin_la_SOURCES = \
     src/koinu.c \
     src/mem.c \
     src/moon.c \
+    src/pow.c \
     src/png.c \
     src/jpeg.c \
     src/qrengine.c \
@@ -88,6 +93,7 @@ libdogecoin_la_SOURCES = \
     src/random.c \
     src/rmd160.c \
     src/script.c \
+    src/scrypt.c \
     src/sign.c \
     src/serialize.c \
     src/sha2.c \
@@ -123,6 +129,7 @@ tests_SOURCES = \
     test/qr_tests.c \
     test/random_tests.c \
     test/rmd160_tests.c \
+    test/scrypt_tests.c \
     test/serialize_tests.c \
     test/sha2_tests.c \
     test/signmsg_tests.c \

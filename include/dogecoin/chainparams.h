@@ -49,6 +49,7 @@ typedef struct dogecoin_chainparams_ {
     uint256 genesisblockhash;
     int default_port;
     dogecoin_dns_seed dnsseeds[8];
+    uint256 pow_limit;
 } dogecoin_chainparams;
 
 typedef struct dogecoin_checkpoint_ {
