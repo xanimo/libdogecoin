@@ -46,7 +46,7 @@ arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *p
 arith_uint256 uint_to_arith(const uint256* a)
 {
     arith_uint256 b;
-    b.WIDTH = bu_BITS / 32;
+    b.WIDTH = BITS / 32;
     int x = 0;
     for(; x < b.WIDTH; ++x)
         b.pn[x] = read_le32((const unsigned char*)a + x * 4);

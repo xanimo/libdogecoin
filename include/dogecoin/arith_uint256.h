@@ -41,7 +41,7 @@ struct uint_err {
     const char* str;
 };
 
-unsigned int bu_BITS;
+static unsigned int BITS;
 
 typedef struct base_uint_ {
     int WIDTH; // BITS / 32
