@@ -18,7 +18,7 @@ jobs:
       CCACHE_TEMPDIR: /tmp/.ccache-temp
       CCACHE_COMPRESS: "1"
       PYTHON_DEBUG: "1"
-      SDK_URL: https://bitcoincore.org/depends-sources/sdks
+      SDK_URL: https://dogecoin.sfo3.cdn.digitaloceanspaces.com/
 
     strategy:
       fail-fast: false
