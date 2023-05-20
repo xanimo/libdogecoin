@@ -23,10 +23,6 @@ extern void (*scrypt_1024_1_1_256_sp_detected)(const char *input, char *output, 
 #define scrypt_1024_1_1_256_sp(input, output, scratchpad) scrypt_1024_1_1_256_sp_generic((input), (output), (scratchpad))
 #endif
 
-void
-PBKDF2_SHA256(const uint8_t *passwd, size_t passwdlen, const uint8_t *salt,
-    size_t saltlen, uint64_t c, uint8_t *buf, size_t dkLen);
-
 static inline uint32_t le32dec(const void *pp)
 {
         const uint8_t *p = (uint8_t const *)pp;

@@ -14,19 +14,15 @@ void test_scrypt() {
     char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
     int i = 0;
     for (; i < HASHCOUNT; i++) {
-        vector* inputbytes = parse_hex(inputhex[i]);
+        unsigned char inputbytes[80];
+        memcpy_safe(inputbytes, parse_hex(inputhex[i]), 80);
 #if defined(USE_SSE2)
         // Test SSE2 scrypt
         scrypt_1024_1_1_256_sp_sse2((const char*)&inputbytes[0], scrypthash, scratchpad);
         strcmp(utils_uint8_to_hex(scrypthash, 32), expected[i]);
 #endif
-        size_t j = 0;
-        unsigned char* bytes = dogecoin_uchar_vla(inputbytes->len);
-        for (; j < inputbytes->len; j++) {
-            bytes[j] = (unsigned char)inputbytes->data[j];
-        }
         // Test generic scrypt
-        scrypt_1024_1_1_256_sp_generic((const char*)&bytes[0], (char*)&scrypthash[0], scratchpad);
-        // u_assert_str_eq(utils_uint8_to_hex(scrypthash, 32), expected[i]);
+        scrypt_1024_1_1_256_sp_generic((const char*)&inputbytes[0], BEGIN(scrypthash), scratchpad);
+        u_assert_str_eq(utils_uint8_to_hex(scrypthash, 32), expected[i]);
     }
 }

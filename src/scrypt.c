@@ -27,8 +27,10 @@
  * online backup system.
  */
 
+#include <dogecoin/mem.h>
 #include <dogecoin/scrypt.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/utils.h>
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -43,6 +45,32 @@
 #include <cpuid.h>
 #endif
 #endif
+
+#ifdef _MSC_VER
+  #define INLINE __inline
+#else
+  #define INLINE inline
+#endif
+
+static INLINE uint32_t
+be32dec(const void *pp)
+{
+	const uint8_t *p = (uint8_t const *)pp;
+
+	return ((uint32_t)(p[3]) + ((uint32_t)(p[2]) << 8) +
+	    ((uint32_t)(p[1]) << 16) + ((uint32_t)(p[0]) << 24));
+}
+
+static INLINE void
+be32enc(void *pp, uint32_t x)
+{
+	uint8_t * p = (uint8_t *)pp;
+
+	p[3] = x & 0xff;
+	p[2] = (x >> 8) & 0xff;
+	p[1] = (x >> 16) & 0xff;
+	p[0] = (x >> 24) & 0xff;
+}
 
 #define ROTL(a, b) (((a) << (b)) | ((a) >> (32 - (b))))
 
@@ -121,7 +149,7 @@ void scrypt_1024_1_1_256_sp_generic(const char *input, char *output, char *scrat
 
 	V = (uint32_t *)(((uintptr_t)(scratchpad) + 63) & ~ (uintptr_t)(63));
 
-	pbkdf2_hmac_sha256((const uint8_t *)input, 80, (const uint8_t *)input, 80, 1, B);
+	pbkdf2_hmac_sha256((const uint8_t *)input, 80, (const uint8_t *)input, 80, 1, B, 128);
 
 	for (k = 0; k < 32; k++)
 		X[k] = le32dec(&B[4 * k]);
@@ -142,7 +170,8 @@ void scrypt_1024_1_1_256_sp_generic(const char *input, char *output, char *scrat
 	for (k = 0; k < 32; k++)
 		le32enc(&B[4 * k], X[k]);
 
-	pbkdf2_hmac_sha256((const uint8_t *)input, 80, B, 128, 1, (uint8_t *)output);
+	pbkdf2_hmac_sha256((const uint8_t *)input, 80, B, 128, 1, (uint8_t *)output, 32);
+	swap_bytes((uint8_t*)output, 32);
 }
 
 #if defined(USE_SSE2)
@@ -183,6 +212,7 @@ void scrypt_detect_sse2()
 
 void scrypt_1024_1_1_256(const char *input, char *output)
 {
-	char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
+    char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
+    memset(scratchpad, 0, sizeof(scratchpad));
     scrypt_1024_1_1_256_sp(input, output, scratchpad);
 }
