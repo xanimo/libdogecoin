@@ -47,6 +47,7 @@ typedef struct dogecoin_block_header_ {
     uint32_t timestamp;
     uint32_t bits;
     uint32_t nonce;
+    dogecoin_bool auxpow;
 } dogecoin_block_header;
 
 typedef struct dogecoin_auxpow_block_ {

@@ -32,7 +32,9 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
+#include <dogecoin/scrypt.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
 
 LIBDOGECOIN_BEGIN_DECL
@@ -73,6 +75,11 @@ LIBDOGECOIN_API static inline dogecoin_bool dogecoin_dblhash(const unsigned char
 LIBDOGECOIN_API static inline void dogecoin_hash_sngl_sha256(const unsigned char* datain, size_t length, uint256 hashout)
 {
     sha256_raw(datain, length, hashout); // single sha256 hash
+}
+
+LIBDOGECOIN_API static inline void dogecoin_get_auxpow_hash(const uint32_t version, uint256 hashout)
+{
+    scrypt_1024_1_1_256(BEGIN(version), BEGIN(hashout));
 }
 
 LIBDOGECOIN_END_DECL

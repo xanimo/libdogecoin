@@ -57,6 +57,7 @@ noinst_HEADERS = \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \
     include/dogecoin/utils.h \
+    include/dogecoin/validation.h \
     include/dogecoin/vector.h \
     include/dogecoin/wow.h
 
@@ -96,6 +97,7 @@ libdogecoin_la_SOURCES = \
     src/transaction.c \
     src/tx.c \
     src/utils.c \
+    src/validation.c \
     src/vector.c
 
 if USE_SSE2
