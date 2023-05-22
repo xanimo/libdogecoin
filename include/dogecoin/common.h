@@ -17,6 +17,7 @@ LIBDOGECOIN_BEGIN_DECL
 #include <stdint.h>
 #include <string.h>
 
+#include <dogecoin/mem.h>
 #include <dogecoin/portable_endian.h>
 #include <dogecoin/utils.h>
 

@@ -32,7 +32,9 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
+#include <dogecoin/scrypt.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
 
 LIBDOGECOIN_BEGIN_DECL
@@ -73,6 +75,43 @@ LIBDOGECOIN_API static inline dogecoin_bool dogecoin_dblhash(const unsigned char
 LIBDOGECOIN_API static inline void dogecoin_hash_sngl_sha256(const unsigned char* datain, size_t length, uint256 hashout)
 {
     sha256_raw(datain, length, hashout); // single sha256 hash
+}
+
+LIBDOGECOIN_API static inline void dogecoin_get_auxpow_hash(const uint32_t version, uint256 hashout)
+{
+    scrypt_1024_1_1_256(BEGIN(version), BEGIN(hashout));
+}
+
+typedef uint256 chain_code;
+
+typedef struct _chash256 {
+    sha256_context* sha;
+    void (*finalize)(sha256_context* ctx, unsigned char hash[SHA256_DIGEST_LENGTH]);
+    void (*write)(sha256_context* ctx, const uint8_t* data, size_t len);
+    void (*reset)();
+} chash256;
+
+static inline chash256* dogecoin_chash256_init() {
+    chash256* chash = dogecoin_calloc(1, sizeof(*chash));
+    sha256_context* ctx = NULL;
+    sha256_init(ctx);
+    chash->sha = ctx;
+    chash->write = sha256_write;
+    chash->finalize = sha256_finalize;
+    chash->reset = sha256_reset;
+    return chash;
+}
+
+static inline uint256* Hash(const uint256 p1begin, const uint256 p1end,
+                    const uint256 p2begin, const uint256 p2end) {
+    static const unsigned char pblank[1];
+    uint256* result = dogecoin_uint256_vla(1);
+    chash256* chash = dogecoin_chash256_init();
+    chash->write(chash->sha, p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0]));
+    chash->write(chash->sha, p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0]));
+    chash->finalize(chash->sha, (unsigned char*)result);
+    chash->reset(chash->sha);
+    return result;
 }
 
 LIBDOGECOIN_END_DECL

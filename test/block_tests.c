@@ -56,7 +56,7 @@ void test_block_header()
 
         dogecoin_block_header* header = dogecoin_block_header_new();
         struct const_buffer buf = {header_data, 80};
-        dogecoin_block_header_deserialize(header, &buf);
+        dogecoin_block_header_deserialize(header, &buf, NULL);
 
         // Check the copies are the same
         dogecoin_block_header* header_copy = dogecoin_block_header_new();
@@ -150,7 +150,7 @@ void test_block_header()
     struct const_buffer buf;
     buf.p = blockheader_ser->str;
     buf.len = blockheader_ser->len;
-    dogecoin_block_header_deserialize(&bheadercheck, &buf);
+    dogecoin_block_header_deserialize(&bheadercheck, &buf, NULL);
     u_assert_str_eq(utils_uint8_to_hex(bheader.prev_block, sizeof(bheader.prev_block)), utils_uint8_to_hex(bheadercheck.prev_block, sizeof(bheadercheck.prev_block)));
     cstr_free(blockheader_ser, true);
     dogecoin_block_header_hash(&bheaderprev, (uint8_t *)&checkhash);

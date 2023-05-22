@@ -23,6 +23,8 @@ noinst_HEADERS = \
     include/bip39/index.h \
     include/dogecoin/address.h \
     include/dogecoin/aes.h \
+    include/dogecoin/arith_uint256.h \
+    include/dogecoin/auxpow.h \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
@@ -33,6 +35,7 @@ noinst_HEADERS = \
     include/dogecoin/byteswap.h \
     include/dogecoin/chainparams.h \
     include/dogecoin/common.h \
+    include/dogecoin/consensus.h \
     include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \
@@ -44,6 +47,7 @@ noinst_HEADERS = \
     include/dogecoin/mem.h \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
+    include/dogecoin/pow.h \
     include/qr/png.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
@@ -58,6 +62,7 @@ noinst_HEADERS = \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \
     include/dogecoin/utils.h \
+    include/dogecoin/validation.h \
     include/dogecoin/vector.h \
     include/dogecoin/wow.h
 
@@ -67,6 +72,8 @@ pkgconfig_DATA = libdogecoin.pc
 libdogecoin_la_SOURCES = \
     src/address.c \
     src/aes.c \
+    src/arith_uint256.c \
+    src/auxpow.c \
     src/base58.c \
     src/bip32.c \
     src/bip39.c \
@@ -74,6 +81,7 @@ libdogecoin_la_SOURCES = \
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
+    src/consensus.c \
     src/cstr.c \
     src/ctaes.c \
     src/ecc.c \
@@ -83,6 +91,7 @@ libdogecoin_la_SOURCES = \
     src/map.c \
     src/mem.c \
     src/moon.c \
+    src/pow.c \
     src/png.c \
     src/jpeg.c \
     src/qrengine.c \
@@ -98,6 +107,7 @@ libdogecoin_la_SOURCES = \
     src/transaction.c \
     src/tx.c \
     src/utils.c \
+    src/validation.c \
     src/vector.c
 
 if USE_SSE2
