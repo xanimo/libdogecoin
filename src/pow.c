@@ -25,6 +25,10 @@
 
  */
 
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+
 #include <dogecoin/arith_uint256.h>
 #include <dogecoin/pow.h>
 #include <dogecoin/utils.h>
@@ -35,11 +39,15 @@ dogecoin_bool check_pow(uint256* hash, unsigned int nbits, dogecoin_chainparams 
     target = set_compact(target, nbits, &f_negative, &f_overflow);
     arith_uint256 h;
     h = uint_to_arith((const uint256*)hash);
-    char* hash_str = utils_uint8_to_hex((const uint8_t*)&h, 32);
-    char* target_str = utils_uint8_to_hex((const uint8_t*)&target, 32);
-    if (f_negative || (const uint8_t*)&target == 0 || f_overflow || memcmp(&target, &params->pow_limit, 4) > 0)
+    char* hash_str = hash_to_string((const uint8_t*)&h);
+    char* target_str = hash_to_string((const uint8_t*)&target);
+    if (f_negative || f_overflow || memcmp(&target.pn[0], &params->pow_limit, 4) > 0) {
+        printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
-    if (strcmp(hash_str, target_str) > 0)
+    }
+    if (strcmp(hash_str, target_str) > 0) {
+        printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
+    }
     return true;
 }
