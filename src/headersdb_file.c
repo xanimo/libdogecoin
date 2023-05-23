@@ -282,8 +282,9 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
 
     if (connect_at != NULL) {
         /* TODO: check claimed PoW */
-        if (!check_pow(blockindex->hash, blockindex->header.bits, &dogecoin_chainparams_main))
-            printf("%s: check_pow failed: %s\n", __func__, utils_uint8_to_hex(blockindex->hash, 32));
+        // if (!check_pow(blockindex->hash, blockindex->header.bits, &dogecoin_chainparams_main))
+        //     printf("%s: check_pow failed: %s\n", __func__, utils_uint8_to_hex(blockindex->hash, 32));
+
         blockindex->prev = connect_at;
         blockindex->height = connect_at->height+1;
 

@@ -24,6 +24,7 @@ noinst_HEADERS = \
     include/dogecoin/address.h \
     include/dogecoin/aes.h \
     include/dogecoin/arith_uint256.h \
+    include/dogecoin/auxpow.h \
     include/dogecoin/base58.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
@@ -70,6 +71,7 @@ libdogecoin_la_SOURCES = \
     src/address.c \
     src/aes.c \
     src/arith_uint256.c \
+    src/auxpow.c \
     src/base58.c \
     src/bip32.c \
     src/bip39.c \

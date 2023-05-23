@@ -25,57 +25,72 @@
 
  */
 
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+
+#include <dogecoin/pow.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
 
-const inline int32_t get_chainid(int version) {
+int32_t get_chainid(int32_t version) {
     return version >> 16;
 }
 
-const inline dogecoin_bool is_auxpow(int version) {
-    return version & VERSION_AUXPOW;
+dogecoin_bool is_auxpow(int32_t version) {
+    return (version & VERSION_AUXPOW) == 256;
 }
 
-const inline dogecoin_bool is_legacy(int version) {
+dogecoin_bool is_legacy(int32_t version) {
     return version == 1
         // Dogecoin: We have a random v2 block with no AuxPoW, treat as legacy
         || (version == 2 && get_chainid(version) == 0);
 }
 
-dogecoin_bool check_auxpow(const dogecoin_block_header block, dogecoin_chainparams* params) {
+dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* params) {
     /* Except for legacy blocks with full version 1, ensure that
        the chain ID is correct.  Legacy blocks are not allowed since
        the merge-mining start, which is checked in AcceptBlockHeader
        where the height is known.  */
-    if (!is_legacy(block.version) && params->strict_id && get_chainid(block.version) != params->auxpow_id)
-        return error("%s : block does not have our chain ID"
-                     " (got %d, expected %d, full nVersion %d)",
-                     __func__, get_chainid(block.version),
-                     params->auxpow_id, block.version);
+    if (!is_legacy(block.header->version) && params->strict_id && get_chainid(block.header->version) != params->auxpow_id)
+        printf("%s : block does not have our chain ID"
+                " (got %d, expected %d, full nVersion %d) : %s\n",
+                __func__, get_chainid(block.header->version),
+                params->auxpow_id, block.header->version, strerror(errno));
+        return false;
 
     /* If there is no auxpow, just check the block hash.  */
-    if (!block.auxpow) {
-        if (is_auxpow(block.version))
-            return error("%s : no auxpow on block with auxpow version",
-                         __func__);
+    if (!block.header->auxpow->is) {
+        if (is_auxpow(block.header->version))
+            printf("%s : no auxpow on block with auxpow version : %s\n", __func__, strerror(errno));
+            return false;
 
         uint256 auxpow_hash;
-        dogecoin_get_auxpow_hash(block.version, auxpow_hash);
-        if (!CheckProofOfWork(auxpow_hash, block.bits, params))
-            return error("%s : non-AUX proof of work failed", __func__);
+        dogecoin_get_auxpow_hash(block.header->version, auxpow_hash);
+        if (!check_pow(&auxpow_hash, block.header->bits, params))
+            printf("%s : non-AUX proof of work failed : %s\n", __func__, strerror(errno));
+            return false;
 
         return true;
     }
 
     /* We have auxpow.  Check it.  */
 
-    if (!is_auxpow(block.version))
-        return error("%s : auxpow on block with non-auxpow version", __func__);
+    if (!is_auxpow(block.header->version))
+        printf("%s : auxpow on block with non-auxpow version : %s\n", __func__, strerror(errno));
+        return false;
 
-    // if (!block.auxpow->check(dogecoin_hash(), get_chainid(block.version), params))
-    //     return error("%s : AUX POW is not valid", __func__);
-    // if (!CheckProofOfWork(block.auxpow->getParentBlockPoWHash(), block.bits, params))
-    //     return error("%s : AUX proof of work failed", __func__);
+    uint256 block_header_hash;
+    dogecoin_block_header_hash(block.header, block_header_hash);
+    if (!block.header->auxpow->check(&block_header_hash, get_chainid(block.header->version), params))
+        printf("%s : AUX POW is not valid : %s\n", __func__, strerror(errno));
+        return false;
+
+    uint256 parent_hash;
+    dogecoin_block_header_hash(block.parent_header, parent_hash); // todo: swap with scrypt block header hash
+    if (!check_pow(&parent_hash, block.parent_header->bits, params))
+        printf("%s : AUX POW is not valid : %s\n", __func__, strerror(errno));
+        return false;
 
     return true;
 }
