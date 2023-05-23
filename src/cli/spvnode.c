@@ -560,6 +560,8 @@ int main(int argc, char* argv[]) {
                         printf("vout:           %d\n", dogecoin_get_utxo_vout(address, i));
                         printf("amount:         %s\n", dogecoin_get_utxo_amount(address, i));
                     }
+                    uint8_t* utxos = dogecoin_get_utxos(address);
+                    printf("utxos: %s\n", utils_uint8_to_hex(utxos, strlen((char*)utxos)));
                 }
             }
         }
