@@ -349,23 +349,3 @@ dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256 
     dogecoin_bool ret = true;
     return ret;
     }
-
-/**
- * @brief This function takes a block header and generates its
- * Scrypt hash.
- *
- * @param header The pointer to the block header to hash.
- * @param hash The Scrypt hash of the block header
- *
- * @return True.
- */
-dogecoin_bool dogecoin_block_header_scrypt_hash(dogecoin_block_header* header, uint256 hash) {
-    cstring* s = cstr_new_sz(80);
-    dogecoin_block_header_serialize(s, header);
-    char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
-    unsigned char inputbytes[80];
-    memcpy_safe(inputbytes, parse_hex(utils_uint8_to_hex((uint8_t*)s->str, s->len)), s->len);
-    scrypt_1024_1_1_256_sp_generic((const char*)&inputbytes[0], BEGIN(hash), scratchpad);
-    cstr_free(s, true);
-    return true;
-    }
