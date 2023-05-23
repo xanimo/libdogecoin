@@ -499,6 +499,8 @@ int main(int argc, char* argv[]) {
                     for (; i <= utxo_count; i++) {
                         printf("txid:           %s\n", dogecoin_get_utxo_txid_str(address, i));
                     }
+                    uint8_t* utxos = dogecoin_get_utxos(address);
+                    printf("utxos: %s\n", utils_uint8_to_hex(utxos, strlen((char*)utxos)));
                 }
             }
         }
