@@ -41,7 +41,7 @@ dogecoin_bool check_pow(uint256* hash, unsigned int nbits, dogecoin_chainparams 
     h = uint_to_arith((const uint256*)hash);
     char* hash_str = hash_to_string((const uint8_t*)&h);
     char* target_str = hash_to_string((const uint8_t*)&target);
-    if (f_negative || f_overflow || memcmp(&target.pn[0], &params->pow_limit, 4) > 0) {
+    if (f_negative || f_overflow || memcmp(&target.pn[0], &params->pow_limit, 32) > 0) {
         printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
