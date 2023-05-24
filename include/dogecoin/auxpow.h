@@ -35,7 +35,7 @@
 LIBDOGECOIN_BEGIN_DECL
 
 typedef struct _merkle_tx {
-    static const uint256 ABANDON_HASH;
+    const uint256 ABANDON_HASH;
     dogecoin_tx* tx;
     uint256 hash;
     uint256* merkle_branch;

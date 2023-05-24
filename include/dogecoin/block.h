@@ -42,11 +42,12 @@ LIBDOGECOIN_BEGIN_DECL
 
 typedef struct _auxpow {
     dogecoin_bool is;
-    dogecoin_bool (*check)(uint256* hash, int32_t chainid, dogecoin_chainparams* params);
+    dogecoin_bool (*check)(void* ctx, uint256* hash, uint32_t chainid, dogecoin_chainparams* params);
+    void *ctx;
 } auxpow;
 
 typedef struct dogecoin_block_header_ {
-    int32_t version;
+    uint32_t version;
     uint256 prev_block;
     uint256 merkle_root;
     uint32_t timestamp;
