@@ -82,6 +82,25 @@ LIBDOGECOIN_API static inline void dogecoin_get_auxpow_hash(const uint32_t versi
     scrypt_1024_1_1_256(BEGIN(version), BEGIN(hashout));
 }
 
+typedef uint256 chain_code;
+
+typedef struct _chash256 {
+    sha256_context* sha;
+    void (*finalize)(sha256_context* ctx, unsigned char hash[SHA256_DIGEST_LENGTH]);
+    void (*write)(sha256_context* ctx, const uint8_t* data, size_t len);
+    void (*reset)();
+} chash256;
+
+static inline chash256 dogecoin_chash256_init() {
+    chash256* chash = dogecoin_calloc(1, sizeof(*chash));
+    sha256_context* ctx;
+    sha256_init(ctx);
+    chash->sha = ctx;
+    chash->write = sha256_write;
+    chash->finalize = sha256_finalize;
+    return *chash;
+}
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_HASH_H__
