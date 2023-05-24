@@ -51,15 +51,15 @@ dogecoin_bool dogecoin_block_header_scrypt_hash(cstring* s, uint256 hash) {
     return true;
     }
 
-int32_t get_chainid(int32_t version) {
+uint32_t get_chainid(uint32_t version) {
     return version >> 16;
 }
 
-dogecoin_bool is_auxpow(int32_t version) {
+dogecoin_bool is_auxpow(uint32_t version) {
     return (version & VERSION_AUXPOW) == 256;
 }
 
-dogecoin_bool is_legacy(int32_t version) {
+dogecoin_bool is_legacy(uint32_t version) {
     return version == 1
         // Dogecoin: We have a random v2 block with no AuxPoW, treat as legacy
         || (version == 2 && get_chainid(version) == 0);
@@ -104,7 +104,8 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* pa
 
     uint256 block_header_hash;
     dogecoin_block_header_hash(block.header, block_header_hash);
-    if (!block.header->auxpow->check(&block_header_hash, get_chainid(block.header->version), params)) {
+    uint32_t chainid = get_chainid(block.header->version);
+    if (!block.header->auxpow->check(&block, &block_header_hash, chainid, params)) {
         printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
