@@ -39,11 +39,12 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/sha2.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/uint256.h>
 #include <dogecoin/validation.h>
 
 dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainparams* params) {
     dogecoin_auxpow_block* block = (dogecoin_auxpow_block*)ctx;
-    print_block(block);
+    // print_block(block);
     if ((block->parent_merkle_index || block->aux_merkle_index) != 0) {
         printf("Auxpow is not a generate\n");
         return false;
@@ -56,27 +57,35 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
     }
 
 
-    // if (vChainMerkleBranch.size() > 30)
-    //     return error("Aux POW chain merkle branch too long");
+    // if (block->parent_merkle_count > 30) {
+    //     printf("Aux POW chain merkle branch too long\n");
+    //     return false;
+    // }
 
     // // Check that the chain merkle root is in the coinbase
-    // const uint256 nRootHash = CheckMerkleBranch(hashAuxBlock, vChainMerkleBranch, nChainIndex);
-    // std::vector<unsigned char> vchRootHash(nRootHash.begin(), nRootHash.end());
-    // std::reverse(vchRootHash.begin(), vchRootHash.end()); // correct endian
+    // const uint256 nRootHash;
+    // memcpy_safe(nRootHash, check_merkle_branch(hash, block->parent_coinbase_merkle, block->parent_merkle_count), 32);
+    // printf("\n\nhash: %s\n", to_string(hash));
+    // unsigned char* vchRootHash = (unsigned char*)hash_to_string((uint8_t*)nRootHash); // correct endian
+    // printf("hash: %s\n\n\n", vchRootHash);
 
-    // // Check that we are in the parent block merkle tree
-    // if (CheckMerkleBranch(GetHash(), vMerkleBranch, nIndex) != parentBlock.hashMerkleRoot)
-    //     return error("Aux POW merkle root incorrect");
-
-    // const dogecoin_script script = tx->vin[0].scriptSig;
+    // struct base_blob* blob = init_blob();
+    // printf("blob: %s\n", to_string((uint8_t*)blob));
+    // Check that we are in the parent block merkle tree
+    // if (check_merkle_branch(hash, block->parent_coinbase_merkle, block->parent_merkle_count) != &block->parent_header->merkle_root) {
+    //     printf("Aux POW merkle root incorrect");
+    //     return false;
+    // }
+    // dogecoin_tx_in* tx_in = vector_idx(block->parent_coinbase->vin, 0);
+    // tx_in->script_sig[0];
 
     // // Check that the same work is not submitted twice to our chain.
     // //
 
-    // CScript::const_iterator pcHead =
+    // cstring* pcHead =
     //     std::search(script.begin(), script.end(), UBEGIN(pchMergedMiningHeader), UEND(pchMergedMiningHeader));
 
-    // CScript::const_iterator pc =
+    // cstring* pc =
     //     std::search(script.begin(), script.end(), vchRootHash.begin(), vchRootHash.end());
 
     // if (pc == script.end())

@@ -59,6 +59,7 @@ noinst_HEADERS = \
     include/dogecoin/tool.h \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \
+    include/dogecoin/uint256.h \
     include/dogecoin/utils.h \
     include/dogecoin/validation.h \
     include/dogecoin/vector.h \
