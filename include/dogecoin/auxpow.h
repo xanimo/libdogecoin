@@ -28,25 +28,14 @@
 #ifndef __LIBDOGECOIN_AUXPOW__
 #define __LIBDOGECOIN_AUXPOW__
 
-#include <dogecoin/block.h>
 #include <dogecoin/dogecoin.h>
-#include <dogecoin/tx.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
-typedef struct _merkle_tx {
-    const uint256 ABANDON_HASH;
-    dogecoin_tx* tx;
-    uint256 hash;
-    uint256* merkle_branch;
-    int index;
-} merkle_tx;
+#define BLOCK_VERSION_AUXPOW_BIT 0x100
 
-typedef struct merkle_tx {
-    uint256* merkle_branch;
-    int index;
-    dogecoin_block_header parent_block;
-} auxpow;
+/** Header for merge-mining data in the coinbase.  */
+static const unsigned char pchMergedMiningHeader[] = { 0xfa, 0xbe, 'm', 'm' };
 
 LIBDOGECOIN_END_DECL
 
