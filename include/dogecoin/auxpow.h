@@ -37,6 +37,8 @@ LIBDOGECOIN_BEGIN_DECL
 /** Header for merge-mining data in the coinbase.  */
 static const unsigned char pchMergedMiningHeader[] = { 0xfa, 0xbe, 'm', 'm' };
 
+uint256* check_merkle_branch(uint256* hash, const uint256* parent_coinbase_merkle, int n_index);
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_AUXPOW__

@@ -1,5 +1,32 @@
 // #include <dogecoin/blockchain.h>
 // #include <dogecoin/utils.h>
+#include <dogecoin/hash.h>
+#include <dogecoin/auxpow.h>
+
+uint256* Hash(const uint256 p1begin, const uint256 p1end,
+                    const uint256 p2begin, const uint256 p2end) {
+    static const unsigned char pblank[1] = {};
+    uint256 result;
+    chash256 chash = dogecoin_chash256_init();
+    chash.write(chash.sha, p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0]));
+    chash.write(chash.sha, p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0]));
+    chash.finalize(chash.sha, (unsigned char*)&result);
+    return result;
+}
+
+uint256* check_merkle_branch(uint256* hash, const uint256* parent_coinbase_merkle, int n_index)
+{
+  if (n_index == -1) return dogecoin_uint256_vla(1);
+  unsigned int i = 0;
+  for (; i < n_index; i++) {
+    if (n_index & 1)
+      hash = Hash(BEGIN(*parent_coinbase_merkle[i]), END(*parent_coinbase_merkle[i]), BEGIN(hash), END(hash));
+    else
+      hash = Hash(BEGIN(hash), END(hash), BEGIN(*parent_coinbase_merkle[i]), END(*parent_coinbase_merkle[i]));
+    n_index >>= 1;
+  }
+  return hash;
+}
 
 // const uint256* ABANDON_HASH(...uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
 
