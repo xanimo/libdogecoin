@@ -58,6 +58,7 @@ LIBDOGECOIN_API void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char*
 LIBDOGECOIN_API uint8_t* utils_hex_to_uint8(const char* str);
 LIBDOGECOIN_API char* utils_uint8_to_hex(const uint8_t* bin, size_t l);
 LIBDOGECOIN_API void utils_reverse_hex(char* h, size_t len);
+LIBDOGECOIN_API signed char utils_hex_digit(char c);
 LIBDOGECOIN_API void utils_uint256_sethex(char* psz, uint8_t* out);
 LIBDOGECOIN_API uint256* uint256S(const char *str);
 LIBDOGECOIN_API unsigned char* parse_hex(const char* psz);
