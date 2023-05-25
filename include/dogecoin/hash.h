@@ -91,14 +91,15 @@ typedef struct _chash256 {
     void (*reset)();
 } chash256;
 
-static inline chash256 dogecoin_chash256_init() {
+static inline chash256* dogecoin_chash256_init() {
     chash256* chash = dogecoin_calloc(1, sizeof(*chash));
-    sha256_context* ctx;
+    sha256_context* ctx = NULL;
     sha256_init(ctx);
     chash->sha = ctx;
     chash->write = sha256_write;
     chash->finalize = sha256_finalize;
-    return *chash;
+    chash->reset = sha256_reset;
+    return chash;
 }
 
 LIBDOGECOIN_END_DECL
