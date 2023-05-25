@@ -44,7 +44,7 @@
 
 dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainparams* params) {
     dogecoin_auxpow_block* block = (dogecoin_auxpow_block*)ctx;
-    // print_block(block);
+    print_block(block);
     if ((block->parent_merkle_index || block->aux_merkle_index) != 0) {
         printf("Auxpow is not a generate\n");
         return false;
@@ -57,18 +57,71 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
     }
 
 
-    // if (block->parent_merkle_count > 30) {
-    //     printf("Aux POW chain merkle branch too long\n");
-    //     return false;
-    // }
+    if (block->parent_merkle_count > 30) {
+        printf("Aux POW chain merkle branch too long\n");
+        return false;
+    }
 
-    // // Check that the chain merkle root is in the coinbase
-    // const uint256 nRootHash;
-    // memcpy_safe(nRootHash, check_merkle_branch(hash, block->parent_coinbase_merkle, block->parent_merkle_count), 32);
-    // printf("\n\nhash: %s\n", to_string(hash));
-    // unsigned char* vchRootHash = (unsigned char*)hash_to_string((uint8_t*)nRootHash); // correct endian
-    // printf("hash: %s\n\n\n", vchRootHash);
+    // Check that the chain merkle root is in the coinbase
+    uint256 n_roothash;
+    memcpy_safe(n_roothash, check_merkle_branch(hash, block->parent_coinbase_merkle, block->parent_merkle_count), 32);
+    printf("\n\nhash: %s\n", to_string(hash));
+    unsigned char* vch_roothash = (unsigned char*)hash_to_string((uint8_t*)n_roothash); // correct endian
+    printf("hash: %s\n\n\n", vch_roothash);
+    printf("&block->parent_header->merkle_root: %s\n", to_string(block->parent_header->merkle_root));
 
+    dogecoin_tx_in* tx_in = dogecoin_tx_in_new();
+    tx_in = vector_idx(block->parent_coinbase->vin, 0);
+    char* script_sig = utils_uint8_to_hex((uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len);
+    printf("tx_in->script_sig: %s\n", script_sig);
+
+    if (!find_needle((uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len, (char*)&pchMergedMiningHeader, 4)) {
+        printf("pchMergedMiningHeader found!\n");
+        return false;
+    }
+
+    size_t haystack_index = 0;
+    char* script = utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[0], tx_in->script_sig->len);
+    char* pch = utils_uint8_to_hex((uint8_t*)&pchMergedMiningHeader[0], 4);
+    printf("pch: %s\n", pch);
+    printf("pch[0]: %c\n", pch[0]);
+    printf("pch[0]: %c\n", pch[1]);
+    for (; haystack_index < tx_in->script_sig->len; haystack_index++) {
+
+        printf("haystack char: %s\n", utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4));
+        printf("needle char: %s\n", utils_uint8_to_hex((uint8_t*)&pchMergedMiningHeader[haystack_index], 4));
+        if (strncmp(utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4), pch, 4)==0) {
+                // do stuff
+                printf("do stuff\n");
+            }
+        bool needle_found = true;
+        size_t needle_index = 0;
+        for (; needle_index < 4; needle_index++) {
+            const auto haystack_character = tx_in->script_sig->str[haystack_index + needle_index];
+            const auto needle_character = pchMergedMiningHeader[needle_index];
+            if (haystack_character == needle_character) {
+                continue;
+            } else {
+                needle_found = false;
+                break;
+            }
+        }
+
+        printf("total length: %zu index: %zu char: %s\n", tx_in->script_sig->len, haystack_index, utils_uint8_to_hex(&tx_in->script_sig->str[haystack_index], 4));
+        if (needle_found) {
+            printf("needle: %s\n", &tx_in->script_sig->str[haystack_index]);
+        }
+    }
+
+    if (!bytes_find((uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len, (uint8_t*)&pchMergedMiningHeader, 4)) {
+        printf("pchMergedMiningHeader found!\n");
+        return false;
+    }
+
+    if (strstr(script_sig, (char*)vch_roothash) == NULL) {
+        printf("match found!\n");
+        return false;
+    }
     // struct base_blob* blob = init_blob();
     // printf("blob: %s\n", to_string((uint8_t*)blob));
     // Check that we are in the parent block merkle tree
@@ -88,9 +141,16 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
     // cstring* pc =
     //     std::search(script.begin(), script.end(), vchRootHash.begin(), vchRootHash.end());
 
-    // if (pc == script.end())
-    //     return error("Aux POW missing chain merkle root in parent coinbase");
+    if ((char*)BEGIN(vch_roothash) == END(script_sig)) {
+        printf("Aux POW missing chain merkle root in parent coinbase");
+        return false;
+    }
 
+    char* pch_mmh = utils_uint8_to_hex(pchMergedMiningHeader, 4);
+    printf("pch_mmh: %s\n", pch_mmh);
+    if (BEGIN(pch_mmh) != END(script_sig)) {
+        return false;
+    }
     // if (pcHead != script.end())
     // {
     //     // Enforce only one chain merkle root by checking that a single instance of the merged
@@ -216,7 +276,9 @@ void print_transaction(dogecoin_tx* x) {
         printf("block->parent_coinbase->vin->prevout.n:         %d\n", tx_in->prevout.n);
         char* hex_utxo_txid = utils_uint8_to_hex(tx_in->prevout.hash, sizeof tx_in->prevout.hash);
         printf("block->parent_coinbase->tx_in->prevout.hash:    %s\n", hex_utxo_txid);
-        printf("block->parent_coinbase->tx_in->script_sig:      %s\n", utils_uint8_to_hex((const uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len));
+        char* script_sig = utils_uint8_to_hex((const uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len);
+        printf("block->parent_coinbase->tx_in->script_sig:      %s\n", script_sig);
+
         printf("block->parent_coinbase->tx_in->sequence:        %x\n", tx_in->sequence);
     }
 

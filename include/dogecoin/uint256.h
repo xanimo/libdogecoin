@@ -40,6 +40,7 @@ static const unsigned int WIDTH = BITS/8;
 
 typedef struct base_blob {
     uint8_t data[32];
+    void (*set_data)(struct base_blob* blob, uint8_t data[WIDTH]);
     dogecoin_bool (*is_null)(uint8_t data[WIDTH]);
     void (*set_null)(uint8_t data[WIDTH]);
     unsigned char* (*begin)(struct base_blob blob);
@@ -56,6 +57,14 @@ typedef struct base_blob {
     void (*serialize)(cstring* s, const void* p, size_t len);
     int (*unserialize)(void* po, struct const_buffer* buf, size_t len);
 } base_blob;
+
+static void set_data(struct base_blob* blob, uint8_t data[WIDTH]) {
+    unsigned int i = 0;
+    for (; i < WIDTH; i++) {
+        memcpy_safe(blob->data[i], data[i], sizeof(uint8_t));
+    }
+    return true;
+}
 
 static dogecoin_bool is_null(uint8_t data[WIDTH]) {
     unsigned int i = 0;
@@ -146,8 +155,25 @@ static char* to_str(const struct base_blob blob) {
     return get_hex(blob);
 }
 
-struct base_blob* init_blob() {
+static void set_compact_blob(struct base_blob* blob, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow) {
+    int size = compact >> 24;
+    uint32_t word = compact & 0x007fffff;
+    if (size <= 3) {
+        word >>= 8 * (3 - size);
+        memcpy_safe(blob->data, &word, sizeof word);
+    } else {
+        word <<= 8 * (size - 3);
+        memcpy_safe(blob->data, &word, sizeof word);
+    }
+    if (pf_negative) *pf_negative = word != 0 && (compact & 0x00800000) != 0;
+    if (pf_overflow) *pf_overflow = word != 0 && ((size > 34) ||
+                                                  (word > 0xff && size > 33) ||
+                                                  (word > 0xffff && size > 32));
+}
+
+static struct base_blob* init_blob() {
     struct base_blob* blob = (struct base_blob*)dogecoin_calloc(1, sizeof(*blob));
+    blob->set_data = set_data;
     blob->is_null = is_null;
     blob->set_null = set_null;
     blob->begin = begin;
