@@ -115,6 +115,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* pa
     dogecoin_block_header_serialize(s, block.parent_header);
     dogecoin_block_header_scrypt_hash(s, parent_hash);
     cstr_free(s, true);
+    // swap_bytes((uint8_t*)&parent_hash, DOGECOIN_HASH_LENGTH);
     if (!check_pow(&parent_hash, block.header->bits, params)) {
         return false;
     }
