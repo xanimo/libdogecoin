@@ -1167,6 +1167,7 @@ uint8_t* dogecoin_get_utxo_txid(char* address, unsigned int index) {
     return (uint8_t*)txid;
 }
 
+
 uint64_t dogecoin_get_balance(char* address) {
     if (!address) return false;
     dogecoin_wallet* wallet = dogecoin_wallet_read(address);

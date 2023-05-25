@@ -641,6 +641,14 @@ void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_
     sha256_finalize(&context, digest);
 }
 
+void sha256_reset(sha256_context* ctx) {
+    if (ctx == (sha256_context*)0)
+        return;
+    MEMCPY_BCOPY(ctx->state, sha256_initial_hash_value, SHA256_DIGEST_LENGTH);
+    MEMSET_BZERO(ctx->buffer, SHA256_BLOCK_LENGTH);
+    ctx->bitcount = 0;
+}
+
 /*** SHA-512: *********************************************************/
 void sha512_init(sha512_context* context)
 {
