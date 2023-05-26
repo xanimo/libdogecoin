@@ -68,6 +68,11 @@ typedef struct dogecoin_auxpow_block_ {
     dogecoin_block_header* parent_header;
 } dogecoin_auxpow_block;
 
+typedef struct dogecoin_block_ {
+    dogecoin_auxpow_block* block;
+    vector* vtx; // vector of transactions
+} dogecoin_block;
+
 LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 LIBDOGECOIN_API dogecoin_auxpow_block* dogecoin_auxpow_block_new();

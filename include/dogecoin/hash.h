@@ -102,6 +102,18 @@ static inline chash256* dogecoin_chash256_init() {
     return chash;
 }
 
+static inline uint256* Hash(const uint256 p1begin, const uint256 p1end,
+                    const uint256 p2begin, const uint256 p2end) {
+    static const unsigned char pblank[1];
+    uint256* result = dogecoin_uint256_vla(1);
+    chash256* chash = dogecoin_chash256_init();
+    chash->write(chash->sha, p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0]));
+    chash->write(chash->sha, p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0]));
+    chash->finalize(chash->sha, (unsigned char*)result);
+    chash->reset(chash->sha);
+    return result;
+}
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_HASH_H__

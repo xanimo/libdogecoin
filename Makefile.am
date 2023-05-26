@@ -35,6 +35,7 @@ noinst_HEADERS = \
     include/dogecoin/byteswap.h \
     include/dogecoin/chainparams.h \
     include/dogecoin/common.h \
+    include/dogecoin/consensus.h \
     include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \
@@ -81,6 +82,7 @@ libdogecoin_la_SOURCES = \
     src/block.c \
     src/buffer.c \
     src/chainparams.c \
+    src/consensus.c \
     src/cstr.c \
     src/ctaes.c \
     src/ecc.c \
