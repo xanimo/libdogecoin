@@ -83,4 +83,24 @@ void test_hash()
     u_assert_uint64_eq(hasher->finalize(hasher), 0x0e3ea96b5304a7d0ull);
     hasher->write(hasher, 0x2F2E2D2C2B2A2928ULL);
     u_assert_uint64_eq(hasher->finalize(hasher), 0xe612a3cb9ecba951ull);
+
+    // Check test vectors from spec, one byte at a time
+    struct siphasher* hasher2 = init_siphasher();
+    siphasher_set(hasher2, 0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL);
+    uint8_t x=0;
+    for (; x<ARRAYLEN(siphash_4_2_testvec); ++x)
+    {
+        u_assert_uint64_eq(hasher2->finalize(hasher2), siphash_4_2_testvec[x]);
+        hasher2->hash(hasher2, &x, 1);
+    }
+
+    // Check test vectors from spec, eight bytes at a time
+    struct siphasher* hasher3 = init_siphasher();
+    siphasher_set(hasher3, 0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL);
+    for (x = 0; x<ARRAYLEN(siphash_4_2_testvec); x += 8)
+    {
+        u_assert_uint64_eq(hasher3->finalize(hasher3), siphash_4_2_testvec[x]);
+        hasher3->write(hasher3, (uint64_t)(x)|((uint64_t)(x+1)<<8)|((uint64_t)(x+2)<<16)|((uint64_t)(x+3)<<24)|
+                     ((uint64_t)(x+4)<<32)|((uint64_t)(x+5)<<40)|((uint64_t)(x+6)<<48)|((uint64_t)(x+7)<<56));
+    }
 }
