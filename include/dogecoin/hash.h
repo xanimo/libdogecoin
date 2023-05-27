@@ -209,7 +209,7 @@ static uint64_t siphasher_finalize(struct siphasher* sh) {
 DISABLE_WARNING_PUSH
 DISABLE_WARNING(-Wunused-function)
 typedef union u256 {
-    uint256 data;
+    uint64_t data[8];
     uint64_t (*get_uint64)(union u256* u256, int pos);
 } u256;
 
@@ -266,10 +266,8 @@ static uint64_t siphash_u256(uint64_t k0, uint64_t k1, u256* val) {
 }
 DISABLE_WARNING_POP
 
-static inline siphasher* init_siphasher() {
-    siphasher* sh = dogecoin_calloc(1, sizeof(*sh));
-    uint64_t zero = 0;
-    siphasher_set(sh, zero, zero);
+static inline struct siphasher* init_siphasher() {
+    struct siphasher* sh = dogecoin_calloc(1, sizeof(*sh));
     sh->write = siphasher_write;
     sh->hash = siphasher_hash;
     sh->finalize = siphasher_finalize;
