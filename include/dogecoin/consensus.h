@@ -100,8 +100,7 @@ typedef struct validation_state {
     char* str_debug_message;
     void (*DoS)(struct validation_state* state, int level, bool ret,
             unsigned int ch_reject_code_in, const char* str_reject_reason_in,
-            bool corruption_in,
-            const char* str_debug_message_in);
+            bool corruption_in, const char* str_debug_message_in);
     dogecoin_bool (*invalid)(struct validation_state* state, bool ret,
                 unsigned int _ch_reject_code, const char* _str_reject_reason,
                 const char* _str_debug_message);
@@ -110,12 +109,11 @@ typedef struct validation_state {
 
 dogecoin_bool DoS(struct validation_state* state, int level, bool ret,
             unsigned int ch_reject_code_in, const char* str_reject_reason_in,
-            bool corruption_in,
-            const char* str_debug_message_in) {
+            bool corruption_in, const char* str_debug_message_in) {
     state->ch_reject_code = ch_reject_code_in;
-    state->str_reject_reason = str_reject_reason_in;
+    state->str_reject_reason = (char*)str_reject_reason_in;
     state->corruption_possible = corruption_in;
-    state->str_debug_message = str_debug_message_in;
+    state->str_debug_message = (char*)str_debug_message_in;
     if (state->mode == MODE_ERROR)
         return ret;
     state->n_dos += level;
@@ -129,7 +127,7 @@ dogecoin_bool invalid(struct validation_state* state, bool ret,
 }
 dogecoin_bool err(struct validation_state* state, const char* str_reject_reason_in) {
     if (state->mode == MODE_VALID)
-        state->str_reject_reason = str_reject_reason_in;
+        state->str_reject_reason = (char*)str_reject_reason_in;
     state->mode = MODE_ERROR;
     return false;
 }
