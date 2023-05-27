@@ -265,13 +265,13 @@ spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
 
-inst_PROGRAMS += dogecoin-txref
-dogecoin_txref_LDADD = libdogecoin.la
-dogecoin_txref_SOURCES = \
-    src/cli/dogecoin-txref.c
-dogecoin_txref_CFLAGS = $(libdogecoin_la_CFLAGS)
-dogecoin_txref_CPPFLAGS = -I$(top_srcdir)/src
-dogecoin_txref_LDFLAGS = -static
+inst_PROGRAMS += txref
+txref_LDADD = libdogecoin.la
+txref_SOURCES = \
+    src/cli/txref.c
+txref_CFLAGS = $(libdogecoin_la_CFLAGS)
+txref_CPPFLAGS = -I$(top_srcdir)/src
+txref_LDFLAGS = -static
 
 
 endif
