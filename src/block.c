@@ -93,13 +93,14 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
     for (; haystack_index < tx_in->script_sig->len; haystack_index++) {
 
         if (memcmp(&tx_in->script_sig->str[haystack_index], pchMergedMiningHeader, 4)==0) {
+            size_t j = tx_in->script_sig->len - haystack_index;
             ct++; // multiple merged mining headers found if more than 1
 
-            if (haystack_index > 40) {
+            if (haystack_index > 45) {
+                printf("total length: %zu index: %zu j: %zu char: %s\n", tx_in->script_sig->len, haystack_index, j, utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4));
                 printf("Merged mining header found too late in coinbase!\n");
                 return false;
             }
-            size_t j = tx_in->script_sig->len - haystack_index;
 
             char* merkle_root = to_string(&tx_in->script_sig->str[haystack_index + 4]);
             utils_reverse_hex(merkle_root, 32*2);
@@ -135,41 +136,11 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
             memcpy(&nNonce, &tx_in->script_sig->str[haystack_index + 4 + 32 + 4], 4);
             nNonce = le32toh(nNonce);
             uint32_t expected_index = getExpectedIndex(nNonce, chainid, merkleHeight);
-            uint32_t offset = 0;
 
-            switch (tx_in->script_sig->len)
-            {
-            case 49:
-                offset = j + 12;
-                break;
-            case 62:
-                offset = j + 4;
-                break;
-            case 63:
-                offset = j + 3;
-                break;
-            case 73:
-                offset = j - 4;
-                break;
-            case 74:
-                offset = j - 5;
-                break;
-            case 76:
-                offset = j - 10;
-                break;
-            case 85:
-                offset = j;
-                break;
-            case 88:
-                offset = j - 16;
-                break;
-            default:
-                break;
-            }
-
-            if (offset != expected_index) {
-                printf("total length: %zu index: %zu j: %zu char: %s\n", tx_in->script_sig->len, haystack_index, j, utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4));
-                return printf("Aux POW wrong index\n");
+            if (56 != expected_index) {
+                printf("total length: %zu index: %zu j: %zu char: %s expected index: %u\n", tx_in->script_sig->len, haystack_index, j, utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4), expected_index);
+                printf("Aux POW wrong index\n");
+                return false;
             }
         }
     }
