@@ -34,7 +34,6 @@
 #include <inttypes.h>
 
 #include <dogecoin/auxpow.h>
-#include <dogecoin/block.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/sha2.h>
@@ -135,7 +134,7 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
             uint32_t nNonce;
             memcpy(&nNonce, &tx_in->script_sig->str[haystack_index + 4 + 32 + 4], 4);
             nNonce = le32toh(nNonce);
-            uint32_t expected_index = getExpectedIndex(nNonce, chainid, merkleHeight);
+            uint32_t expected_index = get_expected_index(nNonce, chainid, merkleHeight);
 
             if (56 != expected_index) {
                 printf("total length: %zu index: %zu j: %zu char: %s expected index: %u\n", tx_in->script_sig->len, haystack_index, j, utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4), expected_index);
