@@ -52,6 +52,7 @@ typedef struct dogecoin_chainparams_ {
     dogecoin_bool strict_id;
     dogecoin_bool auxpow_id;
     uint256 pow_limit;
+    const char txref_code_magic;
 } dogecoin_chainparams;
 
 typedef struct dogecoin_checkpoint_ {
