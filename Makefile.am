@@ -26,6 +26,7 @@ noinst_HEADERS = \
     include/dogecoin/arith_uint256.h \
     include/dogecoin/auxpow.h \
     include/dogecoin/base58.h \
+    include/dogecoin/bech32.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
     include/dogecoin/bip44.h \
@@ -54,12 +55,13 @@ noinst_HEADERS = \
     include/dogecoin/rmd160.h \
     include/dogecoin/script.h \
     include/dogecoin/scrypt.h \
-    include/dogecoin/sign.h \
     include/dogecoin/serialize.h \
     include/dogecoin/sha2.h \
+    include/dogecoin/sign.h \
     include/dogecoin/tool.h \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \
+    include/dogecoin/txref_code.h \
     include/dogecoin/uint256.h \
     include/dogecoin/utils.h \
     include/dogecoin/validation.h \
@@ -75,6 +77,7 @@ libdogecoin_la_SOURCES = \
     src/arith_uint256.c \
     src/auxpow.c \
     src/base58.c \
+    src/bech32.c \
     src/bip32.c \
     src/bip39.c \
     src/bip44.c \
@@ -105,6 +108,7 @@ libdogecoin_la_SOURCES = \
     src/cli/tool.c \
     src/transaction.c \
     src/tx.c \
+    src/txref_code.c \
     src/utils.c \
     src/validation.c \
     src/vector.c
@@ -146,6 +150,7 @@ tests_SOURCES = \
     test/signmsg_tests.c \
     test/transaction_tests.c \
     test/tx_tests.c \
+    test/txref_tests.c \
     include/test/utest.h \
     test/unittester.c \
     test/utils_tests.c \
@@ -257,6 +262,16 @@ spvnode_SOURCES = \
 spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
+
+inst_PROGRAMS += dogecoin-txref
+dogecoin_txref_LDADD = libdogecoin.la
+dogecoin_txref_SOURCES = \
+    src/cli/dogecoin-txref.c
+dogecoin_txref_CFLAGS = $(libdogecoin_la_CFLAGS)
+dogecoin_txref_CPPFLAGS = -I$(top_srcdir)/src
+dogecoin_txref_LDFLAGS = -static
+
+
 endif
 endif
 
