@@ -78,7 +78,7 @@ libtool
 such
 sendtx
 spvnode
-dogecoin-txref
+txref
 config/libdogecoin-config.h
 config/libdogecoin-config.h.in
 config/libdogecoin-config.h.in~
