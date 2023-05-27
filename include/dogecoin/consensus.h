@@ -56,7 +56,7 @@ enum {
     LOCKTIME_MEDIAN_TIME_PAST = (1 << 1),
 };
 
-/** Merkle functions */
+/** Merkle */
 uint256* compute_merkle_root(const vector* leaves, dogecoin_bool* mutated);
 vector* compute_merkle_branch(const vector* leaves, uint32_t position);
 uint256* compute_merkle_root_from_branch(const uint256* leaf, const vector* branch, uint32_t position);
@@ -73,6 +73,100 @@ uint256* block_merkle_root(const dogecoin_block* block, dogecoin_bool* mutated);
  * This can be verified using compute_merkle_root_from_branch.
  */
 vector* block_merkle_branch(const dogecoin_block* block, uint32_t position);
+
+/** Validation */
+/** "reject" message codes */
+static const unsigned char REJECT_MALFORMED = 0x01;
+static const unsigned char REJECT_INVALID = 0x10;
+static const unsigned char REJECT_OBSOLETE = 0x11;
+static const unsigned char REJECT_DUPLICATE = 0x12;
+static const unsigned char REJECT_NONSTANDARD = 0x40;
+static const unsigned char REJECT_DUST = 0x41;
+static const unsigned char REJECT_INSUFFICIENTFEE = 0x42;
+static const unsigned char REJECT_CHECKPOINT = 0x43;
+
+static enum {
+    MODE_VALID,   //!< everything ok
+    MODE_INVALID, //!< network rule violation (DoS value may be set)
+    MODE_ERROR,   //!< run-time error
+} mode;
+
+typedef struct validation_state {
+    int mode;
+    int n_dos;
+    char* str_reject_reason;
+    unsigned int ch_reject_code;
+    dogecoin_bool corruption_possible;
+    char* str_debug_message;
+    void (*DoS)(struct validation_state* state, int level, bool ret,
+            unsigned int ch_reject_code_in, const char* str_reject_reason_in,
+            bool corruption_in,
+            const char* str_debug_message_in);
+    dogecoin_bool (*invalid)(struct validation_state* state, bool ret,
+                unsigned int _ch_reject_code, const char* _str_reject_reason,
+                const char* _str_debug_message);
+    dogecoin_bool (*err)(struct validation_state* state, const char* str_reject_reason_in);
+} validation_state;
+
+dogecoin_bool DoS(struct validation_state* state, int level, bool ret,
+            unsigned int ch_reject_code_in, const char* str_reject_reason_in,
+            bool corruption_in,
+            const char* str_debug_message_in) {
+    state->ch_reject_code = ch_reject_code_in;
+    state->str_reject_reason = str_reject_reason_in;
+    state->corruption_possible = corruption_in;
+    state->str_debug_message = str_debug_message_in;
+    if (state->mode == MODE_ERROR)
+        return ret;
+    state->n_dos += level;
+    state->mode = MODE_INVALID;
+    return ret;
+}
+dogecoin_bool invalid(struct validation_state* state, bool ret,
+                unsigned int _ch_reject_code, const char* _str_reject_reason,
+                const char* _str_debug_message) {
+    return DoS(state, 0, ret, _ch_reject_code, _str_reject_reason, false, _str_debug_message);
+}
+dogecoin_bool err(struct validation_state* state, const char* str_reject_reason_in) {
+    if (state->mode == MODE_VALID)
+        state->str_reject_reason = str_reject_reason_in;
+    state->mode = MODE_ERROR;
+    return false;
+}
+const dogecoin_bool is_valid(struct validation_state* state) {
+    return state->mode == MODE_VALID;
+}
+const dogecoin_bool return_invalid(struct validation_state* state) {
+    return state->mode == MODE_INVALID;
+}
+const dogecoin_bool is_err(struct validation_state* state) {
+    return state->mode == MODE_ERROR;
+}
+const dogecoin_bool is_invalid(struct validation_state* state, int *n_dos_out) {
+    if (return_invalid(state)) {
+        n_dos_out = state->n_dos;
+        return true;
+    }
+    return false;
+}
+const dogecoin_bool corruption_possible(struct validation_state* state) {
+    return state->corruption_possible;
+}
+void set_corruption_possible(struct validation_state* state) {
+    state->corruption_possible = true;
+}
+const unsigned int get_reject_code(struct validation_state* state) { return state->ch_reject_code; }
+const char* get_reject_reason(struct validation_state* state) { return state->str_reject_reason; }
+const char* get_debug_message(struct validation_state* state) { return state->str_debug_message; }
+
+validation_state* init_validation_state() {
+    validation_state* state = dogecoin_calloc(1, sizeof(*state));
+    state->mode = MODE_VALID;
+    state->n_dos = 0;
+    state->ch_reject_code = 0;
+    state->corruption_possible = false;
+    return state;
+}
 
 LIBDOGECOIN_END_DECL
 
