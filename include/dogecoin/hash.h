@@ -114,6 +114,168 @@ static inline uint256* Hash(const uint256 p1begin, const uint256 p1end,
     return result;
 }
 
+/** SipHash 2-4 */
+typedef struct siphasher {
+    uint64_t v[4];
+    uint64_t tmp;
+    int count;
+    void (*write)(struct siphasher* sh, uint64_t data);
+    void (*hash)(struct siphasher* sh, const unsigned char* data, size_t size);
+    uint64_t (*finalize)(struct siphasher* sh);
+} siphasher;
+
+#define ROTL64(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
+
+#define SIPROUND do { \
+    v0 += v1; v1 = ROTL64(v1, 13); v1 ^= v0; \
+    v0 = ROTL64(v0, 32); \
+    v2 += v3; v3 = ROTL64(v3, 16); v3 ^= v2; \
+    v0 += v3; v3 = ROTL64(v3, 21); v3 ^= v0; \
+    v2 += v1; v1 = ROTL64(v1, 17); v1 ^= v2; \
+    v2 = ROTL64(v2, 32); \
+} while (0)
+
+static void siphasher_set(struct siphasher* sh, uint64_t k0, uint64_t k1)
+{
+    sh->v[0] = 0x736f6d6570736575ULL ^ k0;
+    sh->v[1] = 0x646f72616e646f6dULL ^ k1;
+    sh->v[2] = 0x6c7967656e657261ULL ^ k0;
+    sh->v[3] = 0x7465646279746573ULL ^ k1;
+    sh->count = 0;
+    sh->tmp = 0;
+}
+
+static void siphasher_write(struct siphasher* sh, uint64_t data)
+{
+    uint64_t v0 = sh->v[0], v1 = sh->v[1], v2 = sh->v[2], v3 = sh->v[3];
+
+    assert(sh->count % 8 == 0);
+
+    v3 ^= data;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= data;
+
+    sh->v[0] = v0;
+    sh->v[1] = v1;
+    sh->v[2] = v2;
+    sh->v[3] = v3;
+
+    sh->count += 8;
+}
+
+static void siphasher_hash(struct siphasher* sh, const unsigned char* data, size_t size) {
+    uint64_t v0 = sh->v[0], v1 = sh->v[1], v2 = sh->v[2], v3 = sh->v[3];
+    uint64_t t = sh->tmp;
+    int c = sh->count;
+
+    while (size--) {
+        t |= ((uint64_t)(*(data++))) << (8 * (c % 8));
+        c++;
+        if ((c & 7) == 0) {
+            v3 ^= t;
+            SIPROUND;
+            SIPROUND;
+            v0 ^= t;
+            t = 0;
+        }
+    }
+
+    sh->v[0] = v0;
+    sh->v[1] = v1;
+    sh->v[2] = v2;
+    sh->v[3] = v3;
+    sh->count = c;
+    sh->tmp = t;
+}
+
+static uint64_t siphasher_finalize(struct siphasher* sh) {
+    uint64_t v0 = sh->v[0], v1 = sh->v[1], v2 = sh->v[2], v3 = sh->v[3];
+
+    uint64_t t = sh->tmp | (((uint64_t)sh->count) << 56);
+
+    v3 ^= t;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= t;
+    v2 ^= 0xFF;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    return v0 ^ v1 ^ v2 ^ v3;
+}
+
+DISABLE_WARNING_PUSH
+DISABLE_WARNING(-Wunused-function)
+typedef union u256 {
+    uint256 data;
+    uint64_t (*get_uint64)(union u256* u256, int pos);
+} u256;
+
+static uint64_t get_uint64(union u256* u256, int pos) {
+    const uint8_t* ptr = u256->data + pos * 8;
+    return ((uint64_t)ptr[0]) | \
+            ((uint64_t)ptr[1]) << 8 | \
+            ((uint64_t)ptr[2]) << 16 | \
+            ((uint64_t)ptr[3]) << 24 | \
+            ((uint64_t)ptr[4]) << 32 | \
+            ((uint64_t)ptr[5]) << 40 | \
+            ((uint64_t)ptr[6]) << 48 | \
+            ((uint64_t)ptr[7]) << 56;
+}
+
+static uint64_t siphash_u256(uint64_t k0, uint64_t k1, u256* val) {
+    val->get_uint64 = get_uint64;
+    /* Specialized implementation for efficiency */
+    uint64_t d = val->get_uint64(val, 0);
+
+    uint64_t v0 = 0x736f6d6570736575ULL ^ k0;
+    uint64_t v1 = 0x646f72616e646f6dULL ^ k1;
+    uint64_t v2 = 0x6c7967656e657261ULL ^ k0;
+    uint64_t v3 = 0x7465646279746573ULL ^ k1 ^ d;
+
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val->get_uint64(val, 1);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val->get_uint64(val, 2);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    d = val->get_uint64(val, 3);
+    v3 ^= d;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= d;
+    v3 ^= ((uint64_t)4) << 59;
+    SIPROUND;
+    SIPROUND;
+    v0 ^= ((uint64_t)4) << 59;
+    v2 ^= 0xFF;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    SIPROUND;
+    return v0 ^ v1 ^ v2 ^ v3;
+}
+DISABLE_WARNING_POP
+
+static inline siphasher* init_siphasher() {
+    siphasher* sh = dogecoin_calloc(1, sizeof(*sh));
+    uint64_t zero = 0;
+    siphasher_set(sh, zero, zero);
+    sh->write = siphasher_write;
+    sh->hash = siphasher_hash;
+    sh->finalize = siphasher_finalize;
+    return sh;
+}
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_HASH_H__
