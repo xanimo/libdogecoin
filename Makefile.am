@@ -67,6 +67,7 @@ noinst_HEADERS = \
     include/dogecoin/utils.h \
     include/dogecoin/validation.h \
     include/dogecoin/vector.h \
+    include/dogecoin/version.h \
     include/dogecoin/wow.h
 
 pkgconfigdir = $(libdir)/pkgconfig
