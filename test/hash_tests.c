@@ -84,6 +84,10 @@ void test_hash()
     hasher->write(hasher, 0x2F2E2D2C2B2A2928ULL);
     u_assert_uint64_eq(hasher->finalize(hasher), 0xe612a3cb9ecba951ull);
 
+    uint256* hash_in = dogecoin_uint256_vla(1);
+    utils_uint256_sethex("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100", hash_in);
+    u_assert_uint64_eq(siphash_u256(0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL, hash_in), 0x7127512f72f27cceull);
+
     // Check test vectors from spec, one byte at a time
     struct siphasher* hasher2 = init_siphasher();
     siphasher_set(hasher2, 0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL);
