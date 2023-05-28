@@ -82,6 +82,9 @@ LIBDOGECOIN_API static inline void dogecoin_get_auxpow_hash(const uint32_t versi
     scrypt_1024_1_1_256(BEGIN(version), BEGIN(hashout));
 }
 
+DISABLE_WARNING_PUSH
+DISABLE_WARNING(-Wunused-function)
+DISABLE_WARNING(-Wunused-variable)
 typedef uint256 chain_code;
 
 typedef struct _chash256 {
@@ -113,6 +116,62 @@ static inline uint256* Hash(const uint256 p1begin, const uint256 p1end,
     chash->reset(chash->sha);
     return result;
 }
+
+
+/** Hashwriter Psuedoclass */
+static enum ser_type {
+    // primary actions
+    SER_NETWORK         = (1 << 0),
+    SER_DISK            = (1 << 1),
+    SER_GETHASH         = (1 << 2),
+} ser_type;
+
+typedef struct hashwriter {
+    chash256* ctx;
+    int n_type;
+    int n_version;
+    cstring* cstr;
+    uint256* hash;
+    int (*get_type)(struct hashwriter* hw);
+    int (*get_version)(struct hashwriter* hw);
+    void (*write_hash)(struct hashwriter* hw, const char* pch, size_t size);
+    uint256* (*get_hash)(struct hashwriter* hw);
+    void (*ser)(cstring* cstr, const void* obj);
+} hashwriter;
+
+static int get_type(struct hashwriter* hw) {
+    return hw->n_type;
+}
+
+static int get_version(struct hashwriter* hw) {
+    return hw->n_version;
+}
+
+static void write_hash(struct hashwriter* hw, const char* pch, size_t size) {
+    hw->ctx->write(hw->ctx->sha, (const unsigned char*)pch, size);
+}
+
+static uint256* get_hash(struct hashwriter* hw) {
+    dogecoin_dblhash((const unsigned char*)hw->cstr->str, hw->cstr->len, *hw->hash);
+    cstr_free(hw->cstr, true);
+    return hw->hash;
+}
+
+static hashwriter* init_hashwriter(int n_type, int n_version) {
+    hashwriter* hw = dogecoin_calloc(1, sizeof(*hw));
+    chash256* chash = dogecoin_chash256_init();
+    hw->ctx = chash;
+    hw->n_type = n_type;
+    hw->n_version = n_version;
+    hw->cstr = cstr_new_sz(1024);
+    hw->hash = dogecoin_uint256_vla(1);
+    hw->get_type = get_type;
+    hw->get_version = get_version;
+    hw->write_hash = write_hash;
+    hw->get_hash = get_hash;
+    return hw;
+}
+
 
 /** SipHash 2-4 */
 typedef struct siphasher {
@@ -206,8 +265,6 @@ static uint64_t siphasher_finalize(struct siphasher* sh) {
     return v0 ^ v1 ^ v2 ^ v3;
 }
 
-DISABLE_WARNING_PUSH
-DISABLE_WARNING(-Wunused-function)
 typedef union u256 {
     uint256 data;
 } u256;
