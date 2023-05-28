@@ -541,7 +541,7 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
 
 void sha256_write(sha256_context* context, const sha2_byte* data, size_t len)
 {
-    unsigned int freespace, usedspace;
+    unsigned int freespace = 0, usedspace = 0;
     if (len == 0)
         return; /* Calling with no data is valid - we do nothing */
     usedspace = (context->bitcount >> 3) % SHA256_BLOCK_LENGTH;
@@ -574,11 +574,14 @@ void sha256_write(sha256_context* context, const sha2_byte* data, size_t len)
         MEMCPY_BCOPY(context->buffer, data, len);
         context->bitcount += len << 3;
     }
+
+	/* Clean up: */
+	usedspace = freespace = 0;
 }
 
 void sha256_finalize(sha256_context* context, sha2_byte digest[SHA256_DIGEST_LENGTH]) {
     sha2_word32* d = (sha2_word32*)digest;
-    unsigned int usedspace;
+    unsigned int usedspace = 0;
     sha2_word64* t;
     /* If no digest buffer is passed, we don't bother doing this: */
     if (digest != (sha2_byte*)0) {
@@ -959,13 +962,13 @@ void hmac_sha256_prepare(const uint8_t *key, const uint32_t keylen,
 #endif
     key_pad[i] = data ^ 0x5c5c5c5c;
   }
-  sha256_transform(key_pad, opad_digest);
+  sha256_transform((sha256_context*)key_pad, opad_digest);
 
   /* convert o_key_pad to i_key_pad and compute its digest */
   for (i = 0; i < SHA256_BLOCK_LENGTH / (int)sizeof(uint32_t); i++) {
     key_pad[i] = key_pad[i] ^ 0x5c5c5c5c ^ 0x36363636;
   }
-  sha256_transform(key_pad, ipad_digest);
+  sha256_transform((sha256_context*)key_pad, ipad_digest);
   dogecoin_mem_zero(key_pad, sizeof(key_pad));
 }
 
