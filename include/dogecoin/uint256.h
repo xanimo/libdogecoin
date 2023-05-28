@@ -46,7 +46,7 @@ typedef struct base_blob {
     unsigned char* (*begin)(struct base_blob blob);
     unsigned char* (*end)(struct base_blob blob);
     unsigned int (*size)(struct base_blob blob);
-    uint64_t (*get_uint64)(struct base_blob blob, int pos);
+    uint64_t (*blob_uint64)(struct base_blob blob, int pos);
     int (*compare)(const struct base_blob* blob, const struct base_blob* other);
     dogecoin_bool (*eq)(const struct base_blob* a, const struct base_blob* b);
     dogecoin_bool (*neq)(const struct base_blob* a, const struct base_blob* b);
@@ -88,7 +88,7 @@ static unsigned int size(struct base_blob blob) {
     return sizeof(blob.data);
 }
 
-static uint64_t get_uint64(struct base_blob blob, int pos) {
+static uint64_t blob_uint64(struct base_blob blob, int pos) {
     const uint8_t* ptr = blob.data + pos * 8;
     return ((uint64_t)ptr[0]) | \
             ((uint64_t)ptr[1]) << 8 | \
@@ -125,7 +125,7 @@ static char* get_hex(struct base_blob blob) {
 }
 
 static void set_hex(const struct base_blob blob, const char* psz) {
-    memset_safe(blob.data, 0, sizeof(blob.data), 0);
+    memset_safe(&blob.data[0], 0, sizeof(blob.data), 0);
 
     // skip leading spaces
     while (isspace(*psz))
@@ -179,7 +179,7 @@ static struct base_blob* init_blob() {
     blob->begin = begin;
     blob->end = end;
     blob->size = size;
-    blob->get_uint64 = get_uint64;
+    blob->blob_uint64 = blob_uint64;
     blob->compare = compare;
     blob->eq = eq;
     blob->neq = neq;

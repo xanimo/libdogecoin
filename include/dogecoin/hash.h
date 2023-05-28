@@ -209,12 +209,11 @@ static uint64_t siphasher_finalize(struct siphasher* sh) {
 DISABLE_WARNING_PUSH
 DISABLE_WARNING(-Wunused-function)
 typedef union u256 {
-    uint64_t data[8];
-    uint64_t (*get_uint64)(union u256* u256, int pos);
+    uint256 data;
 } u256;
 
-static uint64_t get_uint64(union u256* u256, int pos) {
-    const uint8_t* ptr = u256->data + pos * 8;
+static uint64_t get_uint64(uint256* data, int pos) {
+    const uint8_t* ptr = (const uint8_t*)data + pos * 8;
     return ((uint64_t)ptr[0]) | \
             ((uint64_t)ptr[1]) << 8 | \
             ((uint64_t)ptr[2]) << 16 | \
@@ -225,11 +224,16 @@ static uint64_t get_uint64(union u256* u256, int pos) {
             ((uint64_t)ptr[7]) << 56;
 }
 
-static uint64_t siphash_u256(uint64_t k0, uint64_t k1, u256* val) {
-    val->get_uint64 = get_uint64;
-    /* Specialized implementation for efficiency */
-    uint64_t d = val->get_uint64(val, 0);
+static inline union u256 init_u256(uint256* val) {
+    union u256* u256 = dogecoin_calloc(1, sizeof(*u256));
+    memcpy_safe(u256->data, dogecoin_uint256_vla(1), 32);
+    if (val != NULL) memcpy(u256->data, val, 32);
+    return *u256;
+}
 
+static uint64_t siphash_u256(uint64_t k0, uint64_t k1, uint256* val) {
+    /* Specialized implementation for efficiency */
+    uint64_t d = get_uint64(val, 0);
     uint64_t v0 = 0x736f6d6570736575ULL ^ k0;
     uint64_t v1 = 0x646f72616e646f6dULL ^ k1;
     uint64_t v2 = 0x6c7967656e657261ULL ^ k0;
@@ -238,17 +242,17 @@ static uint64_t siphash_u256(uint64_t k0, uint64_t k1, u256* val) {
     SIPROUND;
     SIPROUND;
     v0 ^= d;
-    d = val->get_uint64(val, 1);
+    d = get_uint64(val, 1);
     v3 ^= d;
     SIPROUND;
     SIPROUND;
     v0 ^= d;
-    d = val->get_uint64(val, 2);
+    d = get_uint64(val, 2);
     v3 ^= d;
     SIPROUND;
     SIPROUND;
     v0 ^= d;
-    d = val->get_uint64(val, 3);
+    d = get_uint64(val, 3);
     v3 ^= d;
     SIPROUND;
     SIPROUND;
