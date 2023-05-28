@@ -14,8 +14,8 @@
 #include <test/utest.h>
 
 #include <dogecoin/hash.h>
-#include <dogecoin/sha2.h>
-#include <dogecoin/utils.h>
+#include <dogecoin/tx.h>
+#include <dogecoin/version.h>
 
 /*
    SipHash-2-4 output with
@@ -85,7 +85,7 @@ void test_hash()
     u_assert_uint64_eq(hasher->finalize(hasher), 0xe612a3cb9ecba951ull);
 
     uint256* hash_in = dogecoin_uint256_vla(1);
-    utils_uint256_sethex("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100", hash_in);
+    utils_uint256_sethex("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100", (uint8_t*)hash_in);
     u_assert_uint64_eq(siphash_u256(0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL, hash_in), 0x7127512f72f27cceull);
 
     // Check test vectors from spec, one byte at a time
@@ -107,4 +107,17 @@ void test_hash()
         hasher3->write(hasher3, (uint64_t)(x)|((uint64_t)(x+1)<<8)|((uint64_t)(x+2)<<16)|((uint64_t)(x+3)<<24)|
                      ((uint64_t)(x+4)<<32)|((uint64_t)(x+5)<<40)|((uint64_t)(x+6)<<48)|((uint64_t)(x+7)<<56));
     }
+
+    hashwriter* hw = init_hashwriter(SER_DISK, CLIENT_VERSION);
+    dogecoin_tx* tx = dogecoin_tx_new();
+    // Note these tests were originally written with tx.nVersion=1
+    // and the test would be affected by default tx version bumps if not fixed.
+    tx->version = 1;
+    dogecoin_tx_serialize(hw->cstr, tx);
+    u_assert_uint64_eq(siphash_u256(1, 2, (uint256*)hw->get_hash(hw)), 0x79751e980c2a0a35ULL);
+
+    dogecoin_free(hasher);
+    dogecoin_free(hasher2);
+    dogecoin_free(hasher3);
+    dogecoin_free(hw);
 }
