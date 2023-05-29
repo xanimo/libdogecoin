@@ -61,9 +61,8 @@ typedef struct base_blob {
 static void set_data(struct base_blob* blob, uint8_t data[WIDTH]) {
     unsigned int i = 0;
     for (; i < WIDTH; i++) {
-        memcpy_safe(blob->data[i], data[i], sizeof(uint8_t));
+        memcpy_safe(&blob->data[i], &data[i], sizeof(uint8_t));
     }
-    return true;
 }
 
 static dogecoin_bool is_null(uint8_t data[WIDTH]) {
@@ -125,7 +124,7 @@ static char* get_hex(struct base_blob blob) {
 }
 
 static void set_hex(const struct base_blob blob, const char* psz) {
-    memset_safe(&blob.data[0], 0, sizeof(blob.data), 0);
+    memset_safe((volatile void*)&blob.data[0], 0, sizeof(blob.data), 0);
 
     // skip leading spaces
     while (isspace(*psz))
