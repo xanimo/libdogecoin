@@ -69,6 +69,16 @@ typedef struct dogecoin_tx_ {
     uint32_t locktime;
 } dogecoin_tx;
 
+typedef struct dogecoin_tx_ref_ {
+    char *output;
+    const char *hrp;
+    const char magic;
+    int block_height;
+    int tx_pos;
+    int non_standard;
+    dogecoin_tx* tx;
+} dogecoin_tx_ref;
+
 //!p2pkh utilities
 LIBDOGECOIN_API int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p2pkh, int is_mainnet);
 LIBDOGECOIN_API dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, size_t script_pubkey_hex_length, char* p2pkh, const dogecoin_chainparams* chain);
