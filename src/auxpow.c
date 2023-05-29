@@ -3,7 +3,9 @@
 #include <dogecoin/hash.h>
 #include <dogecoin/auxpow.h>
 
-// const uint256* ABANDON_HASH(...uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
+static const uint256* ABANDON_HASH() {
+    return uint256S("0000000000000000000000000000000000000000000000000000000000000001");
+};
 
 // void SetMerkleBranch(dogecoin_blockindex* pindex, int posInBlock) {
 //     // Update the tx's hashBlock
