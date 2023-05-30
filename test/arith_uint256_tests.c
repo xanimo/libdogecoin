@@ -68,22 +68,23 @@ void test_arith_uint256() {
     // u_assert_str_not_eq(OneL->to_string((void*)OneL), to_string((uint8_t*)ZeroArray));
 
 //     // == and !=
-//     assert(R1L != R2L);
-//     assert(ZeroL != OneL);
-//     assert(OneL != ZeroL);
-//     assert(MaxL != ZeroL);
+    assert(R1L != R2L);
+    assert(ZeroL != OneL);
+    assert(OneL != ZeroL);
+    assert(MaxL != ZeroL);
 //     assert(~MaxL == ZeroL);
 //     assert( ((R1L ^ R2L) ^ R1L) == R2L);
 
-//     uint64_t Tmp64 = 0xc4dab720d9c7acaaULL;
-//     for (unsigned int i = 0; i < 256; ++i)
-//     {
-//         assert(ZeroL != (OneL << i));
-//         assert((OneL << i) != ZeroL);
-//         assert(R1L != (R1L ^ (OneL << i)));
-//         assert(((arith_uint256(Tmp64) ^ (OneL << i) ) != Tmp64 ));
-//     }
-//     assert(ZeroL == (OneL << 256));
+    // uint64_t Tmp64 = 0xc4dab720d9c7acaaULL;
+    // unsigned int i = 0;
+    // for (; i < 256; ++i)
+    // {
+    //     assert(ZeroL != (base_uint_shift_left(OneL, i)));
+    //     assert((base_uint_shift_left(OneL, i)) != ZeroL);
+    //     // assert(R1L != (R1L ^ (base_uint_shift_left(OneL, i))));
+    //     // assert(((arith_uint256(Tmp64) ^ (OneL << i) ) != Tmp64 ));
+    // }
+    // assert(ZeroL == (base_uint_shift_left(OneL, 256)));
 
 //     // String Constructor and Copy Constructor
 //     assert(arith_uint256("0x"+R1L.ToString()) == R1L);

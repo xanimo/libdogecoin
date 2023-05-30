@@ -36,6 +36,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+DISABLE_WARNING_PUSH
+DISABLE_WARNING(-Wunused-function)
 typedef struct base_blob {
     uint8_t data[32];
     void (*set_data)(struct base_blob* blob, uint8_t data[32]);
@@ -224,6 +226,7 @@ vector* uint256_v(const uint256* blob) {
 uint64_t get_cheap_hash(const base_blob* blob) {
     return read_le64(blob->data);
 }
+DISABLE_WARNING_POP
 
 LIBDOGECOIN_END_DECL
 
