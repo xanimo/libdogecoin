@@ -42,13 +42,14 @@ typedef struct uint_err {
     const char* str;
 } uint_err;
 
-static const unsigned int BITS = {0x0000100};
-static const unsigned int WIDTH = BITS/32;
-
 typedef struct base_uint_ {
     uint_err err;
-    int WIDTH; // BITS / 32
-    uint32_t pn[8]; // pn[WIDTH]
+    int WIDTH; // BITS / 8
+    uint8_t pn[32]; // pn[WIDTH]
+    uint16_t u16[16];
+    uint32_t u32[8];
+    uint64_t u64[4];
+    char* (*to_string)(void*);
 } base_uint;
 
 static base_uint* set_uint_err(char* str) {
@@ -57,11 +58,6 @@ static base_uint* set_uint_err(char* str) {
     base_uint* b;
     b->err = err;
     return b;
-}
-
-static base_uint* init_base_uint() {
-    base_uint* x = dogecoin_calloc(1, sizeof(*x));
-    return x;
 }
 
 static void _base_uint(base_uint* b) {
@@ -102,12 +98,18 @@ void base_uint_set_hex(base_uint* a, const char* psz);
 char* base_uint_to_string(base_uint* a);
 unsigned int base_uint_bits(base_uint* a);
 
+static base_uint* init_base_uint() {
+    base_uint* x = dogecoin_calloc(1, sizeof(*x));
+    x->to_string = base_uint_to_string;
+    return x;
+}
+
 typedef base_uint arith_uint256;
 
 arith_uint256* init_arith_uint256();
 uint64_t get_low64(arith_uint256* a);
 arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
-uint32_t get_compact(arith_uint256 a, dogecoin_bool f_negative);
+uint32_t get_compact(arith_uint256* a, dogecoin_bool f_negative);
 
 uint256* arith_to_uint256(const arith_uint256* a);
 arith_uint256* uint_to_arith(const uint256* a);

@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
+#include <dogecoin/common.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/serialize.h>
@@ -35,14 +36,11 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-static const unsigned int BITS = {0x0000100};
-static const unsigned int WIDTH = BITS/8;
-
 typedef struct base_blob {
     uint8_t data[32];
-    void (*set_data)(struct base_blob* blob, uint8_t data[WIDTH]);
-    dogecoin_bool (*is_null)(uint8_t data[WIDTH]);
-    void (*set_null)(uint8_t data[WIDTH]);
+    void (*set_data)(struct base_blob* blob, uint8_t data[32]);
+    dogecoin_bool (*is_null)(uint8_t data[32]);
+    void (*set_null)(uint8_t data[32]);
     unsigned char* (*begin)(struct base_blob blob);
     unsigned char* (*end)(struct base_blob blob);
     unsigned int (*size)(struct base_blob blob);
@@ -58,20 +56,20 @@ typedef struct base_blob {
     int (*unserialize)(void* po, struct const_buffer* buf, size_t len);
 } base_blob;
 
-static void set_data(struct base_blob* blob, uint8_t data[WIDTH]) {
+static void set_data(struct base_blob* blob, uint8_t data[32]) {
     unsigned int i = 0;
-    for (; i < WIDTH; i++) {
+    for (; i < 32; i++) {
         memcpy_safe(&blob->data[i], &data[i], sizeof(uint8_t));
     }
 }
 
-static dogecoin_bool is_null(uint8_t data[WIDTH]) {
+static dogecoin_bool is_null(uint8_t data[32]) {
     unsigned int i = 0;
-    for (; i < WIDTH; i++) if (data[i] != 0) return false;
+    for (; i < 32; i++) if (data[i] != 0) return false;
     return true;
 }
 
-static void set_null(uint8_t data[WIDTH]) {
+static void set_null(uint8_t data[32]) {
     memset_safe(data, 0, sizeof(*data), 0);
 }
 
@@ -80,7 +78,7 @@ static unsigned char* begin(struct base_blob blob) {
 }
 
 static unsigned char* end(struct base_blob blob) {
-    return (unsigned char*)blob.data[WIDTH];
+    return (unsigned char*)blob.data[32];
 }
 
 static unsigned int size(struct base_blob blob) {
@@ -140,7 +138,7 @@ static void set_hex(const struct base_blob blob, const char* psz) {
         psz++;
     psz--;
     unsigned char* p1 = (unsigned char*)blob.data;
-    unsigned char* pend = p1 + WIDTH;
+    unsigned char* pend = p1 + 32;
     while (psz >= pbegin && p1 < pend) {
         *p1 = utils_hex_digit(*psz--);
         if (psz >= pbegin) {
@@ -190,6 +188,41 @@ static struct base_blob* init_blob() {
     blob->unserialize = deser_bytes;
     blob->set_null(blob->data);
     return blob;
+}
+
+vector* uchar_arr_to_vec(const unsigned char* array) {
+    vector* vout = vector_new(32, dogecoin_free);
+    unsigned int i = 0;
+    for (; i < strlen((char*)array); i++) {
+        vector_add(vout, array[i]);
+    }
+    return vout;
+}
+
+unsigned char* vec_to_uchar_arr(const vector* vector) {
+    unsigned char* arr_out = dogecoin_uchar_vla(vector->len);
+    unsigned int i = 0;
+    for (; i < vector->len; i++) {
+        arr_out[i] = vector_idx(vector, i);
+    }
+    return arr_out;
+}
+
+uint256* uint256_u(const vector* blob) {
+    return (uint256*)vec_to_uchar_arr(blob);
+}
+
+vector* uint256_v(const uint256* blob) {
+    vector* x = vector_new(sizeof(uint256), dogecoin_free);
+    unsigned int i = 0;
+    for (; i < x->len; i++) {
+        x->data[i] = (void*)blob[i];
+    }
+    return x;
+}
+
+uint64_t get_cheap_hash(const base_blob* blob) {
+    return read_le64(blob->data);
 }
 
 LIBDOGECOIN_END_DECL

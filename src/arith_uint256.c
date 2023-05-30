@@ -22,6 +22,7 @@
  */
 
 #include <ctype.h>
+#include <inttypes.h>
 
 #include <dogecoin/arith_uint256.h>
 
@@ -153,6 +154,7 @@ char* base_uint_get_hex(base_uint* a) {
     unsigned int i = 0;
     for (; i < sizeof(a->pn); i++)
         sprintf(psz + i * 2, "%02x", a->pn[sizeof(a->pn) - i - 1]);
+    printf("psz: %s\n", psz);
     return psz;
 }
 
@@ -184,7 +186,7 @@ void base_uint_set_hex(base_uint* a, const char* psz) {
 }
 
 char* base_uint_to_string(base_uint* a) {
-    return base_uint_get_hex(a);
+    return base_uint_get_hex((base_uint*)a);
 }
 
 unsigned int base_uint_bits(base_uint* a) {
@@ -204,8 +206,13 @@ unsigned int base_uint_bits(base_uint* a) {
 
 /* arith_uint256 functions */
 
+char* arith_uint256_to_string(arith_uint256* arr_u256) {
+    return utils_uint8_to_hex((const uint8_t*)arith_to_uint256(arr_u256), 32);
+}
+
 arith_uint256* init_arith_uint256() {
     arith_uint256* x = dogecoin_calloc(1, sizeof(*x));
+    x->to_string = arith_uint256_to_string;
     int i = 0;
     x->WIDTH = WIDTH;
     for (; i < x->WIDTH; i++)
@@ -218,15 +225,15 @@ uint64_t get_low64(arith_uint256* a) {
     return a->pn[0] | (uint64_t)a->pn[1] << 32;
 }
 
-uint32_t get_compact(arith_uint256 a, dogecoin_bool f_negative)
+uint32_t get_compact(arith_uint256* a, dogecoin_bool f_negative)
 {
-    int nSize = (base_uint_bits(&a) + 7) / 8;
+    int nSize = (base_uint_bits(a) + 7) / 8;
     uint32_t nCompact = 0;
     if (nSize <= 3) {
-        nCompact = get_low64(&a) << 8 * (3 - nSize);
+        nCompact = get_low64(a) << 8 * (3 - nSize);
     } else {
         arith_uint256* bn = init_arith_uint256();
-        // bn = a >> 8 * (nSize - 3);
+        bn = *a->pn >> 8 * (nSize - 3);
         nCompact = get_low64(bn);
     }
     // The 0x00800000 bit denotes the sign.
@@ -263,15 +270,17 @@ arith_uint256* uint_to_arith(const uint256* a)
 {
     arith_uint256* b = init_arith_uint256();
     int x = 0;
-    for(; x < WIDTH; ++x)
-        b->pn[x] = read_le32((const unsigned char*)a + x * 4);
+    for(; x < 8; ++x) {
+        uint32_t y = read_le32((const unsigned char*)a + x * 4);
+        memcpy_safe(b->pn[x * 4], y, sizeof(uint32_t));
+    }
     return b;
 }
 
 uint256* arith_to_uint256(const arith_uint256* a) {
     uint256* b = dogecoin_uint256_vla(1);
     int x = 0;
-    for(; x < a->WIDTH; ++x)
+    for(; x < 8; ++x)
         write_le32((unsigned char*)b + x * 4, a->pn[x]);
     return b;
 }

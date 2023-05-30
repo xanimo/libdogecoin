@@ -412,7 +412,9 @@ const char *find_needle(const char *haystack, size_t haystack_length, const char
 }
 
 char* to_string(uint8_t* x) {
-    return utils_uint8_to_hex(x, 32);
+    uint8_t* y = dogecoin_uint8_vla(sizeof(x));
+    memcpy_safe(y, x, sizeof(x));
+    return utils_uint8_to_hex(y, 32);
 }
 
 char* hash_to_string(uint8_t* x) {
