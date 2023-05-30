@@ -106,7 +106,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* pa
     dogecoin_block_header_hash(block.header, block_header_hash);
     uint32_t chainid = get_chainid(block.header->version);
     if (!block.header->auxpow->check(&block, &block_header_hash, chainid, params)) {
-        printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
+        // printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
 
@@ -115,7 +115,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* pa
     dogecoin_block_header_serialize(s, block.parent_header);
     dogecoin_block_header_scrypt_hash(s, parent_hash);
     cstr_free(s, true);
-    // swap_bytes((uint8_t*)&parent_hash, DOGECOIN_HASH_LENGTH);
+    swap_bytes((uint8_t*)&parent_hash, DOGECOIN_HASH_LENGTH);
     if (!check_pow(&parent_hash, block.header->bits, params)) {
         return false;
     }
