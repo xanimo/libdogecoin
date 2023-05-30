@@ -38,6 +38,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+DISABLE_WARNING_PUSH
+DISABLE_WARNING(-Wunused-function)
 typedef struct uint_err {
     const char* str;
 } uint_err;
@@ -85,8 +87,8 @@ static unsigned long _base_uint_size(base_uint* b) {
     return sizeof b->pn;
 }
 
-void base_uint_shift_left(base_uint* b, unsigned int shift);
-void base_uint_shift_right(base_uint* b, unsigned int shift);
+void base_uint_shift_left_equal(base_uint* b, unsigned int shift);
+void base_uint_shift_right_equal(base_uint* b, unsigned int shift);
 void base_uint_times_equal_uint32(base_uint* b, uint32_t b32);
 base_uint* base_uint_times_equal(base_uint* a);
 base_uint* base_uint_divide_equal(base_uint* a);
@@ -106,13 +108,27 @@ static base_uint* init_base_uint() {
 
 typedef base_uint arith_uint256;
 
+static void base_uint_to_arith_uint256(arith_uint256* a, base_uint* b) {
+    int i = 0;
+    for (; i < b->WIDTH; i++)
+        a->pn[i] = b->pn[i];
+}
+
+static void arith_uint256_to_base_uint(base_uint* a, arith_uint256* b) {
+    int i = 0;
+    for (; i < b->WIDTH; i++)
+        a->pn[i] = b->pn[i];
+}
+
 arith_uint256* init_arith_uint256();
+arith_uint256* base_uint_shift_left(const arith_uint256* b, int shift);
 uint64_t get_low64(arith_uint256* a);
 arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
 uint32_t get_compact(arith_uint256* a, dogecoin_bool f_negative);
 
 uint256* arith_to_uint256(const arith_uint256* a);
 arith_uint256* uint_to_arith(const uint256* a);
+DISABLE_WARNING_POP
 
 LIBDOGECOIN_END_DECL
 

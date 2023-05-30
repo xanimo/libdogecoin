@@ -32,7 +32,7 @@
 
 /* base_uint functions */
 
-void base_uint_shift_left(base_uint* b, unsigned int shift) {
+void base_uint_shift_left_equal(base_uint* b, unsigned int shift) {
     base_uint* a = init_base_uint();
     copy_base_uint(a, b);
     int i = 0;
@@ -48,7 +48,7 @@ void base_uint_shift_left(base_uint* b, unsigned int shift) {
     }
 }
 
-void base_uint_shift_right(base_uint* b, unsigned int shift) {
+void base_uint_shift_right_equal(base_uint* b, unsigned int shift) {
     base_uint* a = init_base_uint();
     copy_base_uint(a, b);
     int i = 0;
@@ -101,13 +101,13 @@ base_uint* base_uint_divide_equal(base_uint* a) {
     if (div_bits > num_bits) // the result is certainly 0.
         return a;
     unsigned int shift = num_bits - div_bits;
-    base_uint_shift_left(div, shift); // shift so that div and num align.
+    base_uint_shift_left_equal(div, shift); // shift so that div and num align.
     while (shift >= 0) {
         if (num >= div) {
             num = num - div;
             a->pn[shift / 32] |= (1 << (shift & 31)); // set a bit of the result.
         }
-        base_uint_shift_right(div, 1); // shift back.
+        base_uint_shift_right_equal(div, 1); // shift back.
         shift--;
     }
     // num now contains the remainder of the division.
@@ -218,6 +218,13 @@ arith_uint256* init_arith_uint256() {
     for (; i < x->WIDTH; i++)
         x->pn[i] = 0;
     return x;
+}
+
+arith_uint256* base_uint_shift_left(const arith_uint256* b, int shift) { 
+    base_uint* a = init_base_uint();
+    arith_uint256_to_base_uint(a, b);
+    base_uint_shift_left_equal(a, shift);
+    return (arith_uint256*)a;
 }
 
 uint64_t get_low64(arith_uint256* a) {
