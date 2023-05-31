@@ -60,12 +60,18 @@ void test_arith_uint256() {
 
     // constructors, equality, inequality
     u_assert_int_eq(1, 0 + 1);
+    printf("R1L: %s\n", utils_uint8_to_hex(arith_to_uint256(R1L), 32));
+    printf("R1L: %s\n", to_string(arith_to_uint256(R1L)));
+    printf("R1L: %s\n", utils_uint8_to_hex((uint8_t*)R1L->u16, 32));
+    printf("R1L: %s\n", utils_uint8_to_hex((uint8_t*)R1L->u32, 32));
+    printf("R1L: %s\n", utils_uint8_to_hex((uint8_t*)R1L->u64, 32));
     u_assert_str_eq(R1L->to_string((void*)R1L), to_string((uint8_t*)R1Array));
     u_assert_str_eq(R2L->to_string((void*)R2L), to_string((uint8_t*)R2Array));
     u_assert_str_eq(ZeroL->to_string((void*)ZeroL), to_string((uint8_t*)ZeroArray));
     u_assert_str_eq(OneL->to_string((void*)OneL), to_string((uint8_t*)OneArray));
     u_assert_str_eq(MaxL->to_string((void*)OneL), to_string((uint8_t*)MaxArray));
-    // u_assert_str_not_eq(OneL->to_string((void*)OneL), to_string((uint8_t*)ZeroArray));
+    // assert(OneL->to_string((void*)OneL) != to_string((uint8_t*)ZeroArray));
+    u_assert_str_not_eq(OneL->to_string((void*)OneL), to_string((uint8_t*)ZeroArray));
 
 //     // == and !=
     assert(R1L != R2L);
