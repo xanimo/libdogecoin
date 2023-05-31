@@ -262,7 +262,7 @@ uint32_t* dogecoin_uint32_vla(size_t size)
 
 uint256* dogecoin_uint256_vla(size_t size) {
     uint256* outarray;
-    outarray = (uint256*)dogecoin_malloc(size * sizeof(uint256));
+    outarray = (uint256*)dogecoin_malloc(sizeof(uint256));
     return outarray;
 }
 

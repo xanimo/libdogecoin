@@ -301,7 +301,7 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     wallet->unspent_rbtree = 0;
     wallet->spends = vector_new(10, dogecoin_free);
     wallet->spends_rbtree = 0;
-    wallet->vec_wtxes = vector_new(10, dogecoin_free);
+    wallet->vec_wtxes = vector_new(1, dogecoin_free);
     wallet->wtxes_rbtree = 0;
     wallet->waddr_vector = vector_new(10, dogecoin_free);
     wallet->waddr_rbtree = 0;
@@ -333,6 +333,7 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     dogecoin_btree_tdestroy(wallet->hdkeys_rbtree, dogecoin_free);
     dogecoin_btree_tdestroy(wallet->unspent_rbtree, dogecoin_free);
     dogecoin_btree_tdestroy(wallet->spends_rbtree, dogecoin_free);
+    dogecoin_btree_tdestroy(wallet->waddr_rbtree, dogecoin_free);
     dogecoin_btree_tdestroy(wallet->wtxes_rbtree, dogecoin_free);
 
     if (wallet->waddr_vector) {
@@ -341,7 +342,7 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     }
 
     if (wallet->vec_wtxes) {
-        vector_free(wallet->vec_wtxes, true);
+        vector_free(wallet->vec_wtxes, false);
         wallet->vec_wtxes = NULL;
     }
 
@@ -413,25 +414,25 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
 
 void dogecoin_wallet_add_wtx_intern_move(dogecoin_wallet *wallet, const dogecoin_wtx *wtx) {
     //add to spends
-    dogecoin_wallet_add_to_spent(wallet, wtx);
+    // dogecoin_wallet_add_to_spent(wallet, wtx);
 
-    dogecoin_wtx* checkwtx = dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
-    if (checkwtx) {
-        // remove existing wtx
-        checkwtx = *(dogecoin_wtx **)checkwtx;
-        unsigned int i;
-        for (i = 0; i < wallet->vec_wtxes->len; i++) {
-            dogecoin_wtx *wtx_vec = vector_idx(wallet->vec_wtxes, i);
-            if (wtx_vec == checkwtx) {
-                vector_remove_idx(wallet->vec_wtxes, i);
-            }
-        }
-        // we do not really delete transactions
-        checkwtx->ignore = true;
-        dogecoin_btree_tdelete(checkwtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
-        dogecoin_wallet_wtx_free(checkwtx);
-    }
-    dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
+    // dogecoin_wtx* checkwtx = dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
+    // if (checkwtx) {
+    //     // remove existing wtx
+    //     checkwtx = *(dogecoin_wtx **)checkwtx;
+    //     unsigned int i;
+    //     for (i = 0; i < wallet->vec_wtxes->len; i++) {
+    //         dogecoin_wtx *wtx_vec = vector_idx(wallet->vec_wtxes, i);
+    //         if (wtx_vec == checkwtx) {
+    //             vector_remove_idx(wallet->vec_wtxes, i);
+    //         }
+    //         dogecoin_wallet_wtx_free(wtx_vec);
+    //     }
+    //     // we do not really delete transactions
+    //     checkwtx->ignore = true;
+    //     dogecoin_btree_tdelete(checkwtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
+    //     dogecoin_wallet_wtx_free(checkwtx);
+    // }
     vector_add(wallet->vec_wtxes, (dogecoin_wtx *)wtx);
 }
 

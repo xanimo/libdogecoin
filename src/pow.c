@@ -31,9 +31,9 @@
 
 dogecoin_bool check_pow(uint256* hash, unsigned int nbits, dogecoin_chainparams *params) {
     dogecoin_bool f_negative, f_overflow;
-    arith_uint256* target = init_arith_uint256();
-    *target = set_compact(*target, nbits, &f_negative, &f_overflow);
-    arith_uint256* h = init_arith_uint256();
+    base_uint* target = init_base_uint();
+    set_compact(target, nbits, &f_negative, &f_overflow);
+    base_uint* h = init_base_uint();
     h = uint_to_arith((const uint256*)hash);
     char* hash_str = utils_uint8_to_hex((const uint8_t*)h, 32);
     char* target_str = utils_uint8_to_hex((const uint8_t*)target, 32);

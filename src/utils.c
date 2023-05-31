@@ -413,13 +413,21 @@ const char *find_needle(const char *haystack, size_t haystack_length, const char
 
 char* to_string(uint8_t* x) {
     uint8_t* y = dogecoin_uint8_vla(sizeof(x));
-    memcpy_safe(y, x, sizeof(x));
+    memcpy_safe(y, x, 32);
     return utils_uint8_to_hex(y, 32);
+}
+
+char* uint256_to_string(uint256* x) {
+    uint256* y = dogecoin_uint256_vla(1);
+    memcpy_safe(y, x, 32);
+    char* hexbuf = utils_uint8_to_hex(y, 32);
+    utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH * 2);
+    return hexbuf;
 }
 
 char* hash_to_string(uint8_t* x) {
     char* hexbuf = to_string(x);
-    utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH*2);
+    utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH * 2);
     return hexbuf;
 }
 

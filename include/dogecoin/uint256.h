@@ -170,6 +170,18 @@ static void set_compact_blob(struct base_blob* blob, uint32_t compact, dogecoin_
                                                   (word > 0xffff && size > 32));
 }
 
+uint16_t* uint256_to_uint16(uint256* in) {
+    return (uint16_t*)in;
+}
+
+uint32_t* uint256_to_uint32(uint256* in) {
+    return (uint32_t*)in;
+}
+
+uint64_t* uint256_to_uint64(uint256* in) {
+    return (uint64_t*)in;
+}
+
 static struct base_blob* init_blob() {
     struct base_blob* blob = (struct base_blob*)dogecoin_calloc(1, sizeof(*blob));
     blob->set_data = set_data;
@@ -192,23 +204,11 @@ static struct base_blob* init_blob() {
     return blob;
 }
 
-uint16_t* uint256_to_uint16(uint256 in) {
-    return (uint16_t*)&in;
-}
-
-uint32_t* uint256_to_uint32(uint256 in) {
-    return (uint32_t*)&in;
-}
-
-uint64_t* uint256_to_uint64(uint256 in) {
-    return (uint64_t*)&in;
-}
-
 vector* uchar_arr_to_vec(const unsigned char* array) {
     vector* vout = vector_new(32, dogecoin_free);
     unsigned int i = 0;
     for (; i < strlen((char*)array); i++) {
-        vector_add(vout, array[i]);
+        vector_add(vout, (unsigned char)array[i]);
     }
     return vout;
 }
