@@ -134,7 +134,7 @@ typedef uint8_t uint256[32];
 typedef uint8_t uint160[20];
 
 static const unsigned int BITS = {0x0000100};
-static const unsigned int WIDTH = BITS/8;
+static const unsigned int WIDTH = BITS/32;
 
 LIBDOGECOIN_END_DECL
 

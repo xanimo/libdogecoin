@@ -84,9 +84,10 @@ void test_hash()
     hasher->write(hasher, 0x2F2E2D2C2B2A2928ULL);
     u_assert_uint64_eq(hasher->finalize(hasher), 0xe612a3cb9ecba951ull);
 
-    uint256* hash_in = dogecoin_uint256_vla(1);
+    uint256* hash_in = (uint256*)dogecoin_calloc(1, sizeof(*hash_in));
     utils_uint256_sethex("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100", (uint8_t*)hash_in);
     u_assert_uint64_eq(siphash_u256(0x0706050403020100ULL, 0x0F0E0D0C0B0A0908ULL, hash_in), 0x7127512f72f27cceull);
+    dogecoin_free(hash_in);
 
     // Check test vectors from spec, one byte at a time
     struct siphasher* hasher2 = init_siphasher();
@@ -114,10 +115,15 @@ void test_hash()
     // and the test would be affected by default tx version bumps if not fixed.
     tx->version = 1;
     dogecoin_tx_serialize(hw->cstr, tx);
+    dogecoin_tx_free(tx);
     u_assert_uint64_eq(siphash_u256(1, 2, (uint256*)hw->get_hash(hw)), 0x79751e980c2a0a35ULL);
 
     dogecoin_free(hasher);
     dogecoin_free(hasher2);
     dogecoin_free(hasher3);
+    // dogecoin_free(hw->cstr);
+    // dogecoin_free(hw->ctx);
+    dogecoin_free(hw->hash);
+    dogecoin_free(hw->ctx);
     dogecoin_free(hw);
 }
