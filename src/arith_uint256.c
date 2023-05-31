@@ -210,9 +210,24 @@ char* arith_uint256_to_string(arith_uint256* arr_u256) {
     return utils_uint8_to_hex((const uint8_t*)arith_to_uint256(arr_u256), 32);
 }
 
+uint16_t* uint256_to_uint16(uint256 in) {
+    return (uint16_t*)&in;
+}
+
+uint32_t* uint256_to_uint32(uint256 in) {
+    return (uint32_t*)&in;
+}
+
+uint64_t* uint256_to_uint64(uint256 in) {
+    return (uint64_t*)&in;
+}
+
 arith_uint256* init_arith_uint256() {
     arith_uint256* x = dogecoin_calloc(1, sizeof(*x));
     x->to_string = arith_uint256_to_string;
+    *x->u32 = 0;
+    *x->u64 = 0;
+    *x->u16 = 0;
     int i = 0;
     x->WIDTH = WIDTH;
     for (; i < x->WIDTH; i++)
@@ -273,21 +288,14 @@ arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *p
     return hash;
 }
 
-arith_uint256* uint_to_arith(const uint256* a)
-{
+arith_uint256* uint_to_arith(const uint256* a) {
     arith_uint256* b = init_arith_uint256();
-    int x = 0;
-    for(; x < 8; ++x) {
-        uint32_t y = read_le32((const unsigned char*)a + x * 4);
-        memcpy_safe(b->pn[x * 4], y, sizeof(uint32_t));
-    }
+    memcpy_safe(b->pn, a, 32);
     return b;
 }
 
 uint256* arith_to_uint256(const arith_uint256* a) {
     uint256* b = dogecoin_uint256_vla(1);
-    int x = 0;
-    for(; x < 8; ++x)
-        write_le32((unsigned char*)b + x * 4, a->pn[x]);
+    memcpy_safe(b, a->pn, 32);
     return b;
 }
