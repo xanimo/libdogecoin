@@ -110,6 +110,21 @@
         } while (0);                                                     \
     }
 
+#define u_assert_u32_eq(R, E)                                         \
+    {                                                                    \
+        uint32_t r_ = (R);                                               \
+        uint32_t e_ = (E);                                               \
+        do {                                                             \
+            if (r_ != e_) {                                              \
+                printf("FAILED - %s() - Line %d\n", __func__, __LINE__); \
+                printf("\tExpect: \t%" PRIu32 "\n", e_);                 \
+                printf("\tReceive:\t%" PRIu32 "\n", r_);                 \
+                U_TESTS_FAIL++;                                          \
+                return;                                                  \
+            };                                                           \
+        } while (0);                                                     \
+    }
+
 #define u_assert_uint32_eq(R, E)                                         \
     {                                                                    \
         uint64_t r_ = (R);                                               \

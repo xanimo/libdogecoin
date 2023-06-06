@@ -521,6 +521,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 dogecoin_btree_tfind(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
                 vector_add(wallet->waddr_vector, waddr);
                 wallet->next_childindex = waddr->childindex+1;
+                dogecoin_free(buf);
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
                 unsigned char* buf = dogecoin_uchar_vla(reclen);
                 struct const_buffer cbuf = {buf, reclen};
@@ -768,7 +769,11 @@ dogecoin_bool dogecoin_wallet_add_wtx_move(dogecoin_wallet* wallet, dogecoin_wtx
 {
     dogecoin_wallet_add_wtx(wallet, wtx);
     //add it to the binary tree
-    dogecoin_wallet_add_wtx_intern_move(wallet, wtx); //hands memory management over to the binary tree
+    if (!wallet->vec_wtxes->len) {
+        wallet->vec_wtxes =vector_new(sizeof(*wtx), dogecoin_free);
+    }
+    vector_add(wallet->vec_wtxes, (dogecoin_wtx *)wtx);
+    // dogecoin_wallet_add_wtx_intern_move(wallet, wtx); //hands memory management over to the binary tree
     return true;
 }
 

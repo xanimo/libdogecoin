@@ -174,8 +174,13 @@ void test_wallet()
         size_t outlen = 0;
         utils_hex_to_bin(wallet_txns[i], tx_data, strlen(wallet_txns[i]), &outlen);
         dogecoin_tx_deserialize(tx_data, outlen, wtx->tx, NULL);
+        dogecoin_wallet_add_wtx(wallet, wtx);
+        // dogecoin_wallet_add_wtx_move(wallet, wtx);
 
-        dogecoin_wallet_add_wtx_move(wallet, wtx);
+        if (!wallet->vec_wtxes->len) {
+            wallet->vec_wtxes = vector_new(sizeof(*wtx), dogecoin_free);
+        }
+        vector_add(wallet->vec_wtxes, (dogecoin_wtx *)wtx);
         totalin += dogecoin_wallet_wtx_get_credit(wallet, wtx);
         dogecoin_free(tx_data);
     }
@@ -205,10 +210,9 @@ void test_wallet_basics()
 
     dogecoin_wallet_addr *wallet_addr = dogecoin_wallet_next_addr(wallet);
     u_assert_int_eq(wallet_addr->childindex, 0);
-    dogecoin_wallet_free(wallet);
 
-    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
-    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
+    dogecoin_wallet* wallet2 = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    u_assert_int_eq(dogecoin_wallet_load(wallet2, wallettmpfile, &error, &created), true);
     dogecoin_wallet_addr *wallet_addr2 = dogecoin_wallet_next_addr(wallet);
     u_assert_int_eq(wallet_addr2->childindex, 1);
 
@@ -234,9 +238,6 @@ void test_wallet_basics()
     waddr_search = dogecoin_wallet_find_waddr_byaddr(wallet, "dcrt1qre2XXXXXXXXXXXXXXXXXXXXX"); // must return NULL
     u_assert_is_null(waddr_search);
 
-    dogecoin_wallet_flush(wallet);
-    dogecoin_wallet_free(wallet);
-
     wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
     addrs = vector_new(1, free);
@@ -247,6 +248,5 @@ void test_wallet_basics()
     u_assert_str_eq(addrs->data[2],"DMTbb3NbwAdimWDMVabwip7FjPAVx6Qeq4"); // we have forced to regenerate this key
 
     vector_free(addrs, true);
-    dogecoin_wallet_flush(wallet);
     dogecoin_wallet_free(wallet);
 }

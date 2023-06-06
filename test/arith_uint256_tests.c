@@ -293,8 +293,8 @@ void test_arith_uint256() {
     set_hash(num_index, 0x20123456, typename(0x20123456));
     print_hash(num_index);
     u_assert_str_eq(get_hash_by_index(num_index), "1234560000000000000000000000000000000000000000000000000000000000");
-    // u_assert_uint32_eq(get_compact(&num->x, num->checks.negative), 0x20123456U);
-    // u_assert_uint32_eq(get_compact_hash(num_index), 0x20123456U);
+    // u_assert_uint32_eq(get_compact(&b, num->checks.negative), 0x20123456U);
+    // u_assert_u32_eq(get_compact_hash(num_index), 0x20123456U);
     u_assert_int_eq(num->checks.negative, false);
     u_assert_int_eq(num->checks.overflow, false);
 
@@ -308,12 +308,4 @@ void test_arith_uint256() {
 
     // constructors, equality, inequality
     u_assert_int_eq(1, 0 + 1);
-
-
-    // dogecoin_free(R1L);
-    // dogecoin_free(R2L);
-    // dogecoin_free(OneL);
-    // dogecoin_free(MaxL);
-    // dogecoin_free(ZeroL);
-    // vector_free(tmp, false);
 }
