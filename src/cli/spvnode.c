@@ -249,7 +249,8 @@ void spv_sync_completed(dogecoin_spv_client* client) {
 }
 
 dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* address, char* mnemonic_in) {
-    dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
+    dogecoin_wallet* wallet = dogecoin_calloc(1, sizeof(*wallet));
+    dogecoin_wallet_new(chain, wallet);
     int error;
     dogecoin_bool created;
     // prefix chain to wallet file name:
