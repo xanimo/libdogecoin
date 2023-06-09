@@ -249,14 +249,16 @@ void spv_sync_completed(dogecoin_spv_client* client) {
 }
 
 dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* address, char* mnemonic_in) {
-    dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
+    dogecoin_wallet* wallet = dogecoin_calloc(1, sizeof(*wallet));
+    dogecoin_wallet_new(chain, wallet);
     int error;
-    dogecoin_bool created;
+    dogecoin_bool created = false;
     // prefix chain to wallet file name:
     char* wallet_suffix = "_wallet.db";
     char* wallet_prefix = (char*)chain->chainname;
     char* walletfile = concat(wallet_prefix, wallet_suffix);
     dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
+    printf("created: %d\n", created);
     dogecoin_free(walletfile);
     if (!res) {
         showError("Loading wallet failed\n");
@@ -268,7 +270,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
 #ifdef WITH_UNISTRING
         SEED seed;
 #else
-        uint8_t seed[64];    
+        uint8_t seed[64];
 #endif
         if (mnemonic_in) {
             // generate seed from mnemonic
@@ -285,19 +287,24 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
     } else {
         // ensure we have a key
         // TODO
+        if (!wallet->masterkey) {
+            exit(EXIT_FAILURE);
+        }
     }
 
     dogecoin_wallet_addr* waddr;
 
-    if (address != NULL) {
+    if (address) {
         char delim[] = " ";
-
-        char *ptr = strtok(address, delim);
+        // copy address into a new string, strtok modifies the string
+        char* address_copy = strdup(address);
+        char *ptr = strtok(address_copy, delim);
 
         while(ptr != NULL)
         {
             waddr = dogecoin_wallet_addr_new();
             if (!dogecoin_p2pkh_address_to_wallet_pubkeyhash(ptr, waddr, wallet)) {
+                printf("exit failure p2pkh to hash!\n");
                 exit(EXIT_FAILURE);
             }
             ptr = strtok(NULL, delim);
@@ -306,16 +313,16 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
 #ifdef USE_UNISTRING  
     else if (wallet->waddr_vector->len == 0) {
         int i=0;
+        char str[P2PKH_ADDR_STRINGLEN];
         for(;i<20;i++) {
             waddr = dogecoin_wallet_next_bip44_addr(wallet);
+            dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, str, P2PKH_ADDR_STRINGLEN);
+            printf("Wallet addr: %s (child %d)\n", str, waddr->childindex);
         }
-        char str[P2PKH_ADDR_STRINGLEN];
-        dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, str, P2PKH_ADDR_STRINGLEN);
-        printf("Wallet addr: %s (child %d)\n", str, waddr->childindex);
     }
 #else
     else if (wallet->waddr_vector->len == 0) {
-        waddr = dogecoin_wallet_next_addr(wallet);
+        dogecoin_wallet_next_addr(wallet, waddr);
     }
 #endif
 

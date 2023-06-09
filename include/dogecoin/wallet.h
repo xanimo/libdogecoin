@@ -117,7 +117,7 @@ LIBDOGECOIN_API dogecoin_output* dogecoin_wallet_output_new();
 LIBDOGECOIN_API void dogecoin_wallet_output_free(dogecoin_output* output);
 /** ------------------------------------ */
 
-LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params);
+LIBDOGECOIN_API void dogecoin_wallet_new(const dogecoin_chainparams *params, dogecoin_wallet* wallet);
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet* wallet);
 
 /** load the wallet, sets masterkey, sets next_childindex */
@@ -131,7 +131,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet);
 LIBDOGECOIN_API void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, const dogecoin_hdnode* master_xpub);
 
 /** derives the next child hdnode and derives an address (memory is owned by the wallet) */
-LIBDOGECOIN_API dogecoin_wallet_addr* dogecoin_wallet_next_addr(dogecoin_wallet* wallet);
+LIBDOGECOIN_API void dogecoin_wallet_next_addr(dogecoin_wallet* wallet, dogecoin_wallet_addr* waddr);
 LIBDOGECOIN_API dogecoin_wallet_addr* dogecoin_wallet_next_bip44_addr(dogecoin_wallet* wallet);
 LIBDOGECOIN_API dogecoin_bool dogecoin_p2pkh_address_to_wallet_pubkeyhash(const char* address_in, dogecoin_wallet_addr* addr, dogecoin_wallet* wallet);
 

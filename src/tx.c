@@ -222,6 +222,7 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
                 break;
         }
     }
+    dogecoin_tx_out_free(copy);
     if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, 35)) {
         printf("failed to convert hash160 to p2pkh!\n");
         return false;

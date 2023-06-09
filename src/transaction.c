@@ -682,6 +682,7 @@ int sign_transaction_w_privkey(int txindex, int vout_index, char* privkey) {
         printf("error signing raw transaction: %s\n", __func__);
         return false;
     }
+    dogecoin_free(script_pubkey);
     save_raw_transaction(txindex, raw_hexadecimal_transaction);
     dogecoin_tx_free(txtmp);
     return true;
