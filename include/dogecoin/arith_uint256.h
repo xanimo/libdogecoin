@@ -34,6 +34,8 @@
 #include <string.h>
 
 #include <dogecoin/dogecoin.h>
+#include <dogecoin/common.h>
+#include <dogecoin/mem.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -41,15 +43,14 @@ struct uint_err {
     const char* str;
 };
 
-static unsigned int BITS;
-
 typedef struct base_uint_ {
     int WIDTH; // BITS / 32
-    uint32_t pn[]; // pn[WIDTH]
-} base_uint;
+    uint32_t pn[8]; // pn[WIDTH]
+} base_uint_;
 
-typedef base_uint arith_uint256;
+typedef base_uint_ arith_uint256;
 
+arith_uint256 init_arith_uint256();
 arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
 uint256* arith_to_uint256(const arith_uint256 a);
 arith_uint256 uint_to_arith(const uint256* a);

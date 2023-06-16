@@ -23,8 +23,11 @@
 
 #include <dogecoin/arith_uint256.h>
 
-#include <dogecoin/dogecoin.h>
-#include <dogecoin/common.h>
+arith_uint256 init_arith_uint256() {
+    arith_uint256 x;
+    dogecoin_mem_zero(x.pn, 8);
+    return x;
+}
 
 arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow) {
     int size = compact >> 24;
@@ -46,7 +49,7 @@ arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *p
 arith_uint256 uint_to_arith(const uint256* a)
 {
     arith_uint256 b;
-    b.WIDTH = BITS / 32;
+    b.WIDTH = 8;
     int x = 0;
     for(; x < b.WIDTH; ++x)
         b.pn[x] = read_le32((const unsigned char*)a + x * 4);
