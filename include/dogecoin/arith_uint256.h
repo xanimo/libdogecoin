@@ -44,67 +44,67 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/* hash functions */
-typedef struct checks {
+/* hash_uint functions */
+typedef struct checks_uint {
     dogecoin_bool negative;
     dogecoin_bool overflow;
-} checks;
+} checks_uint;
 
 typedef union swap {
     uint8_t u8[32];
     uint32_t u32[8];
 } swap;
 
-typedef struct hash {
+typedef struct hash_uint {
     int index;
     uint256* data;
     swap x;
-    struct checks checks;
+    checks_uint checks;
     UT_hash_handle hh;
-} hash;
+} hash_uint;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static hash *hashes = NULL;
+static hash_uint *hash_uints = NULL;
 #pragma GCC diagnostic pop
 
-// instantiates a new hash
-LIBDOGECOIN_API hash* new_hash();
-LIBDOGECOIN_API int start_hash();
+// instantiates a new hash_uint
+LIBDOGECOIN_API hash_uint* new_hash_uint();
+LIBDOGECOIN_API int start_hash_uint();
 
-LIBDOGECOIN_API void add_hash(hash *hash);
-LIBDOGECOIN_API hash* zero_hash(int index);
-LIBDOGECOIN_API void set_hash(int index, uint8_t* x, char* typename);
-LIBDOGECOIN_API hash* find_hash(int index);
-char* get_hash_by_index(int index);
+LIBDOGECOIN_API void add_hash_uint(hash_uint *hash_uint);
+LIBDOGECOIN_API hash_uint* zero_hash_uint(int index);
+LIBDOGECOIN_API void set_hash_uint(int index, uint8_t* x, char* typename);
+LIBDOGECOIN_API hash_uint* find_hash_uint(int index);
+char* get_hash_uint_by_index(int index);
 
-LIBDOGECOIN_API void remove_hash(hash *hash);
+LIBDOGECOIN_API void remove_hash_uint(hash_uint *hash_uint);
 
-LIBDOGECOIN_API void remove_all_hashes();
+LIBDOGECOIN_API void remove_all_hash_uintes();
 
-/* hashmap functions */
-typedef struct hashmap {
+/* hash_uintmap functions */
+typedef struct hash_uintmap {
     int index;
     int count;
-    hash *hashes;
+    hash_uint *hash_uints;
     UT_hash_handle hh;
-} hashmap;
+} hash_uintmap;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static hashmap *hashmaps = NULL;
+static hash_uintmap *hash_uintmaps = NULL;
 #pragma GCC diagnostic pop
 
-// instantiates a new hashmap
-LIBDOGECOIN_API hashmap* new_hashmap();
-LIBDOGECOIN_API int start_hashmap();
+// instantiates a new hash_uintmap
+LIBDOGECOIN_API hash_uintmap* new_hash_uintmap();
+LIBDOGECOIN_API int start_hash_uintmap();
 
-LIBDOGECOIN_API void add_hashmap(hashmap *map);
-LIBDOGECOIN_API hashmap* find_hashmap(int idx);
+LIBDOGECOIN_API void add_hash_uintmap(hash_uintmap *map);
+LIBDOGECOIN_API hash_uintmap* find_hash_uintmap(int idx);
 
-LIBDOGECOIN_API void remove_hashmap(hashmap *map);
+LIBDOGECOIN_API void remove_hash_uintmap(hash_uintmap *map);
 
-LIBDOGECOIN_API void remove_all_hashmaps();
+LIBDOGECOIN_API void remove_all_hash_uintmaps();
 
 DISABLE_WARNING_PUSH
 DISABLE_WARNING(-Wunused-function)
@@ -301,7 +301,7 @@ int base_uint_compare(base_uint* a, base_uint* b);
 dogecoin_bool base_uint_equal_to(base_uint* a, uint64_t b);
 double base_uint_get_double(base_uint* a);
 char* base_uint_get_hex(base_uint* a);
-char* get_hash_hex(hash* a);
+char* get_hash_uint_hex(hash_uint* a);
 void base_uint_set_hex(base_uint* a, const char* psz);
 char* base_uint_to_string(const struct base_uint* a);
 unsigned int base_uint_bits(swap* a);
@@ -317,8 +317,8 @@ static dogecoin_bool base_uint_null(const base_uint* b) {
 base_uint* base_uint_shift_right(const base_uint* b, int shift);
 base_uint* base_uint_shift_left(const base_uint* b, int shift);
 uint64_t get_low64(swap* a);
-swap* set_compact(swap* hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
-uint32_t get_compact_hash(int index);
+swap* set_compact(swap* hash_uint, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
+uint32_t get_compact_hash_uint(int index);
 uint32_t get_compact(swap* a, dogecoin_bool f_negative);
 
 uint256* arith_to_uint256(const base_uint* a);

@@ -97,14 +97,6 @@ hash* zero_hash(int index) {
     return hash;
 }
 
-void showbits(unsigned int x) {
-    int i = 0;
-    for (i = (sizeof(int) * 8) - 1; i >= 0; i--) {
-       putchar(x & (1u << i) ? '1' : '0');
-    }
-    printf("\n");
-}
-
 void print_hash(int index) {
     hash* hash_local = find_hash(index);
     printf("%s\n", utils_uint8_to_hex(hash_local->data.u8, 32));

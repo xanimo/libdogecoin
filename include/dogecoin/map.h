@@ -61,14 +61,14 @@ typedef struct checks {
     dogecoin_bool overflow;
 } checks;
 
-typedef union base_uint {
+typedef union base_uint_union {
     uint8_t u8[32];
     uint32_t u32[8];
-} base_uint;
+} base_uint_union;
 
 typedef struct hash {
     int index;
-    base_uint data;
+    base_uint_union data;
     struct checks checks;
     UT_hash_handle hh;
 } hash;
