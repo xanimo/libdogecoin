@@ -62,6 +62,7 @@ typedef struct dogecoin_auxpow_block_ {
     dogecoin_tx* parent_coinbase;
     uint256 parent_hash;
     uint8_t parent_merkle_count;
+    uint256* parent_coinbase_merkle;
     uint32_t parent_merkle_index;
     uint8_t aux_merkle_count;
     uint32_t aux_merkle_index;
