@@ -3,8 +3,8 @@
  The MIT License (MIT)
 
  Copyright (c) 2015 Jonas Schnelli
- Copyright (c) 2022 bluezr
- Copyright (c) 2022 The Dogecoin Foundation
+ Copyright (c) 2023 bluezr
+ Copyright (c) 2023 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -49,6 +49,7 @@ typedef struct dogecoin_chainparams_ {
     uint256 genesisblockhash;
     int default_port;
     dogecoin_dns_seed dnsseeds[8];
+    const char txref_code_magic;
 } dogecoin_chainparams;
 
 typedef struct dogecoin_checkpoint_ {
