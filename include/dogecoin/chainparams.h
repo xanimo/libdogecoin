@@ -50,6 +50,8 @@ typedef struct dogecoin_chainparams_ {
     int default_port;
     dogecoin_dns_seed dnsseeds[8];
     const char txref_code_magic;
+    const char txref_code_hrp[8];
+    dogecoin_bool txref_code_testnet;
 } dogecoin_chainparams;
 
 typedef struct dogecoin_checkpoint_ {
