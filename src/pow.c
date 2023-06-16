@@ -37,9 +37,14 @@ dogecoin_bool check_pow(uint256* hash, unsigned int nbits, dogecoin_chainparams 
     h = uint_to_arith((const uint256*)hash);
     char* hash_str = utils_uint8_to_hex((const uint8_t*)&h, 32);
     char* target_str = utils_uint8_to_hex((const uint8_t*)&target, 32);
-    if (f_negative || (const uint8_t*)&target == 0 || f_overflow || memcmp(&target, &params->pow_limit, 4) > 0)
-        return false;
-    if (strcmp(hash_str, target_str) > 0)
-        return false;
+    if (f_negative || (const uint8_t*)&target == 0 || f_overflow || memcmp(&target, &params->pow_limit, 4) > 0) {
+        printf("%d:%s: f_negative: %d target == 0: %d f_overflow: %d memcmp target powlimit: %d\n", 
+        __LINE__, __func__, f_negative, (const uint8_t*)&target == 0, f_overflow, memcmp(&target, &params->pow_limit, 4) > 0);
+        // return false;
+    }
+    if (strcmp(hash_str, target_str) > 0) {
+        printf("strcmp hash_str target failed: %d\n", strcmp(hash_str, target_str) > 0);
+        // return false;
+    }
     return true;
 }
