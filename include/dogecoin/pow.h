@@ -28,14 +28,16 @@
 #ifndef __LIBDOGECOIN_POW_H__
 #define __LIBDOGECOIN_POW_H__
 
+#include <dogecoin/arith_uint256.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/block.h>
 #include <dogecoin/blockchain.h>
 #include <dogecoin/chainparams.h>
+#include <dogecoin/utils.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
-dogecoin_bool check_pow(uint256* hash, unsigned int nbits, dogecoin_chainparams *params);
+dogecoin_bool check_pow(uint256* hash, unsigned int nbits, const dogecoin_chainparams *params);
 
 LIBDOGECOIN_END_DECL
 

@@ -25,26 +25,22 @@
 
  */
 
-#include <dogecoin/arith_uint256.h>
 #include <dogecoin/pow.h>
-#include <dogecoin/utils.h>
 
-dogecoin_bool check_pow(uint256* hash, unsigned int nbits, dogecoin_chainparams *params) {
+dogecoin_bool check_pow(uint256* hash, unsigned int nbits, const dogecoin_chainparams *params) {
     dogecoin_bool f_negative, f_overflow;
-    arith_uint256 target;
+    arith_uint256 target = init_arith_uint256();
     target = set_compact(target, nbits, &f_negative, &f_overflow);
-    arith_uint256 h;
+    arith_uint256 h = init_arith_uint256();
     h = uint_to_arith((const uint256*)hash);
     char* hash_str = utils_uint8_to_hex((const uint8_t*)&h, 32);
     char* target_str = utils_uint8_to_hex((const uint8_t*)&target, 32);
-    if (f_negative || (const uint8_t*)&target == 0 || f_overflow || memcmp(&target, &params->pow_limit, 4) > 0) {
+    if (f_negative || (const uint8_t*)&target == 0 || f_overflow || memcmp(&target.pn[0], &params->pow_limit, 32) > 0) {
         printf("%d:%s: f_negative: %d target == 0: %d f_overflow: %d memcmp target powlimit: %d\n", 
-        __LINE__, __func__, f_negative, (const uint8_t*)&target == 0, f_overflow, memcmp(&target, &params->pow_limit, 4) > 0);
-        // return false;
+        __LINE__, __func__, f_negative, (const uint8_t*)&target == 0, f_overflow, memcmp(&target, &params->pow_limit, 32) > 0);
+        return false;
     }
-    if (strcmp(hash_str, target_str) > 0) {
-        printf("strcmp hash_str target failed: %d\n", strcmp(hash_str, target_str) > 0);
-        // return false;
-    }
+    if (strcmp(hash_str, target_str) > 0)
+        return false;
     return true;
 }
