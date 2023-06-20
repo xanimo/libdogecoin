@@ -64,7 +64,7 @@ pattern_match* init_pattern_match(size_t length) {
 dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainparams* params) {
     dogecoin_auxpow_block* block = (dogecoin_auxpow_block*)ctx;
 
-    if ((block->parent_merkle_index || block->aux_merkle_index) != 0) {
+    if (block->parent_merkle_index != 0) {
         printf("Auxpow is not a generate\n");
         return false;
     }
@@ -302,7 +302,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     dogecoin_block_header_copy(header, block->header);
     if ((block->header->version & BLOCK_VERSION_AUXPOW_BIT) != 0) {
         if (!deserialize_dogecoin_auxpow_block(block, buf, params)) {
-            printf("%d:%s\n", __LINE__, __func__);
+            // printf("%d:%s\n", __LINE__, __func__);
         }
     }
     dogecoin_auxpow_block_free(block);

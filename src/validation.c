@@ -70,7 +70,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* pa
        the chain ID is correct.  Legacy blocks are not allowed since
        the merge-mining start, which is checked in AcceptBlockHeader
        where the height is known.  */
-    if (!is_legacy(block.header->version) && params->strict_id && get_chainid(block.header->version) == params->auxpow_id) {
+    if (!is_legacy(block.header->version) && params->strict_id && get_chainid(block.header->version) != params->auxpow_id) {
         printf("%s:%d:%s : block does not have our chain ID"
                 " (got %d, expected %d, full nVersion %d) : %s\n",
                 __FILE__, __LINE__, __func__, get_chainid(block.header->version),
