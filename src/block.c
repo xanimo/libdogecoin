@@ -270,7 +270,7 @@ void print_block(dogecoin_auxpow_block* block) {
  *
  * @return 1 if deserialization was successful, 0 otherwise.
  */
-int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf) {
+int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params) {
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
     if (!deser_u32(&block->header->version, buf))
         return false;
@@ -285,9 +285,8 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     if (!deser_u32(&block->header->nonce, buf))
         return false;
     dogecoin_block_header_copy(header, block->header);
-    if ((block->header->version & BLOCK_VERSION_AUXPOW_BIT) != 0) {
-        if (!deserialize_dogecoin_auxpow_block(block, buf)) {
-            printf("deserialize_dogecoin_auxpow_block failed!\n");
+    if ((block->header->version & BLOCK_VERSION_AUXPOW_BIT) != 0 && buf->len) {
+        if (!deserialize_dogecoin_auxpow_block(block, buf, params)) {
             return false;
         }
         }
@@ -295,57 +294,93 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     return true;
     }
 
-int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer) {
+int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params) {
     if (buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
         return printf("\ntransaction is invalid or to large.\n\n");
         }
 
     size_t consumedlength = 0;
     if (!dogecoin_tx_deserialize(buffer->p, buffer->len, block->parent_coinbase, &consumedlength)) {
+        printf("%d:%s\n", __LINE__, __func__);
         return false;
         }
 
-    if (consumedlength == 0) return false;
+    if (consumedlength == 0) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
 
-    if (!deser_skip(buffer, consumedlength)) return false;
+    if (!deser_skip(buffer, consumedlength)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
 
     block->header->auxpow->is = (block->header->version & BLOCK_VERSION_AUXPOW_BIT) == 256;
 
-    if (!deser_u256(block->parent_hash, buffer)) return false;
-
-    if (!deser_varlen((uint32_t*)&block->parent_merkle_count, buffer)) return false;
-
+    if (!deser_u256(block->parent_hash, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_varlen((uint32_t*)&block->parent_merkle_count, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
     uint8_t i = 0;
     block->parent_coinbase_merkle = dogecoin_calloc(block->parent_merkle_count, sizeof(uint256));
     for (; i < block->parent_merkle_count; i++) {
         if (!deser_u256(block->parent_coinbase_merkle[i], buffer)) {
+            printf("%d:%s:%d\n", __LINE__, __func__, i);
             return false;
         }
         }
 
-    if (!deser_u32(&block->parent_merkle_index, buffer)) return false;
-
-    if (!deser_varlen((uint32_t*)&block->aux_merkle_count, buffer)) return false;
-
+    if (!deser_u32(&block->parent_merkle_index, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_varlen((uint32_t*)&block->aux_merkle_count, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
     for (i = 0; i < block->aux_merkle_count; i++) {
         hash* aux_merkle_branch = new_hash();
         if (!deser_u256((uint8_t*)aux_merkle_branch->data.u8, buffer)) {
+            printf("%d:%s:%d\n", __LINE__, __func__, i);
             return false;
         }
         dogecoin_free(aux_merkle_branch);
         }
 
-    if (!deser_u32(&block->aux_merkle_index, buffer)) return false;
-
-    if (!deser_u32(&block->parent_header->version, buffer)) return false;
-    if (!deser_u256(block->parent_header->prev_block, buffer)) return false;
-    if (!deser_u256(block->parent_header->merkle_root, buffer)) return false;
-    if (!deser_u32(&block->parent_header->timestamp, buffer)) return false;
-    if (!deser_u32(&block->parent_header->bits, buffer)) return false;
-    if (!deser_u32(&block->parent_header->nonce, buffer)) return false;
-
+    if (!deser_u32(&block->aux_merkle_index, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_u32(&block->parent_header->version, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_u256(block->parent_header->prev_block, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_u256(block->parent_header->merkle_root, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_u32(&block->parent_header->timestamp, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_u32(&block->parent_header->bits, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
+    if (!deser_u32(&block->parent_header->nonce, buffer)) {
+        printf("%d:%s\n", __LINE__, __func__);
+        return false;
+    }
     // print_block(block);
-    if (!check_auxpow(*block, (dogecoin_chainparams*)&dogecoin_chainparams_main)) {
+    if (!check_auxpow(*block, (dogecoin_chainparams*)params)) {
         printf("check_auxpow failed!\n");
         return false;
     }
