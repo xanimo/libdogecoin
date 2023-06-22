@@ -76,7 +76,7 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         return false;
     }
 
-    vector* parent_merkle = vector_new(8, dogecoin_free);
+    vector* parent_merkle = vector_new(8, NULL);
     size_t p = 0;
     for (; p < block->parent_merkle_count; p++) {
         vector_add(parent_merkle, block->parent_coinbase_merkle[p]);
@@ -85,9 +85,9 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
     // Check that the chain merkle root is in the coinbase
     uint256* n_roothash = check_merkle_branch((uint8_t*)hash, parent_merkle, parent_merkle->len);
     const unsigned char* vch_roothash = (unsigned char*)hash_to_string((uint8_t*)n_roothash); // correct endian
+    vector_free(parent_merkle, true);
 
-    dogecoin_tx_in *tx_in = dogecoin_tx_in_new();
-    tx_in = vector_idx(block->parent_coinbase->vin, 0);
+    dogecoin_tx_in *tx_in = vector_idx(block->parent_coinbase->vin, 0);
     size_t idx = 0, count = 0;
     for (; idx < tx_in->script_sig->len; idx++) {
 
@@ -184,6 +184,7 @@ void dogecoin_auxpow_block_free(dogecoin_auxpow_block* block) {
     if (!block) return;
     dogecoin_block_header_free(block->header);
     dogecoin_tx_free(block->parent_coinbase);
+    free(block->parent_coinbase_merkle);
     block->parent_merkle_count = 0;
     block->aux_merkle_count = 0;
     remove_all_hashes();
