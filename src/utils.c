@@ -331,8 +331,8 @@ uint256* uint256S(const char *str)
 
 unsigned char* parse_hex(const char* psz)
 {
-    // convert hex dump to vector
-    vector* vch = vector_new(1, NULL);
+    int i = 0;
+    unsigned char* input = dogecoin_uchar_vla(strlen(psz));
     while (true)
     {
         while (isspace(*psz))
@@ -345,14 +345,9 @@ unsigned char* parse_hex(const char* psz)
         if (c == (signed char)-1)
             break;
         n |= c;
-        vector_add(vch, n);
+        input[i] = n;
+        i++;
     }
-    unsigned int h = 0;
-	unsigned char* input = dogecoin_uchar_vla(vch->len);
-	for (; h < vch->len; h++) {
-		input[h] = (unsigned char)vector_idx(vch, h);
-	}
-    vector_free(vch, true);
     return input;
 }
 
