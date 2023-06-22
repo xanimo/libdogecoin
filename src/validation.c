@@ -45,8 +45,7 @@
  */
 dogecoin_bool dogecoin_block_header_scrypt_hash(cstring* s, uint256 hash) {
     char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
-    unsigned char inputbytes[80];
-    memcpy_safe(inputbytes, parse_hex(utils_uint8_to_hex((uint8_t*)s->str, s->len)), s->len);
+    unsigned char* inputbytes = (unsigned char*)utils_uint8_to_hex((uint8_t*)s->str, s->len);
     scrypt_1024_1_1_256_sp_generic((const char*)&inputbytes[0], BEGIN(hash), scratchpad);
     return true;
     }
