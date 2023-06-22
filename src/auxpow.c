@@ -86,12 +86,12 @@ uint256* check_merkle_branch(uint256 hash, const vector* parent_coinbase_merkle,
         uint256 pcm;
         memcpy(pcm, vector_idx(parent_coinbase_merkle, i), 32);
         if (i & 1)
-            hash = Hash(BEGIN(*pcm), END(*pcm), BEGIN(hash), END(hash));
+            *hash = Hash(UBEGIN(*pcm), END(*pcm), UBEGIN(hash), UEND(hash));
         else
-            hash = Hash(BEGIN(hash), END(hash), BEGIN(*pcm), END(*pcm));
+            *hash = Hash(UBEGIN(hash), UEND(hash), UBEGIN(*pcm), UEND(*pcm));
         i >>= 1;
     }
-    return hash;
+    return (uint256*)*&hash;
 }
 
 void init_aux_pow(dogecoin_block_header* header) {
