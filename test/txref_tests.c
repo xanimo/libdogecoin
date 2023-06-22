@@ -183,7 +183,7 @@ void test_txref()
     int bh_check;
     int pos_check;
     int res;
-    char encoded_txref[32] = {};
+    char encoded_txref[32] = {0};
 
     char hrpbuf[1024];
     for (i = 0; i < sizeof(test_vectors) / sizeof(test_vectors[0]); ++i) {
