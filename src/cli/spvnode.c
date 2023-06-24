@@ -255,7 +255,8 @@ void spv_sync_completed(dogecoin_spv_client* client) {
 }
 
 dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const char* address, const char* mnemonic_in, const char* name) {
-    dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
+    dogecoin_wallet* wallet = dogecoin_calloc(1, sizeof(*wallet));
+    dogecoin_wallet_new(wallet, chain);
     int error;
     dogecoin_bool created;
     char* wallet_suffix = "_wallet.db";

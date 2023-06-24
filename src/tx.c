@@ -200,15 +200,13 @@ void dogecoin_tx_free(dogecoin_tx* tx)
 int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p2pkh, int is_mainnet) {
     if (!txout) return false;
     const dogecoin_chainparams* chain = is_mainnet ? &dogecoin_chainparams_main : &dogecoin_chainparams_test;
-    dogecoin_tx_out* copy = dogecoin_tx_out_new();
-    dogecoin_tx_out_copy(copy, txout);
     size_t length = 2;
     uint8_t* stripped_array = dogecoin_uint8_vla(txout->script_pubkey->len);
     dogecoin_mem_zero(stripped_array, txout->script_pubkey->len * sizeof(stripped_array[0]));
     // loop through 20 bytes of the script hash while stripping op codes
     // and copy from index 3 to 23:
-    for (; length < copy->script_pubkey->len - 4; length++) {
-        switch (copy->script_pubkey->str[length]) {
+    for (; length < txout->script_pubkey->len - 4; length++) {
+        switch (txout->script_pubkey->str[length]) {
             case OP_DUP:
                 break;
             case (char)OP_HASH160:
@@ -218,7 +216,7 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
             case (char)OP_CHECKSIG:
                 break;
             default:
-                memcpy_safe(stripped_array, &copy->script_pubkey->str[3], 23);
+                memcpy_safe(stripped_array, &txout->script_pubkey->str[3], 23);
                 break;
         }
     }

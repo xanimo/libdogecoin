@@ -157,7 +157,7 @@ void read_cb(struct bufferevent* bev, void* ctx)
             if ((node->state & NODE_CONNECTED) != NODE_CONNECTED) {
                 return;
             }
-            dogecoin_node_parse_message(node, &hdr, &cmd_data_buf);
+            if (!dogecoin_node_parse_message(node, &hdr, &cmd_data_buf)) return;
 
             buf.p = (const unsigned char*)buf.p + hdr.data_len;
             buf.len -= hdr.data_len;
@@ -286,7 +286,7 @@ void event_cb(struct bufferevent* ev, short type, void* ctx)
 dogecoin_node* dogecoin_node_new()
 {
     dogecoin_node* node;
-    node = dogecoin_calloc(1, sizeof(*node));
+    node = calloc(1, sizeof(*node));
     node->version_handshake = false;
     node->state = 0;
     node->nonce = 0;
