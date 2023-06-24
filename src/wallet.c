@@ -670,13 +670,12 @@ void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, const dogecoin
     dogecoin_file_commit(wallet->dbfile);
 }
 
-dogecoin_wallet_addr* dogecoin_wallet_next_addr(dogecoin_wallet* wallet)
+void dogecoin_wallet_next_addr(dogecoin_wallet_addr *waddr, dogecoin_wallet* wallet)
 {
     if (!wallet || !wallet->masterkey)
-        return NULL;
+        return;
 
     //for now, only m/k is possible
-    dogecoin_wallet_addr *waddr = dogecoin_wallet_addr_new();
     dogecoin_hdnode *hdnode = dogecoin_hdnode_copy(wallet->masterkey);
     dogecoin_hdnode_public_ckd(hdnode, wallet->next_childindex);
     dogecoin_hdnode_get_hash160(hdnode, waddr->pubkeyhash);
@@ -732,7 +731,7 @@ dogecoin_wallet_addr* dogecoin_wallet_next_addr(dogecoin_wallet* wallet)
     //increase the in-memory counter (cache)
     wallet->next_childindex++;
 
-    return waddr;
+    return;
 }
 
 dogecoin_wallet_addr* dogecoin_wallet_next_bip44_addr(dogecoin_wallet* wallet)

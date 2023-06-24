@@ -315,7 +315,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
         // TODO
     }
 
-    dogecoin_wallet_addr* waddr;
+    dogecoin_wallet_addr* waddr = dogecoin_calloc(1, sizeof(*waddr));
 
     if (address != NULL) {
         char delim[] = " ";
@@ -347,7 +347,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
     }
 #else
     else if (wallet->waddr_vector->len == 0) {
-        waddr = dogecoin_wallet_next_addr(wallet);
+        dogecoin_wallet_next_addr(waddr, wallet);
     }
 #endif
 
