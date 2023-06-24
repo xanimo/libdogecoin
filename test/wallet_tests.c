@@ -202,17 +202,19 @@ void test_wallet_basics()
     u_assert_int_eq(suc, 1);
     dogecoin_wallet_set_master_key_copy(wallet, &node);
 
-    dogecoin_wallet_addr *wallet_addr = dogecoin_wallet_next_addr(wallet);
+    dogecoin_wallet_addr *wallet_addr = dogecoin_calloc(1, sizeof(*wallet_addr));
+    dogecoin_wallet_next_addr(wallet_addr, wallet);
     u_assert_int_eq(wallet_addr->childindex, 0);
 
     dogecoin_wallet_new(wallet, &dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
-    dogecoin_wallet_addr *wallet_addr2 = dogecoin_wallet_next_addr(wallet);
+    dogecoin_wallet_addr *wallet_addr2 = dogecoin_calloc(1, sizeof(*wallet_addr2));
+    dogecoin_wallet_next_addr(wallet_addr2, wallet);
     u_assert_int_eq(wallet_addr2->childindex, 1);
 
     //force to regenerate child 1
     wallet->next_childindex = 1;
-    wallet_addr = dogecoin_wallet_next_addr(wallet);
+    dogecoin_wallet_next_addr(wallet_addr, wallet);
 
     //now it should be equal
     u_assert_mem_eq(wallet_addr->pubkeyhash, wallet_addr2->pubkeyhash, sizeof(uint160));
