@@ -468,7 +468,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
     if (strcmp(hdr->command, DOGECOIN_MSG_BLOCK) == 0)
     {
         dogecoin_bool connected;
-        dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
+        dogecoin_blockindex *pindex = dogecoin_calloc(1, sizeof(*pindex));
+        client->headers_db->connect_hdr(pindex, client->headers_db_ctx, buf, false, &connected);
 
         if (!pindex) {
             return;
@@ -513,6 +514,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             // last requested block reached, consider stop syncing
             if (!client->called_sync_completed && client->sync_completed) { client->sync_completed(client); client->called_sync_completed = true; }
         }
+        dogecoin_free(pindex);
     }
 
     if (strcmp(hdr->command, DOGECOIN_MSG_HEADERS) == 0)
@@ -530,7 +532,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         for (i = 0; i < amount_of_headers; i++)
         {
             dogecoin_bool connected;
-            dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
+            dogecoin_blockindex *pindex = dogecoin_calloc(1, sizeof(*pindex));
+            client->headers_db->connect_hdr(pindex, client->headers_db_ctx, buf, false, &connected);
             if (!pindex)
             {
                 client->nodegroup->log_write_cb("Header deserialization failed (node %d)\n", node->nodeid);
@@ -563,6 +566,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     break;
                 }
             }
+            dogecoin_free(pindex);
         }
         dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
 
@@ -575,7 +579,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (amount_of_headers == MAX_HEADERS_RESULTS && ((node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC))
         {
             time_t lasttime = chaintip->header.timestamp;
-            client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, ctime(&lasttime));
+            char* lasttime_str = dogecoin_char_vla(strlen(ctime(&lasttime)));
+            lasttime_str = ctime(&lasttime);
+            client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, lasttime_str);
             dogecoin_net_spv_node_request_headers_or_blocks(node, false);
         }
     }

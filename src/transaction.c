@@ -684,6 +684,7 @@ int sign_transaction_w_privkey(int txindex, int vout_index, char* privkey) {
     }
     save_raw_transaction(txindex, raw_hexadecimal_transaction);
     dogecoin_tx_free(txtmp);
+    dogecoin_free(script_pubkey);
     return true;
 }
 

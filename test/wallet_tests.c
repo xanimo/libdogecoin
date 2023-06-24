@@ -153,7 +153,8 @@ void test_wallet()
 {
     // test balance of random choosen mainnet address 1MZnPNbhtmRjzAHqEikQYB7ENaRd5ky4aT
     unlink(wallettmpfile);
-    dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    dogecoin_wallet *wallet = dogecoin_calloc(1, sizeof(*wallet));
+    dogecoin_wallet_new(wallet, &dogecoin_chainparams_main);
     int error;
     dogecoin_bool created;
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
@@ -188,7 +189,8 @@ void test_wallet()
 void test_wallet_basics()
 {
     unlink(wallettmpfile);
-    dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    dogecoin_wallet *wallet = dogecoin_calloc(1, sizeof(*wallet));
+    dogecoin_wallet_new(wallet, &dogecoin_chainparams_main);
     int error;
     dogecoin_bool created;
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
@@ -203,9 +205,8 @@ void test_wallet_basics()
     dogecoin_wallet_addr *wallet_addr = dogecoin_calloc(1, sizeof(*wallet_addr));
     dogecoin_wallet_next_addr(wallet_addr, wallet);
     u_assert_int_eq(wallet_addr->childindex, 0);
-    dogecoin_wallet_free(wallet);
 
-    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    dogecoin_wallet_new(wallet, &dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
     dogecoin_wallet_addr *wallet_addr2 = dogecoin_calloc(1, sizeof(*wallet_addr2));
     dogecoin_wallet_next_addr(wallet_addr2, wallet);
@@ -234,17 +235,17 @@ void test_wallet_basics()
     u_assert_is_null(waddr_search);
 
     dogecoin_wallet_flush(wallet);
-    dogecoin_wallet_free(wallet);
 
-    wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
-    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
+    dogecoin_wallet_new(wallet, &dogecoin_chainparams_main);
+    dogecoin_bool res = dogecoin_wallet_load(wallet, wallettmpfile, &error, &created);
+    u_assert_int_eq(res, true);
     addrs = vector_new(1, free);
     dogecoin_wallet_get_addresses(wallet, addrs);
     u_assert_int_eq(addrs->len, 3);
     u_assert_str_eq(addrs->data[0],"DHprgyNMcy3Ct9zVbJCrezYywxTBDWPL3v");
     u_assert_str_eq(addrs->data[1],"DMTbb3NbwAdimWDMVabwip7FjPAVx6Qeq4");
     u_assert_str_eq(addrs->data[2],"DMTbb3NbwAdimWDMVabwip7FjPAVx6Qeq4"); // we have forced to regenerate this key
-
+    vector_free(addrs, true);
     dogecoin_wallet_flush(wallet);
-    dogecoin_wallet_free(wallet);
+    // dogecoin_wallet_free(wallet);
 }

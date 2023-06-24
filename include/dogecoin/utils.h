@@ -211,7 +211,7 @@ dogecoin_btree_tsearch (const void * __restrict vkey,		/* key to be located */
       rootp = n;
     }
 
-  q = dogecoin_malloc(sizeof(dogecoin_btree_node_t));		/* T5: key not found */
+  q = malloc(sizeof(dogecoin_btree_node_t));		/* T5: key not found */
   if (!q)
     return q;
   *n = q;

@@ -117,7 +117,7 @@ LIBDOGECOIN_API dogecoin_output* dogecoin_wallet_output_new();
 LIBDOGECOIN_API void dogecoin_wallet_output_free(dogecoin_output* output);
 /** ------------------------------------ */
 
-LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params);
+LIBDOGECOIN_API void dogecoin_wallet_new(dogecoin_wallet* wallet, const dogecoin_chainparams *params);
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet* wallet);
 
 /** load the wallet, sets masterkey, sets next_childindex */

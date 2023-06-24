@@ -192,10 +192,10 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                 deser_u256(hash, &cbuf_all);
                 deser_u32(&height, &cbuf_all);
                 dogecoin_bool connected;
+                dogecoin_blockindex *chainheader = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
+                chainheader->height = height;
                 if (firstblock)
                 {
-                    dogecoin_blockindex *chainheader = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
-                    chainheader->height = height;
                     if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all)) {
                         dogecoin_block_header_free(&chainheader->header);
                         dogecoin_free(chainheader);
@@ -207,7 +207,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     db->chaintip = chainheader;
                     firstblock = false;
                 } else {
-                    dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
+                    dogecoin_headers_db_connect_hdr(chainheader, db, &cbuf_all, true, &connected);
                     if (!connected)
                     {
                         printf("Connecting header failed (at height: %d)\n", db->chaintip->height);
@@ -255,10 +255,10 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
  * 
  * @return A pointer to the blockindex.
  */
-dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected) {
+void dogecoin_headers_db_connect_hdr(dogecoin_blockindex* pindex, dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected) {
     *connected = false;
 
-    dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
+    dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(*blockindex));
     if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return NULL;
 
     dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);

@@ -48,7 +48,7 @@ typedef struct dogecoin_headers_db_interface_
     void (*free)(void *db);
     dogecoin_bool (*load)(void *db, const char *filename);
     void (*fill_blocklocator_tip)(void* db, vector *blocklocators);
-    dogecoin_blockindex *(*connect_hdr)(void* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected);
+    void (*connect_hdr)(dogecoin_blockindex* pindex, void* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected);
     dogecoin_blockindex* (*getchaintip)(void *db);
     dogecoin_bool (*disconnect_tip)(void *db);
     dogecoin_bool (*has_checkpoint_start)(void *db);
