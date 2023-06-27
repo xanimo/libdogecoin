@@ -72,6 +72,7 @@ libdogecoin_la_SOURCES = \
     src/bip39.c \
     src/bip44.c \
     src/block.c \
+    src/blockchain.c \
     src/buffer.c \
     src/chainparams.c \
     src/cstr.c \

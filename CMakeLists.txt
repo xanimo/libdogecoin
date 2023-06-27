@@ -142,6 +142,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/bip39.c
     src/bip44.c
     src/block.c
+    src/blockchain.c
     src/buffer.c
     src/cstr.c
     src/ctaes.c
