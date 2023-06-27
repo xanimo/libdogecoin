@@ -42,6 +42,7 @@
 void test_spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
     dogecoin_node_group_shutdown(client->nodegroup);
+    remove_all_blockindices();
 }
 
 dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip) {

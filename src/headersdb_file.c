@@ -258,21 +258,20 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
 void dogecoin_headers_db_connect_hdr(dogecoin_blockindex* pindex, dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected) {
     *connected = false;
 
-    dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(*blockindex));
-    if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return NULL;
+    if (!dogecoin_block_header_deserialize(&pindex->header, buf)) return;
 
-    dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);
+    dogecoin_block_header_hash(&pindex->header, (uint8_t *)&pindex->hash);
 
     dogecoin_blockindex *connect_at = NULL;
     dogecoin_blockindex *fork_from_block = NULL;
 
-    if (memcmp(&blockindex->header.prev_block, db->chaintip->hash, DOGECOIN_HASH_LENGTH) == 0)
+    if (memcmp(&pindex->header.prev_block, db->chaintip->hash, DOGECOIN_HASH_LENGTH) == 0)
     {
         connect_at = db->chaintip;
     }
     else {
         // check if we know the prevblock
-        fork_from_block = dogecoin_headersdb_find(db, blockindex->header.prev_block);
+        fork_from_block = dogecoin_headersdb_find(db, pindex->header.prev_block);
         if (fork_from_block) {
             printf("Block found on a fork...\n");
             connect_at = fork_from_block;
@@ -281,25 +280,25 @@ void dogecoin_headers_db_connect_hdr(dogecoin_blockindex* pindex, dogecoin_heade
 
     if (connect_at != NULL) {
         /* TODO: check claimed PoW */
-        blockindex->prev = connect_at;
-        blockindex->height = connect_at->height+1;
+        pindex->prev = connect_at;
+        pindex->height = connect_at->height+1;
 
         /* TODO: check if we should switch to the fork with most work (instead of height) */
-        if (blockindex->height > db->chaintip->height) {
+        if (pindex->height > db->chaintip->height) {
             if (fork_from_block) {
                 /* TODO: walk back to the fork point and call reorg callback */
                 printf("Switch to the fork!\n");
             }
-            db->chaintip = blockindex;
+            db->chaintip = pindex;
         }
         if (!load_process && db->read_write_file)
         {
-            if (!dogecoin_headers_db_write(db, blockindex)) {
+            if (!dogecoin_headers_db_write(db, pindex)) {
                 fprintf(stderr, "Error writing blockheader to database\n");
             }
         }
         if (db->use_binary_tree) {
-            dogecoin_btree_tfind(blockindex, &db->tree_root, dogecoin_header_compare);
+            dogecoin_btree_tfind(pindex, &db->tree_root, dogecoin_header_compare);
         }
 
         if (db->max_hdr_in_mem > 0) {
@@ -330,10 +329,10 @@ void dogecoin_headers_db_connect_hdr(dogecoin_blockindex* pindex, dogecoin_heade
     else {
         //TODO, add to orphans
         char hex[65] = {0};
-        utils_bin_to_hex(blockindex->hash, DOGECOIN_HASH_LENGTH, hex);
+        utils_bin_to_hex(pindex->hash, DOGECOIN_HASH_LENGTH, hex);
     }
 
-    return blockindex;
+    // return blockindex;
 }
 
 /**
