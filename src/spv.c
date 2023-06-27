@@ -532,7 +532,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         for (i = 0; i < amount_of_headers; i++)
         {
             dogecoin_bool connected;
-            dogecoin_blockindex *pindex = dogecoin_calloc(1, sizeof(*pindex));
+            int index = start_dogecoin_blockindex();
+            dogecoin_blockindex *pindex = find_dogecoin_blockindex(index);
             client->headers_db->connect_hdr(pindex, client->headers_db_ctx, buf, false, &connected);
             if (!pindex)
             {

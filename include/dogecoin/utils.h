@@ -174,7 +174,7 @@ dogecoin_btree_tfind (const void *vkey, void * const *vrootp,
       int r;
 
       if ((r = (*compar)(vkey, (*rootp)->key)) == 0)	/* T2: */
-	return *rootp;		/* key found */
+	return (void*)*rootp;		/* key found */
       rootp = (r < 0) ?
 	  &(*rootp)->left :		/* T3: follow left branch */
 	  &(*rootp)->right;		/* T4: follow right branch */
@@ -201,7 +201,7 @@ dogecoin_btree_tsearch (const void * __restrict vkey,		/* key to be located */
       int r;
 
       if ((r = (*compar)(vkey, ((*n)->key))) == 0)	/* T2: */
-	return *n;		/* we found it! */
+	return (void*)*n;		/* we found it! */
 
       n = (r < 0) ?
 	  &(*rootp)->left :		/* T3: follow left branch */
@@ -211,15 +211,15 @@ dogecoin_btree_tsearch (const void * __restrict vkey,		/* key to be located */
       rootp = n;
     }
 
-  q = malloc(sizeof(dogecoin_btree_node_t));		/* T5: key not found */
+  q = dogecoin_calloc(1, sizeof(*q));		/* T5: key not found */
   if (!q)
-    return q;
+    return (void*)q;
   *n = q;
   /* make new node */
   /* LINTED const castaway ok */
   q->key = (void *)vkey;		/* initialize new node */
   q->left = q->right = NULL;
-  return q;
+  return (void*)q;
 }
 
 LIBDOGECOIN_END_DECL

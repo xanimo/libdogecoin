@@ -346,7 +346,7 @@ void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector *blo
     if (scan_tip->height > 0)
     {
         int i = 0;
-        for(; i<10;i++)
+        for(; i<9;i++)
         {
             //TODO: try to share memory and avoid heap allocation
             uint256 *hash = dogecoin_calloc(1, sizeof(uint256));

@@ -31,6 +31,7 @@
 
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/block.h>
+#include <dogecoin/uthash.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -38,11 +39,38 @@ LIBDOGECOIN_BEGIN_DECL
  * The block index is a data structure that stores the hash and header of each block in the blockchain.
  */
 typedef struct dogecoin_blockindex {
+    int index;
     uint32_t height;
     uint256 hash;
     dogecoin_block_header header;
     struct dogecoin_blockindex* prev;
+    UT_hash_handle hh;
 } dogecoin_blockindex;
+
+DISABLE_WARNING_PUSH
+DISABLE_WARNING(-Wunused-variable)
+static dogecoin_blockindex *block_indices = NULL;
+DISABLE_WARNING_POP
+
+// instantiates a new dogecoin_blockindex
+LIBDOGECOIN_API dogecoin_blockindex* new_dogecoin_blockindex();
+
+// adds dogecoin_blockindex structure to hash table
+LIBDOGECOIN_API void add_dogecoin_blockindex(dogecoin_blockindex *block);
+
+// find dogecoin_blockindex from the hash table
+LIBDOGECOIN_API dogecoin_blockindex* find_dogecoin_blockindex(int index);
+
+// remove dogecoin_blockindex from the hash table
+LIBDOGECOIN_API void remove_dogecoin_blockindex(dogecoin_blockindex *block);
+
+LIBDOGECOIN_API void dogecoin_blockindex_free(dogecoin_blockindex *block);
+
+// remove all block indicies from hash table
+LIBDOGECOIN_API void remove_all_blockindices();
+
+// instantiates and adds index to the hash table
+LIBDOGECOIN_API int start_dogecoin_blockindex();
 
 LIBDOGECOIN_END_DECL
 
