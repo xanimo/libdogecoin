@@ -258,7 +258,7 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
 void dogecoin_headers_db_connect_hdr(dogecoin_blockindex* pindex, dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected) {
     *connected = false;
 
-    dogecoin_block_header_deserialize(&pindex->header, buf);
+    if (!dogecoin_block_header_deserialize(&pindex->header, buf)) return;
 
     dogecoin_block_header_hash(&pindex->header, (uint8_t *)&pindex->hash);
 
