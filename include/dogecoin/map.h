@@ -93,7 +93,7 @@ LIBDOGECOIN_API void remove_all_hashes();
 typedef struct map {
     int index;
     int count;
-    hash *hashes;
+    void* data;
     UT_hash_handle hh;
 } map;
 
@@ -103,8 +103,8 @@ static map *maps = NULL;
 #pragma GCC diagnostic pop
 
 // instantiates a new map
-LIBDOGECOIN_API map* new_map();
-LIBDOGECOIN_API int start_map();
+LIBDOGECOIN_API map* new_map(void* data);
+LIBDOGECOIN_API map* start_map(void* data);
 LIBDOGECOIN_API void add_map(map *map_external);
 LIBDOGECOIN_API map* find_map(int index);
 LIBDOGECOIN_API void remove_map(map *map);

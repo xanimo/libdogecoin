@@ -161,11 +161,12 @@ void remove_all_hashes() {
  * 
  * @return A pointer to the new working map. 
  */
-map* new_map() {
+map* new_map(void* data) {
     map* m = (struct map*)dogecoin_calloc(1, sizeof *m);
     m->count = 1;
-    if (HASH_COUNT(hashes) < 1) start_hash();
-    m->hashes = hashes;
+    if (data != NULL) {
+        m->data = data;
+    }
     m->index = HASH_COUNT(maps) + 1;
     return m;
 }
@@ -177,10 +178,10 @@ map* new_map() {
  * 
  * @return The index of the new map.
  */
-int start_map() {
-    map* map = new_map();
+map* start_map(void* data) {
+    map* map = new_map(data);
     add_map(map);
-    return map->index;
+    return map;
 }
 
 /**

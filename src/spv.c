@@ -532,26 +532,30 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         for (i = 0; i < amount_of_headers; i++)
         {
             dogecoin_bool connected;
-            int index = start_dogecoin_blockindex();
-            dogecoin_blockindex *pindex = find_dogecoin_blockindex(index);
+            dogecoin_blockindex *pindex = new_dogecoin_blockindex();
             client->headers_db->connect_hdr(pindex, client->headers_db_ctx, buf, false, &connected);
             if (!pindex)
             {
                 client->nodegroup->log_write_cb("Header deserialization failed (node %d)\n", node->nodeid);
+                dogecoin_free(pindex);
                 return;
             }
             if (!deser_skip(buf, 1)) {
                 client->nodegroup->log_write_cb("Header deserialization (tx count skip) failed (node %d)\n", node->nodeid);
+                dogecoin_free(pindex);
                 return;
             }
-            
             if (!connected)
             {
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
                 node->state &= ~NODE_HEADERSYNC;
                 dogecoin_node_misbehave(node);
                 dogecoin_net_spv_request_headers(client);
+                dogecoin_free(pindex);
             } else {
+                if (pindex->height - 1 == pindex->prev->height) {
+                    start_map(pindex);
+                }
                 if (client->header_connected) { client->header_connected(client); }
                 connected_headers++;
                 if (pindex->header.timestamp > client->oldest_item_of_interest - (BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) ) {
@@ -567,7 +571,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     break;
                 }
             }
-            remove_dogecoin_blockindex(pindex);
         }
         dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
 
@@ -579,10 +582,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         if (amount_of_headers == MAX_HEADERS_RESULTS && ((node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC))
         {
-            // time_t lasttime = chaintip->header.timestamp;
-            // char* lasttime_str = dogecoin_char_vla(strlen(ctime(&lasttime)));
-            // lasttime_str = ctime(&lasttime);
-            // client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, lasttime_str);
             dogecoin_net_spv_node_request_headers_or_blocks(node, false);
         }
     }
