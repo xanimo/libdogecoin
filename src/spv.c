@@ -468,7 +468,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
     if (strcmp(hdr->command, DOGECOIN_MSG_BLOCK) == 0)
     {
         dogecoin_bool connected;
-        dogecoin_blockindex *pindex = dogecoin_calloc(1, sizeof(*pindex));
+        dogecoin_blockindex *pindex = new_dogecoin_blockindex();
         client->headers_db->connect_hdr(pindex, client->headers_db_ctx, buf, false, &connected);
 
         if (!pindex) {
@@ -514,7 +514,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             // last requested block reached, consider stop syncing
             if (!client->called_sync_completed && client->sync_completed) { client->sync_completed(client); client->called_sync_completed = true; }
         }
-        dogecoin_free(pindex);
     }
 
     if (strcmp(hdr->command, DOGECOIN_MSG_HEADERS) == 0)

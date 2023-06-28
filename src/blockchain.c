@@ -38,7 +38,7 @@
  * @return A pointer to the new working dogecoin_blockindex. 
  */
 dogecoin_blockindex* new_dogecoin_blockindex() {
-    dogecoin_blockindex* blockindex = (struct dogecoin_blockindex*)calloc(1, sizeof *blockindex);
+    dogecoin_blockindex* blockindex = (dogecoin_blockindex*)dogecoin_calloc(1, sizeof *blockindex);
     return blockindex;
 }
 
