@@ -165,8 +165,8 @@ int main()
 #endif
 
 #ifdef WITH_WALLET
-    // u_run_test(test_wallet_basics);
-    // u_run_test(test_wallet);
+    u_run_test(test_wallet_basics);
+    u_run_test(test_wallet);
 #endif
 
 #ifdef WITH_TOOLS
@@ -177,7 +177,7 @@ int main()
     u_run_test(test_net_flag_defined);
     u_run_test(test_net_basics_plus_download_block);
     u_run_test(test_protocol);
-//     u_run_test(test_spv);
+    // u_run_test(test_spv);
 #else
     u_run_test(test_net_flag_not_defined);
 #endif

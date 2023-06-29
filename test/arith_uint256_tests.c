@@ -59,39 +59,7 @@ void shiftArrayLeft(unsigned char* to, const unsigned char* from, unsigned int a
     }
 }
 
-bool almostEqual(double d1, double d2)
-{
-    return fabs(d1-d2) <= 4*fabs(d1)*__DBL_EPSILON__;
-}
-
-void foo (int i)
-{
-  printf ("foo %d!\n", i);
-}
-
-void bar (int i)
-{
-  printf ("%d bar!\n", i);
-}
-
-void message (void (*func)(int), int times)
-{
-  int j;
-  for (j=0; j<times; ++j)
-    func (j);  /* (*func) (j); would be equivalent. */
-}
-
-void example (int want_foo) 
-{
-  void (*pf)(int) = &bar; /* The & is optional. */
-  if (want_foo)
-    pf = foo;
-  message (pf, 5);
-}
-
 void test_arith_uint256() {
-    example(1);
-    // vector* tmp = vector_new(1, free);
     const unsigned char R1Array[] =
         "\x9c\x52\x4a\xdb\xcf\x56\x11\x12\x2b\x29\x12\x5e\x5d\x35\xd2\xd2"
         "\x22\x81\xaa\xb5\x33\xf0\x08\x32\xd5\x56\xb1\xf9\xea\xe5\x1d\x7d";
@@ -244,9 +212,9 @@ void test_arith_uint256() {
     u_assert_int_eq(num->checks.overflow, false);
 
     // Make sure that we don't generate compacts with the 0x00800000 bit set
-    // set_hash_uint(num_index, 0x80, typename(0x80));
-    // num = 0x80;
-    // u_assert_uint32_eq(get_compact(&num->x, num->checks.negative), 0x02008000U);
+    set_hash_uint(num_index, 0x80, typename(0x80));
+    num->x.u8[0] = 0x80;
+    u_assert_uint32_eq(get_compact(&num->x, num->checks.negative), 0x02008000U);
 
     set_hash_uint(num_index, 0x01fe0000, typename(0x01fe0000));
     print_hash_uint(num_index);
@@ -293,8 +261,7 @@ void test_arith_uint256() {
     set_hash_uint(num_index, 0x20123456, typename(0x20123456));
     print_hash_uint(num_index);
     u_assert_str_eq(get_hash_uint_by_index(num_index), "1234560000000000000000000000000000000000000000000000000000000000");
-    // u_assert_uint32_eq(get_compact(&num->x, num->checks.negative), 0x20123456U);
-    // u_assert_uint32_eq(get_compact_hash_uint(num_index), 0x20123456U);
+    u_assert_uint32_eq(get_compact_hash_uint(num_index), 0x20123456U);
     u_assert_int_eq(num->checks.negative, false);
     u_assert_int_eq(num->checks.overflow, false);
 
@@ -303,17 +270,8 @@ void test_arith_uint256() {
     u_assert_int_eq(num->checks.negative, false);
     u_assert_int_eq(num->checks.overflow, true);
 
-
-    remove_all_hash_uintes();
+    remove_all_hash_uints();
 
     // constructors, equality, inequality
     u_assert_int_eq(1, 0 + 1);
-
-
-    // dogecoin_free(R1L);
-    // dogecoin_free(R2L);
-    // dogecoin_free(OneL);
-    // dogecoin_free(MaxL);
-    // dogecoin_free(ZeroL);
-    // vector_free(tmp, false);
 }

@@ -260,7 +260,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
     *connected = false;
 
     dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
-    if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return NULL;
+    dogecoin_block_header_deserialize(&blockindex->header, buf);
 
     dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);
 

@@ -197,6 +197,10 @@ void dogecoin_auxpow_block_free(dogecoin_auxpow_block* block) {
     if (!block) return;
     dogecoin_block_header_free(block->header);
     dogecoin_tx_free(block->parent_coinbase);
+    int i = 0;
+    for (; i < block->parent_merkle_count; i++) {
+        dogecoin_free(block->parent_coinbase_merkle[i]);
+    }
     block->parent_merkle_count = 0;
     block->aux_merkle_count = 0;
     remove_all_hashes();
@@ -299,12 +303,8 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     if (!deser_u32(&block->header->nonce, buf))
         return false;
     dogecoin_block_header_copy(header, block->header);
-    if ((block->header->version & BLOCK_VERSION_AUXPOW_BIT) != 0) {
-        if (!deserialize_dogecoin_auxpow_block(block, buf)) {
-            printf("deserialize_dogecoin_auxpow_block failed!\n");
-            // dogecoin_auxpow_block_free(block);
-            // return false;
-        }
+    if ((block->header->version & BLOCK_VERSION_AUXPOW_BIT && buf->len) != 0) {
+        deserialize_dogecoin_auxpow_block(block, buf);
         }
     dogecoin_auxpow_block_free(block);
     return true;

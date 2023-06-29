@@ -80,31 +80,7 @@ char* get_hash_uint_by_index(int index);
 
 LIBDOGECOIN_API void remove_hash_uint(hash_uint *hash_uint);
 
-LIBDOGECOIN_API void remove_all_hash_uintes();
-
-/* hash_uintmap functions */
-typedef struct hash_uintmap {
-    int index;
-    int count;
-    hash_uint *hash_uints;
-    UT_hash_handle hh;
-} hash_uintmap;
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-static hash_uintmap *hash_uintmaps = NULL;
-#pragma GCC diagnostic pop
-
-// instantiates a new hash_uintmap
-LIBDOGECOIN_API hash_uintmap* new_hash_uintmap();
-LIBDOGECOIN_API int start_hash_uintmap();
-
-LIBDOGECOIN_API void add_hash_uintmap(hash_uintmap *map);
-LIBDOGECOIN_API hash_uintmap* find_hash_uintmap(int idx);
-
-LIBDOGECOIN_API void remove_hash_uintmap(hash_uintmap *map);
-
-LIBDOGECOIN_API void remove_all_hash_uintmaps();
+LIBDOGECOIN_API void remove_all_hash_uints();
 
 DISABLE_WARNING_PUSH
 DISABLE_WARNING(-Wunused-function)
@@ -209,62 +185,6 @@ long long int: "long long int", unsigned long long int: "unsigned long long int"
        uint8_t *: "uint8_t *",                 default: "other")
 
 #define fmt "%20s is '%s'\n"
-// int main() {
-
-//   size_t s; ptrdiff_t p; intmax_t i; int ai[3] = {0}; return printf( fmt fmt fmt fmt fmt fmt fmt fmt,
-
-//      "size_t", typename(s),               "ptrdiff_t", typename(p),     
-//    "intmax_t", typename(i),      "character constant", typename('0'),
-//  "0x7FFFFFFF", typename(0x7FFFFFFF),     "0xFFFFFFFF", typename(0xFFFFFFFF),
-// "0x7FFFFFFFU", typename(0x7FFFFFFFU),  "array of int", typename(ai));
-// }
-
-static const base_uint* self(base_uint* a, ...) {
-    // char* tostring() {
-    //     return utils_uint8_to_hex(b->x.u8, sizeof(b->x.u8));
-    // }
-    va_list parameters;
-    va_start (parameters, a);
-    printf("parameters length: %lu\n", ARRAYLEN(parameters));
-    printf("parameters length: %s\n", parameters);
-    printf("parameters length: %lu\n", strlen(parameters));
-    printf("%s\n", typename(parameters));
-    printf("%s\n", typename(parameters));
-    for (const char* p = parameters; *p != '\0'; ++p)
-    {
-        printf("bleh\n");
-    }
-    // char* arg = va_arg(parameters, char*);
-    // // printf(fmt, typename(arg));
-    // // printf("%d\n", sizeof(arg));
-    // // printf("%d\n", sizeof(*arg));
-    // // printf("%p\n", arg);
-    // // printf("%p\n", arg);
-    
-    // char* argc = arg;
-    // printf("%s\n", arg);
-    va_end(parameters);
-    // if (strlen(argc) > 0) {
-    //     printf("parameters: %s\n", argc);
-    //     printf("%zu\n", strlen(argc));
-    //     printf("%zu\n", sizeof(&argc[0]));
-    //     printf("%zu\n", sizeof(*a));
-    //     printf("%zu\n", sizeof(*arg));
-        
-    // }
-    // for (int j = 0; j < sizeof(parameters); j++) {
-    //     printf("parameters: %s\n", &argc[j]);
-    //     printf("parameters: %02x\n", argu[j]);
-    //     printf("%d\n", sizeof(&argc[j]));
-    //     printf("%d\n", sizeof(argu[j]));
-    // }
-
-    // int i = 0;
-    // b->WIDTH = WIDTH;
-    // for (; i < 32; i++)
-        // b->x.u8[i] =  ? va_arg(parameters, uint8_t*) : 0;
-    return a;
-}
 
 static const base_uint* _base_uint(base_uint* b, ...) {
     va_list parameters;
@@ -276,10 +196,6 @@ static const base_uint* _base_uint(base_uint* b, ...) {
         b->x.u32[i] = va_arg(parameters, uint8_t*) ? va_arg(parameters, uint8_t*) : 0;
     va_end(parameters);
     return b;
-}
-
-static const base_uint* _b(char* (*tostring)()) {
-
 }
 
 static void copy_base_uint(base_uint* a, base_uint* b) {
@@ -370,12 +286,6 @@ static base_uint* base_uint_and(base_uint* a, base_uint* b) {
     for (; i < 8; i++) {
         result->x.u32[i] = a->x.u32[i] & b->x.u32[i];
     }
-    printf("a: %s\n", utils_uint8_to_hex(a->x.u32, 32));
-    printf("a: %s\n", utils_uint8_to_hex(a->x.u8, 32));
-    printf("b: %s\n", utils_uint8_to_hex(b->x.u32, 32));
-    printf("b: %s\n", utils_uint8_to_hex(b->x.u8, 32));
-    printf("result: %s\n", utils_uint8_to_hex(result->x.u32, 32));
-    printf("result: %s\n", utils_uint8_to_hex(result->x.u8, 32));
     return result;
 }
 

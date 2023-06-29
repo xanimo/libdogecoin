@@ -337,7 +337,7 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     dogecoin_btree_tdestroy(wallet->wtxes_rbtree, dogecoin_free);
 
     if (wallet->waddr_vector) {
-        vector_free(wallet->waddr_vector, true);
+        vector_free(wallet->waddr_vector, false);
         wallet->waddr_vector = NULL;
     }
 

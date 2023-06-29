@@ -29,8 +29,6 @@
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/common.h>
 
-
-
 /**
  * @brief This function instantiates a new working hash_uint,
  * but does not add it to the hash_uint table.
@@ -99,81 +97,13 @@ hash_uint* zero_hash_uint(int index) {
 }
 
 void set_hash_uint(int index, uint8_t* x, char* typename) {
-    printnl(typename);
     hash_uint* hash_uint_local = zero_hash_uint(index);
-    dogecoin_bool set = true;
-    size_t i = sizeof(x);
-    if (typename=="unsigned char") {
-        printf("%s\n", typename);
-        goto sethash_uint;
-    } else if (typename=="unsigned long int") {
-        printf("%s\n", typename);
-        set = false;
-        goto sethash_uint;
-    } else if (typename=="int") {
-        printf("%s\n", typename);
-        set = false;
-        goto sethash_uint;
-    } else if (typename=="unsigned int") {
-        printf("%s\n", typename);
-        set = false;
-        goto sethash_uint;
-    }
 
 sethash_uint:
-    printf("i: %d\n", i);
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->x.u8, 32));
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->x.u32, 32));
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->data, 32));
     set_compact(&hash_uint_local->x, x, &hash_uint_local->checks.negative, &hash_uint_local->checks.overflow);
     memcpy_safe(hash_uint_local->data, hash_uint_local->x.u8, 32);
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->x.u8, 32));
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->x.u32, 32));
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->data, 32));
-    if (i < 32) {
-        if (((uint32_t)x >> 24) < 32) swap_bytes(hash_uint_local->data, 32);
-        else swap_bytes(hash_uint_local->data, 4);
-    } else {
-        x = utils_uint8_to_hex((uint8_t*)x, 32);
-        utils_reverse_hex(x, 64);
-        swap_bytes(hash_uint_local->x.u8, 32);
-    }
-    printf("u32: %s\n", utils_uint8_to_hex(hash_uint_local->x.u8, 32));
-    if (set) utils_uint256_sethex(x, hash_uint_local->data);
-}
-
-void set_hash_uint_compact(int index, uint8_t* x, char* typename) {
-
-    printnl(typename);
-    hash_uint* hash_uint_local = zero_hash_uint(index);
-    dogecoin_bool set = true;
-    if (typename=="unsigned char") {
-        printf("%s\n", typename);
-        x = utils_uint8_to_hex((uint8_t*)x, 32);
-        utils_reverse_hex(x, 64);
-    } else if (typename=="unsigned long int") {
-        printf("%s\n", typename);
-        size_t i = sizeof(x);
-        if (i < 32) {
-            memcpy_safe(hash_uint_local->data, (uint8_t*)&x, i);
-        }
-        set = false;
-    } else if (typename=="int") {
-        printf("%s\n", typename);
-        size_t i = sizeof(x);
-        if (i < 32) {
-            base_uint* b = init_base_uint();
-            dogecoin_bool overflow, negative;
-            set_compact(b, x, negative, overflow);
-            memcpy_safe(hash_uint_local->data, b->x.u8, 32);
-            printf("b: %s\n", to_string(b->x.u8));
-            printf("b: %s\n", to_string(b->x.u32));
-            swap_bytes(hash_uint_local->data, 32);
-            dogecoin_free(b);
-        }
-        set = false;
-    }
-    if (set) utils_uint256_sethex(x, hash_uint_local->data);
+    if (((uint32_t)x >> 24) < 32) swap_bytes(hash_uint_local->data, 32);
+    else swap_bytes(hash_uint_local->data, 4);
 }
 
 void showbits( unsigned int x )
@@ -217,101 +147,12 @@ void remove_hash_uint(hash_uint *hash_uint) {
  * 
  * @return Nothing. 
  */
-void remove_all_hash_uintes() {
+void remove_all_hash_uints() {
     struct hash_uint *hash_uint;
     struct hash_uint *tmp;
 
     HASH_ITER(hh, hash_uints, hash_uint, tmp) {
         remove_hash_uint(hash_uint);
-    }
-}
-
-/**
- * @brief This function instantiates a new working hash_uintmap,
- * but does not add it to the hash_uint table.
- * 
- * @return A pointer to the new working hash_uintmap. 
- */
-hash_uintmap* new_hash_uintmap() {
-    hash_uintmap* map = (struct hash_uintmap*)dogecoin_calloc(1, sizeof *map);
-    map->count = 1;
-    map->hash_uints = hash_uints;
-    map->index = HASH_COUNT(hash_uintmaps) + 1;
-    return map;
-}
-
-/**
- * @brief This function creates a new map, places it in
- * the hash_uint table, and returns the index of the new map,
- * starting from 1 and incrementing each subsequent call.
- * 
- * @return The index of the new map.
- */
-int start_hash_uintmap() {
-    hash_uintmap* map = new_hash_uintmap();
-    add_hash_uintmap(map);
-    return map->index;
-}
-
-/**
- * @brief This function takes a pointer to an existing working
- * hash_uintmap object and adds it to the hash_uint table.
- * 
- * @param map The pointer to the working hash_uintmap.
- * 
- * @return Nothing.
- */
-void add_hash_uintmap(hash_uintmap *map) {
-    hash_uintmap *hash_uint_local;
-    HASH_FIND_INT(hash_uintmaps, &map->index, hash_uint_local);
-    if (hash_uint_local == NULL) {
-        HASH_ADD_INT(hash_uintmaps, index, map);
-    } else {
-        HASH_REPLACE_INT(hash_uintmaps, index, map, hash_uint_local);
-    }
-    dogecoin_free(hash_uint_local);
-}
-
-/**
- * @brief This function takes an index and returns the working
- * hash_uintmap associated with that index in the hash_uint table.
- * 
- * @param index The index of the target working hash_uintmap.
- * 
- * @return The pointer to the working hash_uintmap associated with
- * the provided index.
- */
-hash_uintmap* find_hash_uintmap(int index) {
-    hash_uintmap *map;
-    HASH_FIND_INT(hash_uintmaps, &index, map);
-    return map;
-}
-
-/**
- * @brief This function removes the specified working hash_uintmap
- * from the hash_uint table and frees the hash_uintmaps in memory.
- * 
- * @param map The pointer to the hash_uintmap to remove.
- * 
- * @return Nothing.
- */
-void remove_hash_uintmap(hash_uintmap *map) {
-    HASH_DEL(hash_uintmaps, map); /* delete it (hash_uintmaps advances to next) */
-    dogecoin_free(map);
-}
-
-/**
- * @brief This function removes all working hash_uintmaps from
- * the hash_uint table.
- * 
- * @return Nothing. 
- */
-void remove_all_hash_uintmaps() {
-    struct hash_uintmap *map;
-    struct hash_uintmap *tmp;
-
-    HASH_ITER(hh, hash_uintmaps, map, tmp) {
-        remove_hash_uintmap(map);
     }
 }
 
@@ -492,7 +333,6 @@ void base_uint_set_hex(base_uint* a, const char* psz) {
             p1++;
         }
     }
-    printf("psz: %s\n", a->to_string(a));
 }
 
 char* base_uint_to_string(const struct base_uint* a) {
@@ -590,7 +430,7 @@ uint32_t get_compact(swap* a, dogecoin_bool f_negative)
 
 uint32_t get_compact_hash_uint(int index)
 {
-    hash_uint* a = find_hash_uint(a);
+    hash_uint* a = find_hash_uint(index);
     print_hash_uint(index);
     int nSize = (hash_uint_bits(a) + 7) / 8;
     uint32_t nCompact = 0;
@@ -598,7 +438,7 @@ uint32_t get_compact_hash_uint(int index)
         nCompact = get_hash_uint_low64(a) << 8 * (3 - nSize);
     } else {
         swap* bn = dogecoin_calloc(1, sizeof(*bn));
-        bn->u32[0] = (uint32_t)&a->x.u32[0] >> 8 * (nSize - 3);
+        bn->u32[0] = (uint32_t)a->x.u32[0] >> 8 * (nSize - 3);
         nCompact = get_low64(bn);
         dogecoin_free(bn);
     }
@@ -611,18 +451,13 @@ uint32_t get_compact_hash_uint(int index)
     assert((nCompact & ~0x007fffff) == 0);
     assert(nSize < 256);
     nCompact |= nSize << 24;
-    nCompact |= (&a->checks.negative && (nCompact & 0x007fffff) ? 0x00800000 : 0);
+    nCompact |= (a->checks.negative && (nCompact & 0x007fffff) ? 0x00800000 : 0);
     return nCompact;
 }
 
 swap* set_compact(swap* hash_uint, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow) {
     int size = compact >> 24;
     uint32_t word = compact & 0x007fffff;
-    printf("word: %lu\n", word);
-    printf("size: %d\n", size);
-    printf("size: %d\n", pf_negative);
-    printf("size: %d\n", &pf_negative);
-    printf("size: %d\n", *pf_negative);
     if (size <= 3) {
         word >>= 8 * (3 - size);
         hash_uint->u32[0] = word;
@@ -638,7 +473,6 @@ swap* set_compact(swap* hash_uint, uint32_t compact, dogecoin_bool *pf_negative,
                                     (word > 0xff && size > 33) ||
                                     (word > 0xffff && size > 32));
     }
-    printf("size: %d\n", *pf_negative);
     return hash_uint;
 }
 

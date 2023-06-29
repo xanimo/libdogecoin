@@ -205,7 +205,6 @@ void test_wallet_basics()
 
     dogecoin_wallet_addr *wallet_addr = dogecoin_wallet_next_addr(wallet);
     u_assert_int_eq(wallet_addr->childindex, 0);
-    dogecoin_wallet_free(wallet);
 
     wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
@@ -235,7 +234,6 @@ void test_wallet_basics()
     u_assert_is_null(waddr_search);
 
     dogecoin_wallet_flush(wallet);
-    dogecoin_wallet_free(wallet);
 
     wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created), true);
