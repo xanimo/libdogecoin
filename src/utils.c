@@ -394,6 +394,21 @@ const char *find_needle(const char *haystack, size_t haystack_length, const char
     return NULL;
 }
 
+char* to_string(uint8_t* x) {
+    return utils_uint8_to_hex(x, 32);
+}
+
+char* hash_to_string(uint8_t* x) {
+    char* hexbuf = to_string(x);
+    utils_reverse_hex(hexbuf, DOGECOIN_HASH_LENGTH*2);
+    return hexbuf;
+}
+
+uint8_t* hash_to_bytes(uint8_t* x) {
+    char* hexbuf = hash_to_string(x);
+    return utils_hex_to_uint8(hexbuf);
+}
+
 /**
  * @brief This function executes malloc() but exits the
  * program if unsuccessful.
