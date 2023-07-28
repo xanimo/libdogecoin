@@ -39,12 +39,32 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/sha2.h>
 #include <dogecoin/utils.h>
-#include <dogecoin/uint256.h>
+// #include <dogecoin/uint256.h>
 #include <dogecoin/validation.h>
+
+typedef struct pattern_match {
+    size_t index;
+    char* data;
+    void (*set_pattern_match)(struct pattern_match* pm, size_t index, char* data);
+} pattern_match;
+
+void set_pattern_match(struct pattern_match* pm, size_t index, char* data) {
+    pm->index = index;
+    memcpy_safe(pm->data, data, strlen(data));
+}
+
+pattern_match* init_pattern_match(size_t length) {
+    pattern_match* pm = dogecoin_calloc(1, sizeof(*pm));
+    dogecoin_mem_zero(pm->data, length);
+    pm->index = 0;
+    pm->set_pattern_match = set_pattern_match;
+    return pm;
+}
 
 dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainparams* params) {
     dogecoin_auxpow_block* block = (dogecoin_auxpow_block*)ctx;
     // print_block(block);
+
     if ((block->parent_merkle_index || block->aux_merkle_index) != 0) {
         printf("Auxpow is not a generate\n");
         return false;
@@ -56,80 +76,111 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         return false;
     }
 
+    vector* parent_merkle = vector_new(8, free);
+    size_t p = 0;
+    for (; p < block->parent_merkle_count; p++) {
+        vector_add(parent_merkle, block->parent_coinbase_merkle[p]);
+    }
+    // Check that the chain merkle root is in the coinbase
+    uint256* n_roothash = check_merkle_branch(hash, parent_merkle, parent_merkle->len);
+    unsigned char* vch_roothash = (unsigned char*)hash_to_string((uint8_t*)n_roothash); // correct endian
 
-    // if (block->parent_merkle_count > 30) {
-    //     printf("Aux POW chain merkle branch too long\n");
-    //     return false;
-    // }
+    dogecoin_tx_in* tx_in = dogecoin_tx_in_new();
+    tx_in = vector_idx(block->parent_coinbase->vin, 0);
+    char* script_sig = utils_uint8_to_hex((uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len);
 
-    // // Check that the chain merkle root is in the coinbase
-    // const uint256 nRootHash;
-    // memcpy_safe(nRootHash, check_merkle_branch(hash, block->parent_coinbase_merkle, block->parent_merkle_count), 32);
-    // printf("\n\nhash: %s\n", to_string(hash));
-    // unsigned char* vchRootHash = (unsigned char*)hash_to_string((uint8_t*)nRootHash); // correct endian
-    // printf("hash: %s\n\n\n", vchRootHash);
+    size_t haystack_index = 0, ct = 0;
+    for (; haystack_index < tx_in->script_sig->len; haystack_index++) {
 
-    // struct base_blob* blob = init_blob();
-    // printf("blob: %s\n", to_string((uint8_t*)blob));
-    // Check that we are in the parent block merkle tree
-    // if (check_merkle_branch(hash, block->parent_coinbase_merkle, block->parent_merkle_count) != &block->parent_header->merkle_root) {
-    //     printf("Aux POW merkle root incorrect");
-    //     return false;
-    // }
-    // dogecoin_tx_in* tx_in = vector_idx(block->parent_coinbase->vin, 0);
-    // tx_in->script_sig[0];
+        if (memcmp(&tx_in->script_sig->str[haystack_index], pchMergedMiningHeader, 4)==0) {
+            ct++; // multiple merged mining headers found if more than 1
 
-    // // Check that the same work is not submitted twice to our chain.
-    // //
+            if (haystack_index > 31) {
+                printf("Merged mining header found too late in coinbase!\n");
+                return false;
+            }
+            size_t j = tx_in->script_sig->len - haystack_index;
 
-    // cstring* pcHead =
-    //     std::search(script.begin(), script.end(), UBEGIN(pchMergedMiningHeader), UEND(pchMergedMiningHeader));
+            // printf("total length: %zu index: %zu j: %zu char: %s\n", tx_in->script_sig->len, haystack_index, j, utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index], 4));
+            char* merkle_root = to_string(&tx_in->script_sig->str[haystack_index + 4]);
+            utils_reverse_hex(merkle_root, 32*2);
+            if (strncmp(to_string((uint8_t*)hash), merkle_root, 32) != 0) {
+                printf("not equal\n");
+                return false;
+            }
+            
+            char* leftover = utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[haystack_index + 4 + 32], j - 36);
+            
+            char merkle_size[9];
+            dogecoin_mem_zero(merkle_size, 5);
+            slice(leftover, merkle_size, 0, 8);
 
-    // cstring* pc =
-    //     std::search(script.begin(), script.end(), vchRootHash.begin(), vchRootHash.end());
+            char merkle_nonce[9];
+            dogecoin_mem_zero(merkle_nonce, 5);
+            slice(leftover, merkle_nonce, 8, 16);
 
-    // if (pc == script.end())
-    //     return error("Aux POW missing chain merkle root in parent coinbase");
+            if ((strlen(merkle_size) + strlen(merkle_nonce)) / 2 < 8) {
+                printf("Aux POW missing chain merkle tree size and nonce in parent coinbase\n");
+                return false;
+            }
 
-    // if (pcHead != script.end())
-    // {
-    //     // Enforce only one chain merkle root by checking that a single instance of the merged
-    //     // mining header exists just before.
-    //     if (script.end() != std::search(pcHead + 1, script.end(), UBEGIN(pchMergedMiningHeader), UEND(pchMergedMiningHeader)))
-    //         return error("Multiple merged mining headers in coinbase");
-    //     if (pcHead + sizeof(pchMergedMiningHeader) != pc)
-    //         return error("Merged mining header is not just before chain merkle root");
-    // }
-    // else
-    // {
-    //     // For backward compatibility.
-    //     // Enforce only one chain merkle root by checking that it starts early in the coinbase.
-    //     // 8-12 bytes are enough to encode extraNonce and nBits.
-    //     if (pc - script.begin() > 20)
-    //         return error("Aux POW chain merkle root must start in the first 20 bytes of the parent coinbase");
-    // }
+            uint32_t nSize;
+            memcpy(&nSize, &tx_in->script_sig->str[haystack_index + 4 + 32], 4);
+            nSize = le32toh(nSize);
+            const unsigned merkleHeight = sizeof(vch_roothash);
+            if ((nSize * 256) != (1u << merkleHeight)) {
+                return printf("Aux POW merkle branch size does not match parent coinbase\n");
+            }
 
+            uint32_t nNonce;
+            memcpy(&nNonce, &tx_in->script_sig->str[haystack_index + 4 + 32 + 4], 4);
+            nNonce = le32toh(nNonce);
+            uint32_t expected_index = getExpectedIndex(nNonce, chainid, merkleHeight);
+            // printf("merkle: %d\n", block->parent_merkle_count);
+            uint32_t offset = 0;
+            switch (tx_in->script_sig->len)
+            {
+            case 49:
+                // printf("49\n");
+                offset = j + 12;
+                break;
+            case 62:
+                // printf("62\n");
+                offset = j + 4;
+                break;
+            case 63:
+                // printf("63\n");
+                offset = j + 3;
+                break;
+            case 73:
+                // printf("73\n");
+                offset = j - 4;
+                break;
+            case 74:
+                // printf("74\n");
+                offset = j - 5;
+                break;
+            case 76:
+                // printf("76\n");
+                offset = j - 10;
+                break;
+            case 85:
+                // printf("85\n");
+                offset = j;
+                break;
+            case 88:
+                // printf("88\n");
+                offset = j - 16;
+                break;
+            default:
+                break;
+            }
 
-    // // Ensure we are at a deterministic point in the merkle leaves by hashing
-    // // a nonce and our chain ID and comparing to the index.
-    // pc += vchRootHash.size();
-    // if (script.end() - pc < 8)
-    //     return error("Aux POW missing chain merkle tree size and nonce in parent coinbase");
-
-    // uint32_t nSize;
-    // memcpy(&nSize, &pc[0], 4);
-    // nSize = le32toh(nSize);
-    // const unsigned merkleHeight = vChainMerkleBranch.size();
-    // if (nSize != (1u << merkleHeight))
-    //     return error("Aux POW merkle branch size does not match parent coinbase");
-
-    // uint32_t nNonce;
-    // memcpy(&nNonce, &pc[4], 4);
-    // nNonce = le32toh (nNonce);
-    // if (nChainIndex != getExpectedIndex (nNonce, nChainId, merkleHeight))
-    //     return error("Aux POW wrong index");
-
-    // printf("inside check!\n");
+            if (offset != expected_index) {
+                return printf("Aux POW wrong index\n");
+            }
+        }
+    }
 
     return true;
 }
@@ -206,11 +257,12 @@ void print_transaction(dogecoin_tx* x) {
     for (; i < x->vin->len; i++) {
         printf("block->parent_coinbase->tx_in->i:               %d\n", i);
         dogecoin_tx_in* tx_in = vector_idx(x->vin, i);
-        uint32_t vout_index = tx_in->prevout.n;
         printf("block->parent_coinbase->vin->prevout.n:         %d\n", tx_in->prevout.n);
         char* hex_utxo_txid = utils_uint8_to_hex(tx_in->prevout.hash, sizeof tx_in->prevout.hash);
         printf("block->parent_coinbase->tx_in->prevout.hash:    %s\n", hex_utxo_txid);
-        printf("block->parent_coinbase->tx_in->script_sig:      %s\n", utils_uint8_to_hex((const uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len));
+        char* script_sig = utils_uint8_to_hex((const uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len);
+        printf("block->parent_coinbase->tx_in->script_sig:      %s\n", script_sig);
+
         printf("block->parent_coinbase->tx_in->sequence:        %x\n", tx_in->sequence);
     }
 

@@ -64,6 +64,7 @@ LIBDOGECOIN_API uint256* uint256S(const char *str);
 LIBDOGECOIN_API unsigned char* parse_hex(const char* psz);
 LIBDOGECOIN_API void swap_bytes(uint8_t *buf, int buf_size);
 LIBDOGECOIN_API const char *find_needle(const char *haystack, size_t haystack_length, const char *needle, size_t needle_length);
+LIBDOGECOIN_API uint8_t* bytes_find(uint8_t* haystack, size_t haystackLen, uint8_t* needle, size_t needleLen);
 LIBDOGECOIN_API char* to_string(uint8_t* x);
 LIBDOGECOIN_API char* hash_to_string(uint8_t* x);
 LIBDOGECOIN_API uint8_t* hash_to_bytes(uint8_t* x);

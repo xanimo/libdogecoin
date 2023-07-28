@@ -369,6 +369,23 @@ void swap_bytes(uint8_t *buf, int buf_size) {
     }
 }
 
+// Returns a pointer to the first byte of needle inside haystack, 
+uint8_t* bytes_find(uint8_t* haystack, size_t haystackLen, uint8_t* needle, size_t needleLen) {
+    if (needleLen > haystackLen) {
+        return false;
+    }
+    uint8_t* match = memchr(haystack, needle[0], haystackLen);
+    if (match != NULL) {
+        size_t remaining = haystackLen - ((uint8_t*)match - haystack);
+        if (needleLen <= remaining) {
+            if (memcmp(match, needle, needleLen) == 0) {
+                return match;
+            }
+        }
+    }
+    return NULL;
+}
+
 const char *find_needle(const char *haystack, size_t haystack_length, const char *needle, size_t needle_length) {
     size_t haystack_index = 0;
     for (; haystack_index < haystack_length; haystack_index++) {
