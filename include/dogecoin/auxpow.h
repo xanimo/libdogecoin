@@ -2,6 +2,9 @@
 
  The MIT License (MIT)
 
+ Copyright (c) 2009-2010 Satoshi Nakamoto
+ Copyright (c) 2009-2014 The Bitcoin developers
+ Copyright (c) 2014-2016 Daniel Kraft
  Copyright (c) 2023 bluezr
  Copyright (c) 2023 The Dogecoin Foundation
 
