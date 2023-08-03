@@ -34,6 +34,7 @@
 #include <inttypes.h>
 
 #include <dogecoin/auxpow.h>
+#include <dogecoin/mem.h>
 #include <dogecoin/portable_endian.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
@@ -75,7 +76,7 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         return false;
     }
 
-    vector* parent_merkle = vector_new(8, free);
+    vector* parent_merkle = vector_new(8, dogecoin_free);
     size_t p = 0;
     for (; p < block->parent_merkle_count; p++) {
         vector_add(parent_merkle, block->parent_coinbase_merkle[p]);
@@ -93,8 +94,8 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         bool needle_found = true;
         size_t header_idx = 0;
         for (; header_idx < 4; header_idx++) {
-            const auto haystack_char = tx_in->script_sig->str[idx + header_idx];
-            const auto needle_character = pchMergedMiningHeader[header_idx];
+            const int haystack_char = tx_in->script_sig->str[idx + header_idx];
+            const int needle_character = pchMergedMiningHeader[header_idx];
             if (haystack_char == needle_character) {
                 continue;
             } else {
@@ -287,6 +288,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     dogecoin_block_header_copy(header, block->header);
     if ((block->header->version & BLOCK_VERSION_AUXPOW_BIT) != 0 && buf->len) {
         if (!deserialize_dogecoin_auxpow_block(block, buf, params)) {
+            printf("%d:%s\n", __LINE__, __func__);
             return false;
         }
         }
