@@ -110,14 +110,14 @@ int get_expected_index (uint32_t nNonce, int nChainId, unsigned h)
   return rand % (1 << h);
 }
 
-uint256* check_merkle_branch(uint256 hash, const vector* parent_coinbase_merkle, int n_index) {
-    if (n_index == -1) return dogecoin_uint256_vla(1);
+uint256* check_merkle_branch(uint256 hash, const vector* parent_coinbase_merkle, unsigned int n_index) {
+    if (n_index == (unsigned int)-1) return dogecoin_uint256_vla(1);
     unsigned int i = n_index;
     for (; i < n_index; i++) {
         uint256 pcm;
         memcpy(pcm, vector_idx(parent_coinbase_merkle, i), 32);
         if (i & 1)
-            *hash = Hash(UBEGIN(*pcm), END(*pcm), UBEGIN(hash), UEND(hash));
+            *hash = Hash(UBEGIN(*pcm), UEND(*pcm), UBEGIN(hash), UEND(hash));
         else
             *hash = Hash(UBEGIN(hash), UEND(hash), UBEGIN(*pcm), UEND(*pcm));
         i >>= 1;
@@ -145,7 +145,7 @@ void init_aux_pow(dogecoin_block_header* header) {
     const uint256 empty_hash;
     dogecoin_tx_in* tx_in = coinbase->vin->data[0];
     memcpy_safe(tx_in->prevout.hash, empty_hash, 32);
-    dogecoin_script script;
+    // dogecoin_script script;
     tx_in->script_sig = input->data[0];
     assert(coinbase->vout->len==0);
     // CTransactionRef coinbaseRef = MakeTransactionRef(coinbase);

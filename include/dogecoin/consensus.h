@@ -134,29 +134,29 @@ dogecoin_bool err(struct validation_state* state, const char* str_reject_reason_
     state->mode = MODE_ERROR;
     return false;
 }
-const dogecoin_bool is_valid(struct validation_state* state) {
+dogecoin_bool is_valid(struct validation_state* state) {
     return state->mode == MODE_VALID;
 }
-const dogecoin_bool return_invalid(struct validation_state* state) {
+dogecoin_bool return_invalid(struct validation_state* state) {
     return state->mode == MODE_INVALID;
 }
-const dogecoin_bool is_err(struct validation_state* state) {
+dogecoin_bool is_err(struct validation_state* state) {
     return state->mode == MODE_ERROR;
 }
-const dogecoin_bool is_invalid(struct validation_state* state, int *n_dos_out) {
+dogecoin_bool is_invalid(struct validation_state* state, int *n_dos_out) {
     if (return_invalid(state)) {
         n_dos_out = state->n_dos;
         return true;
     }
     return false;
 }
-const dogecoin_bool corruption_possible(struct validation_state* state) {
+dogecoin_bool corruption_possible(struct validation_state* state) {
     return state->corruption_possible;
 }
 void set_corruption_possible(struct validation_state* state) {
     state->corruption_possible = true;
 }
-const unsigned int get_reject_code(struct validation_state* state) { return state->ch_reject_code; }
+unsigned int get_reject_code(struct validation_state* state) { return state->ch_reject_code; }
 const char* get_reject_reason(struct validation_state* state) { return state->str_reject_reason; }
 const char* get_debug_message(struct validation_state* state) { return state->str_debug_message; }
 

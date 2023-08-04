@@ -266,15 +266,6 @@ uint256* dogecoin_uint256_vla(size_t size) {
     return outarray;
 }
 
-uint256* dogecoin_u256_vla(size_t size) {
-    unsigned char outarray[32];
-    unsigned int i = 0;
-    for (; i < 8; i++) {
-        outarray[i] = 0;
-    }
-    return outarray;
-}
-
 char* dogecoin_char_vla(size_t size)
 {
     char* outarray;

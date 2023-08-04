@@ -388,8 +388,8 @@ const char *find_needle(const char *haystack, size_t haystack_length, const char
         bool needle_found = true;
         size_t needle_index = 0;
         for (; needle_index < needle_length; needle_index++) {
-            const auto haystack_character = haystack[haystack_index + needle_index];
-            const auto needle_character = needle[needle_index];
+            const int haystack_character = haystack[haystack_index + needle_index];
+            const int needle_character = needle[needle_index];
             if (haystack_character == needle_character) {
                 continue;
             } else {

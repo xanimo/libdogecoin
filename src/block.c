@@ -95,7 +95,7 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         size_t header_idx = 0;
         for (; header_idx < 4; header_idx++) {
             const int haystack_char = tx_in->script_sig->str[idx + header_idx];
-            const int needle_character = pchMergedMiningHeader[header_idx];
+            const int needle_character = pch_merged_mining_header[header_idx];
             if (haystack_char == needle_character) {
                 continue;
             } else {

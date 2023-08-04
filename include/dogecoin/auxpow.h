@@ -41,10 +41,10 @@ LIBDOGECOIN_BEGIN_DECL
 #define BLOCK_VERSION_AUXPOW_BIT 0x100
 
 /** Header for merge-mining data in the coinbase.  */
-static const unsigned char pchMergedMiningHeader[] = { 0xfa, 0xbe, 'm', 'm' };
+static const unsigned char pch_merged_mining_header[] = { 0xfa, 0xbe, 'm', 'm' };
 
 int get_expected_index(uint32_t nNonce, int nChainId, unsigned h);
-uint256* check_merkle_branch(uint256 hash, const vector* parent_coinbase_merkle, int n_index);
+uint256* check_merkle_branch(uint256 hash, const vector* parent_coinbase_merkle, unsigned int n_index);
 void init_aux_pow(dogecoin_block_header* block);
 
 LIBDOGECOIN_END_DECL

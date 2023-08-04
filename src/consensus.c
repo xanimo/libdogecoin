@@ -161,9 +161,9 @@ uint256* compute_merkle_root_from_branch(const uint256* leaf, const vector* merk
         uint256 vmb;
         memcpy(vmb, vector_idx(merkle_branch_vec, i), 32);
         if (n_index & 1) {
-            hash = Hash(BEGIN(*vmb), END(*vmb), BEGIN(hash), END(hash));
+            hash = Hash(UBEGIN(*vmb), UEND(*vmb), UBEGIN(hash), UEND(hash));
         } else {
-            hash = Hash(BEGIN(hash), END(hash), BEGIN(*vmb), END(*vmb));
+            hash = Hash(UBEGIN(hash), UEND(hash), UBEGIN(*vmb), UEND(*vmb));
         }
         n_index >>= 1;
     }
