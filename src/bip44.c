@@ -76,6 +76,7 @@ int derive_bip44_extended_private_key(const dogecoin_hdnode *master_key, const u
 
     /* Generate the BIP 44 extended private key using the master key and keypath */
     if (!dogecoin_hd_generate_key(bip44_key, keypath, master_key->private_key, master_key->chain_code, false)) {
+        fprintf(stderr, "ERROR: failed to generate BIP 44 extended private key\n");
         return -1;
     }
     debug_print("Account: %u\n", account);
@@ -127,14 +128,17 @@ int derive_bip44_extended_public_key(const dogecoin_hdnode *master_key, const ui
     }
     else {
         /* Construct the BIP 44 keypath using the input parameters and BIP 44 constants */
-        snprintf(keypath, BIP44_KEY_PATH_MAX_LENGTH, SLIP44_KEY_PATH "%s'/%u'/%s%s", is_testnet ? BIP44_COIN_TYPE_TEST : BIP44_COIN_TYPE , account, change_level, addr_idx_str);
+        snprintf(keypath, BIP44_KEY_PATH_MAX_LENGTH, SLIP44_KEY_PATH "%s/%u/%s%s", is_testnet ? BIP44_COIN_TYPE_TEST : BIP44_COIN_TYPE , account, change_level, addr_idx_str);
     }
 
-    /* Generate the BIP 44 extended public key using the master key and keypath */
-    if (!dogecoin_hd_generate_key(bip44_key, keypath, master_key->public_key, master_key->chain_code, true)) {
+    /* Perform public key derivation directly */
+    if (!dogecoin_hdnode_public_ckd(bip44_key, account)) {
+        fprintf(stderr, "ERROR: failed to perform public key derivation\n");
         return -1;
     }
+
     debug_print("Account: %u\n", account);
     debug_print("Derivation path: %s\n", keypath);
     return 0;
 }
+
