@@ -128,7 +128,7 @@ int derive_bip44_extended_public_key(const dogecoin_hdnode *master_key, const ui
     }
     else {
         /* Construct the BIP 44 keypath using the input parameters and BIP 44 constants */
-        snprintf(keypath, BIP44_KEY_PATH_MAX_LENGTH, SLIP44_KEY_PATH "%s/%u/%s%s", is_testnet ? BIP44_COIN_TYPE_TEST : BIP44_COIN_TYPE , account, change_level, addr_idx_str);
+        snprintf(keypath, BIP44_KEY_PATH_MAX_LENGTH, SLIP44_KEY_PATH "%s'/%u'/%s%s", is_testnet ? BIP44_COIN_TYPE_TEST : BIP44_COIN_TYPE , account, change_level, addr_idx_str);
     }
 
     /* Perform public key derivation directly */
