@@ -52,10 +52,10 @@ typedef struct base_uint_ {
 
 typedef base_uint_ arith_uint256;
 
-arith_uint256 init_arith_uint256();
-arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
+arith_uint256* init_arith_uint256();
+uint256* set_compact(uint256* hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow);
 uint256* arith_to_uint256(const arith_uint256 a);
-arith_uint256 uint_to_arith(const uint256* a);
+arith_uint256* uint_to_arith(const uint256* a);
 uint64_t get_low64(arith_uint256 pn);
 
 LIBDOGECOIN_END_DECL

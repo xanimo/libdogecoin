@@ -42,7 +42,7 @@
 dogecoin_bool dogecoin_block_header_scrypt_hash(cstring* s, uint256* hash) {
     char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
     unsigned char* inputbytes = (unsigned char*)utils_uint8_to_hex((uint8_t*)s->str, s->len);
-    scrypt_1024_1_1_256_sp_generic((const char*)&inputbytes[0], hash, scratchpad);
+    scrypt_1024_1_1_256_sp_generic((const char*)&inputbytes[0], utils_uint8_to_hex((const uint8_t*)hash, 32), scratchpad);
     return true;
     }
 
@@ -110,7 +110,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block block, dogecoin_chainparams* pa
     dogecoin_block_header_serialize(s, block.parent_header);
     dogecoin_block_header_scrypt_hash(s, &parent_hash);
     cstr_free(s, true);
-    swap_bytes((uint8_t*)&parent_hash, DOGECOIN_HASH_LENGTH);
+    swap_bytes((uint8_t*)parent_hash, DOGECOIN_HASH_LENGTH);
     if (!check_pow(&parent_hash, block.header->bits, params)) {
         printf("%s:%d:%s : check_pow failure : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;

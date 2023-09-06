@@ -25,14 +25,17 @@
 
 #include <dogecoin/arith_uint256.h>
 
-arith_uint256 init_arith_uint256() {
-    arith_uint256 x;
-    x.WIDTH = 8;
-    dogecoin_mem_zero(x.pn, x.WIDTH);
+arith_uint256* init_arith_uint256() {
+    arith_uint256* x = dogecoin_calloc(8, sizeof(uint32_t));
+    x->WIDTH = 8;
+    int i = 0;
+    for (; i < x->WIDTH; i++) {
+        x->pn[i] = 0;
+    }
     return x;
 }
 
-arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow) {
+uint256* set_compact(uint256* hash, uint32_t compact, dogecoin_bool *pf_negative, dogecoin_bool *pf_overflow) {
     int size = compact >> 24;
     uint32_t word = compact & 0x007fffff;
     if (size <= 3) {
@@ -49,13 +52,13 @@ arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *p
     return hash;
 }
 
-arith_uint256 uint_to_arith(const uint256* a)
+arith_uint256* uint_to_arith(const uint256* a)
 {
-    arith_uint256 b;
-    b.WIDTH = 8;
-    int x = 0;
-    for(; x < b.WIDTH; ++x)
-        b.pn[x] = read_le32((const unsigned char*)a + x * 4);
+    arith_uint256* b = init_arith_uint256();
+    for(int x=0; x<b->WIDTH; ++x)
+        b->pn[x] = &a[x];
+    // printf("a: %s\n", utils_uint8_to_hex(&a, 32));
+    printf("b: %s\n", utils_uint8_to_hex(b->pn, 32));
     return b;
 }
 
@@ -63,9 +66,10 @@ uint256* arith_to_uint256(const arith_uint256 a) {
     uint256* b = dogecoin_uint256_vla(1);
     int x = 0;
     for(; x < a.WIDTH; ++x)
-        write_le32((unsigned char*)b + x * 4, a.pn[x]);
+        *b[x] = a.pn[x];
     return b;
 }
+
 
 uint64_t get_low64(arith_uint256 a) {
     assert(a.WIDTH >= 2);
