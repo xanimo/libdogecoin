@@ -154,6 +154,11 @@ AC_COMPILE_IFELSE([AC_LANG_SOURCE([[void myfunc() {__builtin_expect(0,0);}]])],
 # Check for daemon(3)
 AC_CHECK_DECLS([daemon])
 
+# These packages don't provide pkgconfig config files across all
+# platforms, so we use older autoconf detection mechanisms:
+AC_CHECK_HEADER([gmp.h],,AC_MSG_ERROR(libgmp headers missing))
+AC_CHECK_LIB([gmp],[[__gmpn_sub_n]],GMP_LIBS=-lgmp, [AC_MSG_ERROR(libgmp missing)])
+
 m4_include(m4/macros/with.m4)
 ARG_WITH_SET([random-device], [/dev/urandom], [set the device to read random data from])
 if test "x$random_device" = x"/dev/urandom"; then
@@ -222,6 +227,8 @@ AC_SUBST(BUILD_EXEEXT)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(LIBUNISTRING)
+AC_SUBST(GMP_LIBS)
+AC_SUBST(GMPXX_LIBS)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])

@@ -1,4 +1,4 @@
-packages:=libevent libunistring
+packages:=libevent libunistring libgmp libmpfr
 native_packages := native_ccache
 
 wallet_packages=
