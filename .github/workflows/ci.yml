@@ -154,7 +154,7 @@ jobs:
               source ~/.bashrc
           else
             sudo apt-get update
-            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y autoconf automake libtool-bin libevent-dev build-essential curl python3 valgrind ${{ matrix.packages }}
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y autoconf automake libtool-bin libevent-dev build-essential lzip curl python3 valgrind ${{ matrix.packages }}
           fi
 
       - name: post install
@@ -195,7 +195,7 @@ jobs:
 
       - name: build depends
         run: |
-          make $MAKEJOBS -C depends HOST=${{ matrix.host }} ${{ matrix.dep-opts }}
+          ./contrib/scripts/setup.sh --host ${{ matrix.host }} --depends ${{ matrix.dep-opts }}
 
       - name: ccache
         uses: actions/cache@v3

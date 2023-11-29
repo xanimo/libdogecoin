@@ -4,7 +4,13 @@ $(package)_download_path=https://ftp.gnu.org/gnu/gmp/
 $(package)_file_name=gmp-6.3.0.tar.gz
 $(package)_sha256_hash=e56fd59d76810932a0555aa15a14b61c16bed66110d3c75cc2ac49ddaa9ab24c
 $(package)_dependencies=
-$(package)_config_opts=--enable-cxx --enable-static --disable-shared
+
+define $(package)_set_vars
+$(package)_config_opts=--enable-static --disable-shared --with-gnu-ld
+$(package)_config_opts_mingw32=--enable-mingw
+$(package)_config_opts_darwin=--enable-clang
+$(package)_config_opts_linux=--with-pic
+endef
 
 define $(package)_preprocess_cmds
 endef

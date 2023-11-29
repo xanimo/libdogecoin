@@ -65,6 +65,8 @@ if has_param '--host' "$@"; then
             if [ $DEPENDS ]; then
                 ARCH_PACKAGES+="g++-mingw-w64 "
             fi
+            export CC=$2-gcc
+            export CC_FOR_BUILD=$(gcc -dumpmachine)-gcc
             ARCH_PACKAGES+="nsis wine64 wine-stable bc wine-binfmt"
             TARGET_ARCH="amd64"
             $USE_SUDO dpkg --add-architecture $TARGET_ARCH
@@ -73,6 +75,8 @@ if has_param '--host' "$@"; then
             if [ $DEPENDS ]; then
                 ARCH_PACKAGES+="g++-mingw-w64 "
             fi
+            export CC=$2-gcc
+            export CC_FOR_BUILD=$(gcc -dumpmachine)-gcc
             ARCH_PACKAGES+="nsis wine32 wine-stable bc wine-binfmt zip"
             TARGET_ARCH="i386"
             $USE_SUDO dpkg --add-architecture $TARGET_ARCH
@@ -136,6 +140,7 @@ setup_linux() {
 }
 
 OPTIONS=""
+if has_param '--local' "$@"; then
 case "$TARGET_HOST_TRIPLET" in
     "x86_64-apple-darwin15")
         detect_os
@@ -157,8 +162,9 @@ case "$TARGET_HOST_TRIPLET" in
         setup_linux
     ;;
 esac
+fi
 
-NO_X_COMPILE=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "x86_64-apple-darwin15" "arm64-apple-darwin");
+NO_X_COMPILE=("x86_64-pc-linux-gnu" "i686-pc-linux-gnu" "x86_64-apple-darwin15" "arm64-apple-darwin" "x86_64-w64-mingw32");
 if [ "$DEPENDS" = "1" ]; then
     match=0
     for str in ${NO_X_COMPILE[@]}; do
