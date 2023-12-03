@@ -225,7 +225,7 @@ void print_transaction(dogecoin_tx* x) {
     char tx_hex[2048];
     utils_bin_to_hex((unsigned char *)tx->str, tx->len, tx_hex);
     printf("block->parent_coinbase (hex):                   %s\n", tx_hex); // uncomment to see raw hexadecimal transactions
-
+    
     // begin deconstruction into objects:
     printf("block->parent_coinbase->version:                %d\n", x->version);
 
@@ -303,7 +303,7 @@ void print_block(dogecoin_auxpow_block* block) {
  *
  * @return 1 if deserialization was successful, 0 otherwise.
  */
-int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params) {
+int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, int state) {
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
     if (!deser_u32(&block->header->version, buf))
         return false;
@@ -318,8 +318,8 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     if (!deser_u32(&block->header->nonce, buf))
         return false;
     dogecoin_block_header_copy(header, block->header);
-    if ((block->header->version & 0x100) != 0 && buf->len) {
-        if (!deserialize_dogecoin_auxpow_block(block, buf, params)) {
+    if ((block->header->version == 0x00620104) && buf->len) {
+        if (!deserialize_dogecoin_auxpow_block(block, buf, params, state)) {
             printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
             return false;
         }
@@ -328,7 +328,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     return true;
     }
 
-int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params) {
+int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, int state) {
     if (buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
         return printf("\ntransaction is invalid or to large.\n\n");
         }
@@ -348,8 +348,6 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
-
-    block->header->auxpow->is = (block->header->version & 0x100) == 256;
 
     if (!deser_u256(block->parent_hash, buffer)) {
         printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
@@ -417,10 +415,12 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         return false;
     }
 
-    if (!check_auxpow(block, (dogecoin_chainparams*)params)) {
-        printf("check_auxpow failed!\n");
-        print_block(block);
-        return false;
+    if (state == 2) {
+        if (!check_auxpow(block, (dogecoin_chainparams*)params)) {
+            printf("check_auxpow failed!\n");
+            print_block(block);
+            return false;
+        }
     }
 
     return true;

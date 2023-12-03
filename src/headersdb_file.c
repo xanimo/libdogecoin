@@ -79,7 +79,7 @@ int dogecoin_header_compare(const void *l, const void *r)
  *
  * @return Nothing.
  */
-dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only) {
+dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only, int stateflag) {
     dogecoin_headers_db* db;
     db = dogecoin_calloc(1, sizeof(*db));
 
@@ -92,6 +92,7 @@ dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainpa
     memcpy_safe(db->genesis.hash, chainparams->genesisblockhash, DOGECOIN_HASH_LENGTH);
     db->chaintip = &db->genesis;
     db->chainbottom = &db->genesis;
+    db->stateflag = stateflag;
 
     if (db->use_binary_tree) {
         db->tree_root = 0;
@@ -198,7 +199,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                 {
                     dogecoin_blockindex *chainheader = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
                     chainheader->height = height;
-                    if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all, db->params)) {
+                    if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all, db->params, db->stateflag)) {
                         dogecoin_block_header_free(&chainheader->header);
                         dogecoin_free(chainheader);
                         fprintf(stderr, "Error: Invalid data found.\n");
@@ -261,7 +262,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
     *connected = false;
 
     dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
-    if (!dogecoin_block_header_deserialize(&blockindex->header, buf, db->params)) return NULL;
+    if (!dogecoin_block_header_deserialize(&blockindex->header, buf, db->params, db->stateflag)) return NULL;
 
     dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);
 

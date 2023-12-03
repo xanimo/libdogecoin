@@ -44,7 +44,7 @@ LIBDOGECOIN_BEGIN_DECL
 */
 typedef struct dogecoin_headers_db_interface_
 {
-    void* (*init)(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);
+    void* (*init)(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only, int stateflag);
     void (*free)(void *db);
     dogecoin_bool (*load)(void *db, const char *filename);
     void (*fill_blocklocator_tip)(void* db, vector *blocklocators);

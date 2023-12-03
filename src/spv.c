@@ -114,7 +114,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
         client->use_checkpoints = use_checkpoints;
     }
     client->headers_db = &dogecoin_headers_db_interface_file;
-    client->headers_db_ctx = client->headers_db->init(params, headers_memonly);
+    client->headers_db_ctx = client->headers_db->init(params, headers_memonly, client->stateflags);
 
     // set callbacks
     client->header_connected = NULL;
@@ -427,7 +427,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 {
 
     dogecoin_spv_client *client = (dogecoin_spv_client *)node->nodegroup->ctx;
-
     if (strcmp(hdr->command, DOGECOIN_MSG_INV) == 0 && (node->state & NODE_BLOCKSYNC) == NODE_BLOCKSYNC)
     {
         struct const_buffer original_inv = { buf->p, buf->len };

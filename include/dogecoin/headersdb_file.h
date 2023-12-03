@@ -49,12 +49,13 @@ typedef struct dogecoin_headers_db_
     dogecoin_bool use_binary_tree;
     unsigned int max_hdr_in_mem;
     const dogecoin_chainparams *params;
+    int stateflag;
     dogecoin_blockindex genesis;
     dogecoin_blockindex *chaintip;
     dogecoin_blockindex *chainbottom;
 } dogecoin_headers_db;
 
-dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);
+dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only, int stateflag);
 void dogecoin_headers_db_free(dogecoin_headers_db *db);
 dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *filename);
 dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected);
@@ -66,7 +67,7 @@ dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db);
 void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256 hash, uint32_t height);
 
 static const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = {
-    (void* (*)(const dogecoin_chainparams*, dogecoin_bool))dogecoin_headers_db_new,
+    (void* (*)(const dogecoin_chainparams*, dogecoin_bool, int))dogecoin_headers_db_new,
     (void (*)(void *))dogecoin_headers_db_free,
     (dogecoin_bool (*)(void *, const char *))dogecoin_headers_db_load,
     (void (*)(void* , vector *))dogecoin_headers_db_fill_block_locator,
