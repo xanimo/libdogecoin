@@ -116,7 +116,7 @@ dogecoin_tx_in* dogecoin_tx_in_new()
     tx_in = dogecoin_calloc(1, sizeof(*tx_in));
     dogecoin_mem_zero(&tx_in->prevout, sizeof(tx_in->prevout));
     tx_in->sequence = UINT32_MAX;
-    tx_in->witness_stack = vector_new(8, dogecoin_tx_in_witness_stack_free_cb);
+    // tx_in->witness_stack = vector_new(8, dogecoin_tx_in_witness_stack_free_cb);
     return tx_in;
 }
 
@@ -542,7 +542,8 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
                     cstr_free(witness_item, true);
                     return false;
                 }
-                vector_add(tx_in->witness_stack, witness_item); //vector is responsible for freeing the items memory
+                // vector_add(tx_in->witness_stack, witness_item); //vector is responsible for freeing the items memory
+                cstr_free(witness_item, true);
             }
         }
     }
