@@ -55,6 +55,7 @@ typedef struct dogecoin_tx_in_ {
     dogecoin_tx_outpoint prevout;
     cstring* script_sig;
     uint32_t sequence;
+    vector* witness_stack;
 } dogecoin_tx_in;
 
 typedef struct dogecoin_tx_out_ {

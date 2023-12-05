@@ -415,12 +415,10 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         return false;
     }
 
-    if (state == 2) {
-        if (!check_auxpow(block, (dogecoin_chainparams*)params)) {
-            printf("check_auxpow failed!\n");
-            print_block(block);
-            return false;
-        }
+    if (!check_auxpow(block, (dogecoin_chainparams*)params)) {
+        printf("check_auxpow failed!\n");
+        print_block(block);
+        return false;
     }
 
     return true;
