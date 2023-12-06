@@ -452,6 +452,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
                     return NULL;
                 }
             }
+            dogecoin_wallet_addr_free(waddr);
         }
         dogecoin_free(address_copy);
     }
@@ -460,13 +461,13 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
         int i=0;
         for(;i<20;i++) {
             waddr = dogecoin_wallet_next_bip44_addr(wallet);
+            dogecoin_wallet_addr_free(waddr);
         }
-        char str[P2PKHLEN];
-        dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, str, P2PKHLEN);
     }
 #else
     else if (wallet->waddr_vector->len == 0) {
         waddr = dogecoin_wallet_next_addr(wallet);
+        dogecoin_wallet_addr_free(waddr);
     }
 #endif
     return wallet;
