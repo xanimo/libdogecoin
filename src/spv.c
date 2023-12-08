@@ -382,6 +382,8 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 } else if (check_node->bestknownheight == client->headers_db->getchaintip(client->headers_db_ctx)->height) {
                     nodes_at_same_height++;
                 }
+                dogecoin_net_spv_node_request_headers_or_blocks(check_node, false);
+                new_headers_available = true;
             }
         }
     }
@@ -397,6 +399,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 }
                 dogecoin_net_spv_node_request_headers_or_blocks(check_node, true);
                 new_headers_available = true;
+                return true;
             }
         }
     }

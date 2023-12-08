@@ -126,10 +126,19 @@ void dogecoin_headers_db_free(dogecoin_headers_db* db) {
         dogecoin_blockindex *scan_tip = db->chaintip;
         while (scan_tip && scan_tip != db->chainbottom) {
             dogecoin_blockindex *prev = scan_tip->prev;
-            dogecoin_free(scan_tip);
+            if (scan_tip) {
+                dogecoin_free(scan_tip);
+            }
             scan_tip = prev;
         }
     }
+
+#ifndef __APPLE__
+    // Free the chainbottom
+    if (db->chainbottom) {
+        dogecoin_free(db->chainbottom);
+    }
+#endif
 
     db->chaintip = NULL;
     db->chainbottom = NULL;

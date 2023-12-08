@@ -448,6 +448,8 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
             if (!waddr->ignore) {
                 if (!dogecoin_p2pkh_address_to_wallet_pubkeyhash(ptr, waddr, wallet)) {
                     dogecoin_wallet_addr_free(waddr);
+                    dogecoin_free(address_copy);
+                    return NULL;
                 }
             }
         }
@@ -1402,11 +1404,12 @@ int dogecoin_register_watch_address_with_node(char* address) {
             dogecoin_wallet* wallet = dogecoin_wallet_read(ptr);
             dogecoin_wallet_addr* waddr = dogecoin_wallet_addr_new();
             if (!dogecoin_p2pkh_address_to_wallet_pubkeyhash(ptr, waddr, wallet)) {
-                dogecoin_wallet_addr_free(waddr);
                 dogecoin_wallet_free(wallet);
                 dogecoin_free(address_copy);
                 return false;
             }
+            dogecoin_wallet_addr_free(waddr);
+            dogecoin_wallet_free(wallet);
         }
         dogecoin_free(address_copy);
     } else return false;
@@ -1552,7 +1555,6 @@ copy:
                     fseek(wallet->dbfile, reclen, SEEK_CUR);
                 }
             }
-            dogecoin_free(address_copy);
             cstr_free(record, true);
             dogecoin_wallet_flush(wallet);
             dogecoin_wallet_free(wallet);
@@ -1590,6 +1592,7 @@ copy:
             dogecoin_free(oldname);
             dogecoin_free(newname);
         }
+        dogecoin_free(address_copy);
     } else return false;
     return true;
 }
