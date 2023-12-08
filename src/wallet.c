@@ -452,7 +452,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
                     return NULL;
                 }
             }
-            dogecoin_wallet_addr_free(waddr);
+            if (wallet->waddr_vector->len == 0) dogecoin_wallet_addr_free(waddr);
         }
         dogecoin_free(address_copy);
     }
@@ -461,28 +461,30 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
         int i=0;
         for(;i<20;i++) {
             waddr = dogecoin_wallet_next_bip44_addr(wallet);
-            dogecoin_wallet_addr_free(waddr);
+            if (wallet->waddr_vector->len == 0) dogecoin_wallet_addr_free(waddr);
         }
     }
 #else
     else if (wallet->waddr_vector->len == 0) {
         waddr = dogecoin_wallet_next_addr(wallet);
-        dogecoin_wallet_addr_free(waddr);
+        if (wallet->waddr_vector->len == 0) dogecoin_wallet_addr_free(waddr);
     }
 #endif
     return wallet;
 }
 
 void print_utxos(dogecoin_wallet* wallet) {
-    /* Creating a vector of addresses and storing them in the wallet. */
-    vector* addrs = vector_new(1, free);
-    dogecoin_wallet_get_addresses(wallet, addrs);
-    unsigned int i;
-    for (i = 0; i < addrs->len; i++) {
-        char* addr = vector_idx(addrs, i);
-        printf("address: %s\n", addr);
-        }
-    vector_free(addrs, true);
+    if (wallet->waddr_vector->len) {
+        /* Creating a vector of addresses and storing them in the wallet. */
+        vector* addrs = vector_new(1, free);
+        dogecoin_wallet_get_addresses(wallet, addrs);
+        unsigned int i;
+        for (i = 0; i < addrs->len; i++) {
+            char* addr = vector_idx(addrs, i);
+            printf("address: %s\n", addr);
+            }
+        vector_free(addrs, true);
+    }
 
     if (wallet->spends->len) {
         char wallet_total[21];
@@ -509,6 +511,7 @@ void print_utxos(dogecoin_wallet* wallet) {
     if (unspent->len) {
         char wallet_total[21];
         uint64_t wallet_total_u64 = 0;
+        unsigned int i;
         for (i = 0; i < unspent->len; i++) {
             dogecoin_utxo* utxo = vector_idx(unspent, i);
             printf("%s\n", "----------------------");
@@ -1041,19 +1044,20 @@ dogecoin_bool dogecoin_p2pkh_address_to_wallet_pubkeyhash(const char* address_in
     if (!address_in || !addr || !wallet || !wallet->masterkey) return false;
 
     // lookup to see if we have address already:
-    vector* addrs = vector_new(1, free);
-    dogecoin_wallet_get_addresses(wallet, addrs);
     dogecoin_bool match = false;
-    unsigned int i;
-    for (i = 0; i < addrs->len; i++) {
-        char* watch_addr = vector_idx(addrs, i);
-        if (strncmp(watch_addr, address_in, strlen(watch_addr))==0) {
-            addr->childindex = i;
-            vector_free(addrs, true);
-            return match;
+    if (wallet->waddr_vector->len) {
+        vector* addrs = vector_new(1, free);
+        dogecoin_wallet_get_addresses(wallet, addrs);
+        unsigned int i;
+        for (i = 0; i < addrs->len; i++) {
+            char* watch_addr = vector_idx(addrs, i);
+            if (strncmp(watch_addr, address_in, strlen(watch_addr))==0) {
+                addr->childindex = i;
+                match = true;
+            }
         }
+        vector_free(addrs, true);
     }
-    vector_free(addrs, true);
 
     char* pubkey_hash = dogecoin_address_to_pubkey_hash((char*)address_in);
     if (!pubkey_hash) return false;
@@ -1077,14 +1081,16 @@ dogecoin_bool dogecoin_p2pkh_address_to_wallet_pubkeyhash(const char* address_in
 
 void dogecoin_wallet_get_addresses(dogecoin_wallet* wallet, vector* addr_out)
 {
-    unsigned int i;
-    for (i = 0; i < wallet->waddr_vector->len; i++) {
-        dogecoin_wallet_addr *waddr = vector_idx(wallet->waddr_vector, i);
-        if (!waddr->ignore) {
-            size_t addrsize = P2PKHLEN;
-            char* addr = dogecoin_calloc(1, addrsize);
-            dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, addr, addrsize);
-            vector_add(addr_out, addr);
+    if (wallet->waddr_vector->len) {
+        unsigned int i;
+        for (i = 0; i < wallet->waddr_vector->len; i++) {
+            dogecoin_wallet_addr *waddr = vector_idx(wallet->waddr_vector, i);
+            if (!waddr->ignore) {
+                size_t addrsize = P2PKHLEN;
+                char* addr = dogecoin_calloc(1, addrsize);
+                dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, addr, addrsize);
+                vector_add(addr_out, addr);
+            }
         }
     }
 }
