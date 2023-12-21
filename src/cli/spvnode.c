@@ -477,7 +477,8 @@ int main(int argc, char* argv[]) {
         printf("registered:     %d %s\n", res, address);
         uint64_t amount = dogecoin_get_balance(address);
         if (amount > 0) {
-            printf("amount:         %s\n", dogecoin_get_balance_str(address));
+            char* amount_str = dogecoin_get_balance_str(address);
+            printf("amount:         %s\n", amount_str);
             unsigned int utxo_count = dogecoin_get_utxos_length(address);
             if (utxo_count) {
                 printf("utxo count:     %d\n", utxo_count);
@@ -485,9 +486,12 @@ int main(int argc, char* argv[]) {
                 for (; i <= utxo_count; i++) {
                     printf("txid:           %s\n", dogecoin_get_utxo_txid_str(address, i));
                     printf("vout:           %d\n", dogecoin_get_utxo_vout(address, i));
-                    printf("amount:         %s\n", dogecoin_get_utxo_amount(address, i));
+                    char* utxo_amount_str = dogecoin_get_utxo_amount(address, i);
+                    printf("amount:         %s\n", utxo_amount_str);
+                    dogecoin_free(utxo_amount_str);
                 }
             }
+            dogecoin_free(amount_str);
         }
         res = dogecoin_unregister_watch_address_with_node(address);
         printf("unregistered:   %s\n", res ? "true" : "false");

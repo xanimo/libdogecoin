@@ -620,6 +620,31 @@ void slice(const char *str, char *result, size_t start, size_t end)
     strncpy(result, str + start, end - start);
 }
 
+void remove_substr(char *string, char *sub) {
+    char *match;
+    int len = strlen(sub);
+    while ((match = strstr(string, sub))) {
+        *match = '\0';
+        strcat(string, match+len);
+    }
+}
+
+void replace_last_after_delim(const char *str, char* delim, char* replacement) {
+    char* tmp = strdup((char*)str);
+    char* new = tmp;
+    char *strptr = strtok(new, delim);
+    char* last = NULL;
+    while (strptr != NULL) {
+        last = strptr;
+        strptr = strtok(NULL, delim);
+    }
+    if (last) {
+        remove_substr((char*)str, last);
+        append((char*)str, replacement);
+    }
+    dogecoin_free(tmp);
+}
+
 /**
  * @brief function to convert ascii text to hexadecimal string
  *
