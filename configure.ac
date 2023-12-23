@@ -215,6 +215,9 @@ if test "x$use_openenclave" = xyes; then
   AC_DEFINE(USE_OPENENCLAVE, 1, [Define this symbol if openenclave works])
 fi
 
+AC_CHECK_LIB(m, log, MATH_LIBS=-lm,[AC_MSG_ERROR([Missing required libm])])
+LIBS="$LIBS $MATH_LIBS"
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -222,6 +225,7 @@ AC_SUBST(BUILD_EXEEXT)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(LIBUNISTRING)
+AC_SUBST(MATH_LIBS)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])

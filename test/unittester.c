@@ -44,6 +44,7 @@ extern void test_bip32();
 extern void test_bip39();
 extern void test_bip44();
 extern void test_block_header();
+extern void test_bloom();
 extern void test_buffer();
 extern void test_cstr();
 extern void test_ecc();
@@ -123,6 +124,7 @@ int main()
     u_run_test(test_bip44);
 #endif
     u_run_test(test_block_header);
+    u_run_test(test_bloom);
     u_run_test(test_buffer);
     u_run_test(test_cstr);
     u_run_test(test_ecc);
