@@ -473,28 +473,37 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
     dogecoin_ecc_start();
     if (address != NULL) {
-        int res = dogecoin_register_watch_address_with_node(address);
-        printf("registered:     %d %s\n", res, address);
-        uint64_t amount = dogecoin_get_balance(address);
-        if (amount > 0) {
-            char* amount_str = dogecoin_get_balance_str(address);
-            printf("amount:         %s\n", amount_str);
-            unsigned int utxo_count = dogecoin_get_utxos_length(address);
-            if (utxo_count) {
-                printf("utxo count:     %d\n", utxo_count);
-                unsigned int i = 1;
-                for (; i <= utxo_count; i++) {
-                    printf("txid:           %s\n", dogecoin_get_utxo_txid_str(address, i));
-                    printf("vout:           %d\n", dogecoin_get_utxo_vout(address, i));
-                    char* utxo_amount_str = dogecoin_get_utxo_amount(address, i);
-                    printf("amount:         %s\n", utxo_amount_str);
-                    dogecoin_free(utxo_amount_str);
+        char delim[] = " ";
+        // copy address into a new string, strtok modifies the string
+        char* address_copy = strdup(address);
+        char *ptr;
+        char* temp_address_copy = address_copy;
+
+        while((ptr = strtok_r(temp_address_copy, delim, &temp_address_copy))) {
+            int res = dogecoin_register_watch_address_with_node(ptr);
+            printf("registered:     %d %s\n", res, ptr);
+            uint64_t amount = dogecoin_get_balance(ptr);
+            if (amount > 0) {
+                char* amount_str = dogecoin_get_balance_str(ptr);
+                printf("amount:         %s\n", amount_str);
+                unsigned int utxo_count = dogecoin_get_utxos_length(ptr);
+                if (utxo_count) {
+                    printf("utxo count:     %d\n", utxo_count);
+                    unsigned int i = 1;
+                    for (; i <= utxo_count; i++) {
+                        printf("txid:           %s\n", dogecoin_get_utxo_txid_str(ptr, i));
+                        printf("vout:           %d\n", dogecoin_get_utxo_vout(ptr, i));
+                        char* utxo_amount_str = dogecoin_get_utxo_amount(ptr, i);
+                        printf("amount:         %s\n", utxo_amount_str);
+                        dogecoin_free(utxo_amount_str);
+                    }
                 }
+                dogecoin_free(amount_str);
             }
-            dogecoin_free(amount_str);
+            res = dogecoin_unregister_watch_address_with_node(ptr);
+            printf("unregistered:   %s\n", res ? "true" : "false");
         }
-        res = dogecoin_unregister_watch_address_with_node(address);
-        printf("unregistered:   %s\n", res ? "true" : "false");
+        dogecoin_free(address_copy);
     }
     dogecoin_ecc_stop();
 #endif

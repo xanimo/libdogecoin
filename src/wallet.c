@@ -1582,6 +1582,7 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
                     dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, p2pkh_check, P2PKHLEN);
                     if (memcmp(record->str, buf, record->len)==0) {
                         found = 1;
+                        dogecoin_wallet_addr_free(waddr);
                     } else {
                         const char* addr_match = find_needle(ptr, strlen(ptr), p2pkh_check, P2PKHLEN);
                         if (!addr_match) {
@@ -1590,7 +1591,6 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
                             dogecoin_wallet_addr_free(waddr);
                         }
                     }
-                    if (found) dogecoin_wallet_addr_free(waddr);
                     free(buf);
                 } else if (rectype == WALLET_DB_REC_TYPE_TX) {
                     unsigned char* buf = dogecoin_uchar_vla(reclen);
@@ -1613,12 +1613,17 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
                             goto copy;
                         }
                     }
+                    dogecoin_free(buf);
 copy:
                     dogecoin_wallet_scrape_utxos(wallet_new, wtx);
                     dogecoin_wallet_add_wtx_move(wallet_new, wtx); // hands memory management over to the binary tree
                 } else {
                     fseek(wallet->dbfile, reclen, SEEK_CUR);
                 }
+            }
+
+            if (!wallet_new->waddr_vector->len) {
+                dogecoin_wallet_next_addr(wallet_new);
             }
 
             cstr_free(record, true);
