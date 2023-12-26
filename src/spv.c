@@ -161,7 +161,7 @@ void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char 
     unsigned int i = 0;
     for (; i < client->nodegroup->nodes->len; ++i) {
         dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
-        dogecoin_net_spv_node_bloom_filter_load(check_node);
+        check_node->filter = client->filter;
     }
 }
 
@@ -499,6 +499,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         deser_varlen(&varlen, buf);
         dogecoin_bool contains_block = false;
         dogecoin_bool contains_filtered_block = false;
+        dogecoin_bool contains_compact_block = false;
         client->nodegroup->log_write_cb("Get inv request with %d items\n", varlen);
 
         unsigned int i;
@@ -511,6 +512,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 deser_u256(node->last_requested_inv, buf);
             } else if (type = DOGECOIN_INV_TYPE_FILTERED_BLOCK) {
                 contains_filtered_block = true;
+                deser_u256(node->last_requested_inv, buf);
+            } else if (type = DOGECOIN_INV_TYPE_CMPCT_BLOCK) {
+                contains_compact_block = true;
                 deser_u256(node->last_requested_inv, buf);
             } else {
                 deser_skip(buf, 32);
@@ -533,6 +537,77 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
             dogecoin_node_send(node, p2p_msg);
             cstr_free(p2p_msg, true);
+        }
+
+        if (contains_compact_block)
+        {
+            node->time_last_request = time(NULL);
+            client->nodegroup->log_write_cb("Requesting %d compact blocks\n", varlen);
+            cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
+            dogecoin_node_send(node, p2p_msg);
+            cstr_free(p2p_msg, true);
+        }
+    }
+
+    if (strcmp(hdr->command, DOGECOIN_MSG_FILTERLOAD) == 0) {
+        unsigned int i = 0;
+        for (; i < client->nodegroup->nodes->len; ++i) {
+            dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
+            dogecoin_net_spv_node_bloom_filter_load(check_node);
+        }
+    }
+
+    if (strcmp(hdr->command, DOGECOIN_MSG_CMPCTBLOCK) == 0) {
+        dogecoin_bool connected;
+        dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
+
+        // flag off the block request stall check
+        node->time_last_request = time(NULL);
+
+        if (connected) {
+            if (client->header_connected) { client->header_connected(client); }
+
+            // for now, turn of stall checks if we are near the tip
+            if (pindex->header.timestamp > node->time_last_request - 30*60) {
+                node->time_last_request = 0;
+            }
+
+            time_t lasttime = pindex->header.timestamp;
+            printf("Downloaded new compact block with size %d at height %d from %s\n", hdr->data_len, pindex->height, ctime(&lasttime));
+            uint64_t start = time(NULL);
+
+            uint32_t amount_of_txs;
+            if (!deser_varlen(&amount_of_txs, buf)) {
+                return;
+            }
+
+            client->nodegroup->log_write_cb("Start parsing %d transactions...\n", (int)amount_of_txs);
+
+            size_t consumedlength = 0;
+            unsigned int i;
+            for (i = 0; i < amount_of_txs; i++)
+            {
+                dogecoin_tx* tx = dogecoin_tx_new();
+                if (!dogecoin_tx_deserialize(buf->p, buf->len, tx, &consumedlength)) {
+                    client->nodegroup->log_write_cb("Error deserializing transaction\n");
+                    dogecoin_tx_free(tx);
+                }
+                deser_skip(buf, consumedlength);
+                if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
+                dogecoin_tx_free(tx);
+            }
+            client->nodegroup->log_write_cb("done (took %llu secs)\n", (unsigned long long)(time(NULL) - start));
+        }
+        else
+        {
+            client->nodegroup->log_write_cb("Got invalid compact block (not in sequence) from node %d\n", node->nodeid);
+            node->state &= ~NODE_BLOCKSYNC;
+            return;
+        }
+
+        if (dogecoin_hash_equal(node->last_requested_inv, pindex->hash)) {
+            // last requested block reached, consider stop syncing
+            if (!client->called_sync_completed && client->sync_completed) { client->sync_completed(client); client->called_sync_completed = true; }
         }
     }
 
