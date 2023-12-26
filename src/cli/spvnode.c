@@ -266,7 +266,7 @@ static dogecoin_bool quit_when_synced = true;
  * @param client The client object.
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
-    printf("Sync completed, at height %d\n", &client->headers_db->getchaintip(client->headers_db_ctx)->height);
+    printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
     if (quit_when_synced) {
         dogecoin_node_group_shutdown(client->nodegroup);
     } else {

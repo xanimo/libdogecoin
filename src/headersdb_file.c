@@ -314,8 +314,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
 
     if (connect_at != NULL) {
         // Check the proof of work
-        printf("%d\n", blockindex->header.version);
-        printf("%d\n", is_auxpow(blockindex->header.version));
         if (!is_auxpow(blockindex->header.version) && strcmp(db->params->chainname, "regtest") != 0) {
             uint256 hash = {0};
             cstring* s = cstr_new_sz(64);
@@ -378,16 +376,16 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
 
             // Connect blocks from the new chain
             dogecoin_blockindex* current_block = blockindex;
-            while (memcmp(current_block->header.prev_block, common_ancestor->hash, DOGECOIN_HASH_LENGTH) != 0) {
-                // Find the block in the database that has the current block as its previous block
-                dogecoin_blockindex* next_block = dogecoin_headersdb_find(db, current_block->header.prev_block);
+            while (current_block && memcmp(current_block->hash, common_ancestor->hash, DOGECOIN_HASH_LENGTH) != 0) {
+                // current_block->prev points to the previous block in the chain
+                dogecoin_blockindex* prev_block = current_block->prev;
 
-                if (!next_block) {
-                    fprintf(stderr, "Next block in the new chain not found.\n");
+                if (!prev_block) {
+                    fprintf(stderr, "Previous block in the chain not found.\n");
 
-                    // Add the block to the tree
-                    if (db->use_binary_tree) {
-                        dogecoin_btree_tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
+                    // Add the current_block to the tree if it's not already part of the main chain
+                    if (db->use_binary_tree && current_block != blockindex) {
+                        dogecoin_btree_tsearch(current_block, &db->tree_root, dogecoin_header_compare);
                     }
 
                     // Free the dynamically allocated memory
@@ -396,9 +394,9 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
                     return NULL;
                 }
 
-                // Set the next block as the new chain tip
-                db->chaintip = next_block;
-                current_block = next_block->prev; // Move to the previous block in the chain
+                // Update the chain tip to the previous block
+                db->chaintip = prev_block;
+                current_block = prev_block;
             }
 
             printf("Chain reorganization: %d blocks disconnected, %d blocks connected\n", blockindex->height - common_ancestor->height, blockindex->height - db->chaintip->height);
@@ -421,6 +419,9 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             *connected = true;
         }
         else if (blockindex->height > db->chaintip->height) {
+            // Set the new block as the new chain tip
+            db->chaintip = blockindex;
+
             // Block is valid and part of the main chain, so add it to the tree
             if (db->use_binary_tree) {
                 dogecoin_btree_tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
@@ -535,8 +536,6 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256 h
  * @return The current tip of the blockchain.
  */
 dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db) {
-    printf("%d\n", db->chaintip->height);
-    printf("%d\n", db->chainbottom->height);
     return db->chaintip;
 }
 
