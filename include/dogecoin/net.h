@@ -31,6 +31,7 @@
 
 #include <stdarg.h>
 
+#include <dogecoin/bloom.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/tx.h>
@@ -96,7 +97,9 @@ typedef struct dogecoin_node_ {
     uint64_t services;
     uint32_t state;
     int missbehavescore;
+    int32_t nVersion;
     dogecoin_bool version_handshake;
+    struct bloom filter;
 
     unsigned int bestknownheight;
 

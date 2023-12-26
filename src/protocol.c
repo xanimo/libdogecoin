@@ -210,7 +210,6 @@ void dogecoin_p2p_msg_version_init(dogecoin_p2p_version_msg* msg, const dogecoin
     msg->version = DOGECOIN_PROTOCOL_VERSION;
     msg->services = 0;
     msg->timestamp = time(NULL);
-    msg->timestamp = time(NULL);
     if (addrTo)
         msg->addr_recv = *addrTo;
     else

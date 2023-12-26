@@ -39,7 +39,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+LIBDOGECOIN_API void ser_compact_size(cstring* s, size_t p);
 LIBDOGECOIN_API void ser_bytes(cstring* s, const void* p, size_t len);
+LIBDOGECOIN_API void ser_u8(cstring* s, uint8_t v_);
 LIBDOGECOIN_API void ser_u16(cstring* s, uint16_t v_);
 LIBDOGECOIN_API void ser_u32(cstring* s, uint32_t v_);
 LIBDOGECOIN_API void ser_u64(cstring* s, uint64_t v_);
@@ -51,8 +53,10 @@ LIBDOGECOIN_API void ser_varstr(cstring* s, cstring* s_in);
 LIBDOGECOIN_API void ser_s32(cstring* s, int32_t v_);
 LIBDOGECOIN_API void ser_s64(cstring* s, int64_t v_);
 
+LIBDOGECOIN_API int deser_compact_size(struct const_buffer* buf, size_t offset);
 LIBDOGECOIN_API int deser_skip(struct const_buffer* buf, size_t len);
 LIBDOGECOIN_API int deser_bytes(void* po, struct const_buffer* buf, size_t len);
+LIBDOGECOIN_API int deser_u8(uint8_t* vo, struct const_buffer* buf);
 LIBDOGECOIN_API int deser_u16(uint16_t* vo, struct const_buffer* buf);
 LIBDOGECOIN_API int deser_u32(uint32_t* vo, struct const_buffer* buf);
 LIBDOGECOIN_API int deser_i32(int32_t* vo, struct const_buffer* buf);

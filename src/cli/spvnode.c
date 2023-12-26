@@ -55,6 +55,7 @@
 #include <dogecoin/constants.h>
 #include <dogecoin/base58.h>
 #include <dogecoin/bip39.h>
+#include <dogecoin/bloom.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
@@ -265,7 +266,7 @@ static dogecoin_bool quit_when_synced = true;
  * @param client The client object.
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
-    printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
+    printf("Sync completed, at height %d\n", &client->headers_db->getchaintip(client->headers_db_ctx)->height);
     if (quit_when_synced) {
         dogecoin_node_group_shutdown(client->nodegroup);
     } else {
@@ -392,6 +393,17 @@ int main(int argc, char* argv[]) {
         print_utxos(wallet);
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
+        // insert addresses to bloom filter:
+        assert(bloom_init(&client->filter, wallet->waddr_vector->len, 0.001, 0, BLOOM_UPDATE_ALL) == true);
+        client->filter.nFlags = BLOOM_UPDATE_ALL;
+        unsigned int i = 0;
+        for (; i < wallet->waddr_vector->len; i++) {
+            dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, i);
+            char addr[P2PKHLEN];
+            dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, wallet->chain, addr, P2PKHLEN);
+            bloom_insert(&client->filter, addr, sizeof(addr));
+            assert(bloom_contains(&client->filter, addr, sizeof(addr)) == true);
+        }
 #endif
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;

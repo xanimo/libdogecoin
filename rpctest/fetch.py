@@ -104,7 +104,7 @@ for f in deps_path:
 subprocess.run([os.path.join(os.getcwd(), "rpctest/path.sh")])
 subprocess.run([os.path.join(os.getcwd(), "rpctest/spvtool.py")])
 
-rmlist = ['./dogecoin-*', 'dummy', 'dogecoind', '*.tar.gz', '*.zip', '*.asc']
+rmlist = ['./dogecoin-*', 'dogecoind', '*.tar.gz', '*.zip', '*.asc']
 for path in rmlist:
     for name in glob.glob(path):
         if os.path.isdir(name):

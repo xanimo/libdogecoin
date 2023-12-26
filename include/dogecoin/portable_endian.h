@@ -24,6 +24,14 @@ LIBDOGECOIN_BEGIN_DECL
 
 #include <endian.h>
 
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define htole8(x) (x)
+# elif __BYTE_ORDER == __BIG_ENDIAN
+#  define htole8(x) bswap_8(x)
+#else
+#error UNKNOWN BYTE ORDER
+#endif
+
 #elif defined(__APPLE__)
 
 #include <libkern/OSByteOrder.h>

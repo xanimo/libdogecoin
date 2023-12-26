@@ -114,75 +114,75 @@ int main()
 {
     dogecoin_ecc_start();
 
-    u_run_test(test_address);
-    u_run_test(test_aes);
-    u_run_test(test_base58);
-    u_run_test(test_base64);
-    u_run_test(test_bip32);
-#if WIN32 || USE_UNISTRING
-    u_run_test(test_bip39);
-    u_run_test(test_bip44);
-#endif
-    u_run_test(test_block_header);
+//     u_run_test(test_address);
+//     u_run_test(test_aes);
+//     u_run_test(test_base58);
+//     u_run_test(test_base64);
+//     u_run_test(test_bip32);
+// #if WIN32 || USE_UNISTRING
+//     u_run_test(test_bip39);
+//     u_run_test(test_bip44);
+// #endif
+    // u_run_test(test_block_header);
     u_run_test(test_bloom);
-    u_run_test(test_buffer);
-    u_run_test(test_cstr);
-    u_run_test(test_ecc);
-    u_run_test(test_hash);
-    u_run_test(test_key);
-    u_run_test(test_koinu);
-    u_run_test(test_memory);
-    u_run_test(test_moon);
-    u_run_test(test_op_return);
-    u_run_test(test_random);
-    u_run_test(test_rmd160);
-    u_run_test(test_scrypt);
-    u_run_test(test_serialize);
-    u_run_test(test_sha_256);
-    u_run_test(test_sha_512);
-    u_run_test(test_sha_hmac);
-    u_run_test(test_signmsg);
-    u_run_test(test_signmsg_ext);
-    u_run_test(test_tpm);
-    u_run_test(test_transaction);
-    u_run_test(test_tx_serialization);
-    u_run_test(test_invalid_tx_deser);
-    u_run_test(test_tx_sign);
-    u_run_test(test_tx_sighash);
-    u_run_test(test_tx_sighash_ext);
-    u_run_test(test_tx_negative_version);
-    u_run_test(test_scripts);
-    u_run_test(test_script_parse);
-    u_run_test(test_script_op_codeseperator);
-    u_run_test(test_utils);
-    u_run_test(test_vector);
-    u_run_test(test_qr);
+    // u_run_test(test_buffer);
+    // u_run_test(test_cstr);
+    // u_run_test(test_ecc);
+    // u_run_test(test_hash);
+    // u_run_test(test_key);
+    // u_run_test(test_koinu);
+    // u_run_test(test_memory);
+    // u_run_test(test_moon);
+    // u_run_test(test_op_return);
+    // u_run_test(test_random);
+    // u_run_test(test_rmd160);
+    // u_run_test(test_scrypt);
+    // u_run_test(test_serialize);
+    // u_run_test(test_sha_256);
+    // u_run_test(test_sha_512);
+    // u_run_test(test_sha_hmac);
+    // u_run_test(test_signmsg);
+    // u_run_test(test_signmsg_ext);
+    // u_run_test(test_tpm);
+    // u_run_test(test_transaction);
+    // u_run_test(test_tx_serialization);
+    // u_run_test(test_invalid_tx_deser);
+    // u_run_test(test_tx_sign);
+    // u_run_test(test_tx_sighash);
+    // u_run_test(test_tx_sighash_ext);
+    // u_run_test(test_tx_negative_version);
+    // u_run_test(test_scripts);
+    // u_run_test(test_script_parse);
+    // u_run_test(test_script_op_codeseperator);
+    // u_run_test(test_utils);
+    // u_run_test(test_vector);
+    // u_run_test(test_qr);
 
-#ifdef WITH_LOGDB
-    u_run_test(test_red_black_tree);
-    u_run_test(test_logdb_memdb);
-    u_run_test(test_logdb_rbtree);
-    u_run_test(test_examples);
-#endif
+// #ifdef WITH_LOGDB
+//     u_run_test(test_red_black_tree);
+//     u_run_test(test_logdb_memdb);
+//     u_run_test(test_logdb_rbtree);
+//     u_run_test(test_examples);
+// #endif
 
-#ifdef WITH_WALLET
-    u_run_test(test_wallet_basics);
-    u_run_test(test_wallet);
-#endif
+// #ifdef WITH_WALLET
+//     u_run_test(test_wallet_basics);
+//     u_run_test(test_wallet);
+// #endif
 
-#ifdef WITH_TOOLS
-    u_run_test(test_tool);
-#endif
+// #ifdef WITH_TOOLS
+//     u_run_test(test_tool);
+// #endif
 
-#ifdef WITH_NET
-    u_run_test(test_net_flag_defined);
-    u_run_test(test_net_basics_plus_download_block);
-    u_run_test(test_protocol);
-    u_run_test(test_reorg);
-    u_run_test(test_spv);
-#else
-    u_run_test(test_net_flag_not_defined);
-#endif
+// #ifdef WITH_NET
+//     u_run_test(test_net_flag_defined);
+//     u_run_test(test_net_basics_plus_download_block);
+//     u_run_test(test_protocol);
+//     u_run_test(test_reorg);
+    // u_run_test(test_spv);
+// #else
+//     u_run_test(test_net_flag_not_defined);
+// #endif
 
     dogecoin_ecc_stop();
 

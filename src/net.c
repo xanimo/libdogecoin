@@ -288,6 +288,7 @@ dogecoin_node* dogecoin_node_new()
     dogecoin_node* node;
     node = dogecoin_calloc(1, sizeof(*node));
     node->version_handshake = false;
+    node->nVersion = 0;
     node->state = 0;
     node->nonce = 0;
     node->services = 0;
@@ -344,6 +345,7 @@ void dogecoin_node_release_events(dogecoin_node* node)
  */
 dogecoin_bool dogecoin_node_misbehave(dogecoin_node* node)
 {
+    node->missbehavescore = 100;
     node->nodegroup->log_write_cb("Mark node %d as missbehaved\n", node->nodeid);
     node->state |= NODE_MISSBEHAVED;
     dogecoin_node_connection_state_changed(node);
@@ -699,6 +701,7 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
             if ((v_msg_check.services & DOGECOIN_NODE_NETWORK) != DOGECOIN_NODE_NETWORK) {
                 dogecoin_node_disconnect(node);
             }
+            node->nVersion = v_msg_check.version;
             node->bestknownheight = v_msg_check.start_height;
             node->nodegroup->log_write_cb("Connected to node %d: %s (%d)\n", node->nodeid, v_msg_check.useragent, v_msg_check.start_height);
             /* confirm version via verack */
@@ -816,6 +819,7 @@ dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *g
         dogecoin_mem_zero(working_str, sizeof(working_str));
         size_t offset = 0;
         unsigned int i;
+        printf("%s\n", ips);
         for (i = 0; i <= strlen(ips); i++) {
             if (i == strlen(ips) || ips[i] == ',') {
                 dogecoin_node* node = dogecoin_node_new();

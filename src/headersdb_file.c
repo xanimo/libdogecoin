@@ -314,7 +314,9 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
 
     if (connect_at != NULL) {
         // Check the proof of work
-        if (!is_auxpow(blockindex->header.version)) {
+        printf("%d\n", blockindex->header.version);
+        printf("%d\n", is_auxpow(blockindex->header.version));
+        if (!is_auxpow(blockindex->header.version) && strcmp(db->params->chainname, "regtest") != 0) {
             uint256 hash = {0};
             cstring* s = cstr_new_sz(64);
             dogecoin_block_header_serialize(s, (const dogecoin_block_header*) &blockindex->header);
@@ -533,6 +535,8 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256 h
  * @return The current tip of the blockchain.
  */
 dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db) {
+    printf("%d\n", db->chaintip->height);
+    printf("%d\n", db->chainbottom->height);
     return db->chaintip;
 }
 

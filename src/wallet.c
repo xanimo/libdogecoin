@@ -506,6 +506,13 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
         {
             dogecoin_p2pkh_address_to_wallet(ptr, wallet);
         }
+        // if (wallet->waddr_vector->len < 20) {
+        //     size_t len = 20 - wallet->waddr_vector->len;
+        //     size_t i = 0;
+        //     for (; i < len; i++) {
+        //         dogecoin_wallet_next_addr(wallet);
+        //     }
+        // }
         dogecoin_free(address_copy);
     }
 #ifdef USE_UNISTRING
@@ -517,7 +524,10 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
     }
 #else
     else if (wallet->waddr_vector->len == 0) {
-        dogecoin_wallet_next_addr(wallet);
+        int i = 0;
+        for (; i < 20; i++) {
+            dogecoin_wallet_next_addr(wallet);
+        }
     }
 #endif
     return wallet;

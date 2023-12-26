@@ -52,6 +52,7 @@ typedef struct dogecoin_spv_client_
     int stateflags;
     uint64_t last_statecheck_time;
     dogecoin_bool called_sync_completed;
+    struct bloom filter;
     void *headers_db_ctx;
     const dogecoin_headers_db_interface *headers_db;
 

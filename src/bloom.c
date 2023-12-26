@@ -125,6 +125,8 @@ bool deser_bloom(struct bloom *bf, struct const_buffer *buf)
 {
 	if (!deser_varstr(&bf->vData, buf)) return false;
 	if (!deser_u32(&bf->nHashFuncs, buf)) return false;
+	if (!deser_u32(&bf->nTweak, buf)) return false;
+	if (!deser_bytes(&bf->nFlags, buf, sizeof(uint8_t))) return false;
 	return true;
 }
 
@@ -132,9 +134,11 @@ void ser_bloom(cstring *s, const struct bloom *bf)
 {
 	ser_varstr(s, bf->vData);
 	ser_u32(s, bf->nHashFuncs);
+	ser_u32(s, bf->nTweak);
+    ser_u8(s, bf->nFlags);
 }
 
-bool bloom_init(struct bloom *bf, unsigned int nElements, double nFPRate)
+bool bloom_init(struct bloom *bf, unsigned int nElements, double nFPRate, uint32_t nTweak, uint8_t nFlags)
 {
 	memset(bf, 0, sizeof(*bf));
 
@@ -146,6 +150,9 @@ bool bloom_init(struct bloom *bf, unsigned int nElements, double nFPRate)
 
 	bf->nHashFuncs =
 	MIN((unsigned int)(bf->vData->len * 8 / nElements * LN2), MAX_HASH_FUNCS);
+
+    bf->nTweak = nTweak == NULL ? 0 : nTweak;
+    bf->nFlags = nFlags == NULL ? BLOOM_UPDATE_NONE : nFlags;
 
 	return true;
 }
@@ -161,4 +168,6 @@ void bloom_free(struct bloom *bf)
 		cstr_free(bf->vData, true);
 		bf->vData = NULL;
 	}
+    bf->nTweak = 0;
+    bf->nFlags = BLOOM_UPDATE_NONE;
 }

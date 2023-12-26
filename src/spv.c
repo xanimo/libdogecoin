@@ -87,6 +87,21 @@ void dogecoin_net_set_spv(dogecoin_node_group *nodegroup)
 #endif
 }
 
+void dogecoin_net_spv_node_bloom_filter_load(dogecoin_node* node) {
+    dogecoin_spv_client *client = (dogecoin_spv_client *)node->nodegroup->ctx;
+    if (bloom_size_ok(&client->filter)) {
+        cstring *compactsize = cstr_new_sz(0);
+        ser_compact_size(compactsize, client->filter.vData->len);
+        cstring* filter_msg = cstr_new_sz(9 + compactsize->len + client->filter.vData->len);
+        ser_bloom(filter_msg, &client->filter);
+        cstr_free(compactsize, true);
+        cstring* filter_load_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_FILTERLOAD, filter_msg->str, filter_msg->len);
+        printf("%s\n", utils_uint8_to_hex(filter_load_msg->str, filter_load_msg->len));
+        dogecoin_node_send(node, filter_load_msg);
+        cstr_free(filter_load_msg, true);
+    } else return;
+}
+
 /**
  * The function creates a new dogecoin_spv_client object and initializes it
  *
@@ -143,6 +158,11 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
 void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char *ips)
 {
     dogecoin_node_group_add_peers_by_ip_or_seed(client->nodegroup, ips);
+    unsigned int i = 0;
+    for (; i < client->nodegroup->nodes->len; ++i) {
+        dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
+        dogecoin_net_spv_node_bloom_filter_load(check_node);
+    }
 }
 
 /**
@@ -184,6 +204,10 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         client->nodegroup = NULL;
     }
 
+    if (&client->filter) {
+        bloom_free(&client->filter);
+    }
+
     dogecoin_free(client);
 }
 
@@ -204,7 +228,6 @@ dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client *client, const char *
         return false;
 
     return client->headers_db->load(client->headers_db_ctx, file_path);
-
 }
 
 /**
@@ -475,7 +498,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         uint32_t varlen;
         deser_varlen(&varlen, buf);
         dogecoin_bool contains_block = false;
-
+        dogecoin_bool contains_filtered_block = false;
         client->nodegroup->log_write_cb("Get inv request with %d items\n", varlen);
 
         unsigned int i;
@@ -486,6 +509,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (type == DOGECOIN_INV_TYPE_BLOCK) {
                 contains_block = true;
                 deser_u256(node->last_requested_inv, buf);
+            } else if (type = DOGECOIN_INV_TYPE_FILTERED_BLOCK) {
+                contains_filtered_block = true;
+                deser_u256(node->last_requested_inv, buf);
             } else {
                 deser_skip(buf, 32);
             }
@@ -495,6 +521,15 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         {
             node->time_last_request = time(NULL);
             client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
+            cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
+            dogecoin_node_send(node, p2p_msg);
+            cstr_free(p2p_msg, true);
+        }
+
+        if (contains_filtered_block)
+        {
+            node->time_last_request = time(NULL);
+            client->nodegroup->log_write_cb("Requesting %d filtered blocks\n", varlen);
             cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
             dogecoin_node_send(node, p2p_msg);
             cstr_free(p2p_msg, true);

@@ -19,16 +19,24 @@ enum {
 	MAX_HASH_FUNCS = 50,
 };
 
+enum {
+    BLOOM_UPDATE_NONE = 0,
+    BLOOM_UPDATE_ALL = 1,
+    BLOOM_UPDATE_P2PUBKEY_ONLY = 2,
+};
+
 struct bloom {
 	cstring		*vData;
 	unsigned int	nHashFuncs;
+	unsigned int	nTweak;
+	uint8_t         nFlags;
 };
 
 #ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-extern bool bloom_init(struct bloom *bf, unsigned int nElements,double nFPRate);
+extern bool bloom_init(struct bloom *bf, unsigned int nElements, double nFPRate, uint32_t nTweak, uint8_t nFlags);
 extern void __bloom_init(struct bloom *bf);
 extern void bloom_free(struct bloom *bf);
 
