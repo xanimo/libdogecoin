@@ -96,7 +96,7 @@ void dogecoin_net_spv_node_bloom_filter_load(dogecoin_node* node) {
         ser_bloom(filter_msg, &client->filter);
         cstr_free(compactsize, true);
         cstring* filter_load_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_FILTERLOAD, filter_msg->str, filter_msg->len);
-        printf("%s\n", utils_uint8_to_hex(filter_load_msg->str, filter_load_msg->len));
+        printf("%s\n", utils_uint8_to_hex((const uint8_t*)filter_load_msg->str, filter_load_msg->len));
         dogecoin_node_send(node, filter_load_msg);
         cstr_free(filter_load_msg, true);
     } else return;
@@ -510,10 +510,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (type == DOGECOIN_INV_TYPE_BLOCK) {
                 contains_block = true;
                 deser_u256(node->last_requested_inv, buf);
-            } else if (type = DOGECOIN_INV_TYPE_FILTERED_BLOCK) {
+            } else if (type == DOGECOIN_INV_TYPE_FILTERED_BLOCK) {
                 contains_filtered_block = true;
                 deser_u256(node->last_requested_inv, buf);
-            } else if (type = DOGECOIN_INV_TYPE_CMPCT_BLOCK) {
+            } else if (type == DOGECOIN_INV_TYPE_CMPCT_BLOCK) {
                 contains_compact_block = true;
                 deser_u256(node->last_requested_inv, buf);
             } else {

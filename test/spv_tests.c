@@ -43,7 +43,7 @@
 #include <dogecoin/validation.h>
 
 void test_spv_sync_completed(dogecoin_spv_client* client) {
-    printf("Sync completed, at height %d\n", &client->headers_db->getchaintip(client->headers_db_ctx)->height);
+    printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
     dogecoin_node_group_shutdown(client->nodegroup);
 }
 

@@ -16,24 +16,23 @@ void ser_compact_size(cstring* s, size_t p) {
     if (p < 252) {
         ser_u8(s, (uint8_t)p);
     } else if (p < 65535) {
-        cstring* sizebite = cstr_new(utils_hex_to_uint8("fd"));
+        cstring* sizebite = cstr_new((const char*)utils_hex_to_uint8("fd"));
         cstr_append_buf(s, sizebite, sizebite->len);
         ser_u16(s, (uint16_t)p);
         cstr_free(sizebite, true);
     } else if (p < 4294967295) {
-        cstring* sizebite = cstr_new(utils_hex_to_uint8("fe"));
+        cstring* sizebite = cstr_new((const char*)utils_hex_to_uint8("fe"));
         printf("%s\n", utils_uint8_to_hex(sizebite->str, sizebite->len));
         cstr_append_cstr(s, sizebite);
         ser_u32(s, (uint32_t)p);
         printf("%s\n", utils_uint8_to_hex(s->str, s->len));
         cstr_free(sizebite, true);
-    } else if (p < 18446744073709552000) {
-        cstring* sizebite = cstr_new(utils_hex_to_uint8("ff"));
+    } else if (p < 18446744073709551614UL) {
+        cstring* sizebite = cstr_new((const char*)utils_hex_to_uint8("ff"));
         cstr_append_buf(s, sizebite, sizebite->len);
         ser_u64(s, (uint64_t)p);
         cstr_free(sizebite, true);
     }
-    return s;
 }
 
 /**

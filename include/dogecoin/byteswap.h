@@ -77,10 +77,13 @@ static unsigned char bit_swap_table[256] =
 // Non-Mac OS X / non-Darwin
 
 #if HAVE_DECL_BSWAP_8 == 0
+DISABLE_WARNING_PUSH
+DISABLE_WARNING(-Wunused-function)
 LIBDOGECOIN_API static uint8_t bswap_8(uint8_t x)
 {
     return bit_swap_table[x];
 }
+DISABLE_WARNING_POP
 #endif
 
 #if HAVE_DECL_BSWAP_16 == 0

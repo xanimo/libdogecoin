@@ -163,9 +163,6 @@ void remove_all_hashes() {
  */
 map* new_map() {
     map* m = (struct map*)dogecoin_calloc(1, sizeof *m);
-    m->count = 1;
-    if (HASH_COUNT(hashes) < 1) start_hash();
-    m->hashes = hashes;
     m->index = HASH_COUNT(maps) + 1;
     return m;
 }

@@ -342,7 +342,7 @@ uint256* uint256S(const char *str)
 unsigned char* parse_hex(const char* psz)
 {
     int i = 0;
-    unsigned char* input = dogecoin_uchar_vla(strlen(psz));
+    unsigned char* input = dogecoin_uchar_vla(strlen(psz) / 2);
     while (true)
     {
         while (isspace(*psz))

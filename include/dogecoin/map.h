@@ -92,8 +92,7 @@ LIBDOGECOIN_API void remove_all_hashes();
 /* map functions */
 typedef struct map {
     int index;
-    int count;
-    hash *hashes;
+    void* data;
     UT_hash_handle hh;
 } map;
 

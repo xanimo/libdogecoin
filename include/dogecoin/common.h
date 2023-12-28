@@ -41,6 +41,12 @@ LIBDOGECOIN_API static inline uint64_t read_le64(const unsigned char* ptr)
     return le64toh(x);
 }
 
+LIBDOGECOIN_API static inline void write_le8(unsigned char* ptr, uint8_t x)
+{
+    uint8_t v = htole8(x);
+    memcpy_safe(ptr, (char*)&v, 1);
+}
+
 LIBDOGECOIN_API static inline void write_le16(unsigned char* ptr, uint16_t x)
 {
     uint16_t v = htole16(x);
@@ -83,6 +89,27 @@ LIBDOGECOIN_API static inline void write_be64(unsigned char* ptr, uint64_t x)
 {
     uint64_t v = htobe64(x);
     memcpy_safe(ptr, (char*)&v, 8);
+}
+
+/** Return the smallest number n such that (x >> n) == 0 (or 64 if the highest bit in x is set. */
+LIBDOGECOIN_API static inline uint64_t count_bits(uint64_t x)
+{
+#if HAVE_BUILTIN_CLZL
+    if (sizeof(unsigned long) >= sizeof(uint64_t)) {
+        return x ? 8 * sizeof(unsigned long) - __builtin_clzl(x) : 0;
+    }
+#endif
+#if HAVE_BUILTIN_CLZLL
+    if (sizeof(unsigned long long) >= sizeof(uint64_t)) {
+        return x ? 8 * sizeof(unsigned long long) - __builtin_clzll(x) : 0;
+    }
+#endif
+    int ret = 0;
+    while (x) {
+        x >>= 1;
+        ++ret;
+    }
+    return ret;
 }
 
 LIBDOGECOIN_END_DECL

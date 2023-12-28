@@ -33,6 +33,35 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+#include <dogecoin/chacha20.h>
+#include <stdint.h>
+
+typedef struct fast_random_context {
+    dogecoin_bool requires_seed;
+    chacha20* rng;
+    unsigned char bytebuf[64];
+    int bytebuf_size;
+    uint64_t bitbuf;
+    int bitbuf_size;
+    void (*random_seed)(struct fast_random_context* this);
+    void (*fill_byte_buffer)(struct fast_random_context* this);
+    void (*fill_bit_buffer)(struct fast_random_context* this);
+    uint256* (*rand256)(struct fast_random_context* this);
+    uint64_t (*rand64)(struct fast_random_context* this);
+    uint64_t (*randbits)(struct fast_random_context* this, int bits);
+    uint32_t (*rand32)(struct fast_random_context* this);
+    dogecoin_bool (*randbool)(struct fast_random_context* this);
+} fast_random_context;
+
+struct fast_random_context* init_fast_random_context(dogecoin_bool f_deterministic, const uint256* seed);
+uint256* rand256(struct fast_random_context* this);
+uint64_t rand64(struct fast_random_context* this);
+void free_fast_random_context(struct fast_random_context* this);
+
+static const ssize_t NUM_OS_RANDOM_BYTES = 32;
+void get_os_rand(unsigned char* ent32);
+void random_sanity_check();
+
 typedef struct dogecoin_rnd_mapper_ {
     void (*dogecoin_random_init)(void);
     dogecoin_bool (*dogecoin_random_bytes)(uint8_t* buf, uint32_t len, const uint8_t update_seed);
