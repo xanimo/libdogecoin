@@ -91,6 +91,7 @@ src/stamp-h1
 libbtc256k1.pc
 .deps/
 .dirstamp
+dummy*
 
 # Tests
 tests

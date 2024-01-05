@@ -1598,7 +1598,7 @@ copy:
                 if (!result) {
                     error = GetLastError();
                     FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&message, 0, NULL);
-                    printf("ERROR: %s\n", message);
+                    printf("ERROR: %s\n", (char*)message);
                 }
                 result = rename( oldname, newname );
 #else

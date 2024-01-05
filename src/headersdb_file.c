@@ -208,7 +208,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
             // print progress
             if (connected_headers_count % 1000 == 0)
             {
-                printf("\r%ld headers loaded", connected_headers_count);
+                printf("\r%ld headers loaded", (long int)connected_headers_count);
                 fflush(stdout);
             }
 
@@ -250,7 +250,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
             }
         }
     }
-    printf("\nConnected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
+    printf("\nConnected %ld headers, now at height: %d\n",  (long int)connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
 

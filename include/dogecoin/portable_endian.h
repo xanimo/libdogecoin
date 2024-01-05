@@ -84,6 +84,9 @@ LIBDOGECOIN_BEGIN_DECL
 #define be32toh(x) ntohl(x)
 #define le32toh(x) (x)
 
+#define htonll(x)   ((((uint64_t)htonl(x&0xFFFFFFFF)) << 32) + htonl(x >> 32))
+#define ntohll(x)   ((((uint64_t)ntohl(x&0xFFFFFFFF)) << 32) + ntohl(x >> 32))
+
 #define htobe64(x) htonll(x)
 #define htole64(x) (x)
 #define be64toh(x) ntohll(x)

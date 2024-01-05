@@ -276,7 +276,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         DWORD error = GetLastError();
         FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&message, 0, NULL);
-        fprintf(stderr, "ERROR: getting length of normalized passphrase: %s\n", message);
+        fprintf(stderr, "ERROR: getting length of normalized passphrase: %s\n", (char*)message);
         LocalFree(message);
         dogecoin_free(salt);
         dogecoin_free(pass_w);
@@ -752,7 +752,7 @@ int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* lan
 
             /* Verify size of the string equals the entropy_size specified */
             if (strlen(entropy) != expected_entropy_size) {
-                fprintf(stderr, "ERROR: invalid entropy string, expected %ld characters\n", expected_entropy_size);
+                fprintf(stderr, "ERROR: invalid entropy string, expected %ld characters\n", (long int)expected_entropy_size);
 
                 /* Free memory for custom words */
                 if (filepath != NULL) {

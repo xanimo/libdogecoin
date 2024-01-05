@@ -8,6 +8,9 @@
 
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
+#include <qr/jpeg.h>
+#include <qr/png.h>
+#include <qr/qr.h>
 
 // internal funcs not exported
 void printQr(const uint8_t qrcode[]);
