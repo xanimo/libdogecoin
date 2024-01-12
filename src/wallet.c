@@ -481,6 +481,29 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
                 showError("Generating random bytes failed\n");
                 return NULL;
             }
+            printf("Store seed in encrypted file? (Y/n): ");
+
+            char buffer[MAX_LEN];
+            int file_id = 0; // Variable to store file ID, defaulting to 0
+
+            // read user input
+            if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+                if (buffer[0] == 'Y' || buffer[0] == 'y') {
+                    printf("Enter file ID: ");
+                    if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+                        file_id = atoi(buffer); // Update file_id with user input
+                    }
+
+                    printf("Overwrite existing file? (y/n): ");
+                    if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+                        bool overwrite = (buffer[0] == 'Y' || buffer[0] == 'y');
+                        // encrypt seed for storage with software
+                        if (dogecoin_encrypt_seed_with_sw(seed, sizeof(seed), file_id, overwrite, NULL) == false) {
+                            return NULL;
+                        }
+                    }
+                }
+            }
         }
         if (!master_key) {
             // generate hdnode from mnemonic or random seed
@@ -880,7 +903,35 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
 
     struct stat buffer;
     *created = true;
-    if (stat(file_path, &buffer) == 0) *created = false;
+
+    if (stat(file_path, &buffer) == 0) {
+        if (!strstr(file_path, "dummy")) { // ignore dummy wallet
+            printf("Load %s? (Enter) or (o)verwrite:\n", file_path);
+            char response[MAX_LEN];
+            if (!fgets(response, MAX_LEN, stdin)) {
+                printf("Error reading input.\n");
+                return false;
+            }
+            if (response[0] == 'o' || response[0] == 'O') {
+                printf("Are you sure? (y/n): \n");
+                char confirm[MAX_LEN];
+                if (!fgets(confirm, MAX_LEN, stdin)) {
+                    printf("Error reading input.\n");
+                    return false;
+                }
+                if (confirm[0] == 'y' || confirm[0] == 'Y') {
+                    remove(file_path); // remove the existing file
+                    *created = true;
+                } else {
+                    *created = false;
+                }
+            } else {
+                *created = false;
+            }
+        } else {
+            *created = false;
+        }
+    }
 
     wallet->dbfile = fopen(file_path, *created ? "a+b" : "r+b");
 

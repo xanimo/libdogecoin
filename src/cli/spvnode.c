@@ -41,6 +41,7 @@
 #endif
 
 #include <inttypes.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -273,6 +274,16 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     }
 }
 
+// Signal handler for SIGINT
+void handle_sigint() {
+    // Reset standard input back to blocking mode
+#ifndef _WIN32
+    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
+    fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+#endif
+    exit(0);
+}
+
 int main(int argc, char* argv[]) {
     int ret = 0;
     int long_index = 0;
@@ -372,6 +383,7 @@ int main(int argc, char* argv[]) {
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync);
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
+        signal(SIGINT, handle_sigint);
 
 #if WITH_WALLET
         dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, name, mnemonic_in, pass, encrypted, tpm, file_num, master_key);
