@@ -132,7 +132,7 @@ setup_brew() {
 
 setup_linux() {
     $USE_SUDO apt-get update
-    DEBIAN_FRONTEND=noninteractive $USE_SUDO apt-get install -y $COMMON_PACKAGES $ARCH_PACKAGES
+    DEBIAN_FRONTEND=noninteractive $USE_SUDO apt-get install --no-install-recommends -y $COMMON_PACKAGES $ARCH_PACKAGES
 }
 
 OPTIONS=""
