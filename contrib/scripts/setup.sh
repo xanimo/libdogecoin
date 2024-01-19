@@ -25,7 +25,7 @@ has_param() {
     return 1
 }
 
-COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates golang libtool libtool-bin pkg-config procps python3 python3-venv qemu-user rsync valgrind"
+COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates golang libtool libtool-bin pkg-config procps python3 python3-requests python3-venv qemu-user rsync valgrind"
 ARCH_PACKAGES=""
 OS_PACKAGES=""
 DEPENDS=""
@@ -36,7 +36,7 @@ TARGET_ARCH=""
 if has_param '--depends' "$@"; then
     DEPENDS=1
 else
-    COMMON_PACKAGES+=" libevent-dev"
+    COMMON_PACKAGES+=" libevent-dev libunistring-dev"
 fi
 
 if has_param '--docker' "$@"; then
