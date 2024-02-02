@@ -54,14 +54,18 @@ case $host in
   *mingw*)
     build_windows=yes
     TARGET_OS=windows
-    AC_CHECK_LIB([pthread],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([winpthread],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([shell32],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([advapi32],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([iphlpapi],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([ws2_32],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([bcrypt],      [main],, AC_MSG_ERROR(lib missing))
-    AC_CHECK_LIB([crypt32],      [main],, AC_MSG_ERROR(lib missing))
+    AC_CHECK_LIB([pthread],      [main],, AC_MSG_ERROR(pthread missing))
+    AC_CHECK_LIB([winpthread],      [main],, AC_MSG_ERROR(winpthread missing))
+    AC_CHECK_LIB([shell32],      [main],, AC_MSG_ERROR(shell32 missing))
+    AC_CHECK_LIB([advapi32],      [main],, AC_MSG_ERROR(advapi32 missing))
+    AC_CHECK_LIB([iphlpapi],      [main],, AC_MSG_ERROR(iphlpapi missing))
+    AC_CHECK_LIB([ws2_32],      [main],, AC_MSG_ERROR(ws2_32 missing))
+    AC_CHECK_LIB([bcrypt],      [main],, AC_MSG_ERROR(bcrypt missing))
+    AC_CHECK_LIB([crypt32],      [main],, AC_MSG_ERROR(crypt32 missing))
+    AC_CHECK_LIB([gcc],      [main],, AC_MSG_ERROR(gcc missing))
+    AC_CHECK_LIB([mingwex],      [main],, AC_MSG_ERROR(mingwex missing))
+    AC_CHECK_LIB([moldname],      [main],, AC_MSG_ERROR(moldname missing))
+    AC_CHECK_LIB([msvcrt],      [main],, AC_MSG_ERROR(msvcrt missing))
 
     # -static is interpreted by libtool, where it has a different meaning.
     # In libtool-speak, it's -all-static.
