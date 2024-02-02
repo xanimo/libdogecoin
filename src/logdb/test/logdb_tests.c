@@ -11,13 +11,17 @@
 
 #include <test/utest.h>
 
+#ifdef _WIN32
+static const char *dbtmpfile = "dummy";
+#else
+static const char *dbtmpfile = "/tmp/dummy";
+#endif
+
 #ifdef _MSC_VER
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-static const char *dbtmpfile = "dummy";
 #else
 #include <unistd.h>
-static const char *dbtmpfile = "/tmp/dummy";
 #endif
 
 #include <errno.h>

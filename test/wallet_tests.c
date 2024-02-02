@@ -6,13 +6,17 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 
+#ifdef _WIN32
+static const char *wallettmpfile = "dummy";
+#else
+static const char *wallettmpfile = "/tmp/dummy";
+#endif
+
 #ifdef _MSC_VER
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-static const char *wallettmpfile = "dummy";
 #else
 #include <unistd.h>
-static const char *wallettmpfile = "/tmp/dummy";
 #endif
 
 #include <test/utest.h>
