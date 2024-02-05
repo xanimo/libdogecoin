@@ -263,6 +263,10 @@ spvnode_LDFLAGS = -static
 endif
 endif
 
+if USE_UNISTRING
+libdogecoin_la_LIBADD += $(LIBUNISTRING)
+endif
+
 libdogecoin_la_LDFLAGS = -no-undefined -version-info $(LIB_VERSION_CURRENT):$(LIB_VERSION_REVISION):$(LIB_VERSION_AGE)
 
 clean-local:

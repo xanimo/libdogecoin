@@ -25,7 +25,7 @@ has_param() {
     return 1
 }
 
-COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates golang libtool libtool-bin pkg-config procps python3 python3-venv qemu-user rsync valgrind"
+COMMON_PACKAGES="autoconf automake autotools-dev bison build-essential curl ca-certificates libtool libtool-bin pkg-config procps qemu-user rsync valgrind"
 ARCH_PACKAGES=""
 OS_PACKAGES=""
 DEPENDS=""
@@ -36,7 +36,7 @@ TARGET_ARCH=""
 if has_param '--depends' "$@"; then
     DEPENDS=1
 else
-    COMMON_PACKAGES+=" libevent-dev"
+    COMMON_PACKAGES+=" libevent-dev libunistring-dev"
 fi
 
 if has_param '--docker' "$@"; then
@@ -65,7 +65,7 @@ if has_param '--host' "$@"; then
             if [ $DEPENDS ]; then
                 ARCH_PACKAGES+="g++-mingw-w64 "
             fi
-            ARCH_PACKAGES+="nsis wine64 wine-stable bc wine-binfmt"
+            ARCH_PACKAGES+="nsis wine64 wine-stable bc wine-binfmt zip"
             TARGET_ARCH="amd64"
             $USE_SUDO dpkg --add-architecture $TARGET_ARCH
         ;;
@@ -79,12 +79,12 @@ if has_param '--host' "$@"; then
         ;;
         "x86_64-apple-darwin15")
             OS_PACKAGES="cmake zlib xorriso go"
-            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal golang"
+            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal"
             TARGET_ARCH="amd64"
         ;;
         "arm64-apple-darwin")
             OS_PACKAGES="cmake zlib xorriso go"
-            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal golang"
+            ARCH_PACKAGES+="g++ cmake libz-dev libcap-dev libtinfo5 libplist-utils librsvg2-bin libz-dev libtiff-tools libncurses-dev lld python2-minimal"
             TARGET_ARCH="arm64"
         ;;
         "x86_64-pc-linux-gnu") 

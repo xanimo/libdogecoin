@@ -1,0 +1,9 @@
+contrib/gitian/
+main_headers*
+main_txid*
+*.db
+configure
+configure~
+aclocal.m4
+.vscode
+output/

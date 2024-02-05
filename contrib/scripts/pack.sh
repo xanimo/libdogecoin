@@ -168,6 +168,7 @@ if [ ! -d "$BUILD_PREFIX/$BUILD_SUFFIX/lib" ]; then
 fi
 
 mv "$BUILD_PREFIX/$BUILD_SUFFIX/libdogecoin.a" "$BUILD_PREFIX/$BUILD_SUFFIX/lib/libdogecoin.a"
+mv `pwd`/depends/$HOST/lib/libunistring.a "$BUILD_PREFIX/$BUILD_SUFFIX/lib/libunistring.a"
 
 if [ ! -d "$BUILD_PREFIX/$BUILD_SUFFIX/include" ]; then
     mkdir -p "$BUILD_PREFIX/$BUILD_SUFFIX/include"
