@@ -8,7 +8,8 @@ architectures:
 packages:
 - "ca-certificates"
 - "curl"
-- "g++"
+- "gcc-10"
+- "g++-10"
 - "git-core"
 - "pkg-config"
 - "autoconf"
