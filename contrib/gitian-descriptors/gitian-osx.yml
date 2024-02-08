@@ -31,7 +31,7 @@ files:
 - "Xcode-12.2-12B45b-extracted-SDK-with-libcxx-headers.tar.gz"
 script: |
   WRAP_DIR=$HOME/wrapped
-  HOSTS="x86_64-apple-darwin15"
+  HOSTS="x86_64-apple-darwin15 arm64-apple-darwin"
   FAKETIME_HOST_PROGS=""
   FAKETIME_PROGS="ar ranlib date"
 
