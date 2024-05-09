@@ -68,3 +68,67 @@ void test_base64() {
         dogecoin_free(dec_output);
     }
 }
+
+#if defined(USE_DIT) && defined(__aarch64__)
+/* Read PSTATE.DIT for direct test verification (mirrors src/utils.c). */
+static unsigned dit_test_read_bit(void)
+{
+    uint64_t v = 0;
+    __asm__ volatile("mrs %0, S3_3_C4_C2_5" : "=r"(v));
+    return (unsigned)((v >> 24) & 1);
+}
+#endif
+
+void test_dit()
+{
+    dogecoin_bool dit_supported = is_DIT_supported();
+    dogecoin_bool first_enable = enable_DIT();
+    debug_print("DIT test: supported=%d first_enable_result=%d\n", (int)dit_supported, (int)first_enable);
+
+    if (dit_supported) {
+        u_assert_int_eq(first_enable, true);
+#if defined(USE_DIT) && defined(__aarch64__)
+        /* enable_DIT() must actually have set PSTATE.DIT on this thread. */
+        u_assert_int_eq(dit_test_read_bit(), 1u);
+#endif
+        disable_DIT();
+#if defined(USE_DIT) && defined(__aarch64__)
+        /* Prior bit was 0 (not previously enabled), so disable_DIT() must clear it. */
+        u_assert_int_eq(dit_test_read_bit(), 0u);
+#endif
+        debug_print("%s", "DIT test: disabled after first enable\n");
+        dogecoin_bool second_enable = enable_DIT();
+        debug_print("DIT test: second_enable_result=%d\n", (int)second_enable);
+        u_assert_int_eq(second_enable, true);
+#if defined(USE_DIT) && defined(__aarch64__)
+        u_assert_int_eq(dit_test_read_bit(), 1u);
+#endif
+        disable_DIT();
+#if defined(USE_DIT) && defined(__aarch64__)
+        u_assert_int_eq(dit_test_read_bit(), 0u);
+        /* A second disable_DIT() with no prior enable_DIT() must be a no-op. */
+        disable_DIT();
+        u_assert_int_eq(dit_test_read_bit(), 0u);
+
+        /* Nested enable/disable: only the outermost pair should toggle DIT. */
+        dogecoin_bool outer = enable_DIT();
+        u_assert_int_eq(outer, true);
+        u_assert_int_eq(dit_test_read_bit(), 1u);
+        dogecoin_bool inner = enable_DIT();
+        u_assert_int_eq(inner, true);
+        u_assert_int_eq(dit_test_read_bit(), 1u);
+        disable_DIT();
+        /* Inner disable must not clear DIT while the outer scope is still active. */
+        u_assert_int_eq(dit_test_read_bit(), 1u);
+        disable_DIT();
+        /* Outer disable restores the prior (cleared) bit. */
+        u_assert_int_eq(dit_test_read_bit(), 0u);
+#endif
+        debug_print("%s", "DIT test: disabled after second enable\n");
+    } else {
+        /* On platforms without DIT, both enable and supported must report false. */
+        u_assert_int_eq(first_enable, false);
+        disable_DIT();
+        debug_print("%s", "DIT test: disabled (DIT not supported)\n");
+    }
+}
