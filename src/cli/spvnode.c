@@ -390,10 +390,15 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'u':
                     http_server = optarg;
-                    if (!isdigit(http_server[0])) {
+                    char *tmp = strdup((char *)optarg);
+                    char* ptr = strtok(tmp, DELIM_COLON);
+                    if (is_valid_ip(&ptr[0]) != 1 && is_valid_port(&ptr[1]) != 1) {
                         printf("Please add the ip and port after -u and try again. e.g. '-u 0.0.0.0:8080'\n");
+                        dogecoin_free(tmp);
+                        dogecoin_free(ptr);
                         exit(EXIT_FAILURE);
                     }
+                    dogecoin_free(ptr);
                     break;
                 case 'z':
                     have_decl_daemon = true;

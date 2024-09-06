@@ -30,12 +30,21 @@
 
 #include <dogecoin/dogecoin.h>
 
+#include <stdbool.h>
+
 #include <event2/buffer.h>
 #include <event2/http.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
+#define DELIM_DOT "."
+#define DELIM_COLON ":"
+
 LIBDOGECOIN_API void dogecoin_http_request_cb(struct evhttp_request *req, void *arg);
+LIBDOGECOIN_API bool valid_ip_section(const char* s);
+LIBDOGECOIN_API bool valid_port_section(const char* s);
+LIBDOGECOIN_API int is_valid_ip(char* ip);
+LIBDOGECOIN_API int is_valid_port(char* port);
 
 LIBDOGECOIN_END_DECL
 
