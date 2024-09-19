@@ -321,6 +321,7 @@ int main(int argc, char* argv[]) {
     dogecoin_bool master_key = false;
     dogecoin_bool tpm = false;
     char* http_server = NULL;
+    char *http_server_copy = NULL;
     int file_num = NO_FILE;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
@@ -390,15 +391,25 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'u':
                     http_server = optarg;
-                    char *tmp = strdup((char *)optarg);
-                    char* ptr = strtok(tmp, DELIM_COLON);
-                    if (is_valid_ip(&ptr[0]) != 1 && is_valid_port(&ptr[1]) != 1) {
-                        printf("Please add the ip and port after -u and try again. e.g. '-u 0.0.0.0:8080'\n");
-                        dogecoin_free(tmp);
-                        dogecoin_free(ptr);
-                        exit(EXIT_FAILURE);
+                    http_server_copy = strdup(http_server);
+                    char* ptr;
+                    int ct = 0;
+                    while((ptr = strtok_r(http_server_copy, DELIM_COLON, &http_server_copy))) {
+                        if (ptr != NULL) {
+                            if (ct == 0) { // validate ip address
+                                if (is_valid_ip(ptr) != 1) {
+                                    printf("Please add a valid ip address and try again.\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                                ct++;
+                            } else if (ct == 1) { // validate port
+                                if (valid_port_section(ptr) != 1) {
+                                    printf("Please enter a valid port and try again.\n");
+                                    exit(EXIT_FAILURE);
+                                }
+                            }
+                        }
                     }
-                    dogecoin_free(ptr);
                     break;
                 case 'z':
                     have_decl_daemon = true;
@@ -423,7 +434,7 @@ int main(int argc, char* argv[]) {
         client->sync_completed = spv_sync_completed;
         signal(SIGINT, handle_sigint);
 
-#if WITH_WALLET
+    #if WITH_WALLET
         dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, name, mnemonic_in, pass, encrypted, tpm, file_num, master_key, prompt);
         if (!wallet) {
             printf("Could not initialize wallet...\n");

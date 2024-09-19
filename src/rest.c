@@ -288,106 +288,27 @@ bool valid_port_section(const char* s)
  */
 int is_valid_ip(char* ip)
 {
-    printf("ip: %s\n", ip);
-    // if empty string then return false
-    if (ip == NULL)
-        return 0;
-    int num, dots = 0;
+    if (ip == NULL) return 0;
+    int dots = 0;
     int len = strlen(ip);
     int count = 0;
- 
-    // the number dots in the original
-    // string should be 3
-    // for it to be valid
+
     for (int i = 0; i < len; i++) {
-        if (ip[i] == '.')
-            count++;
+        if (ip[i] == '.') count++;
     }
-    printf("count: %d\n", count);
-    if (count != 3)
-        return false;
- 
-    // See following link for strtok()
+    if (count != 3) return false;
  
     char* ptr = strtok(ip, DELIM_DOT);
-    if (ptr == NULL)
-        return 0;
+    if (ptr == NULL) return 0;
  
     while (ptr) {
-        /* after parsing string, it must be valid */
         if (valid_ip_section(ptr)) {
-            /* parse remaining string */
             ptr = strtok(NULL, ".");
-            if (ptr != NULL)
-                ++dots;
-        }
-        else
+            if (ptr != NULL) ++dots;
+        } else {
             return 0;
-    }
- 
-    /* valid IP string must contain 3 dots */
-    // this is for the cases such as 1...1 where
-    // originally the no. of dots is three but
-    // after iteration of the string we find
-    // it is not valid
-    if (dots != 3)
-        return 0;
-    printf("success\n");
-    return 1;
-}
-
-/**
- * This function is validates a port
- * if user decides to use http server
- *
- * @param s the port we are validating
- *
- * @return 1 if port is valid, 0 if not.
- */
-int is_valid_port(char* port)
-{
-    if (port == NULL)
-        return 0;
-    int num, colon = 0;
-    int len = strlen(port);
-    int count = 0;
- 
-    // the number dots in the original
-    // string should be 3
-    // for it to be valid
-    for (int i = 0; i < len; i++) {
-        if (port[i] == ':')
-            count++;
-    }
-    printf("count: %d\n", count);
-    if (count != 1)
-        return false;
- 
-    // See following link for strtok()
- 
-    char* ptr = strtok(port, DELIM_COLON);
-    if (ptr == NULL)
-        return 0;
- 
-    while (ptr) {
-        /* after parsing string, it must be valid */
-        if (valid_port_section(ptr)) {
-            /* parse remaining string */
-            ptr = strtok(NULL, ":");
-            if (ptr != NULL)
-                ++colon;
         }
-        else
-            return 0;
     }
- 
-    /* valid IP string must contain 3 dots */
-    // this is for the cases such as 1...1 where
-    // originally the no. of dots is three but
-    // after iteration of the string we find
-    // it is not valid
-    if (colon != 1)
-        return 0;
-    printf("success\n");
+    if (dots != 3) return 0;
     return 1;
 }
