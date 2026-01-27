@@ -393,6 +393,8 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-j`, `--use_tpm` | Use TPM | No | Utilize TPM for decryption: `./spvnode -j scan` |
 | `-k`, `--master_key` | Master Key | No | Use master key decryption: `./spvnode -k scan` |
 | `-z`, `--daemon` | Daemon Mode | No | Run as a daemon: `./spvnode -z scan` |
+| `-u`, `--http_server` | Enable HTTP | No | Enabled HTTP: `./spvnode -u 127.0.0.1:8080 scan` |
+| `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 
 ### Commands
 

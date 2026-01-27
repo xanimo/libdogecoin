@@ -498,7 +498,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
                 return NULL;
             }
             if (prompt_ok) {
-                printf("Store seed in encrypted file? (Y/n): ");
+                printf("No mnemonic/key, store random seed in encrypted file? (Y/n): ");
 
                 char buffer[MAX_LEN];
                 int file_id = 0; // Variable to store file ID, defaulting to 0
@@ -762,7 +762,7 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
                         dogecoin_utxo* existing_utxo;
                         dogecoin_utxo* tmp;
                         HASH_ITER(hh, utxos, existing_utxo, tmp) {
-                            if (memcmp(existing_utxo->txid, &utxo_txid, 32) == 0 && existing_utxo->vout == j) {
+                            if (memcmp(existing_utxo->txid, &utxo_txid, 32) == 0 && (size_t)existing_utxo->vout == j) {
                                 existing_utxo->height = wtx->height;
                                 break;
                             }

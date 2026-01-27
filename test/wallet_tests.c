@@ -287,12 +287,12 @@ void test_wallet_reorg_utxo_update() {
     out->value = 100000000;
 
     cstring* script = cstr_new_sz(25);
-    cstr_append_c(script, OP_DUP);
-    cstr_append_c(script, OP_HASH160);
+    cstr_append_c(script, (unsigned char)OP_DUP);
+    cstr_append_c(script, (unsigned char)OP_HASH160);
     cstr_append_c(script, 20);
     cstr_append_buf(script, waddr->pubkeyhash, 20);
-    cstr_append_c(script, OP_EQUALVERIFY);
-    cstr_append_c(script, OP_CHECKSIG);
+    cstr_append_c(script, (unsigned char)OP_EQUALVERIFY);
+    cstr_append_c(script, (unsigned char)OP_CHECKSIG);
     out->script_pubkey = script;
     vector_add(tx->vout, out);
 

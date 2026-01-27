@@ -189,8 +189,10 @@ typedef uint64_t sha2_word64; /* Exactly 8 bytes */
 static void sha512_last(sha512_context*);
 static void sha256_transform(sha256_context*, const sha2_word32*);
 static void sha512_transform(sha512_context*, const sha2_word64*);
+#if defined(USE_ARMV8) || defined(USE_ARMV82)
 static void sha256_transform_armv8(uint32_t* s, const unsigned char* chunk);
 static void sha512_transform_armv82(uint64_t* s, const unsigned char* chunk);
+#endif
 
 /*** SHA-XYZ EXTERN FUNCTION DEFINITIONS ******************************/
 /* NOTE: These functions are assembled from Intel's MB IPSEC library

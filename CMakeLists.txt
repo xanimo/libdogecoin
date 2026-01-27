@@ -293,6 +293,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/serialize.c
     src/sha2.c
     src/sign.c
+    src/smpv.c
     src/cli/tool.c
     src/transaction.c
     src/tx.c
@@ -383,6 +384,7 @@ IF(USE_TESTS)
         test/sha1_tests.c
         test/sha2_tests.c
         test/signmsg_tests.c
+        test/smpv_tests.c
         test/tpm_tests.c
         test/transaction_tests.c
         test/tx_tests.c

@@ -160,7 +160,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
         create = false; // Set create to false as file already exists
 
         if (prompt) {
-            printf("\nLoad %s? ", file_path_local);
+            printf("\nLoad %s? (Enter) or (o)verwrite:", file_path_local);
             char response[MAX_LEN];
             if (!fgets(response, MAX_LEN, stdin)) {
                 printf("Error reading input.\n");

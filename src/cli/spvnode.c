@@ -191,6 +191,7 @@ static struct option long_options[] = {
         {"use_tpm", no_argument, NULL, 'j'},
         {"master_key", no_argument, NULL, 'k'},
         {"http_server", required_argument, NULL, 'u'},
+        {"smpv", no_argument, NULL, 'x'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -209,7 +210,7 @@ static void print_usage() {
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
-(-u|--http_server <ip:port>) (-t[--testnet]) (-r[--regtest]) (-d[--debug]) <command>\n");
+(-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
@@ -322,6 +323,7 @@ int main(int argc, char* argv[]) {
     dogecoin_bool tpm = false;
     char* http_server = NULL;
     int file_num = NO_FILE;
+    dogecoin_bool smpv_cli_enable = false;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -331,7 +333,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:x", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -402,6 +404,9 @@ int main(int argc, char* argv[]) {
                     print_version();
                     exit(EXIT_SUCCESS);
                     break;
+                case 'x':
+                    smpv_cli_enable = true;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -413,6 +418,10 @@ int main(int argc, char* argv[]) {
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync, maxnodes, http_server);
         if (http_server) {
             evhttp_set_gencb(client->nodegroup->http_server, dogecoin_http_request_cb, client);
+        }
+        if (smpv_cli_enable) {
+            dogecoin_spv_enable_smpv(client, true);
+            printf("[smpv] enabled via CLI flag\n");
         }
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;

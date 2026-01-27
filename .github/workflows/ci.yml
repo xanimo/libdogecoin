@@ -140,7 +140,7 @@ jobs:
             run-tests: true
           - name: x86_64-win-native
             host: x86_64-pc-windows-msvc
-            os: windows-latest
+            os: windows-2022
             packages: cmake
             postinstall: |
               choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
@@ -150,7 +150,7 @@ jobs:
             goal: install
           - name: x86_64-win-native-rel
             host: x86_64-pc-windows-msvc
-            os: windows-latest
+            os: windows-2022
             packages: cmake
             postinstall: |
               choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
@@ -160,7 +160,7 @@ jobs:
             goal: install
           - name: x86_64-win-native-notpm
             host: x86_64-pc-windows-msvc
-            os: windows-latest
+            os: windows-2022
             packages: cmake
             postinstall: |
               choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
@@ -605,7 +605,7 @@ jobs:
 
   sign-x86_64-win:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
@@ -631,21 +631,21 @@ jobs:
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: bin/spvnode.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign such.exe (x86_64-win)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: bin/such.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign sendtx.exe (x86_64-win)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: bin/sendtx.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
@@ -666,7 +666,7 @@ jobs:
 
   sign-x86_64-win-native:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
@@ -690,21 +690,21 @@ jobs:
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win-native)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Debug/spvnode.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign such.exe (x86_64-win-native)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Debug/such.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign sendtx.exe (x86_64-win-native)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Debug/sendtx.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
@@ -720,7 +720,7 @@ jobs:
 
   sign-x86_64-win-native-rel:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
@@ -744,21 +744,21 @@ jobs:
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win-native-rel)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Release/spvnode.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign such.exe (x86_64-win-native-rel)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Release/such.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign sendtx.exe (x86_64-win-native-rel)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Release/sendtx.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
@@ -774,7 +774,7 @@ jobs:
 
   sign-x86_64-win-native-notpm:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
@@ -797,21 +797,21 @@ jobs:
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win-native-notpm)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Release/spvnode.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign such.exe (x86_64-win-native-notpm)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Release/such.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign sendtx.exe (x86_64-win-native-notpm)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: Release/sendtx.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
@@ -827,7 +827,7 @@ jobs:
 
   sign-i686-win:
     needs: build
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
@@ -851,21 +851,21 @@ jobs:
         shell: pwsh
 
       - name: Sign spvnode.exe (i686-win)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: bin/spvnode.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign such.exe (i686-win)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: bin/such.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Sign sendtx.exe (i686-win)
-        uses: lando/code-sign-action@v2
+        uses: lando/code-sign-action@v3
         with:
           file: bin/sendtx.exe
           certificate-data: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
