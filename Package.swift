@@ -153,6 +153,8 @@ let package = Package(
                 .unsafeFlags([
                     "-UHAVE_CONFIG_H",
                     "-Wno-shorten-64-to-32",
+                    "-Wno-deprecated-non-prototype",
+                    "-Wno-pointer-bool-conversion",
                     "-Wno-unused-function",
                     "-Wno-unused-variable"
                 ])

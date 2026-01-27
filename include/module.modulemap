@@ -1,0 +1,11 @@
+module clibdogecoin {
+    // libdogecoin.h is the unified API header that contains all public functions
+    // It already includes definitions from bip32, bip39, bip44, wallet, etc.
+    header "dogecoin/libdogecoin.h"
+
+    // BIP39 English wordlist for mnemonic validation and autocomplete
+    // This only contains a const char array, no typedef conflicts
+    header "bip39/english.h"
+
+    export *
+}
