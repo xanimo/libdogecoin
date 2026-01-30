@@ -485,6 +485,7 @@ void test_error_handling() {
     }
 
     dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 1);
+    dogecoin_smpv_tip_update(NULL, 1);
 
     debug_print("%s", "  NULL parameter operations handled gracefully\n");
 
@@ -509,6 +510,187 @@ void test_error_handling() {
     debug_print("%s", "  Error handling test passed\n\n");
 }
 
+/* Test confirmation tracking */
+void test_confirmation_tracking() {
+    debug_print("%s", "Testing confirmation tracking...\n");
+
+    dogecoin_smpv_client* client = dogecoin_smpv_client_new(&dogecoin_chainparams_main);
+    if (!client) {
+        debug_print("%s", "  Failed to create client\n");
+        return;
+    }
+
+    /* Process a transaction - initially unconfirmed */
+    if (!dogecoin_smpv_process_tx(client, TEST_RAW_TX, NULL, NULL)) {
+        debug_print("%s", "  Failed to process transaction\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (client->mempool_tx_count != 1) {
+        debug_print("%s", "  Wrong tx count after processing\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    dogecoin_smpv_tx* tx = &client->mempool_txs[0];
+    
+    /* Verify initial state - unconfirmed */
+    if (tx->is_confirmed != false) {
+        debug_print("%s", "  Transaction should be unconfirmed initially\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (tx->confirmations != 0) {
+        debug_print("%s", "  Initial confirmations should be 0\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (client->unconfirmed_count != 1) {
+        debug_print("%s", "  Unconfirmed count should be 1\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  Transaction initially unconfirmed (0 confirmations)\n");
+
+    /* Confirm the transaction at block height 100 */
+    const char* test_block_hash = "0000000000000000000000000000000000000000000000000000000000000abc";
+    dogecoin_smpv_update_tx_status(client, tx->txid, true, test_block_hash, 100);
+
+    /* Verify confirmation */
+    if (tx->is_confirmed != true) {
+        debug_print("%s", "  Transaction should be confirmed\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (tx->confirmations != 1) {
+        debug_print("  Confirmations should be 1, got %u\n", tx->confirmations);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (tx->block_height != 100) {
+        debug_print("  Block height should be 100, got %u\n", tx->block_height);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (client->confirmed_count != 1) {
+        debug_print("  Confirmed count should be 1, got %u\n", client->confirmed_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (client->unconfirmed_count != 0) {
+        debug_print("  Unconfirmed count should be 0, got %u\n", client->unconfirmed_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  Transaction confirmed at block 100 (1 confirmation)\n");
+
+    /* Simulate new blocks being added - tip advances to 105 */
+    dogecoin_smpv_tip_update(client, 105);
+
+    /* Verify confirmation count increased */
+    if (tx->confirmations != 6) {
+        debug_print("  Confirmations should be 6, got %u\n", tx->confirmations);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  After tip advances to 105, transaction has 6 confirmations\n");
+
+    /* Simulate more blocks - tip advances to 110 */
+    dogecoin_smpv_tip_update(client, 110);
+
+    if (tx->confirmations != 11) {
+        debug_print("  Confirmations should be 11, got %u\n", tx->confirmations);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  After tip advances to 110, transaction has 11 confirmations\n");
+
+    /* Test reorg: tip moves below transaction height → 0 confirmations */
+    dogecoin_smpv_tip_update(client, 99);
+
+    if (tx->confirmations != 0) {
+        debug_print("  After reorg below tx height, confirmations should be 0, got %u\n", tx->confirmations);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  After reorg (tip at 99, below tx at 100), confirmations = 0\n");
+
+    /* Test unconfirming a transaction (e.g., during reorg) */
+    dogecoin_smpv_update_tx_status(client, tx->txid, false, NULL, 0);
+
+    if (tx->is_confirmed != false) {
+        debug_print("%s", "  Transaction should be unconfirmed after reorg\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (tx->confirmations != 0) {
+        debug_print("  Confirmations should be 0 after unconfirm, got %u\n", tx->confirmations);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (client->confirmed_count != 0) {
+        debug_print("  Confirmed count should be 0 after unconfirm, got %u\n", client->confirmed_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    if (client->unconfirmed_count != 1) {
+        debug_print("  Unconfirmed count should be 1 after unconfirm, got %u\n", client->unconfirmed_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  Transaction unconfirmed during reorg (back to 0 confirmations)\n");
+
+    /* Test that transactions NOT in mempool are ignored */
+    const char* unknown_txid = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+    uint32_t tx_count_before = client->mempool_tx_count;
+    uint32_t confirmed_count_before = client->confirmed_count;
+    
+    /* Try to confirm a transaction that was never in mempool */
+    dogecoin_smpv_update_tx_status(client, unknown_txid, true, test_block_hash, 120);
+    
+    /* Verify it was NOT added */
+    if (client->mempool_tx_count != tx_count_before) {
+        debug_print("  Transaction count should remain %u, got %u\n", tx_count_before, client->mempool_tx_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+    
+    if (client->confirmed_count != confirmed_count_before) {
+        debug_print("  Confirmed count should remain %u, got %u\n", confirmed_count_before, client->confirmed_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+    
+    dogecoin_smpv_tx* should_be_null = dogecoin_smpv_get_tx(client, unknown_txid);
+    if (should_be_null) {
+        debug_print("%s", "  Transaction not in mempool should not be tracked\n");
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    debug_print("%s", "  Transactions not in mempool correctly ignored\n");
+
+    dogecoin_smpv_client_free(client);
+
+    debug_print("%s", "  Confirmation tracking test passed\n\n");
+}
+
 /* Main test function for the test framework */
 void test_smpv() {
     debug_print("%s", "SMPV (Simplified Mempool Payment Verification) Test Suite\n");
@@ -520,6 +702,7 @@ void test_smpv() {
     test_client_control();
     test_statistics_and_utils();
     test_error_handling();
+    test_confirmation_tracking();
 
     debug_print("%s", "All SMPV tests completed\n");
 }

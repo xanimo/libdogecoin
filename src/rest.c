@@ -513,9 +513,10 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
             total_bytes  = smpv->total_bytes;
             last_seen_ts = smpv->last_seen_ts;
 
-            // sum per-tx script classifications
+            // sum per-tx script classifications for current mempool (unconfirmed only)
             for (uint32_t i = 0; i < smpv->mempool_tx_count; i++) {
                 const dogecoin_smpv_tx* t = &smpv->mempool_txs[i];
+                if (t->is_confirmed) continue;
                 p2pk     += t->pubkey_out;
                 p2pkh    += t->p2pkh_out;
                 p2sh     += t->p2sh_out;
