@@ -172,6 +172,12 @@ AC_ARG_ENABLE([yubikey],
   [use_yubikey=$enableval],
   [use_yubikey=no])
 
+AC_ARG_ENABLE([liboqs],
+  [AS_HELP_STRING([--enable-liboqs],
+  [Build with liboqs (default is no)])],
+  [use_liboqs=$enableval],
+  [use_liboqs=no])
+
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
   [use_tests=$enableval],
@@ -298,6 +304,12 @@ if test "x$use_yubikey" = xyes; then
   AC_DEFINE(USE_YUBIKEY, 1, [Define this symbol if Yubikey works])
 fi
 
+if test "x$use_liboqs" = xyes; then
+  AC_CHECK_LIB([oqs],[main],[LIBOQS=-loqs],AC_MSG_ERROR(liboqs missing))
+  LIBS="$LIBS $LIBOQS"
+  AC_DEFINE(USE_LIBOQS, 1, [Define this symbol if liboqs works])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -320,6 +332,7 @@ AM_CONDITIONAL([USE_SSE2], [test "x$use_scrypt_sse2" = "xyes"])
 AM_CONDITIONAL([USE_OPENENCLAVE], [test "x$use_openenclave" = "xyes"])
 AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
+AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
@@ -354,6 +367,7 @@ echo
 echo "  openenclave     = $use_openenclave"
 echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
+echo "  liboqs          = $use_liboqs"
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"

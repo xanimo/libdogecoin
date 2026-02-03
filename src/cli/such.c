@@ -28,6 +28,7 @@
 */
 
 #include <assert.h>
+#include <ctype.h>
 #ifndef _MSC_VER
 #include <getopt.h>
 #include <unistd.h>
@@ -63,6 +64,8 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wow.h>
+#include <dogecoin/pqc_dilithium.h>
+#include <dogecoin/pqc_falcon.h>
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
 #ifdef WITH_NET
@@ -658,11 +661,26 @@ static void print_usage()
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
+#ifdef USE_LIBOQS
+    printf("tx_sighash32 (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>),\n");
+#endif
     printf("comp2der (-s <compact signature>),\n");
     printf("bip32maintotest (-p <extended hd master key>),\n");
     printf("signmessage (-x '<message>' -p <private key>),\n");
     printf("verifymessage (-x '<message>' -s <signature (base64 encoded)> -k <address>),\n");
-    printf("transaction\n");
+    printf("transaction,\n");
+#ifdef USE_LIBOQS
+    printf("falcon_keygen (generates Falcon-512 keypair),\n");
+    printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
+    printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
+    printf("dilithium2_keygen (generates Dilithium2 keypair),\n");
+    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
+    printf("dilithium2_commit (requires -k <dilithium2_public_key_hex> -s <signature_hex>),\n");
+    printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>),\n");
+    printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>),\n");
+#endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
     printf("> such -c generate_private_key\n\n");
@@ -1107,6 +1125,52 @@ int main(int argc, char* argv[])
             }
         dogecoin_tx_free(tx);
         }
+#ifdef USE_LIBOQS
+    else if (strcmp(cmd, "tx_sighash32") == 0) {
+        // ./such -c tx_sighash32 -x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>
+        if (!txhex || !scripthex) {
+            return showError("Missing tx-hex or script-hex (use -x, -s)\n");
+        }
+
+        if (strlen(txhex) > 1024 * 100) { // don't accept tx larger than 100kb
+            return showError("tx too large (max 100kb)\n");
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+        }
+        dogecoin_free(data_bin);
+
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+        }
+
+        uint8_t* script_data = dogecoin_uint8_vla(strlen(scripthex) / 2 + 1);
+        utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlen);
+        cstring* script = cstr_new_buf(script_data, outlen);
+        free(script_data);
+
+        uint8_t sighash32[32];
+        dogecoin_mem_zero(sighash32, sizeof(sighash32));
+        if (!dogecoin_tx_sighash32(tx, script, inputindex, sighashtype, sighash32)) {
+            cstr_free(script, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to compute tx sighash");
+        }
+
+        char* sighash_hex = utils_uint8_to_hex(sighash32, sizeof(sighash32));
+        printf("tx_sighash32: %s\n", sighash_hex);
+        cstr_free(script, true);
+        dogecoin_tx_free(tx);
+    }
+#endif
     else if (strcmp(cmd, "comp2der") == 0) {
         // ./such -c comp2der -s <compact signature>
         if (!scripthex || strlen(scripthex) != 128) {
@@ -1541,6 +1605,465 @@ int main(int argc, char* argv[])
     else if (strcmp(cmd, "transaction") == 0) {
         main_menu();
         }
+#ifdef USE_LIBOQS
+    else if (strcmp(cmd, "falcon_keygen") == 0) {
+        // ./such -c falcon_keygen
+        uint8_t *pk = NULL, *sk = NULL;
+        size_t pk_len = 0, sk_len = 0;
+        
+        printf("Generating Falcon-512 keypair...\n");
+        
+        if (!dogecoin_falcon512_keypair(&pk, &pk_len, &sk, &sk_len)) {
+            return showError("Failed to generate Falcon-512 keypair\n");
+        }
+        
+        char* pk_hex = dogecoin_malloc(pk_len * 2 + 1);
+        char* sk_hex = dogecoin_malloc(sk_len * 2 + 1);
+        if (!pk_hex || !sk_hex) {
+            if (pk_hex) dogecoin_free(pk_hex);
+            if (sk_hex) dogecoin_free(sk_hex);
+            dogecoin_free(pk);
+            dogecoin_free(sk);
+            return showError("Failed to allocate Falcon key hex buffers\n");
+        }
+        utils_bin_to_hex(pk, pk_len, pk_hex);
+        utils_bin_to_hex(sk, sk_len, sk_hex);
+        
+        printf("\n=== Falcon-512 Keypair Generated ===\n");
+        printf("public key:  %s\n", pk_hex);
+        printf("secret key:  %s\n", sk_hex);
+        printf("pk length:   %zu bytes\n", pk_len);
+        printf("sk length:   %zu bytes\n", sk_len);
+        printf("\n⚠️  Keep your secret key safe! Anyone with it can sign messages.\n");
+        
+        dogecoin_free(pk_hex);
+        dogecoin_free(sk_hex);
+        dogecoin_free(pk);
+        dogecoin_free(sk);
+        }
+    else if (strcmp(cmd, "falcon_sign") == 0) {
+        // ./such -c falcon_sign -p <secret_key_hex> -x <message_hex>
+        if (!pkey) {
+            return showError("Missing secret key (use -p)\n");
+        }
+        if (!txhex) {
+            return showError("Missing message (use -x)\n");
+        }
+        
+        printf("Signing message with Falcon-512...\n");
+        
+        if ((strlen(pkey) % 2) != 0) {
+            return showError("Invalid secret key hex\n");
+        }
+        size_t sk_len = strlen(pkey) / 2;
+        uint8_t* sk = dogecoin_malloc(sk_len);
+        size_t sk_outlen = 0;
+        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        if (sk_outlen != sk_len) {
+            dogecoin_free(sk);
+            return showError("Invalid secret key hex\n");
+        }
+        
+        if ((strlen(txhex) % 2) != 0) {
+            dogecoin_free(sk);
+            return showError("Invalid message hex\n");
+        }
+        size_t msg_len = strlen(txhex) / 2;
+        uint8_t* msg = dogecoin_malloc(msg_len);
+        size_t msg_outlen = 0;
+        utils_hex_to_bin(txhex, msg, strlen(txhex), &msg_outlen);
+        if (msg_outlen != msg_len) {
+            dogecoin_free(sk);
+            dogecoin_free(msg);
+            return showError("Invalid message hex\n");
+        }
+        
+        // Sign (allocates new buffer that must be freed)
+        uint8_t* sig = NULL;
+        size_t sig_len = 0;
+        
+        if (!dogecoin_falcon512_sign(sk, sk_len, msg, msg_len, &sig, &sig_len)) {
+            dogecoin_free(sk);
+            dogecoin_free(msg);
+            return showError("Failed to sign message with Falcon-512\n");
+        }
+        
+        // utils_uint8_to_hex returns static buffer, don't free
+        char* sig_hex = utils_uint8_to_hex(sig, sig_len);
+        
+        printf("\n=== Falcon-512 Signature Generated ===\n");
+        printf("signature:   %s\n", sig_hex);
+        printf("sig length:  %zu bytes\n", sig_len);
+        printf("msg length:  %zu bytes\n", msg_len);
+        
+        dogecoin_free(sk);
+        dogecoin_free(msg);
+        dogecoin_free(sig);
+        }
+    else if (strcmp(cmd, "falcon_verify") == 0) {
+        // ./such -c falcon_verify -k <public_key_hex> -x <message_hex> -s <signature_hex>
+        if (!pubkey) {
+            return showError("Missing public key (use -k)\n");
+        }
+        if (!txhex) {
+            return showError("Missing message (use -x)\n");
+        }
+        if (!scripthex) {
+            return showError("Missing signature (use -s)\n");
+        }
+        
+        printf("Verifying Falcon-512 signature...\n");
+        
+        if ((strlen(pubkey) % 2) != 0) {
+            return showError("Invalid public key hex\n");
+        }
+        size_t pk_len = strlen(pubkey) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len);
+        size_t pk_outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &pk_outlen);
+        if (pk_outlen != pk_len) {
+            dogecoin_free(pk);
+            return showError("Invalid public key hex\n");
+        }
+        
+        if ((strlen(txhex) % 2) != 0) {
+            dogecoin_free(pk);
+            return showError("Invalid message hex\n");
+        }
+        size_t msg_len = strlen(txhex) / 2;
+        uint8_t* msg = dogecoin_malloc(msg_len);
+        size_t msg_outlen = 0;
+        utils_hex_to_bin(txhex, msg, strlen(txhex), &msg_outlen);
+        if (msg_outlen != msg_len) {
+            dogecoin_free(pk);
+            dogecoin_free(msg);
+            return showError("Invalid message hex\n");
+        }
+        
+        if ((strlen(scripthex) % 2) != 0) {
+            dogecoin_free(pk);
+            dogecoin_free(msg);
+            return showError("Invalid signature hex\n");
+        }
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* sig = dogecoin_malloc(sig_len);
+        size_t sig_outlen = 0;
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &sig_outlen);
+        if (sig_outlen != sig_len) {
+            dogecoin_free(pk);
+            dogecoin_free(msg);
+            dogecoin_free(sig);
+            return showError("Invalid signature hex\n");
+        }
+        
+        // Verify
+        dogecoin_bool verified = dogecoin_falcon512_verify(pk, pk_len, msg, msg_len, sig, sig_len);
+        
+        printf("\n=== Falcon-512 Verification Result ===\n");
+        if (verified) {
+            printf("✓ VERIFIED: Signature is valid!\n");
+            printf("The signature is authentic for this message and public key.\n");
+        } else {
+            printf("✗ FAILED: Signature is invalid!\n");
+            printf("The signature does NOT match the message/public key.\n");
+        }
+        
+        if (!verified) {
+            dogecoin_free(pk);
+            dogecoin_free(msg);
+            dogecoin_free(sig);
+            dogecoin_ecc_stop();
+            return 1;
+        }
+        dogecoin_free(pk);
+        dogecoin_free(msg);
+        dogecoin_free(sig);
+        }
+    else if (strcmp(cmd, "falcon_commit") == 0) {
+        // ./such -c falcon_commit -k <public_key_hex> -s <signature_hex>
+        if (!pubkey) {
+            return showError("Missing public key (use -k)\n");
+        }
+        if (!scripthex) {
+            return showError("Missing signature (use -s)\n");
+        }
+        
+        printf("Generating Falcon-512 commitment...\n");
+        
+        if ((strlen(pubkey) % 2) != 0) {
+            return showError("Invalid public key hex\n");
+        }
+        size_t pk_len = strlen(pubkey) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len);
+        size_t pk_outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &pk_outlen);
+        if (pk_outlen != pk_len) {
+            dogecoin_free(pk);
+            return showError("Invalid public key hex\n");
+        }
+        
+        if ((strlen(scripthex) % 2) != 0) {
+            dogecoin_free(pk);
+            return showError("Invalid signature hex\n");
+        }
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* sig = dogecoin_malloc(sig_len);
+        size_t sig_outlen = 0;
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &sig_outlen);
+        if (sig_outlen != sig_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("Invalid signature hex\n");
+        }
+        
+        // Generate commitment
+        uint8_t commit[32];
+        if (!dogecoin_falcon512_commit_bytes(pk, pk_len, sig, sig_len, commit)) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("Failed to generate Falcon-512 commitment\n");
+        }
+        
+        char commit_hex[65];
+        utils_bin_to_hex(commit, 32, commit_hex);
+        
+        printf("\n=== Falcon-512 Commitment Generated ===\n");
+        printf("commitment:  %s\n", commit_hex);
+        printf("length:      32 bytes\n");
+        printf("\nThis commitment can be included in an OP_RETURN output:\n");
+        printf("OP_RETURN script: 6a24464c4331%s\n", commit_hex);
+        printf("\nTo verify off-chain:\n");
+        printf("1. Get the full signature from the signer\n");
+        printf("2. Recompute: commit = SHA256(public_key || signature)\n");
+        printf("3. Compare with this on-chain commitment\n");
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        }
+    else if (strcmp(cmd, "dilithium2_keygen") == 0) {
+        uint8_t *pk = NULL, *sk = NULL;
+        size_t pk_len = 0, sk_len = 0;
+        printf("Generating Dilithium2 keypair...\n");
+        if (!dogecoin_dilithium2_keypair(&pk, &pk_len, &sk, &sk_len)) {
+            return showError("Failed to generate Dilithium2 keypair\n");
+        }
+        char* pk_hex = dogecoin_malloc(pk_len * 2 + 1);
+        char* sk_hex = dogecoin_malloc(sk_len * 2 + 1);
+        if (!pk_hex || !sk_hex) {
+            if (pk_hex) dogecoin_free(pk_hex);
+            if (sk_hex) dogecoin_free(sk_hex);
+            dogecoin_free(pk);
+            dogecoin_free(sk);
+            return showError("Failed to allocate Dilithium2 key hex buffers\n");
+        }
+        utils_bin_to_hex(pk, pk_len, pk_hex);
+        utils_bin_to_hex(sk, sk_len, sk_hex);
+        printf("\n=== Dilithium2 Keypair Generated ===\n");
+        printf("public key:  %s\n", pk_hex);
+        printf("secret key:  %s\n", sk_hex);
+        printf("pk length:   %zu bytes\n", pk_len);
+        printf("sk length:   %zu bytes\n", sk_len);
+        dogecoin_free(pk_hex);
+        dogecoin_free(sk_hex);
+        dogecoin_free(pk);
+        dogecoin_free(sk);
+    }
+    else if (strcmp(cmd, "dilithium2_sign") == 0) {
+        if (!pkey) return showError("Missing secret key (use -p)\n");
+        if (!txhex) return showError("Missing message (use -x)\n");
+        if ((strlen(pkey) % 2) != 0) return showError("Invalid secret key hex\n");
+        size_t sk_len = strlen(pkey) / 2;
+        uint8_t* sk = dogecoin_malloc(sk_len);
+        size_t sk_outlen = 0;
+        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        if (sk_outlen != sk_len) { dogecoin_free(sk); return showError("Invalid secret key hex\n"); }
+        if ((strlen(txhex) % 2) != 0) { dogecoin_free(sk); return showError("Invalid message hex\n"); }
+        size_t msg_len = strlen(txhex) / 2;
+        uint8_t* msg = dogecoin_malloc(msg_len);
+        size_t msg_outlen = 0;
+        utils_hex_to_bin(txhex, msg, strlen(txhex), &msg_outlen);
+        if (msg_outlen != msg_len) { dogecoin_free(sk); dogecoin_free(msg); return showError("Invalid message hex\n"); }
+        uint8_t* sig = NULL; size_t sig_len = 0;
+        if (!dogecoin_dilithium2_sign(sk, sk_len, msg, msg_len, &sig, &sig_len)) {
+            dogecoin_free(sk); dogecoin_free(msg);
+            return showError("Failed to sign message with Dilithium2\n");
+        }
+        char* sig_hex = utils_uint8_to_hex(sig, sig_len);
+        printf("\n=== Dilithium2 Signature Generated ===\n");
+        printf("signature:   %s\n", sig_hex);
+        printf("sig length:  %zu bytes\n", sig_len);
+        printf("msg length:  %zu bytes\n", msg_len);
+        dogecoin_free(sk); dogecoin_free(msg); dogecoin_free(sig);
+    }
+    else if (strcmp(cmd, "dilithium2_verify") == 0) {
+        if (!pubkey) return showError("Missing public key (use -k)\n");
+        if (!txhex) return showError("Missing message (use -x)\n");
+        if (!scripthex) return showError("Missing signature (use -s)\n");
+        if ((strlen(pubkey) % 2) != 0) return showError("Invalid public key hex\n");
+        size_t pk_len = strlen(pubkey) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len);
+        size_t pk_outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &pk_outlen);
+        if (pk_outlen != pk_len) { dogecoin_free(pk); return showError("Invalid public key hex\n"); }
+        if ((strlen(txhex) % 2) != 0) { dogecoin_free(pk); return showError("Invalid message hex\n"); }
+        size_t msg_len = strlen(txhex) / 2;
+        uint8_t* msg = dogecoin_malloc(msg_len);
+        size_t msg_outlen = 0;
+        utils_hex_to_bin(txhex, msg, strlen(txhex), &msg_outlen);
+        if (msg_outlen != msg_len) { dogecoin_free(pk); dogecoin_free(msg); return showError("Invalid message hex\n"); }
+        if ((strlen(scripthex) % 2) != 0) { dogecoin_free(pk); dogecoin_free(msg); return showError("Invalid signature hex\n"); }
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* sig = dogecoin_malloc(sig_len);
+        size_t sig_outlen = 0;
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &sig_outlen);
+        if (sig_outlen != sig_len) { dogecoin_free(pk); dogecoin_free(msg); dogecoin_free(sig); return showError("Invalid signature hex\n"); }
+        dogecoin_bool verified = dogecoin_dilithium2_verify(pk, pk_len, msg, msg_len, sig, sig_len);
+        printf("\n=== Dilithium2 Verification Result ===\n");
+        printf("%s\n", verified ? "✓ VERIFIED: Signature is valid!" : "✗ FAILED: Signature is invalid!");
+        dogecoin_free(pk); dogecoin_free(msg); dogecoin_free(sig);
+        if (!verified) { dogecoin_ecc_stop(); return 1; }
+    }
+    else if (strcmp(cmd, "dilithium2_commit") == 0) {
+        if (!pubkey) return showError("Missing public key (use -k)\n");
+        if (!scripthex) return showError("Missing signature (use -s)\n");
+        if ((strlen(pubkey) % 2) != 0) return showError("Invalid public key hex\n");
+        size_t pk_len = strlen(pubkey) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len);
+        size_t pk_outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &pk_outlen);
+        if (pk_outlen != pk_len) { dogecoin_free(pk); return showError("Invalid public key hex\n"); }
+        if ((strlen(scripthex) % 2) != 0) { dogecoin_free(pk); return showError("Invalid signature hex\n"); }
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* sig = dogecoin_malloc(sig_len);
+        size_t sig_outlen = 0;
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &sig_outlen);
+        if (sig_outlen != sig_len) { dogecoin_free(pk); dogecoin_free(sig); return showError("Invalid signature hex\n"); }
+        uint8_t commit[32];
+        if (!dogecoin_dilithium2_commit_bytes(pk, pk_len, sig, sig_len, commit)) {
+            dogecoin_free(pk); dogecoin_free(sig); return showError("Failed to generate Dilithium2 commitment\n");
+        }
+        char commit_hex[65];
+        utils_bin_to_hex(commit, 32, commit_hex);
+        printf("\n=== Dilithium2 Commitment Generated ===\n");
+        printf("commitment:  %s\n", commit_hex);
+        printf("length:      32 bytes\n");
+        printf("\nThis commitment can be included in an OP_RETURN output:\n");
+        printf("OP_RETURN script (prefix 6a24 + tag 44494c32='DIL2'): 6a2444494c32%s\n", commit_hex);
+        dogecoin_free(pk); dogecoin_free(sig);
+    }
+    #endif
+#ifdef USE_LIBOQS
+    else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
+        // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <falcon_commitment_hex>
+        if (!txhex || !scripthex) {
+            return showError("Missing tx hex or commitment hex (use -x, -s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0) {
+            return showError("Raw transaction hex length must be even\n");
+        }
+        if (strlen(scripthex) != 64) {
+            return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
+        }
+        for (size_t i = 0; i < strlen(scripthex); i++) {
+            if (!isxdigit((unsigned char)scripthex[i])) {
+                return showError("Commitment must be hex encoded\n");
+            }
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(data_bin);
+
+        uint8_t commit32[32];
+        size_t commit_len = 0;
+        utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
+        if (commit_len != sizeof(commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to decode commitment\n");
+        }
+
+        if (!dogecoin_tx_add_falcon512_commit(tx, commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append Falcon commitment output\n");
+        }
+
+        cstring* tx_with_commit = cstr_new_sz(1024);
+        dogecoin_tx_serialize(tx_with_commit, tx);
+        char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
+        if (!tx_with_commit_hex) {
+            cstr_free(tx_with_commit, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate memory for tx hex\n");
+        }
+        utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
+
+        printf("tx with commitment: %s\n", tx_with_commit_hex);
+
+        cstr_free(tx_with_commit, true);
+        dogecoin_free(tx_with_commit_hex);
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "dilithium2_add_commit_tx") == 0) {
+        if (!txhex || !scripthex) {
+            return showError("Missing tx hex or commitment hex (use -x, -s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0) {
+            return showError("Raw transaction hex length must be even\n");
+        }
+        if (strlen(scripthex) != 64) {
+            return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
+        }
+        for (size_t i = 0; i < strlen(scripthex); i++) {
+            if (!isxdigit((unsigned char)scripthex[i])) {
+                return showError("Commitment must be hex encoded\n");
+            }
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(data_bin);
+
+        uint8_t commit32[32];
+        size_t commit_len = 0;
+        utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
+        if (commit_len != sizeof(commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to decode commitment\n");
+        }
+
+        if (!dogecoin_tx_add_dilithium2_commit(tx, commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append Dilithium2 commitment output\n");
+        }
+
+        cstring* tx_with_commit = cstr_new_sz(1024);
+        dogecoin_tx_serialize(tx_with_commit, tx);
+        char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
+        if (!tx_with_commit_hex) {
+            cstr_free(tx_with_commit, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate memory for tx hex\n");
+        }
+        utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
+        printf("tx with commitment: %s\n", tx_with_commit_hex);
+        cstr_free(tx_with_commit, true);
+        dogecoin_free(tx_with_commit_hex);
+        dogecoin_tx_free(tx);
+    }
+#endif
     else {
         print_usage();
         return showError("Unknown command\n");

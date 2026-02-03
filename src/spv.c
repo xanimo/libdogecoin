@@ -58,7 +58,21 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
+#include <dogecoin/pqc_dilithium.h>
+#include <dogecoin/pqc_falcon.h>
 #include <event2/event.h>
+
+/* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
+#ifdef USE_LIBOQS
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+#include <oqs/sig.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+#endif
 
 #define DOGECOIN_KOINU_PER_COIN 100000000ULL
 /* Dogecoin block subsidy has been 10,000 DOGE for years; good for 24h stats */
@@ -95,9 +109,9 @@ dogecoin_bool dogecoin_node_should_connect_to_more_cb(dogecoin_node* node) {
     node->nodegroup->log_write_cb("check if more nodes are required (connected to already: %d): %s\n", connected_amount, connected_amount < node->nodegroup->desired_amount_connected_nodes ? "true" : "false");
     if (connected_amount < node->nodegroup->desired_amount_connected_nodes) {
         return true;
-        }
-    return false;
     }
+    return false;
+}
 
 /**
  * The function sets the nodegroup's postcmd_cb to dogecoin_net_spv_post_cmd,
@@ -153,6 +167,16 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     if (debug) {
         client->nodegroup->log_write_cb = net_write_log_printf;
     }
+
+#ifdef USE_LIBOQS
+    // Log what Falcon variants are present at runtime (minimal, no hard dependency).
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb(
+            "[oqs] falcon_512=%s falcon_1024=%s (liboqs)\n",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled");
+    }
+#endif
 
     if (params == &dogecoin_chainparams_main || params == &dogecoin_chainparams_test) {
         client->use_checkpoints = use_checkpoints;
@@ -662,6 +686,25 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 }
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
+                
+#ifdef USE_LIBOQS
+                // Validate Falcon commit in canonical tagged OP_RETURN form (6a24 + "FLC1" + 32 bytes)
+                uint8_t falcon_commit_data[32];
+                if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
+                    char falcon_commit_hex[65];
+                    utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
+                    client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s\n",
+                                                     pindex->height, i, falcon_commit_hex);
+                }
+                uint8_t dilithium_commit_data[32];
+                if (dogecoin_tx_extract_dilithium2_commit(tx, dilithium_commit_data)) {
+                    char dilithium_commit_hex[65];
+                    utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
+                    client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s\n",
+                                                     pindex->height, i, dilithium_commit_hex);
+                }
+#endif
+                
                 total_tx_size += consumedlength;
 
                 // accumulate outputs for this tx

@@ -1,0 +1,216 @@
+<pre>
+  BIP: ?
+  Layer: Consensus (soft fork)
+  Title: Post-Quantum Signature Commitments
+  Author: Ed Tubbs <ectubbs@gmail.com>
+  Status: Draft
+  Type: Standards Track
+  Created: 2026-02-18
+  License: BSD-3-Clause
+</pre>
+
+==Introduction==
+
+===Abstract===
+
+This document proposes a staged path for introducing post-quantum (PQ) signature support.
+In the initial stage, a PQ signature commitment is embedded in transaction outputs using a canonical OP_RETURN pattern to enable immediate interoperability and chain-level observability without a consensus change.
+In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
+
+The current implementation focus is Falcon-512 and Dilithium2 commitment publication and SPV-side commitment validation during block scan.
+This document is written in standard BIP format and can be adapted to a DIP process if/when a formal DIP track is preferred.
+
+===Copyright===
+
+This BIP is licensed under the BSD 3-clause license.
+
+===Motivation===
+
+Bitcoin-family systems require a migration strategy for post-quantum cryptographic primitives that:
+
+# works with existing transaction relay and wallet infrastructure;
+# is deployable before introducing new consensus opcodes; and
+# supports incremental hardening from commitment-only publication toward full script validation semantics.
+
+An OP_RETURN commitment-first model provides a low-friction deployment mechanism while ecosystem tooling matures.
+A reserved-opcode follow-up provides a path toward first-class script integration once consensus and implementation readiness are established.
+
+===Rationale===
+
+The design is intentionally staged:
+
+* '''Phase 1 (Now):''' publish a 32-byte commitment (derived from PQ verification material) in canonical OP_RETURN form.
+* '''Phase 2 (Future):''' define and activate a dedicated script opcode path to validate PQ signatures in script execution, replacing commitment-only signaling.
+
+This balances deployability and safety:
+
+* avoids immediate consensus risk;
+* enables ecosystem measurement and operational validation via tooling (including SPV scanning); and
+* creates a clean upgrade target for native script verification.
+
+This direction is related to broader PQ discussions, including BIP 360, but is focused here on practical incremental deployment of signature commitments and an explicit migration path to opcode-based verification.
+
+==Specification==
+
+===Phase 1: OP_RETURN Commitment Encoding===
+
+For Phase 1, PQ commitments are encoded in outputs using canonical tagged script form.
+Current libdogecoin tagged variants are:
+
+<source>
+Falcon-512:  0x6a 0x24 0x464c4331 <32-byte-commitment>   ; "FLC1"
+Dilithium2:  0x6a 0x24 0x44494c32 <32-byte-commitment>   ; "DIL2"
+</source>
+
+Where:
+
+* <code>0x6a</code> is OP_RETURN
+* <code>0x24</code> is push-36
+* <code>0x464c4331</code> is the Falcon identifier (<code>"FLC1"</code> in ASCII)
+* <code>0x44494c32</code> is the Dilithium2 identifier (<code>"DIL2"</code> in ASCII)
+* payload is exactly 4-byte tag + 32-byte commitment
+
+Non-canonical encodings are invalid for commitment interpretation under this proposal.
+
+For implementation namespace clarity, libdogecoin defines identifier constants:
+
+<source>
+DOGECOIN_PQC_FALCON_TAG = "FLC1"
+DOGECOIN_PQC_DILITHIUM_TAG = "DIL2"
+</source>
+
+Current consensus-neutral Phase 1 interoperability in this proposal remains canonical tagged <code>OP_RETURN 0x24 <tag4> <32-byte-commitment></code>.
+
+Commitment derivation for Falcon-512 and Dilithium2 stage implementations is:
+
+<source>
+commitment32 = SHA256(public_key_bytes || signature_bytes)
+</source>
+
+Phase 1 does '''not''' standardize a new on-chain wire format for full PQ public keys or signatures.
+Those artifacts remain off-chain verifier material; only the tagged 32-byte commitment is committed on-chain.
+
+===Phase 1: Signature Payload (Transaction Binding)===
+
+To support transaction-level validation workflows, the PQ signature payload SHOULD be the transaction signature hash (<code>sighash32</code>) for the input being authorized, not an arbitrary application message.
+
+In practical terms, verifiers and signers should use:
+
+<source>
+message32 = dogecoin_tx_sighash32(tx, scriptPubKey, input_index, hash_type)
+signature = PQ_SIGN(secret_key, message32)
+commitment32 = SHA256(public_key_bytes || signature_bytes)
+</source>
+
+This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
+
+===Phase 1: Base Transaction Binding===
+
+Because the OP_RETURN commitment payload is itself derived from the PQ signature, implementers must avoid circular dependency between:
+
+* the digest being signed; and
+* the final transaction bytes carrying the commitment output.
+
+The implementation model in this proposal is:
+
+# derive <code>message32</code> from a deterministic '''base transaction template''' (before commitment output is appended),
+# PQ-sign <code>message32</code>,
+# derive commitment32 from <code>pubkey || signature</code>,
+# append canonical tagged OP_RETURN commitment output, and
+# produce final spend-authorized transaction with existing secp signing path.
+
+This means PQC proof is bound to the base transaction template context, while on-chain publication is anchored in the final committed transaction.
+
+Current libdogecoin behavior is compatible with this model:
+
+* PQ sign APIs/CLI sign raw message bytes (<code>-x</code>), allowing callers to provide transaction sighash bytes directly.
+* Existing secp signing flow in <code>such -c sign</code> is implemented via <code>dogecoin_tx_sign_input(...)</code> (ECC-backed), which internally uses the transaction sighash for authorization.
+* PQC transaction-binding workflows should use <code>dogecoin_tx_sighash32(...)</code> to derive that same per-input transaction-digest context, then publish the PQ commitment in OP_RETURN.
+* SPV Phase 1 still validates canonical commitment encoding only; full signature verification remains an off-chain verifier responsibility.
+
+Implementations MAY support additional PQ schemes in future revisions, but MUST preserve canonical on-chain encoding rules.
+
+===Phase 1: SPV Validation Behavior===
+
+SPV implementations should:
+
+* parse transactions in scanned blocks;
+* detect canonical tagged Falcon and Dilithium2 commitment scripts;
+* treat only canonical encodings as valid commitments; and
+* surface deterministic commitment logs/telemetry for downstream verification workflows.
+
+===Phase 2: Reserved Opcode Upgrade Path===
+
+This proposal reserves a follow-up soft-fork design track to migrate from OP_RETURN signaling to native script validation semantics using a reserved opcode approach.
+The Phase 2 document is expected to define:
+
+* exact opcode assignment path;
+* witness/program format for PQ verification data;
+* script evaluation and failure semantics; and
+* activation/deployment process.
+
+===Signature Transition Model (secp256k1 -> PQC)===
+
+This proposal is intentionally transitional:
+
+* '''Current implementation state (Phase 1):''' transactions remain spend-authorized by existing secp256k1 script rules; PQC signatures are published/committed as parallel evidence.
+* '''Target state (Phase 2):''' script execution validates PQC signatures directly (via reserved-opcode soft-fork path), allowing migration away from secp256k1-only authorization.
+
+In Phase 1, PQC commitments should be treated as an interoperability and migration bridge:
+
+# Build transaction and derive per-input <code>sighash32</code>.
+# Sign <code>sighash32</code> with Falcon-512 or Dilithium2.
+# Publish <code>SHA256(pubkey || signature)</code> in canonical tagged OP_RETURN.
+# Keep full PQ verification material off-chain for validators/auditors.
+
+This mirrors current implementation behavior:
+
+* <code>such</code> exposes PQ sign/verify/commit commands and commitment-output append commands.
+* PQ sign/verify command payload (<code>-x</code>) accepts transaction sighash bytes.
+* SPV commitment detection validates canonical encoding and emits deterministic commitment logs.
+
+Until Phase 2 activation, secp256k1 consensus checks remain authoritative for spend validity; PQC signature checks are verifier-side and policy/audit driven.
+
+==Backwards Compatibility==
+
+Phase 1 is backward-compatible because OP_RETURN outputs are already standard and spendability semantics are unchanged.
+Legacy nodes continue to relay and index transactions as usual.
+
+Phase 2 is expected to be a consensus soft fork and must be specified with full backwards-compatibility and activation analysis in a successor BIP.
+
+==Security Considerations==
+
+Phase 1 commitments provide publication and detectability, not script-level PQ enforcement.
+Users must not interpret commitment publication alone as equivalent to consensus-enforced PQ signature validity.
+
+Canonical encoding requirements are mandatory to avoid ambiguous parsing and commitment spoofing via non-standard script shapes.
+
+For transaction-binding assurance, validators should verify that revealed PQ signatures are computed over the correct transaction sighash32 for the referenced input and hash type, then compare recomputed commitment32 against the tagged on-chain value.
+
+==Reference Implementation==
+
+Current reference behavior exists in libdogecoin components that:
+
+* sign raw transaction inputs using existing <code>dogecoin_tx_sign_input(...)</code> secp/ECC authorization flow;
+* derive matching PQC signing messages with <code>dogecoin_tx_sighash32(...)</code>;
+* generate/verify Falcon-512 and Dilithium2 signatures over caller-provided message bytes;
+* derive commitments from PQ verification material (<code>SHA256(pubkey || signature)</code>);
+* append/extract canonical tagged commitments in transaction OP_RETURN outputs; and
+* detect canonical commitments during SPV block scanning and emit deterministic commitment logs.
+
+Current CLI wiring reflects this implementation model:
+
+* <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
+* <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
+* <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
+* <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs.
+
+==Deployment==
+
+Phase 1 can be deployed immediately in wallets, tooling, and SPV infrastructure without consensus change.
+
+Phase 2 requires a separate consensus-track proposal and activation plan.
+
+==Acknowledgements==
+
+Thanks to the broader Bitcoin and Dogecoin post-quantum research community, including prior art discussions such as BIP 360.
