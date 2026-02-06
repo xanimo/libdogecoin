@@ -39,6 +39,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+#define SPV_HEADERS_FILE_HDR_LEN 8 /* magic(4) + version(4) */
+#define SPV_HEADERS_FILE_REC_LEN (32 + 4 + 32 + 80) /* hash + height + chainwork + header */
+
 /* filebased headers database (including binary tree option for fast access)
 */
 typedef struct dogecoin_headers_db_
@@ -64,7 +67,6 @@ dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db);
 void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, uint256_t chainwork);
-
 static const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = {
     (void* (*)(const dogecoin_chainparams*, dogecoin_bool))dogecoin_headers_db_new,
     (void (*)(void *))dogecoin_headers_db_free,

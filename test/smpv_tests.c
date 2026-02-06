@@ -11,9 +11,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <test/utest.h>
 #include <dogecoin/dogecoin.h>
+#include <dogecoin/base58.h>
+#include <dogecoin/cstr.h>
 #include <dogecoin/smpv.h>
 #include <dogecoin/chainparams.h>
+#include <dogecoin/mem.h>
+#include <dogecoin/utils.h>
 
 /* Test data */
 static const char* TEST_ADDRESS_1 = "D7Y55vD8nNtW7VnT9Xr6Qc4vB8hN3jK2mP";
@@ -29,6 +34,30 @@ static void test_tx_callback(const dogecoin_smpv_tx* tx, const char* address, vo
     debug_print("    Address: %s\n", address ? address : "NULL");
     debug_print("    Size: %llu bytes\n", (unsigned long long)tx->size);
     debug_print("    Timestamp: %llu\n", (unsigned long long)tx->timestamp);
+}
+
+static dogecoin_tx* build_test_tx_for_address(const char* address) {
+    if (!address) return NULL;
+
+    char script_pubkey_hex[64];
+    dogecoin_mem_zero(script_pubkey_hex, sizeof(script_pubkey_hex));
+    if (!dogecoin_p2pkh_address_to_pubkey_hash((char*)address, script_pubkey_hex)) return NULL;
+
+    uint8_t script_pubkey[32];
+    size_t script_pubkey_len = 0;
+    utils_hex_to_bin(script_pubkey_hex, script_pubkey, strlen(script_pubkey_hex), &script_pubkey_len);
+    if (script_pubkey_len == 0) return NULL;
+
+    dogecoin_tx* tx = dogecoin_tx_new();
+    if (!tx) return NULL;
+    dogecoin_tx_in* in = dogecoin_tx_in_new();
+    vector_add(tx->vin, in);
+    dogecoin_tx_out* out = dogecoin_tx_out_new();
+    out->value = 1000;
+    out->script_pubkey = cstr_new_sz(script_pubkey_len);
+    cstr_append_buf(out->script_pubkey, (const void*)script_pubkey, script_pubkey_len);
+    vector_add(tx->vout, out);
+    return tx;
 }
 
 /* Test SMPV client creation and destruction */
@@ -534,7 +563,7 @@ void test_confirmation_tracking() {
     }
 
     dogecoin_smpv_tx* tx = &client->mempool_txs[0];
-    
+
     /* Verify initial state - unconfirmed */
     if (tx->is_confirmed != false) {
         debug_print("%s", "  Transaction should be unconfirmed initially\n");
@@ -660,23 +689,23 @@ void test_confirmation_tracking() {
     const char* unknown_txid = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
     uint32_t tx_count_before = client->mempool_tx_count;
     uint32_t confirmed_count_before = client->confirmed_count;
-    
+
     /* Try to confirm a transaction that was never in mempool */
     dogecoin_smpv_update_tx_status(client, unknown_txid, true, test_block_hash, 120);
-    
+
     /* Verify it was NOT added */
     if (client->mempool_tx_count != tx_count_before) {
         debug_print("  Transaction count should remain %u, got %u\n", tx_count_before, client->mempool_tx_count);
         dogecoin_smpv_client_free(client);
         return;
     }
-    
+
     if (client->confirmed_count != confirmed_count_before) {
         debug_print("  Confirmed count should remain %u, got %u\n", confirmed_count_before, client->confirmed_count);
         dogecoin_smpv_client_free(client);
         return;
     }
-    
+
     dogecoin_smpv_tx* should_be_null = dogecoin_smpv_get_tx(client, unknown_txid);
     if (should_be_null) {
         debug_print("%s", "  Transaction not in mempool should not be tracked\n");
@@ -689,6 +718,66 @@ void test_confirmation_tracking() {
     dogecoin_smpv_client_free(client);
 
     debug_print("%s", "  Confirmation tracking test passed\n\n");
+
+}
+
+void test_smpv_relevance_and_address_lookup() {
+    uint160_t h1;
+    uint160_t h2;
+    for (int i = 0; i < 20; i++) {
+        h1[i] = (uint8_t)(i + 1);
+        h2[i] = (uint8_t)(i + 21);
+    }
+
+    char addr1[P2PKHLEN];
+    char addr2[P2PKHLEN];
+    u_assert_true(dogecoin_p2pkh_addr_from_hash160(h1, &dogecoin_chainparams_main, addr1, sizeof(addr1)));
+    u_assert_true(dogecoin_p2pkh_addr_from_hash160(h2, &dogecoin_chainparams_main, addr2, sizeof(addr2)));
+
+    dogecoin_smpv_client* client = dogecoin_smpv_client_new(&dogecoin_chainparams_main);
+    u_assert_true(client != NULL);
+    u_assert_true(dogecoin_smpv_add_watcher(client, addr1));
+
+    dogecoin_tx* tx_match = build_test_tx_for_address(addr1);
+    dogecoin_tx* tx_other = build_test_tx_for_address(addr2);
+    u_assert_true(tx_match != NULL);
+    u_assert_true(tx_other != NULL);
+
+    char* relevant = NULL;
+    u_assert_true(dogecoin_smpv_is_tx_relevant(client, tx_match, &relevant));
+    u_assert_true(relevant != NULL);
+    u_assert_true(strcmp(relevant, addr1) == 0);
+    dogecoin_free(relevant);
+    relevant = NULL;
+
+    u_assert_true(!dogecoin_smpv_is_tx_relevant(client, tx_other, &relevant));
+    u_assert_true(relevant == NULL);
+
+    client->mempool_txs = (dogecoin_smpv_tx*)dogecoin_calloc(2, sizeof(dogecoin_smpv_tx));
+    u_assert_true(client->mempool_txs != NULL);
+    client->mempool_tx_count = 2;
+    client->mempool_txs[0].decoded_tx = tx_match;
+    client->mempool_txs[0].txid = (char*)dogecoin_calloc(1, strlen("tx_match") + 1);
+    strcpy(client->mempool_txs[0].txid, "tx_match");
+    client->mempool_txs[1].decoded_tx = tx_other;
+    client->mempool_txs[1].txid = (char*)dogecoin_calloc(1, strlen("tx_other") + 1);
+    strcpy(client->mempool_txs[1].txid, "tx_other");
+
+    size_t tx_count = 0;
+    dogecoin_smpv_tx** txs = dogecoin_smpv_get_address_txs(client, addr1, &tx_count);
+    u_assert_true(txs != NULL);
+    u_assert_true(tx_count == 1);
+    dogecoin_free(txs);
+
+    tx_count = 0;
+    /* get_address_txs() is an address query over mempool transactions,
+       independent from watcher registration. */
+    txs = dogecoin_smpv_get_address_txs(client, addr2, &tx_count);
+    u_assert_true(txs != NULL);
+    u_assert_true(tx_count == 1);
+    dogecoin_free(txs);
+
+    dogecoin_smpv_client_free(client);
 }
 
 /* Main test function for the test framework */
@@ -703,6 +792,7 @@ void test_smpv() {
     test_statistics_and_utils();
     test_error_handling();
     test_confirmation_tracking();
+    test_smpv_relevance_and_address_lookup();
 
     debug_print("%s", "All SMPV tests completed\n");
 }

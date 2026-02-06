@@ -198,7 +198,7 @@ uint8_t* utils_hex_to_uint8(const char* str)
  *
  * @return Nothing.
  */
-void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out)
+void utils_bin_to_hex(const unsigned char* bin_in, size_t inlen, char* hex_out)
     {
     static char digits[] = "0123456789abcdef";
     size_t i;

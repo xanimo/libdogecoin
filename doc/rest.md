@@ -571,6 +571,8 @@ uptime_sec: 3600
 
 Lightweight status and counters for the SMPV (Simplified Mempool Payment Verification) tracker.
 SMPV must be enabled with the CLI flag `-x` (e.g., `spvnode -x ...`).
+When SMPV watchers are configured, `mempool_txs` reflects transactions relevant to those watched
+addresses (not the global node mempool).
 
 **Request**
 
