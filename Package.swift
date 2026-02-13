@@ -57,7 +57,6 @@ let package = Package(
                 "doc",
                 "contrib",
                 "depends",
-                "Example",
                 // Exclude build artifacts and config
                 "config"
             ],
