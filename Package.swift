@@ -151,6 +151,7 @@ let package = Package(
                 // Suppress warnings for third-party code and undefine HAVE_CONFIG_H
                 .unsafeFlags([
                     "-UHAVE_CONFIG_H",
+                    "-D_GNU_SOURCE",
                     "-Wno-shorten-64-to-32",
                     "-Wno-deprecated-non-prototype",
                     "-Wno-pointer-bool-conversion",
