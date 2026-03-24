@@ -572,8 +572,10 @@ dogecoin_smpv_tx* dogecoin_smpv_get_tx(
 
 static dogecoin_bool smpv_tx_matches_address(const dogecoin_smpv_client* client, const dogecoin_tx* tx, const char* address)
 {
-    if (!client || !tx || !address || !tx->vout) return false;
-    int is_mainnet = (client->chain_params == &dogecoin_chainparams_main);
+    if (!client || !client->chain_params || !tx || !address || !tx->vout) return false;
+    /* Compare by value, not pointer, to avoid DLL/EXE address mismatch on Windows. */
+    int is_mainnet = (client->chain_params->b58prefix_pubkey_address ==
+                      dogecoin_chainparams_main.b58prefix_pubkey_address);
 
     for (size_t i = 0; i < tx->vout->len; i++) {
         dogecoin_tx_out* out = vector_idx(tx->vout, i);
@@ -589,9 +591,11 @@ static dogecoin_bool smpv_tx_matches_address(const dogecoin_smpv_client* client,
 
 static const char* smpv_tx_find_relevant_watcher_address(const dogecoin_smpv_client* client, const dogecoin_tx* tx)
 {
-    if (!client || !tx || !tx->vout) return NULL;
+    if (!client || !client->chain_params || !tx || !tx->vout) return NULL;
 
-    int is_mainnet = (client->chain_params == &dogecoin_chainparams_main);
+    /* Compare by value, not pointer, to avoid DLL/EXE address mismatch on Windows. */
+    int is_mainnet = (client->chain_params->b58prefix_pubkey_address ==
+                      dogecoin_chainparams_main.b58prefix_pubkey_address);
     smpv_watcher_index_entry* head = (smpv_watcher_index_entry*)client->watcher_index;
 
     for (size_t i = 0; i < tx->vout->len; i++) {

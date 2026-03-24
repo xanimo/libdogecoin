@@ -214,7 +214,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
         return false;
     }
 
-#ifndef TEST_PASSWD
+#if !defined(TEST_TPM_AUTO)
     // Set the UI policy to force high protection (PIN dialog)
     NCRYPT_UI_POLICY uiPolicy;
     memset(&uiPolicy, 0, sizeof(NCRYPT_UI_POLICY));
@@ -524,17 +524,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
 
     // Prompt for the password
     char* password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       password = malloc(PASS_MAX_LEN);
-       strcpy(password, test_password);
+        password = strdup(test_password);
     }
     else
-#else
-    (void) test_password;
-#endif
-    password = getpass("Enter password for seed encryption: \n");
+    {
+        password = getpass("Enter password for seed encryption: \n");
+    }
     if (password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -551,15 +548,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
 
     // Confirm the password
     char* confirm_password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       confirm_password = malloc(PASS_MAX_LEN);
-       strcpy(confirm_password, test_password);
+        confirm_password = strdup(test_password);
     }
     else
-#endif
-    confirm_password = getpass("Confirm password: \n");
+    {
+        confirm_password = getpass("Confirm password: \n");
+    }
     if (confirm_password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -709,17 +705,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
 
     // Prompt for the password
     char* password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       password = malloc(PASS_MAX_LEN);
-       strcpy(password, test_password);
+        password = strdup(test_password);
     }
     else
-#else
-    (void) test_password;
-#endif
-    password = getpass("Enter password for seed decryption: \n");
+    {
+        password = getpass("Enter password for seed decryption: \n");
+    }
     if (password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -956,7 +949,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
         return false;
     }
 
-#ifndef TEST_PASSWD
+#if !defined(TEST_TPM_AUTO)
     // Set the UI policy to force high protection (PIN dialog)
     NCRYPT_UI_POLICY uiPolicy;
     memset(&uiPolicy, 0, sizeof(NCRYPT_UI_POLICY));
@@ -1318,17 +1311,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
 
     // Prompt for the password
     char* password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       password = malloc(PASS_MAX_LEN);
-       strcpy(password, test_password);
+        password = strdup(test_password);
     }
     else
-#else
-    (void) test_password;
-#endif
-    password = getpass("Enter password for HD node encryption: \n");
+    {
+        password = getpass("Enter password for HD node encryption: \n");
+    }
     if (password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -1345,15 +1335,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
 
     // Confirm the password
     char* confirm_password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       confirm_password = malloc(PASS_MAX_LEN);
-       strcpy(confirm_password, test_password);
+        confirm_password = strdup(test_password);
     }
     else
-#endif
-    confirm_password = getpass("Confirm password: \n");
+    {
+        confirm_password = getpass("Confirm password: \n");
+    }
     if (confirm_password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -1507,17 +1496,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
 
     // Prompt for the password
     char* password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       password = malloc(PASS_MAX_LEN);
-       strcpy(password, test_password);
+        password = strdup(test_password);
     }
     else
-#else
-    (void) test_password;
-#endif
-    password = getpass("Enter password for HD node decryption: \n");
+    {
+        password = getpass("Enter password for HD node decryption: \n");
+    }
     if (password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -1801,7 +1787,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
         return false;
     }
 
-#ifndef TEST_PASSWD
+#if !defined(TEST_TPM_AUTO)
     // Set the UI policy to force high protection (PIN dialog)
     NCRYPT_UI_POLICY uiPolicy;
     memset(&uiPolicy, 0, sizeof(NCRYPT_UI_POLICY));
@@ -2130,17 +2116,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
 
     // Prompt for the password
     char* password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       password = malloc(PASS_MAX_LEN);
-       strcpy(password, test_password);
+        password = strdup(test_password);
     }
     else
-#else
-    (void) test_password;
-#endif
-    password = getpass("Enter password for mnemonic encryption: \n");
+    {
+        password = getpass("Enter password for mnemonic encryption: \n");
+    }
     if (password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -2157,15 +2140,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
 
     // Confirm the password
     char* confirm_password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       confirm_password = malloc(PASS_MAX_LEN);
-       strcpy(confirm_password, test_password);
+        confirm_password = strdup(test_password);
     }
     else
-#endif
-    confirm_password = getpass("Confirm password: \n");
+    {
+        confirm_password = getpass("Confirm password: \n");
+    }
     if (confirm_password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");
@@ -2322,17 +2304,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
 
     // Prompt for the password
     char* password = NULL;
-#ifdef TEST_PASSWD
     if (test_password)
     {
-       password = malloc(PASS_MAX_LEN);
-       strcpy(password, test_password);
+        password = strdup(test_password);
     }
     else
-#else
-    (void) test_password;
-#endif
-    password = getpass("Enter password for mnemonic decryption: \n");
+    {
+        password = getpass("Enter password for mnemonic decryption: \n");
+    }
     if (password == NULL)
     {
         fprintf(stderr, "ERROR: Failed to read password.\n");

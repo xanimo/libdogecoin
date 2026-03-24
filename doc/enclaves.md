@@ -388,7 +388,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
     # Build libdogecoin for Host
     make -j 4 -C depends HOST=aarch64-linux-gnu && \
     ./autogen.sh && \
-    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd HOST=aarch64-linux-gnu && \
+    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared HOST=aarch64-linux-gnu && \
     make -j 4 && \
     make install && \
 
@@ -405,7 +405,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
     # Build libdogecoin for OP-TEE
     cd /src/ && \
     make -j 4 -C depends CFLAGS=-Wp,-D_FORTIFY_SOURCE=0 HOST=aarch64-linux-gnu && \
-    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-Wp,-D_FORTIFY_SOURCE=0 HOST=aarch64-linux-gnu && \
+    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-optee CFLAGS=-Wp,-D_FORTIFY_SOURCE=0 HOST=aarch64-linux-gnu && \
     make -j 4 && \
     make install && \
 
@@ -549,13 +549,13 @@ docker run --device /dev/sgx_enclave:/dev/sgx_enclave --device /dev/sgx_provisio
   # Build libdogecoin for Enclave
   make -j 4 -C depends HOST=x86_64-pc-linux-gnu && \
   ./autogen.sh && \
-  ./configure --prefix=/src/depends/x86_64-pc-linux-gnu --enable-openenclave --enable-test-passwd CFLAGS=-Wp,-D_FORTIFY_SOURCE=0 && \
+  ./configure --prefix=/src/depends/x86_64-pc-linux-gnu --enable-openenclave CFLAGS=-Wp,-D_FORTIFY_SOURCE=0 && \
   make && \
   make install && \
 
   # Build libdogecoin for Host
   make -j 4 -C depends HOST=x86_64-pc-linux-gnu/host && \
-  ./configure --prefix=/src/depends/x86_64-pc-linux-gnu/host --enable-test-passwd && \
+  ./configure --prefix=/src/depends/x86_64-pc-linux-gnu/host && \
   make && \
   make install && \
 

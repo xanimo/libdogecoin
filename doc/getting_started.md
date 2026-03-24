@@ -58,14 +58,7 @@ mkdir build
 cd build
 cmake ..
 ```
-Another useful flag is `--enable-test-passwd`, which will generate a random password for testing software encryption/decryption. This flag disables the need for a password to be entered when testing TPM encryption/decryption. _Note: this flag is for testing purposes only._ This flag is disabled by default, but can be enabled with the `./configure` command or by using `cmake`:
-```c
-./configure --enable-test-passwd
-```
-```c
-cmake -DTEST_PASSWD=TRUE ..
-```
-## _`--enable-test-passwd` is for **testing purposes only**._
+When tests are enabled, test password support is enabled automatically for software encryption/decryption so test runs do not block on interactive password entry.
 For a complete list of all different configuration options, you can run the command `./configure --help`.
 
 Finally, once you have configured the library to your liking, it is ready to be built. This can be done with the simple `make` command:
