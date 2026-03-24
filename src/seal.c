@@ -241,12 +241,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
         return false;
     }
 
+    // Free the handle from NCryptCreatePersistedKey before re-opening to avoid leaking it
+    NCryptFreeObject(hEncryptionKey);
+
     // Open the existing encryption key in the TPM storage provider
     status = NCryptOpenKey(hProvider, &hEncryptionKey, name, 0, 0);
     if (status != ERROR_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to open existing encryption key in TPM storage provider (0x%08x)\n", status);
-        NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
     }
@@ -276,6 +278,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
     if (status != ERROR_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to encrypt the seed (0x%08x)\n", status);
+        dogecoin_free(pbOutput);
         NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
@@ -285,6 +288,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
     if (_wmkdir(CRYPTO_DIR_PATH_W) == -1 && errno != EEXIST)
     {
         fprintf(stderr, "ERROR: Failed to create directory\n");
+        dogecoin_free(pbOutput);
+        NCryptFreeObject(hEncryptionKey);
+        NCryptFreeObject(hProvider);
         return false;
     }
 
@@ -295,6 +301,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
     if (!fp)
     {
         fprintf(stderr, "ERROR: Failed to open file for writing\n");
+        dogecoin_free(pbOutput);
         NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
@@ -305,6 +312,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
     if (bytesWritten != cbOutput)
     {
         fprintf(stderr, "ERROR: Failed to write encrypted seed to file\n");
+        dogecoin_free(pbOutput);
+        fclose(fp);
         NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
@@ -312,6 +321,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
 
     // Close the file
     fclose(fp);
+
+    // Free the memory for the encrypted data
+    dogecoin_free(pbOutput);
 
     // Free the encryption key handle and close the TPM storage provider
     NCryptFreeObject(hEncryptionKey);
@@ -983,12 +995,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
         return false;
     }
 
+    // Free the handle from NCryptCreatePersistedKey before re-opening to avoid leaking it
+    NCryptFreeObject(hEncryptionKey);
+
     // Open the existing encryption key in the TPM storage provider
     status = NCryptOpenKey(hProvider, &hEncryptionKey, name, 0, 0);
     if (status != ERROR_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to open existing encryption key in TPM storage provider (0x%08x)\n", status);
-        NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
     }
@@ -1002,6 +1016,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
     if (hr != TBS_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to create TBS context (0x%08x)\n", hr);
+        NCryptFreeObject(hEncryptionKey);
+        NCryptFreeObject(hProvider);
         return false;
     }
 
@@ -1025,6 +1041,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
         {
             fprintf(stderr, "ERROR: Failed to close TBS context (0x%08x)\n", hr);
         }
+        NCryptFreeObject(hEncryptionKey);
+        NCryptFreeObject(hProvider);
         return false;
     }
 
@@ -1033,6 +1051,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
     if (hr != TBS_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to close TBS context (0x%08x)\n", hr);
+        NCryptFreeObject(hEncryptionKey);
+        NCryptFreeObject(hProvider);
         return false;
     }
 
@@ -1074,6 +1094,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
     if (_wmkdir(CRYPTO_DIR_PATH_W) == -1 && errno != EEXIST)
     {
         fprintf(stderr, "ERROR: Failed to create directory\n");
+        dogecoin_free(pbResult);
+        NCryptFreeObject(hEncryptionKey);
+        NCryptFreeObject(hProvider);
         return false;
     }
 
@@ -1828,12 +1851,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
         return false;
     }
 
+    // Free the handle from NCryptCreatePersistedKey before re-opening to avoid leaking it
+    NCryptFreeObject(hEncryptionKey);
+
     // Open the existing encryption key in the TPM storage provider
     status = NCryptOpenKey(hProvider, &hEncryptionKey, name, 0, 0);
     if (status != ERROR_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to open existing encryption key in TPM storage provider (0x%08x)\n", status);
-        NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
     }
@@ -1844,6 +1869,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     if (mnemonicResult == -1)
     {
         fprintf(stderr, "ERROR: Failed to generate mnemonic\n");
+        NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         utils_clear_buffers();
         return false;
@@ -1877,6 +1903,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     if (status != ERROR_SUCCESS)
     {
         fprintf(stderr, "ERROR: Failed to encrypt the mnemonic (0x%08x)\n", status);
+        dogecoin_free(pbOutput);
         NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
@@ -1886,6 +1913,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     if (_wmkdir(CRYPTO_DIR_PATH_W) == -1 && errno != EEXIST)
     {
         fprintf(stderr, "ERROR: Failed to create directory\n");
+        dogecoin_free(pbOutput);
+        NCryptFreeObject(hEncryptionKey);
+        NCryptFreeObject(hProvider);
         return false;
     }
 
@@ -1896,6 +1926,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     if (!fp)
     {
         fprintf(stderr, "ERROR: Failed to open file for writing\n");
+        dogecoin_free(pbOutput);
         NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
@@ -1906,6 +1937,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     if (bytesWritten != cbOutput)
     {
         fprintf(stderr, "ERROR: Failed to write encrypted mnemonic to file\n");
+        dogecoin_free(pbOutput);
+        fclose(fp);
         NCryptFreeObject(hEncryptionKey);
         NCryptFreeObject(hProvider);
         return false;
@@ -2523,6 +2556,15 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         else if (status != ERROR_SUCCESS)
         {
             fprintf(stderr, "ERROR: Failed to enumerate keys in TPM storage provider (0x%08x)\n", status);
+            // Free any names already allocated to avoid leaking them on error
+            for (size_t i = 0; i < *count; i++)
+            {
+                dogecoin_free(names[i]);
+                names[i] = NULL;
+            }
+            *count = 0;
+            if (keyList) NCryptFreeBuffer(keyList);
+            if (ppEnumState) NCryptFreeBuffer(ppEnumState);
             NCryptFreeObject(hProvider);
             return false;
         }
@@ -2533,6 +2575,15 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         if (names[*count] == NULL)
         {
             fprintf(stderr, "ERROR: Failed to allocate memory for object name\n");
+            // Free any names already allocated to avoid leaking them on error
+            for (size_t i = 0; i < *count; i++)
+            {
+                dogecoin_free(names[i]);
+                names[i] = NULL;
+            }
+            *count = 0;
+            NCryptFreeBuffer(keyList);
+            if (ppEnumState) NCryptFreeBuffer(ppEnumState);
             NCryptFreeObject(hProvider);
             return false;
         }
@@ -2542,16 +2593,20 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
 
         // Increment the count of keys
         (*count)++;
+
+        // Free this iteration's key info; NCryptEnumKeys allocates a new buffer on each call
+        NCryptFreeBuffer(keyList);
+        keyList = NULL;
     }
 
     // Free the key list
-    NCryptFreeBuffer(keyList);
+    if (keyList) NCryptFreeBuffer(keyList);
 
     // Close the TPM storage provider
     NCryptFreeObject(hProvider);
 
     // Free the enumeration state
-    NCryptFreeBuffer(ppEnumState);
+    if (ppEnumState) NCryptFreeBuffer(ppEnumState);
 
     return true;
 #else
