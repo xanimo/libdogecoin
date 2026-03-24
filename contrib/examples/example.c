@@ -123,8 +123,8 @@ int main() {
 	}
 
 	char keypath[BIP44_KEY_PATH_MAX_SIZE] = "m/44'/3'/0'/0/0";
-	if (getDerivedHDAddressByPath(masterkey_main_ext, keypath, extout, true)) {
-		printf("Derived HD Addresses:\n%s\n%s\n", extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+	if (getDerivedHDAddressByPath(masterkey_main_ext, keypath, extout)) {
+		printf("Derived P2PKH Address:\n%s\n%s\n", extout, "DCm7oSg95sxwn3sWxYUDHgKKbB2mDmuR3B");
 	} else {
 		printf("getDerivedHDAddressByPath failed!\n");
 		return -1;
