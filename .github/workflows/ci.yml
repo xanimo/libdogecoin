@@ -939,3 +939,186 @@ jobs:
             lib/**
             test/**
             LICENSE
+
+  gitian-build:
+    runs-on: ubuntu-22.04
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip zip wget osslsigncode
+          if ! command -v docker >/dev/null 2>&1; then
+            sudo apt-get install -y docker.io
+          fi
+
+      - name: run gitian build
+        env:
+          LIBDOGECOIN_DEV_WINDOWS_CERT_DATA: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}
+          LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
+        run: |
+          cert_tmp_root=
+          cert_tmpdir=
+          cert_file=
+          cert_compat_file=
+          cert_password_file=
+          cert_convert_log=
+          cert_for_gitian=
+          cleanup() {
+            if [ -n "$cert_tmpdir" ] && [ -d "$cert_tmpdir" ]; then
+              if command -v shred >/dev/null 2>&1; then
+                [ -n "$cert_file" ] && [ -f "$cert_file" ] && shred -u "$cert_file" || true
+                [ -n "$cert_compat_file" ] && [ -f "$cert_compat_file" ] && shred -u "$cert_compat_file" || true
+                [ -n "$cert_password_file" ] && [ -f "$cert_password_file" ] && shred -u "$cert_password_file" || true
+                [ -n "$cert_convert_log" ] && [ -f "$cert_convert_log" ] && shred -u "$cert_convert_log" || true
+              else
+                [ -n "$cert_file" ] && [ -f "$cert_file" ] && rm -f "$cert_file" || true
+                [ -n "$cert_compat_file" ] && [ -f "$cert_compat_file" ] && rm -f "$cert_compat_file" || true
+                [ -n "$cert_password_file" ] && [ -f "$cert_password_file" ] && rm -f "$cert_password_file" || true
+                [ -n "$cert_convert_log" ] && [ -f "$cert_convert_log" ] && rm -f "$cert_convert_log" || true
+              fi
+              rm -rf "$cert_tmpdir"
+            fi
+          }
+          trap cleanup EXIT
+
+          gitian_args=(
+            --docker
+            --mem=6000
+            --proc=2
+            --commit=${{ github.ref_name }}
+            --url=https://github.com/${{ github.repository }}
+          )
+
+          if [ -n "$LIBDOGECOIN_DEV_WINDOWS_CERT_DATA" ]; then
+            cert_tmp_root="${RUNNER_TEMP:-/tmp}"
+            mkdir -p "$cert_tmp_root"
+            cert_tmpdir="$(mktemp -d "$cert_tmp_root/libdogecoin-signing.XXXXXX")"
+            chmod 700 "$cert_tmpdir"
+            old_umask="$(umask)"
+          fi
+
+          if [ -n "$LIBDOGECOIN_DEV_WINDOWS_CERT_DATA" ] && [ -n "$LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD" ]; then
+            cert_file="$cert_tmpdir/libdogecoin-windows-signing-cert.p12"
+            cert_compat_file="$cert_tmpdir/libdogecoin-windows-signing-cert-compat.p12"
+            cert_password_file="$cert_tmpdir/signing.pass"
+            cert_convert_log="$cert_tmpdir/openssl-convert.log"
+            umask 077
+            printf '%s' "$LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD" > "$cert_password_file"
+            umask "$old_umask"
+            printf '%s' "$LIBDOGECOIN_DEV_WINDOWS_CERT_DATA" | base64 -d > "$cert_file"
+            pem_tmp="$cert_tmpdir/cert-and-key.pem"
+            if openssl pkcs12 -legacy -in "$cert_file" -out "$pem_tmp" -nodes -passin file:"$cert_password_file" 2>"$cert_convert_log" && \
+              openssl pkcs12 -export -in "$pem_tmp" -out "$cert_compat_file" -passout file:"$cert_password_file" 2>>"$cert_convert_log"; then
+              cert_for_gitian="$cert_compat_file"
+              echo "Legacy PKCS#12 certificate converted to modern format for signing."
+            else
+              echo "::warning::Legacy PKCS#12 conversion failed; using original certificate (osslsigncode will use legacy provider)."
+              if [ -s "$cert_convert_log" ]; then
+                sed 's/^/openssl: /' "$cert_convert_log"
+              fi
+              cert_for_gitian="$cert_file"
+            fi
+            if [ -f "$pem_tmp" ]; then
+              if command -v shred >/dev/null 2>&1; then
+                shred -u "$pem_tmp"
+              else
+                rm -f "$pem_tmp"
+              fi
+            fi
+            if [ -n "$cert_for_gitian" ]; then
+              gitian_args+=(
+                --codesign-win
+                --windows-cert-file="$cert_for_gitian"
+                --windows-cert-password="$LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD"
+              )
+            fi
+          fi
+
+          ./contrib/gitian-build.sh "${gitian_args[@]}"
+
+      - name: Upload Gitian artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libdogecoin-${{ github.sha }}-gitian
+          path: |
+            gitian/builds/${{ github.ref_name }}/**
+
+      # Release assets are uploaded by the sign-gitian-macos continuation job
+      # below, after macOS tarballs have been signed on a macOS runner.  This
+      # keeps a single, unified set of signed gitian release assets per tag.
+
+  sign-gitian-macos:
+    needs: gitian-build
+    runs-on: macos-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Gitian artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: libdogecoin-${{ github.sha }}-gitian
+          path: gitian/builds/${{ github.ref_name }}
+
+      - name: Import certificate to keychain (gitian-macos)
+        env:
+          LIBDOGECOIN_DEV_MACOS_CERT_DATA: ${{ secrets.LIBDOGECOIN_DEV_MACOS_CERT_DATA }}
+          LIBDOGECOIN_DEV_MACOS_CERT_PASS: ${{ secrets.LIBDOGECOIN_DEV_MACOS_CERT_PASSWORD }}
+        run: |
+          if [ -z "$LIBDOGECOIN_DEV_MACOS_CERT_DATA" ] || [ -z "$LIBDOGECOIN_DEV_MACOS_CERT_PASS" ]; then
+            echo "macOS signing secrets not available; skipping"
+            exit 0
+          fi
+          # Mirrors the sign-x86_64-macos job: decode the Developer ID Application
+          # certificate and import it into a dedicated build keychain so that
+          # /usr/bin/codesign can find the signing identity without prompting.
+          echo $LIBDOGECOIN_DEV_MACOS_CERT_DATA | base64 --decode > certificate.p12
+          security create-keychain -p $LIBDOGECOIN_DEV_MACOS_CERT_PASS ~/Library/Keychains/build.keychain
+          security default-keychain -s ~/Library/Keychains/build.keychain
+          security unlock-keychain -p $LIBDOGECOIN_DEV_MACOS_CERT_PASS ~/Library/Keychains/build.keychain
+          security import certificate.p12 -k ~/Library/Keychains/build.keychain -P $LIBDOGECOIN_DEV_MACOS_CERT_PASS -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $LIBDOGECOIN_DEV_MACOS_CERT_PASS ~/Library/Keychains/build.keychain
+          rm -f certificate.p12
+
+      - name: Sign Gitian macOS tarballs
+        env:
+          LIBDOGECOIN_DEV_APPLE_TEAM_ID: ${{ secrets.LIBDOGECOIN_DEV_APPLE_TEAM_ID }}
+          LIBDOGECOIN_DEV_MACOS_CERT_DATA: ${{ secrets.LIBDOGECOIN_DEV_MACOS_CERT_DATA }}
+        run: |
+          if [ -z "$LIBDOGECOIN_DEV_MACOS_CERT_DATA" ] || [ -z "$LIBDOGECOIN_DEV_APPLE_TEAM_ID" ]; then
+            echo "macOS signing secrets not available; skipping"
+            exit 0
+          fi
+          # --sign-only skips the gitian build and runs sign_macos_targets()
+          # against the already-built artifacts downloaded above.
+          ./contrib/gitian-build.sh \
+            --sign-only \
+            --codesign-macos \
+            --macos-team-id="$LIBDOGECOIN_DEV_APPLE_TEAM_ID" \
+            --macos-keychain="$HOME/Library/Keychains/build.keychain" \
+            --commit=${{ github.ref_name }}
+
+      - name: Upload signed Gitian artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: libdogecoin-${{ github.sha }}-gitian
+          path: |
+            gitian/builds/${{ github.ref_name }}/**
+          overwrite: true
+
+      - name: Upload signed Gitian release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            gitian/builds/${{ github.ref_name }}/**/*
+          fail_on_unmatched_files: true
