@@ -212,7 +212,7 @@ void test_reorg() {
     utils_hex_to_bin(merkleroot_hex2, (uint8_t*) header5_fork->merkle_root, 64, &outlen); // merkle is a don't care
 
     // Calculate the chainwork for each header
-    uint256_t chainwork1, chainwork2, chainwork3, chainwork4, chainwork2_stale, chainwork2_fork, chainwork3_fork, chainwork4_fork, chainwork5_fork;
+    arith_uint256 chainwork1 = {0}, chainwork2 = {0}, chainwork3 = {0}, chainwork4 = {0}, chainwork2_stale = {0}, chainwork2_fork = {0}, chainwork3_fork = {0}, chainwork4_fork = {0}, chainwork5_fork = {0};
     arith_uint256* target1 = init_arith_uint256();
     arith_uint256* target2 = init_arith_uint256();
     arith_uint256* target3 = init_arith_uint256();
@@ -270,7 +270,7 @@ void test_reorg() {
     dogecoin_free(target4);
 
     arith_uint256* arith_chainwork2 = init_arith_uint256();
-    memcpy(arith_chainwork2, &chainwork2, sizeof(arith_uint256));
+    *arith_chainwork2 = chainwork2;
     arith_uint256* arith_chainwork2_stale = init_arith_uint256();
 
     // Mine the stale block header 2
@@ -287,7 +287,7 @@ void test_reorg() {
         bool pow_passed = check_pow(hash, header2_stale->bits, chain, &chainwork2_stale);
 
         // Update the arith_uint256 chainwork of the stale
-        memcpy(arith_chainwork2_stale, &chainwork2_stale, sizeof(uint256_t));
+        *arith_chainwork2_stale = chainwork2_stale;
 
         // Check if the chainwork of the stale is equal and the hash passes PoW
         if (arith_uint256_equal(arith_chainwork2_stale, arith_chainwork2) && pow_passed) {
@@ -324,7 +324,7 @@ void test_reorg() {
         bool pow_passed = check_pow(hash, header2_fork->bits, chain, &chainwork2_fork);
 
         // Update the arith_uint256 chainwork of the fork
-        memcpy(arith_chainwork2_fork, &chainwork2_fork, sizeof(uint256_t));
+        *arith_chainwork2_fork = chainwork2_fork;
 
         // Check if the chainwork of the fork is greater and the hash passes PoW
         if (arith_uint256_greater_than(arith_chainwork2_fork, arith_chainwork2) && pow_passed) {
@@ -371,7 +371,7 @@ void test_reorg() {
         bool pow_passed = check_pow(hash, header3_fork->bits, chain, &chainwork3_fork);
 
         // Update the arith_uint256 chainwork of the fork
-        memcpy(arith_chainwork3_fork, &chainwork3_fork, sizeof(uint256_t));
+        *arith_chainwork3_fork = chainwork3_fork;
 
         // Check if the hash passes PoW
         if (pow_passed) {
@@ -417,7 +417,7 @@ void test_reorg() {
         bool pow_passed = check_pow(hash, header4_fork->bits, chain, &chainwork4_fork);
 
         // Update the arith_uint256 chainwork of the fork
-        memcpy(arith_chainwork4_fork, &chainwork4_fork, sizeof(uint256_t));
+        *arith_chainwork4_fork = chainwork4_fork;
 
         // Check if the hash passes PoW
         if (pow_passed) {
@@ -463,7 +463,7 @@ void test_reorg() {
         bool pow_passed = check_pow(hash, header5_fork->bits, chain, &chainwork5_fork);
 
         // Update the arith_uint256 chainwork of the fork
-        memcpy(arith_chainwork5_fork, &chainwork5_fork, sizeof(uint256_t));
+        *arith_chainwork5_fork = chainwork5_fork;
 
         // Check if the hash passes PoW
         if (pow_passed) {

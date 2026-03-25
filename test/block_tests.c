@@ -55,7 +55,7 @@ void test_block_header()
         const struct blockheadertest* test = &block_header_tests[i];
         uint8_t header_data[80];
         uint256_t hash_data;
-        uint256_t chainwork = {0};
+        arith_uint256 chainwork = {0};
         utils_hex_to_bin(test->hexheader, header_data, 160, &outlen);
 
         utils_hex_to_bin(test->hexhash, hash_data, sizeof(hash_data), &outlen);
@@ -104,7 +104,7 @@ void test_block_header()
             check_pow(hash, block_header_tests[i].bits, block_header_tests[i].params, &chainwork);
 
             // Check the chainwork matches
-            u_assert_mem_eq(utils_uint8_to_hex(chainwork, DOGECOIN_HASH_LENGTH), test->chainwork, 64);
+            u_assert_mem_eq(utils_uint8_to_hex(arith_to_uint256(&chainwork), DOGECOIN_HASH_LENGTH), test->chainwork, 64);
             cstr_free(s, true);
             dogecoin_free(hash);
             dogecoin_free(target);
@@ -169,7 +169,7 @@ void test_block_header()
     u_assert_str_eq(headercheck, blockheader_h371338);
 
     uint256_t checkhash;
-    uint256_t chainwork;
+    arith_uint256 chainwork = {0};
     dogecoin_block_header_hash(&bheader, (uint8_t *)&checkhash);
     char hashhex[sizeof(checkhash) * 2 + 1];
     utils_bin_to_hex(checkhash, sizeof(checkhash), hashhex);

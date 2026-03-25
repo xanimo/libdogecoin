@@ -30,6 +30,7 @@
 #define __LIBDOGECOIN_BLOCKCHAIN_H__
 
 #include <dogecoin/dogecoin.h>
+#include <dogecoin/arith_uint256.h>
 #include <dogecoin/block.h>
 
 LIBDOGECOIN_BEGIN_DECL
@@ -40,7 +41,7 @@ LIBDOGECOIN_BEGIN_DECL
 typedef struct dogecoin_blockindex {
     uint32_t height;
     uint256_t hash;
-    uint256_t chainwork;
+    arith_uint256 chainwork;
     dogecoin_block_header header;
     struct dogecoin_blockindex* prev;
 } dogecoin_blockindex;

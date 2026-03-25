@@ -64,7 +64,7 @@ dogecoin_bool is_legacy(int32_t version) {
         || (version == 2 && get_chainid(version) == 0);
 }
 
-dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* params, uint256_t* chainwork) {
+dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* params, arith_uint256* chainwork) {
     /* Except for legacy blocks with full version 1, ensure that
        the chain ID is correct.  Legacy blocks are not allowed since
        the merge-mining start, which is checked in AcceptBlockHeader

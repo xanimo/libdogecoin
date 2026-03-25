@@ -7,6 +7,7 @@
 
 #include <test/utest.h>
 
+#include <dogecoin/arith_uint256.h>
 #include <dogecoin/block.h>
 #include <dogecoin/net.h>
 #include <dogecoin/utils.h>
@@ -83,7 +84,7 @@ void postcmd(struct dogecoin_node_ *node, dogecoin_p2p_msg_hdr *hdr, struct cons
     if (strcmp(hdr->command, "block") == 0)
     {
         dogecoin_block_header header;
-        uint256_t chainwork;
+        arith_uint256 chainwork = {0};
         if (!dogecoin_block_header_deserialize(&header, buf, node->nodegroup->chainparams, &chainwork)) return;
 
         uint32_t vsize;
