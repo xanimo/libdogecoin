@@ -177,7 +177,6 @@ void scrypt_1024_1_1_256_sp_generic(const char *input, char *output, char *scrat
 }
 
 #if defined(USE_SSE2)
-// By default, set to generic scrypt function. This will prevent crash in case when scrypt_detect_sse2() wasn't called
 void (*scrypt_1024_1_1_256_sp_detected)(const char *input, char *output, char *scratchpad) = &scrypt_1024_1_1_256_sp_generic;
 
 void scrypt_detect_sse2()
@@ -191,7 +190,7 @@ void scrypt_detect_sse2()
     // MSVC
     int x86cpuid[4];
     __cpuid(x86cpuid, 1);
-    cpuid_edx = (unsigned int)buffer[3];
+    cpuid_edx = (unsigned int)x86cpuid[3];
 #else // _MSC_VER
     // Linux or i686-w64-mingw32 (gcc-4.6.3)
     unsigned int eax, ebx, ecx;
