@@ -1,8 +1,8 @@
 /**********************************************************************
  * Copyright (c) 2022 bluezr                                          *
- * Copyright (c) 2022-2023 The Dogecoin Foundation                         *
- * Distributed under the MIT software license, see the accompanying   *
- * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
+ * Copyright (c) 2022-2023 The Dogecoin Foundation                     *
+ * Distributed under the MIT software license, see the accompanying    *
+ * file COPYING or http://www.opensource.org/licenses/mit-license.php. *
  **********************************************************************/
 
 #include <stdlib.h>
@@ -19,7 +19,12 @@
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/pqc_dilithium.h>
+#include <dogecoin/pqc_falcon.h>
 
+/*
+ * Transaction API tests (UTXO build/sign) plus optional Falcon-512 commit test.
+ */
 void test_transaction()
 {
     // internal keys
@@ -598,4 +603,62 @@ void test_transaction()
     u_assert_true(sign_transaction_w_privkey_ex(working_transaction_index, private_key_wif, buf5, sizeof(buf5)));
     u_assert_str_eq(buf5, get_raw_transaction(working_transaction_index));
 
+    // ----------------------------------------------------------------
+    // optional Falcon-512 OP_RETURN commit test (only when built with liboqs)
+#ifdef USE_LIBOQS
+    uint8_t *pk = NULL, *sk = NULL, *sig = NULL;
+    size_t pk_len = 0, sk_len = 0, sig_len = 0;
+
+    // generate keypair
+    u_assert_true(dogecoin_falcon512_keypair(&pk, &pk_len, &sk, &sk_len));
+
+    // sign a simple 32-byte message (for demo; a tx sighash could also be used)
+    uint8_t msg[32];
+    for (int i = 0; i < 32; ++i) msg[i] = (uint8_t)i;
+    u_assert_true(dogecoin_falcon512_sign(sk, sk_len, msg, sizeof msg, &sig, &sig_len));
+
+    // verify signature
+    u_assert_true(dogecoin_falcon512_verify(pk, pk_len, msg, sizeof msg, sig, sig_len));
+
+    // compute commit = SHA256(pk||sig)
+    uint8_t commit32[32];
+    u_assert_true(dogecoin_falcon512_commit_bytes(pk, pk_len, sig, sig_len, commit32));
+
+    // push commit into OP_RETURN and then extract it back
+    dogecoin_tx* txc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_falcon512_commit(txc, commit32));
+
+    uint8_t extracted[32];
+    u_assert_true(dogecoin_tx_extract_falcon512_commit(txc, extracted));
+    u_assert_true(memcmp(extracted, commit32, 32) == 0);
+
+    // cleanup
+    dogecoin_tx_free(txc);
+    dogecoin_free(pk);
+    dogecoin_free(sk);
+    dogecoin_free(sig);
+
+    // optional Dilithium2 OP_RETURN commit test
+    uint8_t *dpk = NULL, *dsk = NULL, *dsig = NULL;
+    size_t dpk_len = 0, dsk_len = 0, dsig_len = 0;
+
+    u_assert_true(dogecoin_dilithium2_keypair(&dpk, &dpk_len, &dsk, &dsk_len));
+    u_assert_true(dogecoin_dilithium2_sign(dsk, dsk_len, msg, sizeof msg, &dsig, &dsig_len));
+    u_assert_true(dogecoin_dilithium2_verify(dpk, dpk_len, msg, sizeof msg, dsig, dsig_len));
+
+    uint8_t dcommit32[32];
+    u_assert_true(dogecoin_dilithium2_commit_bytes(dpk, dpk_len, dsig, dsig_len, dcommit32));
+
+    dogecoin_tx* dtxc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_dilithium2_commit(dtxc, dcommit32));
+
+    uint8_t dextracted[32];
+    u_assert_true(dogecoin_tx_extract_dilithium2_commit(dtxc, dextracted));
+    u_assert_true(memcmp(dextracted, dcommit32, 32) == 0);
+
+    dogecoin_tx_free(dtxc);
+    dogecoin_free(dpk);
+    dogecoin_free(dsk);
+    dogecoin_free(dsig);
+#endif
 }

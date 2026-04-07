@@ -492,6 +492,9 @@ int main(int argc, char* argv[]) {
         dogecoin_free(headersfile);
         if (!response) {
             printf("Could not load or create headers database...aborting\n");
+#if WITH_WALLET
+            dogecoin_wallet_free(wallet);
+#endif
             ret = EXIT_FAILURE;
         } else {
             if (have_decl_daemon) {

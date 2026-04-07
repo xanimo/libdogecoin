@@ -30,6 +30,15 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - signmessage
 - verify_message
 - transaction
+- tx_sighash32 (requires --enable-liboqs)
+- falcon_keygen (requires --enable-liboqs)
+- falcon_sign (requires --enable-liboqs)
+- falcon_verify (requires --enable-liboqs)
+- falcon_commit (requires --enable-liboqs)
+- dilithium2_keygen (requires --enable-liboqs)
+- dilithium2_sign (requires --enable-liboqs)
+- dilithium2_verify (requires --enable-liboqs)
+- dilithium2_commit (requires --enable-liboqs)
 
 So an example run of `such` could be something like this:
 ```
@@ -464,3 +473,114 @@ When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate 
 
 #### Sync up, with a wallet file "main_wallet.db", with encrypted mnemonic 0, show debug info, with a headers file "main_headers.db", wait for new blocks, use TPM:
     ./spvnode -d -c -w "./main_wallet.db" -h "./main_headers.db" -y 0 -j -b scan
+
+## Falcon-512 Post-Quantum Cryptography (PQC) Commands
+
+> **Note**: These commands are only available when libdogecoin is built with `--enable-liboqs` flag.
+
+The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
+
+### Available Falcon Commands
+
+| Command | Required Flags | Description |
+| - | - | - |
+| falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
+| tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
+| falcon_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Falcon-512 secret key. Returns signature (~660 bytes) |
+| falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against message bytes and public key |
+| falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
+| dilithium2_keygen | None | Generates a Dilithium2/ML-DSA-44 keypair |
+| dilithium2_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Dilithium2 secret key |
+| dilithium2_verify | -k, -x, -s | Verifies a Dilithium2 signature against message bytes and public key |
+| dilithium2_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
+
+### Flag Usage for Falcon Commands
+
+| Flag | Description | Format |
+| - | - | - |
+| -k, --pubkey | Falcon-512 public key | Hex string (1794 chars for 897 bytes) |
+| -p, --privkey | Falcon-512 secret key | Hex string (2562 chars for 1281 bytes) |
+| -x | Message to sign/verify | Hex string |
+| -s | Falcon-512 signature | Hex string (~1320 chars for ~660 bytes) |
+
+### Examples
+
+#### Generate a Falcon-512 keypair:
+```bash
+./such -c falcon_keygen
+```
+Output:
+```
+Generating Falcon-512 keypair...
+Public Key (897 bytes): 0141...
+Secret Key (1281 bytes): 5014...
+```
+
+#### Derive transaction sighash32:
+```bash
+./such -c tx_sighash32 -x <unsigned_raw_tx_hex> -s <script_pubkey_hex> -i 0 -h 1
+```
+
+#### Sign tx_sighash32 with Falcon-512:
+```bash
+# Sign with Falcon secret key over tx_sighash32 hex
+MESSAGE_HEX=$(./such -c tx_sighash32 -x <unsigned_raw_tx_hex> -s <script_pubkey_hex> -i 0 -h 1 | awk '/tx_sighash32:/ {print $2}')
+./such -c falcon_sign -p <secret_key_hex> -x $MESSAGE_HEX
+```
+Output:
+```
+Signing message with Falcon-512...
+Message (hex): <tx_sighash32_hex>
+Signature (666 bytes): 3a7f...
+```
+
+#### Verify a Falcon-512 signature:
+```bash
+./such -c falcon_verify -k <public_key_hex> -x <tx_sighash32_hex> -s <signature_hex>
+```
+Output:
+```
+Verifying Falcon-512 signature...
+Signature is VALID
+```
+
+#### Generate a commitment for OP_RETURN:
+```bash
+./such -c falcon_commit -k <public_key_hex> -s <signature_hex>
+```
+Output:
+```
+Generating Falcon-512 commitment...
+Commitment (32 bytes): a1b2c3d4e5f6789...
+```
+
+### Testnet Workflow Helpers
+
+For end-to-end testnet command flow, use the provided scripts:
+- `contrib/testnet_falcon_test.sh`
+- `contrib/testnet_dilithium2_test.sh`
+
+These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, and SPV monitoring commands.
+
+### Automated Testing Script
+
+A comprehensive testnet integration test script is available at:
+```
+contrib/testnet_falcon_test.sh
+```
+
+Run it to perform end-to-end testing:
+```bash
+./contrib/testnet_falcon_test.sh
+```
+
+This script automates:
+- Testnet wallet generation
+- Falcon keypair generation
+- Message signing
+- Commitment generation
+- Transaction building guidance
+- SPV monitoring instructions
+
+For protocol rationale/specification details, see:
+- `doc/spec/bip-post-quantum-signature-commitments.mediawiki`
