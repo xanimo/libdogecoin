@@ -43,6 +43,19 @@ If you are also running the HTTP server, the SMPV endpoints are documented separ
 ./spvnode -x -u 127.0.0.1:8080 scan
 ```
 
+To run spvnode with debug logging, continuous mode, SMPV enabled, HTTP REST API, and checkpoints:
+
+```bash
+./spvnode -d -c -x -u 127.0.0.1:8080 -p -b scan
+```
+
+**Note**: The `-b` flag is **recommended** but not strictly required. Without it, `spvnode` will automatically transition to full block sync when reaching the chain tip. See `tools.md` for more details on all available flags.
+
+```bash
+./spvnode -d -c -x -u 127.0.0.1:8080 -p scan
+```
+This will sync headers first (fast), then auto-transition to full block sync at the tip.
+
 ## API Reference
 
 ### Client Management
