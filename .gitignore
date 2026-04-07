@@ -45,6 +45,8 @@
 
 # Kernel Module Compile Results
 *.mod*
+# But allow Swift module maps
+!module.modulemap
 *.cmd
 .tmp_versions/
 modules.order
