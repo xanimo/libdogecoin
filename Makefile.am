@@ -31,6 +31,7 @@ noinst_HEADERS = \
     include/dogecoin/arith_uint256.h \
     include/dogecoin/auxpow.h \
     include/dogecoin/base58.h \
+    include/dogecoin/bip37.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
     include/dogecoin/bip44.h \
@@ -300,6 +301,7 @@ noinst_HEADERS += \
 
 libdogecoin_la_SOURCES += \
     src/headersdb_file.c \
+    src/bip37.c \
     src/net.c \
     src/protocol.c \
     src/rest.c \

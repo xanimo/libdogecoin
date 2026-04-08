@@ -56,7 +56,7 @@ LIBDOGECOIN_BEGIN_DECL
 
 LIBDOGECOIN_API void utils_clear_buffers(void);
 LIBDOGECOIN_API void utils_hex_to_bin(const char* str, unsigned char* out, size_t inLen, size_t* outLen);
-LIBDOGECOIN_API void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out);
+LIBDOGECOIN_API void utils_bin_to_hex(const unsigned char* bin_in, size_t inlen, char* hex_out);
 LIBDOGECOIN_API uint8_t* utils_hex_to_uint8(const char* str);
 LIBDOGECOIN_API char* utils_uint8_to_hex(const uint8_t* bin, size_t l);
 LIBDOGECOIN_API void utils_reverse_hex(char* h, size_t len);

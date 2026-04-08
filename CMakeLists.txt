@@ -471,6 +471,7 @@ IF(WITH_NET)
         DESTINATION include/dogecoin
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
+        src/bip37.c
         src/headersdb_file.c
         src/net.c
         src/protocol.c

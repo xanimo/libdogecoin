@@ -740,6 +740,7 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
             if ((v_msg_check.services & DOGECOIN_NODE_NETWORK) != DOGECOIN_NODE_NETWORK) {
                 dogecoin_node_disconnect(node);
             }
+            node->services = v_msg_check.services;
             node->bestknownheight = v_msg_check.start_height;
             node->nodegroup->log_write_cb("Connected to node %d: %s (%d)\n", node->nodeid, v_msg_check.useragent, v_msg_check.start_height);
             /* confirm version via verack */

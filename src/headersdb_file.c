@@ -217,7 +217,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                 fflush(stdout);
             }
 
-            uint8_t buf_all[32+4+32+80];
+            uint8_t buf_all[SPV_HEADERS_FILE_REC_LEN];
             if (fread(buf_all, sizeof(buf_all), 1, db->headers_tree_file) == 1) {
                 struct const_buffer cbuf_all = {buf_all, sizeof(buf_all)};
 
@@ -275,7 +275,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
  * @return Nothing.
  */
 dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blockindex *blockindex) {
-    cstring *rec = cstr_new_sz(148); // hash + height + chainwork + header
+    cstring *rec = cstr_new_sz(SPV_HEADERS_FILE_REC_LEN); // hash + height + chainwork + header
     ser_u256(rec, blockindex->hash);
     ser_u32(rec, blockindex->height);
     ser_u256(rec, blockindex->chainwork);
@@ -444,7 +444,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             dogecoin_btree_tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
         }
 
-        if (db->max_hdr_in_mem > 0) {
+        if (!load_process && db->max_hdr_in_mem > 0) {
             // de-allocate no longer required headers
             // keep them only on-disk
             dogecoin_blockindex *scan_tip = db->chaintip;

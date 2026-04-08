@@ -95,6 +95,10 @@ typedef struct {
     uint32_t confirmed_count;
     uint32_t unconfirmed_count;
     uint64_t last_seen_ts;
+
+    /* internal hash indexes (map.h/uthash-backed) */
+    void* watcher_index;
+    void* tx_index;
 } dogecoin_smpv_client;
 
 /* Callback function type for transaction notifications */

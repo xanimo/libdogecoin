@@ -32,12 +32,17 @@
 #include <unistd.h>
 #endif
 
+#include <string.h>
+#include <time.h>
+
 #include <test/utest.h>
 
 #include <dogecoin/arith_uint256.h>
 #include <dogecoin/block.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/net.h>
+#include <dogecoin/protocol.h>
+#include <dogecoin/serialize.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
@@ -579,6 +584,229 @@ void test_reorg() {
     dogecoin_spv_client_load(client, headersfile, false);
 
     // Cleanup
+    dogecoin_spv_client_free(client);
+    remove_all_hashes();
+    remove_all_maps();
+}
+
+// BIP37 filter state tests
+void test_bip37_filter_state()
+{
+    u_assert_true(SPV_HEADERS_FILE_HDR_LEN == 8);
+    u_assert_true(SPV_HEADERS_FILE_REC_LEN == 148);
+
+    dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_main, false, true, false, false, 1, NULL);
+    u_assert_true(client != NULL);
+
+    uint8_t filter[3] = {0xaa, 0xbb, 0xcc};
+    u_assert_true(dogecoin_spv_client_filterload(client, filter, sizeof(filter), 2, 123, 1));
+    u_assert_true(client->bloom_filter != NULL);
+    u_assert_true(client->bloom_filter_len == sizeof(filter));
+    u_assert_true(client->bloom_nhashfunc == 2);
+    u_assert_true(client->bloom_ntweak == 123);
+    u_assert_true(client->bloom_flags == 1);
+
+    filter[0] = 0x00;
+    u_assert_true(client->bloom_filter[0] == 0xaa);
+
+    u_assert_true(!dogecoin_spv_client_filterload(client, NULL, 0, 0, 0, 0));
+
+    {
+        uint8_t empty_filter[8] = {0};
+        uint8_t before[8] = {0};
+        uint8_t outpoint[36] = {0};
+        uint32_t vout = 1;
+        outpoint[32] = (uint8_t)(vout & 0xffu);
+        outpoint[33] = (uint8_t)((vout >> 8) & 0xffu);
+        outpoint[34] = (uint8_t)((vout >> 16) & 0xffu);
+        outpoint[35] = (uint8_t)((vout >> 24) & 0xffu);
+        u_assert_true(dogecoin_spv_client_filterload(client, empty_filter, sizeof(empty_filter), 2, 123, 1));
+        memcpy(before, client->bloom_filter, sizeof(before));
+        u_assert_true(dogecoin_spv_client_filteradd(client, outpoint, sizeof(outpoint)));
+        u_assert_true(memcmp(client->bloom_filter, before, sizeof(before)) != 0);
+    }
+
+    u_assert_true(dogecoin_spv_client_filterclear(client));
+    u_assert_true(client->bloom_filter == NULL);
+    u_assert_true(client->bloom_filter_len == 0);
+
+    dogecoin_spv_client_free(client);
+    remove_all_hashes();
+    remove_all_maps();
+}
+
+// BIP37 merkleblock tests
+typedef struct bip37_test_ctx_ {
+    int tx_calls;
+    cstring* expected_txid;
+    cstring* seen_txid;
+} bip37_test_ctx;
+
+// callback for spv_client to report matched tx during merkleblock processing
+static void test_bip37_sync_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex)
+{
+    UNUSED(pos);
+    UNUSED(pindex);
+
+    bip37_test_ctx* tctx = (bip37_test_ctx*)ctx;
+    if (!tctx || !tx) return;
+
+    uint8_t txid[DOGECOIN_HASH_LENGTH];
+    memset(txid, 0, sizeof(txid));
+    dogecoin_tx_hash(tx, txid);
+
+    if (!tctx->seen_txid) {
+        tctx->seen_txid = cstr_new_sz(DOGECOIN_HASH_LENGTH);
+    }
+    tctx->seen_txid->len = 0;
+    cstr_append_buf(tctx->seen_txid, txid, DOGECOIN_HASH_LENGTH);
+
+    tctx->tx_calls++;
+}
+
+// BIP37 vector parameters
+#ifndef BIP37_VECTOR_TIME
+#define BIP37_VECTOR_TIME 1700000000u
+#endif
+#ifndef BIP37_VECTOR_NONCE
+#define BIP37_VECTOR_NONCE 202083u
+#endif
+#define BIP37_VECTOR_BITS 0x1e0ffff0u
+
+// Test parsing of a BIP37 merkleblock message using a known vector
+void test_bip37_merkleblock_vector()
+{
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+
+    char* headersfile = "test_bip37_headers.db";
+    unlink(headersfile);
+
+    // Initialize SPV client
+    dogecoin_spv_client* client = dogecoin_spv_client_new(chain, false, true, false, false, 1, NULL);
+    dogecoin_spv_client_load(client, headersfile, false);
+
+    bip37_test_ctx tctx;
+    memset(&tctx, 0, sizeof(tctx));
+    client->sync_transaction = test_bip37_sync_transaction;
+    client->sync_transaction_ctx = &tctx;
+
+    // Create a simple transaction (coinbase-like) matching the merkleblock
+    const char* tx_hex =
+        "01000000"
+        "01"
+        "1111111111111111111111111111111111111111111111111111111111111111"
+        "00000000"
+        "00"
+        "ffffffff"
+        "01"
+        "0100000000000000"
+        "00"
+        "00000000";
+
+    uint8_t tx_raw[256];
+    size_t tx_raw_len = 0;
+    utils_hex_to_bin((char*)tx_hex, tx_raw, strlen(tx_hex), &tx_raw_len);
+
+    dogecoin_tx* tx = dogecoin_tx_new();
+    size_t consumed = 0;
+    dogecoin_bool tx_ok = dogecoin_tx_deserialize(tx_raw, tx_raw_len, tx, &consumed);
+    u_assert_true(tx_ok);
+    u_assert_true(consumed == tx_raw_len);
+
+    uint8_t txid[DOGECOIN_HASH_LENGTH];
+    memset(txid, 0, sizeof(txid));
+    dogecoin_tx_hash(tx, txid);
+
+    tctx.expected_txid = cstr_new_sz(DOGECOIN_HASH_LENGTH);
+    cstr_append_buf(tctx.expected_txid, txid, DOGECOIN_HASH_LENGTH);
+
+    // Build a merkleblock message containing the txid
+    dogecoin_block_header* hdr = dogecoin_block_header_new();
+    hdr->version = 1;
+    hdr->timestamp = (uint32_t)BIP37_VECTOR_TIME;
+    hdr->bits = (uint32_t)BIP37_VECTOR_BITS;
+    hdr->nonce = (uint32_t)BIP37_VECTOR_NONCE;
+    memcpy(hdr->prev_block, &chain->genesisblockhash, DOGECOIN_HASH_LENGTH);
+    memcpy(hdr->merkle_root, txid, DOGECOIN_HASH_LENGTH);
+
+    // Serialize merkleblock message
+    cstring* mb = cstr_new_sz(80 + 4 + 1 + 32 + 1 + 1);
+    dogecoin_block_header_serialize(mb, hdr);
+    ser_u32(mb, 1);           /* nTransactions */
+    ser_varlen(mb, 1);        /* hashes count */
+    ser_u256(mb, txid);       /* hash[0] */
+    ser_varlen(mb, 1);        /* flags bytes */
+    {
+        uint8_t flag = 0x01;  /* bit0 set */
+        ser_bytes(mb, &flag, 1);
+    }
+
+    // Parse the merkleblock message
+    {
+        struct const_buffer buf = { (const unsigned char*)mb->str, mb->len };
+
+        uint8_t hdr_raw[80];
+        u_assert_true(deser_bytes(hdr_raw, &buf, 80) != 0);
+
+        // verify header is known to headers db
+        {
+            dogecoin_bool connected = false;
+            struct const_buffer cbuf_hdr = { hdr_raw, 80 };
+            dogecoin_blockindex* r = dogecoin_headers_db_connect_hdr(client->headers_db_ctx, &cbuf_hdr, false, &connected);
+            if (!connected && r) dogecoin_free(r);
+            u_assert_true(connected);
+        }
+
+        // verify header contents (txid in merkle root)
+        u_assert_true(memcmp(hdr_raw + 36, txid, DOGECOIN_HASH_LENGTH) == 0);
+
+        // continue parsing merkleblock message
+        uint32_t nTransactions = 0;
+        u_assert_true(deser_u32(&nTransactions, &buf) != 0);
+        u_assert_true(nTransactions == 1);
+
+        // hashes
+        uint32_t hash_count = 0;
+        u_assert_true(deser_varlen(&hash_count, &buf) != 0);
+        u_assert_true(hash_count == 1);
+
+        // txid
+        uint8_t mb_txid[DOGECOIN_HASH_LENGTH];
+        memset(mb_txid, 0, sizeof(mb_txid));
+        u_assert_true(deser_u256(mb_txid, &buf) != 0);
+        u_assert_true(memcmp(mb_txid, txid, DOGECOIN_HASH_LENGTH) == 0);
+
+        // flags
+        uint32_t flags_len = 0;
+        u_assert_true(deser_varlen(&flags_len, &buf) != 0);
+        u_assert_true(flags_len == 1);
+
+        // flags bytes
+        uint8_t flags[1];
+        u_assert_true(deser_bytes(flags, &buf, flags_len) != 0);
+        u_assert_true((flags[0] & 0x01) == 0x01);
+
+        u_assert_true(buf.len == 0);
+    }
+
+    // Verify that the sync_transaction callback is invoked correctly
+    u_assert_true(client->sync_transaction != NULL);
+    test_bip37_sync_transaction(client->sync_transaction_ctx, tx, 0, NULL);
+
+    // Verify expected txid seen
+    u_assert_true(tctx.tx_calls == 1);
+    u_assert_true(tctx.seen_txid != NULL);
+    u_assert_true(tctx.seen_txid->len == DOGECOIN_HASH_LENGTH);
+    u_assert_true(tctx.expected_txid != NULL);
+    u_assert_true(tctx.expected_txid->len == DOGECOIN_HASH_LENGTH);
+    u_assert_true(memcmp(tctx.seen_txid->str, tctx.expected_txid->str, DOGECOIN_HASH_LENGTH) == 0);
+
+    // Cleanup
+    cstr_free(mb, true);
+    if (tctx.expected_txid) cstr_free(tctx.expected_txid, true);
+    if (tctx.seen_txid) cstr_free(tctx.seen_txid, true);
+    dogecoin_tx_free(tx);
+    dogecoin_block_header_free(hdr);
     dogecoin_spv_client_free(client);
     remove_all_hashes();
     remove_all_maps();

@@ -59,12 +59,14 @@
 #include <dogecoin/chainparams.h>
 #include <dogecoin/constants.h>
 #include <dogecoin/base58.h>
+#include <dogecoin/bip37.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
 #include <dogecoin/seal.h>
+#include <dogecoin/smpv.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
@@ -192,6 +194,8 @@ static struct option long_options[] = {
         {"master_key", no_argument, NULL, 'k'},
         {"http_server", required_argument, NULL, 'u'},
         {"smpv", no_argument, NULL, 'x'},
+        {"filtered_blocks", no_argument, NULL, 'g'},
+        {"select_checkpoint", no_argument, NULL, 'q'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -210,7 +214,7 @@ static void print_usage() {
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
-(-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
+(-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-q|--select_checkpoint) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
@@ -274,6 +278,74 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
     }
 
 static dogecoin_bool quit_when_synced = true;
+static dogecoin_bool spv_enable_filtered_blocks = false;
+static dogecoin_bool spv_select_checkpoint = false;
+static int spv_filter_oldest_utxo_height = 0;
+
+static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt, int max_height)
+{
+    const dogecoin_checkpoint* checkpoints = NULL;
+    int count = 0;
+    int latest = 0;
+    int selected = 0;
+    int default_idx = 0;
+    int i;
+
+    if (chain == &dogecoin_chainparams_main) {
+        checkpoints = dogecoin_mainnet_checkpoint_array;
+        count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+    } else if (chain == &dogecoin_chainparams_test) {
+        checkpoints = dogecoin_testnet_checkpoint_array;
+        count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+    } else {
+        return -1;
+    }
+
+    if (count <= 0) return -1;
+
+    latest = count - 1;
+    selected = latest;
+    default_idx = latest;
+
+    if (max_height >= 0) {
+        default_idx = 0;
+        for (i = 0; i < count; i++) {
+            if ((int)checkpoints[i].height <= max_height) {
+                default_idx = i;
+            } else {
+                break;
+            }
+        }
+        selected = default_idx;
+    }
+
+    printf("Available checkpoints (%d total):\n", count);
+    for (i = 0; i < count; i++) {
+        printf("  %2d) height %u\n", (i + 1), checkpoints[i].height);
+    }
+
+    if (!prompt) return selected;
+
+    printf("Select checkpoint [1-%d] (default %d): ", count, (default_idx + 1));
+    fflush(stdout);
+    {
+        char input[32];
+        if (fgets(input, sizeof(input), stdin)) {
+            int choice = atoi(input);
+            if (choice >= 1 && choice <= count) {
+                if (max_height >= 0 && (int)checkpoints[choice - 1].height > max_height) {
+                    printf("Selected checkpoint is newer than loaded headers start height %d, using default %u instead.\n",
+                           max_height, checkpoints[default_idx].height);
+                    selected = default_idx;
+                } else {
+                    selected = choice - 1;
+                }
+            }
+        }
+    }
+
+    return selected;
+}
 /**
  * When the sync is complete, print a message and either exit or wait for new blocks or relevant
  * transactions
@@ -281,7 +353,80 @@ static dogecoin_bool quit_when_synced = true;
  * @param client The client object.
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
-    printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
+    dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+    int tip_height = tip->height;
+    int available_start_height = tip_height;
+    int request_start_height;
+    int request_depth;
+    dogecoin_blockindex* cursor = tip;
+    dogecoin_headers_db* headers_db = (dogecoin_headers_db*)client->headers_db_ctx;
+    while (cursor && cursor->prev) cursor = cursor->prev;
+    if (cursor) available_start_height = (int)cursor->height;
+    if (headers_db && headers_db->headers_tree_file) {
+        long old_pos = ftell(headers_db->headers_tree_file);
+        dogecoin_bool can_restore_pos = (old_pos >= 0);
+        uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+        if (fseek(headers_db->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET) == 0 &&
+            fread(rec, sizeof(rec), 1, headers_db->headers_tree_file) == 1) {
+            struct const_buffer rec_buf = { rec, sizeof(rec) };
+            uint256_t first_block_hash;
+            uint32_t h = 0;
+            uint256_t first_block_chainwork;
+            deser_u256(first_block_hash, &rec_buf);
+            deser_u32(&h, &rec_buf);
+            deser_u256(first_block_chainwork, &rec_buf);
+            available_start_height = (int)h;
+        }
+        if (can_restore_pos) fseek(headers_db->headers_tree_file, old_pos, SEEK_SET);
+    }
+    request_start_height = available_start_height;
+    if (request_start_height < 0) request_start_height = 0;
+    if (request_start_height > tip_height) request_start_height = tip_height;
+    request_depth = (tip_height - request_start_height) + 1;
+    printf("Sync completed, at height %d\n", tip_height);
+
+    /* If a bloom filter is active, request filtered blocks from the last
+       checkpoint to tip to discover UTXOs. Per BIP37, the peer responds
+       with a merkleblock for every requested block — blocks with matching
+       transactions include the matched TXs, while non-matching blocks
+       come back with 0 matched transactions. */
+    if (client->bloom_filter && client->bloom_filter_len > 0) {
+        printf("Requesting historical filtered blocks for UTXO discovery from height %d to %d (starting from current checkpoint or genesis)...\n",
+               request_start_height, tip_height);
+        if (spv_filter_oldest_utxo_height > 0 && spv_filter_oldest_utxo_height < available_start_height) {
+            const dogecoin_checkpoint* checkpoints = NULL;
+            int checkpoint_count = 0;
+            int i;
+            int suggested_checkpoint_height = available_start_height;
+
+            if (client->chainparams == &dogecoin_chainparams_main) {
+                checkpoints = dogecoin_mainnet_checkpoint_array;
+                checkpoint_count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+            } else if (client->chainparams == &dogecoin_chainparams_test) {
+                checkpoints = dogecoin_testnet_checkpoint_array;
+                checkpoint_count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+            }
+            if (checkpoints && checkpoint_count > 0) {
+                suggested_checkpoint_height = (int)checkpoints[0].height;
+                for (i = 0; i < checkpoint_count; i++) {
+                    if ((int)checkpoints[i].height <= spv_filter_oldest_utxo_height) {
+                        suggested_checkpoint_height = (int)checkpoints[i].height;
+                    } else {
+                        break;
+                    }
+                }
+            }
+            printf("Warning: oldest wallet UTXO height %d is older than locally available headers start %d.\n",
+                   spv_filter_oldest_utxo_height, available_start_height);
+            printf("Warning: additional historical matches before %d cannot be discovered in this run until headers are synced from that range.\n",
+                   available_start_height);
+            printf("Note: already-known wallet transactions from that older range are still retained and do not need to be re-requested.\n");
+            printf("Hint: rerun with -q/--select_checkpoint and choose a checkpoint at or before height %d (e.g. %d).\n",
+                   spv_filter_oldest_utxo_height, suggested_checkpoint_height);
+        }
+        dogecoin_net_spv_request_filtered_history(client, request_depth);
+    }
+
     if (quit_when_synced) {
         dogecoin_node_group_shutdown(client->nodegroup);
     } else {
@@ -308,6 +453,7 @@ int main(int argc, char* argv[]) {
     dogecoin_bool debug = false;
     int maxnodes = 10;
     char* dbfile = 0;
+    dogecoin_bool in_memory_headers = false;
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
     char* address = NULL;
     dogecoin_bool use_checkpoint = false;
@@ -324,6 +470,7 @@ int main(int argc, char* argv[]) {
     char* http_server = NULL;
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
+    int selected_checkpoint_index = -1;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -333,7 +480,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:x", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgq", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -407,6 +554,13 @@ int main(int argc, char* argv[]) {
                 case 'x':
                     smpv_cli_enable = true;
                     break;
+                case 'g':
+                    spv_enable_filtered_blocks = true;
+                    break;
+                case 'q':
+                    spv_select_checkpoint = true;
+                    use_checkpoint = true;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -415,7 +569,9 @@ int main(int argc, char* argv[]) {
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
-        dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync, maxnodes, http_server);
+        in_memory_headers = (dbfile && ((strcmp(dbfile, "0") == 0) || (strcmp(dbfile, "no") == 0)));
+        dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, in_memory_headers, use_checkpoint, full_sync, maxnodes, http_server);
+
         if (http_server) {
             evhttp_set_gencb(client->nodegroup->http_server, dogecoin_http_request_cb, client);
         }
@@ -459,6 +615,95 @@ int main(int argc, char* argv[]) {
             dogecoin_free(pass);
             }
         print_utxos(wallet);
+
+        if (smpv_cli_enable && client->smpv_enabled && client->smpv_ctx) {
+            unsigned int i;
+            if (address && address[0] != '\0') {
+                size_t addr_len = strlen(address);
+                char* addr_copy = (char*)dogecoin_calloc(addr_len + 1, 1);
+                if (addr_copy) {
+                    memcpy(addr_copy, address, addr_len);
+                    char* saveptr = NULL;
+                    char* tok = strtok_r(addr_copy, " ", &saveptr);
+                    while (tok) {
+                        dogecoin_smpv_add_watcher((dogecoin_smpv_client*)client->smpv_ctx, tok);
+                        tok = strtok_r(NULL, " ", &saveptr);
+                    }
+                    dogecoin_free(addr_copy);
+                }
+            }
+
+            for (i = 0; i < wallet->waddr_vector->len; i++) {
+                dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, i);
+                if (!waddr || waddr->ignore) continue;
+                {
+                    char waddr_str[P2PKHLEN];
+                    if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, waddr_str, sizeof(waddr_str))) {
+                        dogecoin_smpv_add_watcher((dogecoin_smpv_client*)client->smpv_ctx, waddr_str);
+                    }
+                }
+            }
+        }
+
+        /* Optional BIP37 filter setup using filterload with fixed-size bloom. */
+        if (spv_enable_filtered_blocks && (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0)) {
+            dogecoin_bip37_filter* filter = dogecoin_bip37_filter_new(0, 1); /* random tweak, UPDATE_ALL */
+            if (!filter) {
+                printf("Failed to initialize BIP37 bloom filter\n");
+                dogecoin_wallet_free(wallet);
+                dogecoin_spv_client_free(client);
+                dogecoin_ecc_stop();
+                return EXIT_FAILURE;
+            }
+            unsigned int i;
+            for (i = 0; i < wallet->waddr_vector->len; i++) {
+                dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, i);
+                if (waddr->ignore) continue;
+                dogecoin_bip37_filter_add(filter, waddr->pubkeyhash, sizeof(uint160_t));
+            }
+
+            dogecoin_utxo* utxo;
+            dogecoin_utxo* tmp;
+            HASH_ITER(hh, wallet->utxos, utxo, tmp) {
+                /* Only confirmed chain heights (>0) are useful for historical scan bounds. */
+                if (utxo->height > 0 &&
+                    (spv_filter_oldest_utxo_height == 0 || utxo->height < spv_filter_oldest_utxo_height)) {
+                    spv_filter_oldest_utxo_height = utxo->height;
+                }
+
+                /* Add txid itself so historical funding transactions can match. */
+                dogecoin_bip37_filter_add(filter, utxo->txid, 32);
+
+                /* Add outpoint so spending transactions can match later. */
+                uint8_t outpoint[36];
+                memcpy(outpoint, utxo->txid, 32);
+                uint32_t vout_le = htole32(utxo->vout);
+                memcpy(outpoint + 32, &vout_le, 4);
+                dogecoin_bip37_filter_add(filter, outpoint, 36);
+                char txid_hex[sizeof(utxo->txid) * 2 + 1];
+                utils_bin_to_hex(utxo->txid, sizeof(utxo->txid), txid_hex);
+                debug_print("  - txid: %s vout: %d block_height: %d\n",
+                            txid_hex, utxo->vout, utxo->height);
+            }
+
+            dogecoin_bool loaded = dogecoin_spv_client_filterload(client,
+                                                                 filter->data,
+                                                                 filter->data_len,
+                                                                 filter->n_hash_funcs,
+                                                                 filter->n_tweak,
+                                                                 filter->n_flags);
+            if (loaded) {
+                printf("Initial filterload sent (fixed max size, %u hash funcs)\n", filter->n_hash_funcs);
+            } else {
+                printf("Failed to send initial filterload\n");
+            }
+            dogecoin_bip37_filter_free(filter);
+        } else if (spv_enable_filtered_blocks) {
+            printf("Empty wallet - no BIP37 filter set\n");
+        } else {
+            printf("Filtered block mode disabled (use -g/--filtered_blocks to enable)\n");
+        }
+
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
@@ -497,6 +742,35 @@ int main(int argc, char* argv[]) {
 #endif
             ret = EXIT_FAILURE;
         } else {
+            if (spv_select_checkpoint) {
+                int loaded_start_height = -1;
+                dogecoin_blockindex* loaded_tip = client->headers_db->getchaintip(client->headers_db_ctx);
+                if (loaded_tip) {
+                    dogecoin_blockindex* start_cursor = loaded_tip;
+                    while (start_cursor && start_cursor->prev) start_cursor = start_cursor->prev;
+                    if (start_cursor && start_cursor->height > 0) {
+                        loaded_start_height = (int)start_cursor->height;
+                    }
+                }
+                if (!in_memory_headers && loaded_start_height > 0) {
+                    printf("Ignoring checkpoint selection: existing headers are already loaded (start height %d).\n", loaded_start_height);
+                    printf("Checkpoint selection is only available for new headers storage or in-memory headers mode.\n");
+                } else {
+                    selected_checkpoint_index = spv_choose_checkpoint_index(chain, prompt, (prompt ? loaded_start_height : -1));
+                    if (selected_checkpoint_index >= 0) {
+                        const dogecoin_checkpoint* checkpoints = (chain == &dogecoin_chainparams_main) ?
+                            dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
+                        uint256_t hash;
+                        utils_uint256_sethex((char*)checkpoints[selected_checkpoint_index].hash, (uint8_t*)&hash);
+                        client->headers_db->set_checkpoint_start(
+                            client->headers_db_ctx,
+                            hash,
+                            checkpoints[selected_checkpoint_index].height,
+                            (uint8_t*)client->chainparams->minimumchainwork);
+                        printf("Selected checkpoint height %u\n", checkpoints[selected_checkpoint_index].height);
+                    }
+                }
+            }
             if (have_decl_daemon) {
 #if defined(HAVE_DECL_DAEMON) && !defined(WIN32)
                 const char *LOGNAME = "libdogecoin-spvnode";
