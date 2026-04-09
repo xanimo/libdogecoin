@@ -50,6 +50,7 @@
 #include <time.h>
 
 #include <event2/buffer.h>
+#include <event2/event.h>
 #include <event2/http.h>
 
 #if defined(HAVE_CONFIG_H)
@@ -282,6 +283,12 @@ static dogecoin_bool spv_enable_filtered_blocks = false;
 static dogecoin_bool spv_select_checkpoint = false;
 static int spv_filter_oldest_utxo_height = 0;
 
+/* Global pointers used by handle_sigint for graceful cleanup */
+static dogecoin_spv_client* g_spv_client_shutdown = NULL;
+#if WITH_WALLET
+static dogecoin_wallet* g_wallet_shutdown = NULL;
+#endif
+
 static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt, int max_height)
 {
     const dogecoin_checkpoint* checkpoints = NULL;
@@ -441,7 +448,14 @@ void handle_sigint() {
     int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
     fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
 #endif
-    exit(0);
+    // Trigger a graceful event-loop exit so cleanup functions run normally.
+    if (g_spv_client_shutdown && g_spv_client_shutdown->nodegroup) {
+        dogecoin_node_group_shutdown(g_spv_client_shutdown->nodegroup);
+        if (g_spv_client_shutdown->nodegroup->event_base)
+            event_base_loopbreak(g_spv_client_shutdown->nodegroup->event_base);
+    } else {
+        exit(0);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -582,6 +596,7 @@ int main(int argc, char* argv[]) {
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
         signal(SIGINT, handle_sigint);
+        signal(SIGTERM, handle_sigint);
 
 #if WITH_WALLET
         dogecoin_wallet_opts wopts = {
@@ -740,7 +755,9 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
             dogecoin_wallet_free(wallet);
 #endif
-            ret = EXIT_FAILURE;
+            dogecoin_spv_client_free(client);
+            dogecoin_ecc_stop();
+            return EXIT_FAILURE;
         } else {
             if (spv_select_checkpoint) {
                 int loaded_start_height = -1;
@@ -809,7 +826,15 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_client_discover_peers(client, ips);
 
             printf("Connecting to the p2p network...\n");
+            g_spv_client_shutdown = client;
+#if WITH_WALLET
+            g_wallet_shutdown = wallet;
+#endif
             dogecoin_spv_client_runloop(client);
+            g_spv_client_shutdown = NULL;
+#if WITH_WALLET
+            g_wallet_shutdown = NULL;
+#endif
             dogecoin_spv_client_free(client);
             printf("done\n");
             ret = EXIT_SUCCESS;

@@ -16,15 +16,25 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-TESTNET_FLAG="-t"
+NETWORK="${NETWORK:-testnet}"
+NETWORK_FLAG="-t"
+if [ "$NETWORK" = "mainnet" ]; then
+    NETWORK_FLAG=""
+elif [ "$NETWORK" != "testnet" ]; then
+    echo "Unsupported NETWORK value: $NETWORK (expected testnet|mainnet)" >&2
+    exit 1
+fi
 TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
+SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
+NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
+AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 # sendtx can report success either as immediate relay or as "already known".
-RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
+RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -63,10 +73,10 @@ generate_testnet_wallet() {
     if [ -n "$TESTNET_PRIVKEY_WIF" ]; then
         PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
     else
-        run_and_log "such generate_private_key" ./such -c generate_private_key $TESTNET_FLAG | tee "$TMPDIR/testnet_key.txt"
+        run_and_log "such generate_private_key" ./such -c generate_private_key $NETWORK_FLAG | tee "$TMPDIR/testnet_key.txt"
         PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
     fi
-    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG | tee "$TMPDIR/testnet_addr.txt"
+    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     success "Wallet ready: $TESTNET_ADDR"
     echo "  Private Key (WIF): $PRIVKEY_WIF"
@@ -75,13 +85,18 @@ generate_testnet_wallet() {
 
 get_testnet_coins() {
     echo ""
-    echo "Send testnet DOGE to: $TESTNET_ADDR"
+    echo "Send ${NETWORK} DOGE to: $TESTNET_ADDR"
     echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo "Faucet: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
-    read -p "Optional faucet txid (for log): " FAUCET_TXID
-    info "Press Enter after funding the address..."
-    read
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+        FAUCET_TXID="${FAUCET_TXID:-}"
+        info "NON_INTERACTIVE=1, skipping funding prompt."
+    else
+        read -p "Optional faucet txid (for log): " FAUCET_TXID
+        info "Press Enter after funding the address..."
+        read
+    fi
     if [ -n "$FAUCET_TXID" ]; then
         echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
     fi
@@ -114,8 +129,22 @@ generate_commitment() {
 
 build_transaction() {
     info "Build unsigned testnet tx with such, then paste hex below:"
-    read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
-    read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+    if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
+    fi
+    if [ -z "$RAW_UNSIGNED_TX" ]; then
+        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    else
+        info "Using RAW_UNSIGNED_TX from environment"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "SCRIPT_PUBKEY must be set in NON_INTERACTIVE mode"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ]; then
+        read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+    else
+        info "Using SCRIPT_PUBKEY from environment"
+    fi
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -140,7 +169,9 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    TX_FOR_SIGNING="$TX_WITH_COMMIT"
+
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
@@ -156,11 +187,18 @@ SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
 EOF
 
-    read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    DO_BROADCAST="n"
+    if [ "$AUTO_BROADCAST" -eq 1 ]; then
+        DO_BROADCAST="y"
+    elif [ "$NON_INTERACTIVE" -eq 0 ]; then
+        read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    fi
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $TESTNET_FLAG "$SIGNED_TX" || true)
+        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "not relayed back|Seen on other nodes:[[:space:]]*0"; then
+            error "sendtx reported non-relay (not relayed back / seen on other nodes: 0)"
+        elif echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
@@ -178,7 +216,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"
@@ -200,7 +238,10 @@ monitor_spvnode() {
 
 verify_commitment() {
     info "Step 8: Off-chain verification"
-    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$DILITHIUM2_SIG")
+    local VERIFY_PK="$DILITHIUM2_PK"
+    local VERIFY_SIG="$DILITHIUM2_SIG"
+
+    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/dilithium2_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
@@ -208,7 +249,7 @@ verify_commitment() {
         error "Off-chain Dilithium2 signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
+    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$VERIFY_PK" -s "$VERIFY_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/dilithium2_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then

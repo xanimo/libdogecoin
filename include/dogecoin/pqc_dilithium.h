@@ -41,22 +41,43 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_DILITHIUM_COMMIT_LEN 32
 #define DOGECOIN_PQC_DILITHIUM_PUSH_TOTAL (DOGECOIN_PQC_DILITHIUM_TAG_LEN + DOGECOIN_PQC_DILITHIUM_COMMIT_LEN)
 
+/*
+ * Generate a Dilithium2 keypair.
+ */
 #ifdef USE_LIBOQS
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len,
                                                            uint8_t** sk, size_t* sk_len);
+
+/*
+ * Sign a message with Dilithium2.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len,
                                                         const uint8_t* msg, size_t msg_len,
                                                         uint8_t** sig, size_t* sig_len);
+
+/*
+ * Verify a Dilithium2 signature.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len,
                                                           const uint8_t* msg, size_t msg_len,
                                                           const uint8_t* sig, size_t sig_len);
 
+/*
+ * Compute commit = SHA256(pk || sig).
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len,
                                                                 const uint8_t* signature, size_t signature_len,
                                                                 uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
 
+/*
+ * Append OP_RETURN output carrying "DIL2" || commit32 (0 DOGE).
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx,
                                                                  const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+
+/*
+ * Extract first "DIL2" commit32 from a transaction.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx,
                                                                      uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
 #endif

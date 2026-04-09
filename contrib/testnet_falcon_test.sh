@@ -21,15 +21,25 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TESTNET_FLAG="-t"
+NETWORK="${NETWORK:-testnet}"
+NETWORK_FLAG="-t"
+if [ "$NETWORK" = "mainnet" ]; then
+    NETWORK_FLAG=""
+elif [ "$NETWORK" != "testnet" ]; then
+    echo "Unsupported NETWORK value: $NETWORK (expected testnet|mainnet)" >&2
+    exit 1
+fi
 TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
+SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
-# sendtx can report success either as immediate relay or as "already known".
-RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
+NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
+AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+# sendtx success must be explicit relay or explicit already-known acceptance.
+RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
 # Function to print colored messages
 info() {
@@ -87,11 +97,11 @@ generate_testnet_wallet() {
         PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
         echo "private key wif: $PRIVKEY_WIF" > "$TMPDIR/testnet_key.txt"
     else
-        run_and_log "such generate_private_key" ./such -c generate_private_key $TESTNET_FLAG | tee "$TMPDIR/testnet_key.txt"
+        run_and_log "such generate_private_key" ./such -c generate_private_key $NETWORK_FLAG | tee "$TMPDIR/testnet_key.txt"
         PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
     fi
 
-    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG | tee "$TMPDIR/testnet_addr.txt"
+    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     PUBKEY=$(grep "^public key hex:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     
@@ -99,7 +109,7 @@ generate_testnet_wallet() {
     echo "  Address: $TESTNET_ADDR"
     echo "  Private Key (WIF): $PRIVKEY_WIF"
     echo "  Public Key: $PUBKEY"
-    echo "  [FUNDING] Send testnet DOGE to this address: $TESTNET_ADDR"
+    echo "  [FUNDING] Send ${NETWORK} DOGE to this address: $TESTNET_ADDR"
     
     # Save to file for later use
     cat > "$TMPDIR/wallet.txt" <<EOF
@@ -118,7 +128,7 @@ get_testnet_coins() {
     echo "  REQUEST TESTNET COINS"
     echo "=========================================="
     echo ""
-    echo "Send testnet DOGE to: $TESTNET_ADDR"
+    echo "Send ${NETWORK} DOGE to: $TESTNET_ADDR"
     echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo ""
     echo "Faucets:"
@@ -132,9 +142,14 @@ get_testnet_coins() {
     echo ""
     echo "[FAUCET] Preferred: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
-    read -p "Optional faucet txid (for log): " FAUCET_TXID
-    info "Press Enter after you have received coins..."
-    read
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+        FAUCET_TXID="${FAUCET_TXID:-}"
+        info "NON_INTERACTIVE=1, skipping funding prompt."
+    else
+        read -p "Optional faucet txid (for log): " FAUCET_TXID
+        info "Press Enter after you have received coins..."
+        read
+    fi
     if [ -n "$FAUCET_TXID" ]; then
         echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
     fi
@@ -169,13 +184,28 @@ EOF
 # Step 6: Build transaction with OP_RETURN
 build_transaction() {
     info "Step 4: Building transaction and deriving tx_sighash32..."
-    
-    echo "Create an unsigned testnet transaction with such first:"
-    echo "  ./such -c transaction"
-    echo ""
-    echo "Then paste the unsigned raw tx hex below."
-    read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
-    read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+
+    if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
+    fi
+    if [ -z "$RAW_UNSIGNED_TX" ]; then
+        echo "Create an unsigned testnet transaction with such first:"
+        echo "  ./such -c transaction"
+        echo ""
+        echo "Then paste the unsigned raw tx hex below."
+        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    else
+        info "Using RAW_UNSIGNED_TX from environment"
+    fi
+
+    if [ -z "$SCRIPT_PUBKEY" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "SCRIPT_PUBKEY must be set in NON_INTERACTIVE mode"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ]; then
+        read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+    else
+        info "Using SCRIPT_PUBKEY from environment"
+    fi
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -220,8 +250,10 @@ build_transaction() {
         error "Failed to append Falcon commitment to transaction"
     fi
 
+    TX_FOR_SIGNING="$TX_WITH_COMMIT"
+
     info "Signing transaction with commitment output..."
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
@@ -233,11 +265,18 @@ build_transaction() {
     success "Signed transaction with Falcon commitment ready"
     echo "  Signed TX: ${SIGNED_TX:0:80}..."
     echo ""
-    read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    DO_BROADCAST="n"
+    if [ "$AUTO_BROADCAST" -eq 1 ]; then
+        DO_BROADCAST="y"
+    elif [ "$NON_INTERACTIVE" -eq 0 ]; then
+        read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    fi
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $TESTNET_FLAG "$SIGNED_TX" || true)
+        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "not relayed back|Seen on other nodes:[[:space:]]*0"; then
+            error "sendtx reported non-relay (not relayed back / seen on other nodes: 0)"
+        elif echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
@@ -267,11 +306,11 @@ monitor_spvnode() {
     echo "After broadcasting your transaction, monitor it with header-first sync:"
     echo ""
     echo "  # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address"
-    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
+    echo "  ./spvnode $NETWORK_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
     echo ""
     echo "Then switch to full block scan mode (or use -b directly):"
     echo ""
-    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
+    echo "  ./spvnode $NETWORK_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
     echo ""
     echo "The SPV node will:"
     echo "  - Sync testnet blockchain headers"
@@ -285,7 +324,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"
@@ -308,7 +347,10 @@ monitor_spvnode() {
 # Step 8: Verify commitment off-chain
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
-    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
+    local VERIFY_PK="$FALCON_PK"
+    local VERIFY_SIG="$FALCON_SIG"
+
+    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
@@ -316,7 +358,7 @@ verify_commitment() {
         error "Off-chain Falcon signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG")
+    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$VERIFY_PK" -s "$VERIFY_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/falcon_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then

@@ -80,6 +80,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <dogecoin/utils.h>
+
 #define u_run_test(TEST)                      \
     do {                                      \
         int f_ = U_TESTS_FAIL;                \

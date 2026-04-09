@@ -33,6 +33,7 @@ jobs:
           - x86_64-nixos
           - x86_64-linux-dbg
           - x86_64-linux-openenclave
+          - x86_64-linux-raccoon-g
           - x86_64-macos
           # - arm64-macos
           - x86_64-win
@@ -197,6 +198,17 @@ jobs:
             run-tests: true
             dep-opts: "SPEED=slow V=1"
             config-opts: "--enable-static --disable-shared"
+            goal: install
+          - name: x86_64-linux-raccoon-g
+            host: x86_64-pc-linux-gnu
+            os: ubuntu-22.04
+            # libgmp-dev / libmpfr-dev are required by the in-tree Raccoon-G-44
+            # gaussian sampler (MPFR @256-bit) and are gated behind
+            # --enable-raccoon-g in configure.ac.
+            packages: libgmp-dev libmpfr-dev
+            run-tests: true
+            dep-opts: "SPEED=slow V=1"
+            config-opts: "--enable-static --disable-shared --enable-raccoon-g"
             goal: install
 
     runs-on: ${{ matrix.os }}

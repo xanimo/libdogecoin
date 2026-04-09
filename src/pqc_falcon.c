@@ -44,11 +44,17 @@
 #endif
 #endif
 
-/* Helpers (compile even without liboqs) */
-
-/*
- * Helper hash primitive used by commitment builders.
- * Computes SHA256(pk || msg) and writes a 32-byte digest to out32.
+/**
+ * @brief This function computes SHA256(pk || msg) and writes
+ * a 32-byte digest to out32.
+ *
+ * @param out32 The output buffer for the 32-byte hash.
+ * @param pk The pointer to the public key bytes.
+ * @param pk_len The length of the public key.
+ * @param msg The pointer to the message bytes.
+ * @param msg_len The length of the message.
+ *
+ * @return Nothing.
  */
 static inline void sha256_pk_msg(uint8_t out32[32],
                                  const uint8_t* pk, size_t pk_len,
@@ -65,9 +71,18 @@ static inline void sha256_pk_msg(uint8_t out32[32],
     sha256_finalize(&ctx, out32);
 }
 
-/* Public API */
-
-/* Computes a 32-byte Falcon commitment from public key and signature bytes. */
+/**
+ * @brief This function computes a 32-byte Falcon-512 commitment
+ * as SHA256(pk || sig).
+ *
+ * @param pk The pointer to the public key bytes.
+ * @param pk_len The length of the public key.
+ * @param msg The pointer to the signature bytes.
+ * @param msg_len The length of the signature.
+ * @param out32 The output buffer for the 32-byte commitment.
+ *
+ * @return true if the commitment was computed, false on invalid input.
+ */
 dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len,
                                                const uint8_t* msg, size_t msg_len,
                                                uint8_t out32[32])
@@ -79,8 +94,17 @@ dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len,
     return true;
 }
 
-/* Append OP_RETURN output with Falcon-512 commit */
-dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* commit32) {
+/**
+ * @brief This function appends an OP_RETURN output carrying
+ * the "FLC1" tag and a 32-byte Falcon-512 commitment to a
+ * transaction.
+ *
+ * @param tx The pointer to the transaction to modify.
+ * @param commit32 The 32-byte commitment hash.
+ *
+ * @return true if the output was added, false on invalid input.
+ */
+dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]) {
     if (!tx || !commit32) {
         return false;
     }
@@ -112,9 +136,17 @@ dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* c
     return true;
 }
 
-/* Extract Falcon-512 commit from tx */
-dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t* out32) {
-    if (!tx || !out32) {
+/**
+ * @brief This function extracts the first "FLC1" tagged
+ * Falcon-512 commitment from a transaction's outputs.
+ *
+ * @param tx The pointer to the transaction to search.
+ * @param out_commit32 The output buffer for the 32-byte commitment.
+ *
+ * @return true if a commitment was found, false otherwise.
+ */
+dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]) {
+    if (!tx || !out_commit32) {
         return false;
     }
 
@@ -131,16 +163,24 @@ dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_
             p[0] == 0x6a &&
             p[1] == DOGECOIN_PQC_FALCON_PUSH_TOTAL &&
             memcmp(p + 2, DOGECOIN_PQC_FALCON_TAG, DOGECOIN_PQC_FALCON_TAG_LEN) == 0) {
-            memcpy(out32, p + 2 + DOGECOIN_PQC_FALCON_TAG_LEN, 32);
+            memcpy(out_commit32, p + 2 + DOGECOIN_PQC_FALCON_TAG_LEN, 32);
             return true;
         }
     }
     return false;
 }
 
-/*
- * Convenience wrapper around dogecoin_tx_sighash() that returns the raw
- * 32-byte digest bytes used by signing code paths.
+/**
+ * @brief This function computes a transaction sighash and
+ * writes the raw 32-byte digest to out32.
+ *
+ * @param tx_to The pointer to the transaction.
+ * @param fromPubKey The scriptPubKey of the input being signed.
+ * @param in_num The index of the input being signed.
+ * @param hashtype The sighash type (e.g. SIGHASH_ALL).
+ * @param out32 The output buffer for the 32-byte hash.
+ *
+ * @return true if the sighash was computed, false on error.
  */
 dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
                                     const cstring* fromPubKey,
@@ -160,7 +200,17 @@ dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
 
 #ifdef USE_LIBOQS
 
-/* Allocate and produce a Falcon-512 keypair */
+/**
+ * @brief This function generates a Falcon-512 keypair via
+ * liboqs and allocates the public and secret key buffers.
+ *
+ * @param pk The pointer to receive the allocated public key.
+ * @param pk_len The pointer to receive the public key length.
+ * @param sk The pointer to receive the allocated secret key.
+ * @param sk_len The pointer to receive the secret key length.
+ *
+ * @return true if the keypair was generated, false on error.
+ */
 dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len,
                                          uint8_t** sk, size_t* sk_len)
 {
@@ -199,7 +249,19 @@ dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len,
     return true;
 }
 
-/* Sign: allocates *sig_out */
+/**
+ * @brief This function signs a message with a Falcon-512
+ * secret key and allocates the signature buffer.
+ *
+ * @param sk The pointer to the secret key.
+ * @param sk_len The length of the secret key.
+ * @param msg The pointer to the message to sign.
+ * @param msg_len The length of the message.
+ * @param sig_out The pointer to receive the allocated signature.
+ * @param sig_len The pointer to receive the signature length.
+ *
+ * @return true if signing succeeded, false on error.
+ */
 dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len,
                                       const uint8_t* msg, size_t msg_len,
                                       uint8_t** sig_out, size_t* sig_len)
@@ -239,7 +301,19 @@ dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len,
     return true;
 }
 
-/* Verify */
+/**
+ * @brief This function verifies a Falcon-512 signature
+ * against a public key and message.
+ *
+ * @param pk The pointer to the public key.
+ * @param pk_len The length of the public key.
+ * @param msg The pointer to the message.
+ * @param msg_len The length of the message.
+ * @param sig The pointer to the signature.
+ * @param sig_len The length of the signature.
+ *
+ * @return true if the signature is valid, false otherwise.
+ */
 dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
                                         const uint8_t* msg, size_t msg_len,
                                         const uint8_t* sig, size_t sig_len)
