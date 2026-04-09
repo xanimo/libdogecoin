@@ -52,6 +52,7 @@ The following can be set when running make: make FOO=bar
     DEBUG: disable some optimizations and enable more runtime checking
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids
+    YUBIKEY: set to 'y' to include yubikey packages for the enclave hosts
 
 If some packages are not built, the appropriate
 options will be passed to libdogecoin's configure. In this case, `--disable-net`.
