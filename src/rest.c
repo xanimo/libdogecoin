@@ -372,6 +372,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
     // aggregate from ring, newest -> older until cutoff or block limit hit
     uint64_t sum_txs = 0, sum_outputs = 0, sum_out_value = 0, sum_fees = 0, sum_size = 0;
     uint32_t blocks = 0;
+    uint32_t newest_ts = 0;
+    uint32_t oldest_ts = 0;
     uint64_t fees_buf[SPV_STATS_RING], fee_kb_buf[SPV_STATS_RING];
     size_t fees_n = 0;
     size_t fee_kb_n = 0;
@@ -384,6 +386,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         } else {
             if (blocks >= limit_blocks) break;          // last-N-blocks mode
         }
+        if (blocks == 0) newest_ts = s->ts;
+        oldest_ts = s->ts;
         blocks++;
         sum_txs      += s->txs;
         sum_outputs  += s->outputs;
@@ -396,7 +400,11 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         }
     }
 
-    double tps = window ? ((double)sum_txs / (double)window) : 0.0;
+    uint32_t observed_window = window;
+    if (blocks > 1 && newest_ts > oldest_ts) {
+        observed_window = newest_ts - oldest_ts;
+    }
+    double tps = observed_window ? ((double)sum_txs / (double)observed_window) : 0.0;
 
     // median/avg fee per block (in koinu)
     uint64_t median_fee = 0;
