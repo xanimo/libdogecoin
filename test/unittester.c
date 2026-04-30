@@ -112,6 +112,7 @@ extern void test_examples();
 extern void test_wallet_basics();
 extern void test_wallet();
 extern void test_wallet_reorg_utxo_update();
+extern void test_wallet_balance_accounts_for_spends();
 #endif
 
 #ifdef WITH_TOOLS
@@ -218,6 +219,7 @@ int main()
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
     u_run_test(test_wallet_reorg_utxo_update);
+    u_run_test(test_wallet_balance_accounts_for_spends);
 #endif
 
 #ifdef WITH_TOOLS

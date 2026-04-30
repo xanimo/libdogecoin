@@ -321,3 +321,78 @@ void test_wallet_reorg_utxo_update() {
     dogecoin_hdnode_free(node);
     remove_all_utxos();
 }
+
+void test_wallet_balance_accounts_for_spends() {
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+
+    /* clear leftover utxos from previous tests */
+    remove_all_utxos();
+    unlink(wallettmpfile);
+    dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
+
+    int error;
+    dogecoin_bool created;
+    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created, false), true);
+
+    /* register a wallet-owned pubkeyhash */
+    dogecoin_wallet_addr* waddr = dogecoin_wallet_addr_new();
+    size_t outlen = 0;
+    utils_hex_to_bin("e195b669de8e49f955749033fa2d79390732c435", waddr->pubkeyhash, 40, &outlen);
+    dogecoin_btree_tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
+    vector_add(wallet->waddr_vector, waddr);
+
+    /* credit wtx: pays 1.0 DOGE to wallet's pubkeyhash */
+    dogecoin_wtx* wtx1 = dogecoin_wallet_wtx_new();
+    wtx1->height = 100;
+    dogecoin_tx_out* out1 = dogecoin_tx_out_new();
+    out1->value = 100000000;
+    cstring* script1 = cstr_new_sz(25);
+    cstr_append_c(script1, (unsigned char)OP_DUP);
+    cstr_append_c(script1, (unsigned char)OP_HASH160);
+    cstr_append_c(script1, 20);
+    cstr_append_buf(script1, waddr->pubkeyhash, 20);
+    cstr_append_c(script1, (unsigned char)OP_EQUALVERIFY);
+    cstr_append_c(script1, (unsigned char)OP_CHECKSIG);
+    out1->script_pubkey = script1;
+    vector_add(wtx1->tx->vout, out1);
+
+    /* index utxo, capture txid, then transfer ownership to wallet */
+    dogecoin_wallet_scrape_utxos(wallet, wtx1);
+    uint256_t tx1_hash;
+    dogecoin_tx_hash(wtx1->tx, tx1_hash);
+    dogecoin_wallet_add_wtx_move(wallet, wtx1);
+
+    /* balance == credit before any spend */
+    u_assert_int_eq(dogecoin_wallet_get_balance(wallet), 100000000);
+
+    /* spend wtx: consumes wtx1's output to a foreign address */
+    dogecoin_wtx* wtx2 = dogecoin_wallet_wtx_new();
+    wtx2->height = 101;
+    dogecoin_tx_in* in2 = dogecoin_tx_in_new();
+    memcpy(in2->prevout.hash, tx1_hash, sizeof(uint256_t));
+    in2->prevout.n = 0;
+    vector_add(wtx2->tx->vin, in2);
+    dogecoin_tx_out* out2 = dogecoin_tx_out_new();
+    out2->value = 99000000;
+    uint8_t other_pkh[20];
+    size_t olen = 0;
+    utils_hex_to_bin("0000000000000000000000000000000000000001", other_pkh, 40, &olen);
+    cstring* script2 = cstr_new_sz(25);
+    cstr_append_c(script2, (unsigned char)OP_DUP);
+    cstr_append_c(script2, (unsigned char)OP_HASH160);
+    cstr_append_c(script2, 20);
+    cstr_append_buf(script2, other_pkh, 20);
+    cstr_append_c(script2, (unsigned char)OP_EQUALVERIFY);
+    cstr_append_c(script2, (unsigned char)OP_CHECKSIG);
+    out2->script_pubkey = script2;
+    vector_add(wtx2->tx->vout, out2);
+
+    dogecoin_wallet_add_wtx_move(wallet, wtx2);
+
+    /* output now spent: balance must be 0 */
+    u_assert_int_eq(dogecoin_wallet_get_balance(wallet), 0);
+
+    dogecoin_wallet_flush(wallet);
+    dogecoin_wallet_free(wallet);
+    remove_all_utxos();
+}

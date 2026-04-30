@@ -1079,7 +1079,17 @@ dogecoin_bool dogecoin_tx_add_p2pkh_out(dogecoin_tx* tx, int64_t amount, const d
  */
 dogecoin_bool dogecoin_tx_outpoint_is_null(dogecoin_tx_outpoint* tx)
 {
-    (void)(tx);
+    if (!tx) {
+        return true;
+    }
+    if (tx->n != (uint32_t)-1) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(tx->hash); i++) {
+        if (tx->hash[i] != 0) {
+            return false;
+        }
+    }
     return true;
 }
 

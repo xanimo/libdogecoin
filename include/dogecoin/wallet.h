@@ -201,6 +201,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_txout_is_mine(dogecoin_wallet* wal
 
 /** checks if a transaction outpoint is owned by the wallet */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256_t hash, uint32_t n);
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_is_from_me(dogecoin_wallet *wallet, const dogecoin_tx *tx);
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_get_unspents(dogecoin_wallet* wallet, vector_t* unspents);
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_get_unspent(vector_t* unspents);
 
