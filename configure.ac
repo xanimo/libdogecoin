@@ -39,6 +39,11 @@ AC_HEADER_STDBOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
+# AC_PROG_CXX must be invoked unconditionally because Makefile.am references
+# src/zk_carrier/zk_groth16_mcl.cpp inside an `if HAVE_MCL` block; automake
+# scans all source lists at autoconf time and requires the C++ depcomp
+# infrastructure (am__fastdepCXX) to be defined unconditionally.
+AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
 
@@ -187,6 +192,24 @@ AC_ARG_ENABLE([raccoon-g],
   [use_raccoon_g=$enableval],
   [use_raccoon_g=no])
 
+AC_ARG_ENABLE([zk-carrier],
+  [AS_HELP_STRING([--enable-zk-carrier],
+  [Build with ZK carrier (Groth16/PLONK/STARK on top of PQ carrier) (default is no)])],
+  [use_zk_carrier=$enableval],
+  [use_zk_carrier=no])
+
+AC_ARG_WITH([rapidsnark],
+  [AS_HELP_STRING([--with-rapidsnark],
+  [Link the rapidsnark Groth16 verifier into libdogecoin (default is no; verification falls back to delegated mode without it)])],
+  [use_rapidsnark=$withval],
+  [use_rapidsnark=no])
+
+AC_ARG_WITH([mcl],
+  [AS_HELP_STRING([--with-mcl@<:@=DIR@:>@],
+  [Link the herumi/mcl BN254 pairing library + the libdogecoin Groth16 mcl verifier into libdogecoin (default is no; verification falls back to delegated mode without it).  DIR may point to a manual mcl install (uses DIR/include and DIR/lib); when omitted, the standard search path / depends-staged mcl is used.])],
+  [use_mcl=$withval],
+  [use_mcl=no])
+
 
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
@@ -323,6 +346,72 @@ if test "x$use_raccoon_g" = xyes; then
   AC_DEFINE(USE_RACCOON_G, 1, [Define this symbol to enable the in-tree Raccoon-G-44 backend])
 fi
 
+if test "x$use_zk_carrier" = xyes; then
+  AC_DEFINE(USE_ZK_CARRIER, 1, [Define this symbol to enable the ZK carrier module])
+fi
+
+if test "x$use_rapidsnark" != xno -a "x$use_rapidsnark" != x; then
+  RAPIDSNARK_LIBS="-lrapidsnark -lfr -lfq -lgmp -lstdc++ -lpthread"
+  ac_check_lib_save_LIBS="$LIBS"
+  LIBS="$RAPIDSNARK_LIBS $LIBS"
+  AC_MSG_CHECKING([for groth16_verify in -lrapidsnark])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+    extern int groth16_verify(const char* proof, const char* inputs,
+                              const char* vk, char* err, unsigned long max);
+  ]],[[
+    return groth16_verify(0, 0, 0, 0, 0);
+  ]])],[
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([HAVE_RAPIDSNARK], [1], [Define if rapidsnark is available for in-process Groth16 verification])
+  ],[
+    AC_MSG_RESULT([no])
+    AC_MSG_WARN([--with-rapidsnark requested but librapidsnark not found; falling back to delegated verification])
+    LIBS="$ac_check_lib_save_LIBS"
+  ])
+fi
+
+have_mcl=no
+if test "x$use_mcl" != xno -a "x$use_mcl" != x; then
+  if test "x$use_mcl" = xyes; then
+    MCL_CFLAGS=""
+  else
+    MCL_CFLAGS="-I$use_mcl/include"
+    MCL_LIBS="-L$use_mcl/lib"
+  fi
+  MCL_LIBS="$MCL_LIBS -lmcl -lstdc++"
+  # mcl is a C++ library and exports no `main`; AC_CHECK_LIB([mcl],[main],…)
+  # was unreliable (passed/failed depending on which static libs the linker
+  # happened to pull in).  Use an explicit C++ link test against a known
+  # mcl symbol instead — this is the canonical way upstream recommends
+  # detecting mcl from autoconf.
+  AC_LANG_PUSH([C++])
+  ac_check_mcl_save_LIBS="$LIBS"
+  ac_check_mcl_save_CXXFLAGS="$CXXFLAGS"
+  LIBS="$MCL_LIBS $LIBS"
+  CXXFLAGS="$MCL_CFLAGS $CXXFLAGS"
+  AC_MSG_CHECKING([for mcl::bn::initPairing in $MCL_LIBS])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+    #include <mcl/bn.hpp>
+  ]],[[
+    mcl::bn::initPairing(mcl::BN_SNARK1);
+    return 0;
+  ]])],[
+    AC_MSG_RESULT([yes])
+    have_mcl=yes
+    AC_DEFINE([HAVE_MCL], [1], [Define if herumi/mcl BN254 pairing is available for Groth16 verification])
+    AC_SUBST([MCL_CFLAGS])
+    AC_SUBST([MCL_LIBS])
+  ],[
+    AC_MSG_RESULT([no])
+    AC_MSG_WARN([--with-mcl requested but libmcl not found; falling back to delegated verification])
+    MCL_CFLAGS=""
+    MCL_LIBS=""
+  ])
+  LIBS="$ac_check_mcl_save_LIBS"
+  CXXFLAGS="$ac_check_mcl_save_CXXFLAGS"
+  AC_LANG_POP([C++])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -347,7 +436,9 @@ AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
 AM_CONDITIONAL([USE_RACCOON_G], [test "x$use_raccoon_g" = "xyes"])
-AM_CONDITIONAL([USE_PQC_CARRIER], [test "x$use_liboqs" = "xyes" -o "x$use_raccoon_g" = "xyes"])
+AM_CONDITIONAL([USE_ZK_CARRIER], [test "x$use_zk_carrier" = "xyes"])
+AM_CONDITIONAL([HAVE_MCL], [test "x$have_mcl" = "xyes"])
+AM_CONDITIONAL([USE_PQC_CARRIER], [test "x$use_liboqs" = "xyes" -o "x$use_raccoon_g" = "xyes" -o "x$use_zk_carrier" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
@@ -383,6 +474,9 @@ echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
 echo "  liboqs          = $use_liboqs"
 echo "  raccoon-g       = $use_raccoon_g (experimental, in-tree)"
+echo "  zk-carrier      = $use_zk_carrier"
+echo "  rapidsnark      = $use_rapidsnark"
+echo "  mcl             = $have_mcl"
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"

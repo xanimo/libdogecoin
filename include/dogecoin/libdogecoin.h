@@ -66,12 +66,16 @@ typedef struct dogecoin_checkpoint_ {
     uint32_t target;
 } dogecoin_checkpoint;
 
+/* forward declarations for opaque types referenced by the PQC and ZK APIs */
+typedef struct dogecoin_tx_ dogecoin_tx;
+typedef struct cstring cstring;
+
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 
 // the mainnet checkpoints, needs a fix size
-extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[31];
+extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[33];
 extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[24];
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
@@ -600,3 +604,322 @@ dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t up
 void hmac_sha1(const uint8_t* key, const size_t keylen, const uint8_t* msg, const size_t msglen, uint8_t* hmac);
 
 void sha256_raw(const uint8_t*, size_t, uint8_t[SHA256_DIGEST_LENGTH]);
+
+/* Post-Quantum Cryptography (PQC) API: PQC carrier helpers and Falcon-512 /
+   Dilithium2 (USE_LIBOQS) / Raccoon-G-44 (USE_RACCOON_G) signature schemes. */
+
+/* PQC carrier sizing / wire-format constants. */
+#define DOGECOIN_PQC_CARRIER_MAX_CHUNKS 3
+#define DOGECOIN_PQC_CARRIER_CHUNK_MAX  520
+#define DOGECOIN_PQC_CARRIER_HDR_LEN    8
+#define DOGECOIN_PQC_CARRIER_TAG_LEN    8
+
+/* P2PKH scriptSig length bounds used during PQC sighash derivation. */
+#define DOGECOIN_PQC_MIN_P2PKH_SCRIPTSIG_LEN 106
+#define DOGECOIN_PQC_MAX_P2PKH_SCRIPTSIG_LEN 180
+
+/* DER signature push length bounds (includes 1-byte sighash type). */
+#define DOGECOIN_PQC_MIN_DER_SIG_PUSH_LEN 9
+#define DOGECOIN_PQC_MAX_DER_SIG_PUSH_LEN 73
+
+/* PQC algorithm discriminant used by carrier extraction and SPV validation. */
+typedef enum {
+    DOGECOIN_PQC_ALGO_FALCON,
+    DOGECOIN_PQC_ALGO_DILITHIUM,
+    DOGECOIN_PQC_ALGO_RACCOONG /* available only when built with USE_RACCOON_G */
+} dogecoin_pqc_algo_t;
+
+/* Per-algorithm tag / commit / push-total constants. */
+#define DOGECOIN_PQC_FALCON_TAG          "FLC1"
+#define DOGECOIN_PQC_FALCON_TAG_LEN      4
+#define DOGECOIN_PQC_FALCON_COMMIT_LEN   32
+#define DOGECOIN_PQC_FALCON_PUSH_TOTAL   (DOGECOIN_PQC_FALCON_TAG_LEN + DOGECOIN_PQC_FALCON_COMMIT_LEN)
+
+#define DOGECOIN_PQC_DILITHIUM_TAG        "DIL2"
+#define DOGECOIN_PQC_DILITHIUM_TAG_LEN    4
+#define DOGECOIN_PQC_DILITHIUM_COMMIT_LEN 32
+#define DOGECOIN_PQC_DILITHIUM_PUSH_TOTAL (DOGECOIN_PQC_DILITHIUM_TAG_LEN + DOGECOIN_PQC_DILITHIUM_COMMIT_LEN)
+
+#define DOGECOIN_PQC_RACCOON_TAG          "RCG4"
+#define DOGECOIN_PQC_RACCOON_TAG_LEN      4
+#define DOGECOIN_PQC_RACCOON_COMMIT_LEN   32
+#define DOGECOIN_PQC_RACCOON_PUSH_TOTAL   (DOGECOIN_PQC_RACCOON_TAG_LEN + DOGECOIN_PQC_RACCOON_COMMIT_LEN)
+#define DOGECOIN_PQC_RACCOON_CHAINCODE_LEN 32
+
+/* Build a P2SH redeem script / scriptPubKey for PQC carrier outputs. */
+dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem);
+dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem, cstring** out_spk);
+
+/* Build a carrier scriptSig for one part of a multi-part PQC payload. */
+dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
+    const char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN],
+    uint8_t part_index,
+    uint8_t part_total,
+    uint16_t pk_len,
+    uint16_t full_len,
+    const uint8_t* part_data,
+    size_t part_data_len,
+    const cstring* redeem,
+    cstring** out_scriptsig);
+
+/* Parse a carrier scriptSig to extract tag, part metadata, and payload. */
+dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
+    const cstring* scriptsig,
+    char out_tag8[DOGECOIN_PQC_CARRIER_TAG_LEN + 1],
+    uint8_t* out_part_index,
+    uint8_t* out_part_total,
+    uint16_t* out_pk_len,
+    uint16_t* out_full_len,
+    uint8_t** out_part_data,
+    size_t* out_part_data_len,
+    cstring** out_redeem);
+
+/* Add carrier P2SH outputs to a transaction. */
+dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
+    dogecoin_tx* tx,
+    const cstring* carrier_spk,
+    uint64_t value,
+    uint8_t part_total);
+
+/* Reassemble PQC pubkey+sig from carrier-format scriptSigs.
+   Caller must free *carrier_buf with dogecoin_free(). */
+dogecoin_bool dogecoin_pqc_carrier_extract_scriptsig(
+    const dogecoin_tx* tx,
+    dogecoin_pqc_algo_t* out_algo,
+    const uint8_t** out_pk,
+    size_t* out_pk_len,
+    const uint8_t** out_sig,
+    size_t* out_sig_len,
+    size_t* out_vin_index,
+    uint8_t** carrier_buf,
+    size_t* carrier_buf_len);
+
+/* Verify a PQC carrier reveal by reconstructing TX_BASE from raw TX_C bytes,
+   deriving the sighash32, and verifying the PQC signature over it. */
+dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
+    dogecoin_pqc_algo_t algo,
+    const uint8_t* txc_raw,
+    size_t txc_raw_len,
+    const uint8_t* pk,
+    size_t pk_len,
+    const uint8_t* sig,
+    size_t sig_len,
+    uint8_t out_sighash[32]);
+
+/* Falcon-512 (requires USE_LIBOQS).  Caller must free *pk/*sk/*sig with dogecoin_free(). */
+dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
+dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
+dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
+dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len, const uint8_t* sig, size_t sig_len, uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+
+/* Dilithium2 (requires USE_LIBOQS).  Caller must free *pk/*sk/*sig with dogecoin_free(). */
+dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
+dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
+dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
+dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len, const uint8_t* signature, size_t signature_len, uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+
+/* Raccoon-G-44 (requires USE_RACCOON_G).  Caller must free *pk/*sk/*sig/*child_* with dogecoin_free(). */
+dogecoin_bool dogecoin_raccoong44_is_available(void);
+dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
+dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
+dogecoin_bool dogecoin_raccoong44_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
+dogecoin_bool dogecoin_raccoong44_commit_bytes(const uint8_t* pk, size_t pk_len, const uint8_t* signature, size_t signature_len, uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_add_raccoong44_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_extract_raccoong44_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+
+/* Derive Raccoon-G-44 child secret + public key from parent (BIP32-style). */
+dogecoin_bool dogecoin_raccoong44_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
+                                                 const uint8_t* parent_pk, size_t parent_pk_len,
+                                                 const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
+                                                 uint32_t index, dogecoin_bool hardened,
+                                                 uint8_t** child_sk, size_t* child_sk_len,
+                                                 uint8_t** child_pk, size_t* child_pk_len);
+
+/* Derive Raccoon-G-44 child public key from parent public key (non-hardened only). */
+dogecoin_bool dogecoin_raccoong44_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
+                                                const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
+                                                uint32_t index,
+                                                uint8_t** child_pk, size_t* child_pk_len);
+
+/* Zero-Knowledge Proof (ZK) Carrier API: Groth16 / PLONK / STARK payload
+   encode/decode, commit hashing, TX_C / TX_R helpers (USE_ZK_CARRIER). */
+
+#define DOGECOIN_ZK_CARRIER_MAGIC      "ZKP1"
+#define DOGECOIN_ZK_CARRIER_MAGIC_LEN  4
+#define DOGECOIN_ZK_CARRIER_TAG8       "ZKP1FULL"
+#define DOGECOIN_ZK_CARRIER_HDR_FIXED  (DOGECOIN_ZK_CARRIER_MAGIC_LEN + 1 + 1 + 4 + 2)
+#define DOGECOIN_ZK_OPRETURN_TAG       "DZKC"
+#define DOGECOIN_ZK_OPRETURN_TAG_LEN   4
+#define DOGECOIN_ZK_OPRETURN_DATA_LEN  (DOGECOIN_ZK_OPRETURN_TAG_LEN + 1 + 32)
+
+/* Wire-format version byte: v0 = legacy (no embedded vk); v1 = self-contained
+   reveal with verification-key bytes appended after the proof. */
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V0     0x00
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V1     0x01
+#define DOGECOIN_ZK_PAYLOAD_VERSION_MASK   0x01
+
+/* Selectable proof systems; values are stable on-wire mode selectors. */
+typedef enum {
+    DOGECOIN_ZK_MODE_GROTH16  = 0,
+    DOGECOIN_ZK_MODE_PLONK    = 1,
+    DOGECOIN_ZK_MODE_STARK_S2 = 2
+} dogecoin_zk_mode_t;
+
+typedef enum {
+    DOGECOIN_ZK_OK                  = 0,
+    DOGECOIN_ZK_ERR_INVALID_ARG     = -1,
+    DOGECOIN_ZK_ERR_BAD_MAGIC       = -2,
+    DOGECOIN_ZK_ERR_BAD_MODE        = -3,
+    DOGECOIN_ZK_ERR_TRUNCATED       = -4,
+    DOGECOIN_ZK_ERR_OOM             = -5,
+    DOGECOIN_ZK_ERR_NOT_IMPLEMENTED = -6,
+    DOGECOIN_ZK_ERR_DELEGATED       = -7,
+    DOGECOIN_ZK_ERR_VERIFY_FAIL     = -8,
+    DOGECOIN_ZK_ERR_BAD_VERSION     = -9
+} dogecoin_zk_err_t;
+
+/* Encode a proof + public inputs (and optional verification key) into the
+   canonical ZK carrier payload.  Caller frees *out_payload with dogecoin_free(). */
+dogecoin_zk_err_t dogecoin_zk_encode_payload(
+    dogecoin_zk_mode_t mode,
+    uint32_t circuit_id,
+    const uint8_t* public_inputs,
+    size_t public_inputs_len,
+    const uint8_t* proof,
+    size_t proof_len,
+    const uint8_t* vk_bytes,
+    size_t vk_len,
+    uint8_t** out_payload,
+    size_t* out_payload_len);
+
+/* Decode a canonical ZK carrier payload.  Out-pointers alias into the input
+   buffer (no allocation); caller must keep `payload` alive while in use. */
+dogecoin_zk_err_t dogecoin_zk_decode_payload(
+    const uint8_t* payload,
+    size_t payload_len,
+    dogecoin_zk_mode_t* out_mode,
+    uint32_t* out_circuit_id,
+    const uint8_t** out_public_inputs,
+    size_t* out_public_inputs_len,
+    const uint8_t** out_proof,
+    size_t* out_proof_len,
+    const uint8_t** out_vk,
+    size_t* out_vk_len);
+
+/* Compute the TX_C commitment value: SHA256d(payload). */
+dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
+    const uint8_t* payload,
+    size_t payload_len,
+    uint8_t out_commitment[32]);
+
+/* Extract the canonical 25-byte P2PKH scriptPubKey of the signer for input 0
+   of `tx`, parsing the standard `<sig> <pubkey>` P2PKH scriptSig.  Returns
+   NULL on parse failure; caller frees the cstring. */
+cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx);
+
+/* Compute the tx_base sighash for a candidate TX_C.  This is the value the
+   ZK prover MUST bind into its `tx_binding` public input, mirroring the PQC
+   carrier sighash binding.  The top byte of the returned digest is zeroed
+   to give an unambiguous 248-bit field element for BN254 R1CS. */
+dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
+    const dogecoin_tx* tx_c,
+    const cstring* signer_p2pkh_spk,
+    const cstring* carrier_spk,
+    uint8_t out_sighash[32]);
+
+/* Build the canonical OP_RETURN scriptPubKey carrying a ZK commitment. */
+dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
+    dogecoin_zk_mode_t mode,
+    const uint8_t commitment[32],
+    cstring** out_spk);
+
+/* Parse the decimal string at index `idx` of a snarkjs-style public-inputs
+   JSON array and convert it to a 32-byte big-endian buffer. */
+dogecoin_zk_err_t dogecoin_zk_parse_public_input_be32(
+    const uint8_t* public_inputs,
+    size_t public_inputs_len,
+    size_t idx,
+    uint8_t out_be32[32],
+    size_t* out_token_count);
+
+/* Append the OP_RETURN commit output and the P2SH carrier outputs (one per
+   reveal-part) to an in-progress TX_C.  *out_carrier_spk is the P2SH spk of
+   the carrier outputs (caller frees) and *out_part_total is how many parts
+   TX_R will spend. */
+dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_c(
+    dogecoin_tx* tx,
+    const uint8_t* payload,
+    size_t payload_len,
+    dogecoin_zk_mode_t mode,
+    uint64_t carrier_value,
+    cstring** out_carrier_spk,
+    uint8_t* out_part_total);
+
+/* Build the per-part scriptSigs for TX_R; caller frees each scriptsig with
+   cstr_free(..., true) and the array itself with dogecoin_free(). */
+dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_r_scriptsigs(
+    const uint8_t* payload,
+    size_t payload_len,
+    cstring*** out_scriptsigs,
+    uint8_t* out_part_total);
+
+/* Reassemble a previously-revealed payload from a TX_R by walking its inputs.
+   Caller frees *out_payload with dogecoin_free(). */
+dogecoin_zk_err_t dogecoin_zk_extract_carrier_payload(
+    const dogecoin_tx* tx_r,
+    uint8_t** out_payload,
+    size_t* out_payload_len);
+
+/* Walk a transaction's outputs for the canonical TX_C OP_RETURN commitment.
+   Mirrors dogecoin_tx_extract_falcon512_commit for SPV detection. */
+dogecoin_bool dogecoin_tx_extract_zk_commit(
+    const dogecoin_tx* tx,
+    dogecoin_zk_mode_t* out_mode,
+    uint8_t out_commit32[32]);
+
+/* Verify a Groth16 proof using the rapidsnark verifier when HAVE_RAPIDSNARK
+   is enabled at build time; otherwise returns DOGECOIN_ZK_ERR_NOT_IMPLEMENTED. */
+dogecoin_zk_err_t dogecoin_zk_verify_groth16(
+    const uint8_t* vk_json,
+    size_t vk_json_len,
+    const uint8_t* public_json,
+    size_t public_json_len,
+    const uint8_t* proof_json,
+    size_t proof_json_len);
+
+/* Verify any ZK payload by mode, dispatching to the proof-system specific
+   verifier.  v1 payloads carry their own vk and ignore `vk_blob`; for v0
+   payloads the caller-supplied vk_blob is used. */
+dogecoin_zk_err_t dogecoin_zk_verify_proof(
+    const uint8_t* payload,
+    size_t payload_len,
+    const uint8_t* vk_blob,
+    size_t vk_blob_len);
+
+/* Proof generation surface — always returns DOGECOIN_ZK_ERR_DELEGATED in
+   this build because proving lives outside libdogecoin (snarkjs / rapidsnark
+   CLI driven by contrib/zk_carrier/witness_helper.py). */
+dogecoin_zk_err_t dogecoin_zk_generate_groth16_proof(
+    const uint8_t* witness_json,
+    size_t witness_json_len,
+    const char* circuit_path,
+    uint8_t** out_proof,
+    size_t* out_proof_len,
+    uint8_t** out_public,
+    size_t* out_public_len);
+
+dogecoin_zk_err_t dogecoin_zk_generate_plonk_proof(
+    const uint8_t* witness_json,
+    size_t witness_json_len,
+    const char* circuit_path,
+    uint8_t** out_proof,
+    size_t* out_proof_len,
+    uint8_t** out_public,
+    size_t* out_public_len);
+
+/* Human-readable error string.  Never returns NULL. */
+const char* dogecoin_zk_strerror(dogecoin_zk_err_t err);

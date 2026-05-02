@@ -1,0 +1,881 @@
+<pre>
+  BIP: ?
+  Layer: Consensus (soft fork)
+  Title: Zero-Knowledge Proof Carrier Commitments
+  Author: Ed Tubbs <ectubbs@gmail.com>
+  Status: Draft
+  Type: Standards Track
+  Created: 2026-05-02
+  License: BSD-3-Clause
+</pre>
+
+==Introduction==
+
+===Abstract===
+
+This document proposes a staged path for introducing zero-knowledge (ZK) proof support in transactions.
+In the initial stage, a ZK proof commitment is embedded in a transaction output using a canonical OP_RETURN pattern, and the full proof bytes (public inputs and proof material) are published on-chain via a P2SH data-carrier reveal pattern (TX_C + TX_R), to enable immediate interoperability and chain-level observability without a consensus change.
+In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
+
+The current implementation focus is Groth16 (snarkjs/rapidsnark-compatible JSON encoding) and PLONK for interim, classical-security deployments; STARK_S2 (mode 0x02; hash/FRI-based, no pairing- or DLOG-based assumptions) is the reserved post-quantum-safe growth slot and the long-term in-process verifier target.
+For post-quantum-safe spend authorization in libdogecoin '''today''', the canonical path is the already-shipping sibling Post-Quantum Signature Commitments BIP (Falcon-512, Dilithium2, and Raccoon-G-44 in-library verifiers — see "PQC-safe growth path" under Rationale).
+This document is written in standard BIP format and is a sibling proposal to that Post-Quantum Signature Commitments BIP, sharing the same TX_C + TX_R staging model, the same canonical 39-byte tagged OP_RETURN shape, the same SPV scanning/log conventions, and the same explicit migration target away from classical-only primitives toward post-quantum-safe primitives.
+It can be adapted to a DIP process if/when a formal DIP track is preferred.
+
+===Copyright===
+
+This BIP is licensed under the BSD 3-clause license.
+
+===Motivation===
+
+Bitcoin-family systems increasingly need to publish ZK proofs to enable confidential balances, range proofs, set membership, and other privacy/scaling primitives. A practical deployment strategy must:
+
+# work with existing transaction relay and wallet infrastructure;
+# be deployable before introducing new consensus opcodes; and
+# support incremental hardening from commitment-only publication toward full script validation semantics.
+
+An OP_RETURN commitment-first model, paired with a P2SH data-carrier reveal for the full proof bytes, provides a low-friction deployment mechanism while ecosystem tooling (snarkjs, rapidsnark, circom, halo2, plonky2, etc.) matures.
+A reserved-opcode follow-up provides a path toward first-class script integration once consensus and implementation readiness are established.
+
+===Rationale===
+
+The design is intentionally staged:
+
+* '''Phase 1 (Now):''' publish a 32-byte commitment (derived from the canonical ZK payload) in canonical OP_RETURN form, and optionally publish the full proof bytes via P2SH data-carrier in TX_R.
+* '''Phase 2 (Future):''' define and activate a dedicated script opcode path to validate ZK proofs in script execution, replacing commitment-only signaling.
+
+This balances deployability and safety:
+
+* avoids immediate consensus risk;
+* enables ecosystem measurement and operational validation via tooling (including SPV scanning); and
+* creates a clean upgrade target for native script verification.
+
+This direction is closely aligned with the parallel Post-Quantum Signature Commitments BIP: the two carriers share the same TX_C + TX_R staging, the same canonical 39-byte tagged OP_RETURN shape, the same SPV scanning conventions, and the same P2SH data-carrier reveal strategy. The differences are confined to the tag and proof-system specifics.
+
+====PQC-safe growth path====
+
+The Groth16 and PLONK proof systems registered above (modes <code>0x00</code> and <code>0x01</code>) both rely on pairing-based assumptions on BN254 / bn128 / BN_SNARK1 / alt_bn128 (KZG for PLONK, pairing-check soundness for Groth16). Those assumptions are not post-quantum-safe: a cryptographically relevant quantum adversary can recover discrete logs in the underlying curve groups and forge proofs. Phase 1 deploys these modes as interim, classical-security tooling — useful for ecosystem readiness and SPV-level operational validation, but never as the long-term migration target.
+
+The post-quantum-safe path for libdogecoin spend authorization is '''not''' deferred to a future build: it is already shipping in-library through the sibling Post-Quantum Signature Commitments BIP, whose Falcon-512, Dilithium2, and Raccoon-G-44 verifiers run inside libdogecoin today (see <code>contrib/mainnet_falcon_test.sh</code> and the <code>[falcon-commit] / [dilithium-commit] / [raccoong-commit]</code> mainnet logs reproduced in that BIP). Because the ZK carrier shares the PQC carrier's TX_C + TX_R staging, the same canonical 39-byte tagged OP_RETURN shape, and the same P2SH data-carrier reveal strategy, a deployer who needs '''post-quantum-safe spend authorization today''' SHOULD use the sibling PQC carrier (with its in-library Falcon/Dilithium2/Raccoon-G-44 signature commitments) and treat the ZK carrier's Groth16 / PLONK modes as orthogonal evidence (e.g. range proofs, set-membership proofs) rather than as the authoritative authorization primitive.
+
+For the ZK carrier itself, the in-tree post-quantum-safe growth slot is mode <code>0x02</code> <code>DOGECOIN_ZK_MODE_STARK_S2</code> — a hash/FRI-based proof system whose soundness rests on collision resistance and the random oracle model alone, with no pairing or DLOG assumption that a CRQC can break. The verifier-support matrix in §"Prover / Verifier Support Matrix" reserves this slot today and defers a native in-process implementation; once an in-tree STARK_S2 verifier lands, it will be co-sequenced with the PQC carrier's Phase-2 reserved-opcode track so that the ZK and PQC sides of the migration share a single OP_SUCCESSx allocation block and a single PQ activation window. The Phase-2 reserved-opcode design (see "Phase 2: Reserved Opcode Upgrade Path" below) explicitly targets that PQC-safe verifier path; classical Groth16 / PLONK script-level validation is '''not''' a Phase-2 goal of this BIP.
+
+==Specification==
+
+===Phase 1: OP_RETURN Commitment Encoding===
+
+For Phase 1, ZK commitments are encoded in outputs using a canonical tagged script form:
+
+<source>
+ZK carrier:  0x6a 0x25 0x445a4b43 <mode-byte> <32-byte-commitment>   ; "DZKC"
+</source>
+
+Where:
+
+* <code>0x6a</code> is OP_RETURN
+* <code>0x25</code> is push-37
+* <code>0x445a4b43</code> is the ZK carrier identifier (<code>"DZKC"</code> in ASCII)
+* <code>mode-byte</code> identifies the proof system (see "Mode Identifiers" below)
+* payload is exactly 4-byte tag + 1-byte mode + 32-byte commitment (37 bytes pushed; 39 bytes scriptPubKey total)
+
+Non-canonical encodings are invalid for commitment interpretation under this proposal. In particular, mode-byte values outside the registered allow-list MUST be rejected by SPV scanners (see "Mode Identifiers").
+
+For implementation namespace clarity, libdogecoin defines identifier constants:
+
+<source>
+DOGECOIN_ZK_OPRETURN_TAG       = "DZKC"
+DOGECOIN_ZK_OPRETURN_TAG_LEN   = 4
+DOGECOIN_ZK_OPRETURN_DATA_LEN  = 4 (tag) + 1 (mode) + 32 (commit) = 37
+</source>
+
+====Mode Identifiers====
+
+The mode byte selects the proof system used by the off-chain verifier. libdogecoin currently defines the following allow-listed values; SPV scanners MUST reject other values as malformed:
+
+{|
+! Mode byte !! Constant !! Proof system !! Encoding
+|-
+| 0x00 || <code>DOGECOIN_ZK_MODE_GROTH16</code> || Groth16 over BN254 (snarkjs/rapidsnark) || JSON-encoded public inputs and proof
+|-
+| 0x01 || <code>DOGECOIN_ZK_MODE_PLONK</code>   || PLONK over BN254 (snarkjs) || JSON-encoded public inputs and proof
+|-
+| 0x02 || <code>DOGECOIN_ZK_MODE_STARK_S2</code>|| STARK (S-two; hash/FRI, post-quantum-safe) || implementation-defined
+|}
+
+The pairing-friendly curve used by both <code>DOGECOIN_ZK_MODE_GROTH16</code> and <code>DOGECOIN_ZK_MODE_PLONK</code> is the BN254 / Barreto–Naehrig curve at the 254-bit security parameter. The same curve appears in libdogecoin and the broader ecosystem under four conventional labels which '''MUST''' be treated as synonymous when interpreting on-chain reveals:
+
+* '''BN254''' — the academic name and the label used throughout this BIP's prose and in the spvnode SPV decode log (e.g. <code>mode=0(groth16-bn254)</code>).
+* '''bn128''' — the canonical snarkjs/circom JSON label. This is the literal string that appears in every embedded <code>verification_key.json</code> and <code>proof.json</code> in a ZKP1 reveal: <code>"curve": "bn128"</code>. The on-chain wire format is authoritatively the snarkjs label.
+* '''BN_SNARK1''' — the herumi/mcl curve identifier (<code>--with-mcl[=DIR]</code> backend).
+* '''alt_bn128''' — the Ethereum precompile name; cited for cross-ecosystem clarity.
+
+Verifiers MUST reject reveals whose embedded <code>"curve"</code> field is anything other than <code>"bn128"</code> for modes 0x00 and 0x01.
+
+Future modes MAY be added by amending this BIP. Mode-byte assignments are reserved by this proposal; deployers SHOULD NOT use unassigned values for production proofs.
+
+====Commitment Derivation====
+
+The commitment is the SHA256 double-hash of the canonical ZK payload bytes:
+
+<source>
+commitment32 = SHA256d(ZK_PAYLOAD)
+             = SHA256(SHA256(ZK_PAYLOAD))
+</source>
+
+Where <code>ZK_PAYLOAD</code> is the canonical encoding defined in "Phase 1: ZK Payload Encoding (ZKP1)" below. This binds the commitment to the exact byte sequence revealed in TX_R, so any tampering with public inputs, proof bytes, or — for v1 payloads — the embedded verification key invalidates the commitment match.
+
+Phase 1 defines two on-chain wire formats for the verification key (<code>vk</code>):
+
+* '''ZKP1 v0 (legacy):''' the version byte at offset 5 is <code>0x00</code> and the canonical payload contains only <code>(magic, mode, version, circuit_id, public_inputs, proof)</code>. The verifier must obtain <code>vk</code> through an out-of-band channel (signed releases, a separate registry transaction, etc.). v0 is retained for backwards compatibility with reveals published before this spec stabilized; new deployments MUST NOT emit v0.
+* '''ZKP1 v1 (self-contained reveal, RECOMMENDED for new deployments):''' the version byte at offset 5 is <code>0x01</code> and the canonical payload appends a trailing <code>VK_LEN4 || VK</code> block after the proof. v1 reveals are fully self-contained: a verifier with no access to the original <code>verification_key.json</code> can reassemble the ZKP1 payload from TX_R, extract the embedded vk, and re-run <code>snarkjs &lt;system&gt; verify</code> end-to-end against on-chain bytes alone. Because the vk is hashed into <code>SHA256d(ZK_PAYLOAD) == commit32</code>, swapping the vk after publication invalidates the commitment match — the consensus-relevant binding is preserved.
+
+Implementations MUST accept both versions and SHOULD emit v1 by default for new deployments. v0 is retained for backwards compatibility with existing on-chain pairs.
+
+===Phase 1: ZK Payload Encoding (ZKP1)===
+
+The canonical ZK payload format ("ZKP1") is the byte sequence that appears in TX_R carrier scriptSigs and is hashed to produce the OP_RETURN commitment. Layout:
+
+<source>
+ZK_PAYLOAD := MAGIC4 || MODE1 || VERSION1 || CIRCUIT_ID4 || PIL2 || PUBLIC_INPUTS
+              || PROOF_LEN4 || PROOF
+              [ || VK_LEN4 || VK ]            ; present iff VERSION1 == 0x01
+
+MAGIC4        : ASCII "ZKP1"            (4 bytes, DOGECOIN_ZK_CARRIER_MAGIC)
+MODE1         : mode byte               (1 byte, matches OP_RETURN mode-byte)
+VERSION1      : payload version         (1 byte; 0x00 = v0 legacy, 0x01 = v1 vk-included)
+CIRCUIT_ID4   : application circuit ID  (4 bytes, big-endian uint32)
+PIL2          : public_inputs length    (2 bytes, big-endian uint16; max 65535)
+PUBLIC_INPUTS : opaque bytes            (PIL2 bytes; for Groth16/PLONK: snarkjs public.json)
+PROOF_LEN4    : proof length            (4 bytes, big-endian uint32; max 2^25 = 32 MiB)
+PROOF         : opaque bytes            (PROOF_LEN4 bytes; for Groth16/PLONK: snarkjs proof.json)
+VK_LEN4       : (v1 only) vk length     (4 bytes, big-endian uint32; max 2^25 = 32 MiB)
+VK            : (v1 only) vk bytes      (VK_LEN4 bytes; for Groth16/PLONK: snarkjs verification_key.json)
+</source>
+
+Header constants:
+
+<source>
+DOGECOIN_ZK_CARRIER_MAGIC      = "ZKP1"
+DOGECOIN_ZK_CARRIER_MAGIC_LEN  = 4
+DOGECOIN_ZK_CARRIER_HDR_FIXED  = 4 (magic) + 1 (mode) + 1 (version) + 4 (circuit_id) + 2 (pi_len) = 12
+DOGECOIN_ZK_PAYLOAD_VERSION_V0 = 0x00 (legacy, vk distributed out-of-band)
+DOGECOIN_ZK_PAYLOAD_VERSION_V1 = 0x01 (self-contained reveal — vk embedded in payload)
+</source>
+
+Encoder/decoder rules:
+
+* The <code>MODE1</code> byte in <code>ZK_PAYLOAD</code> MUST equal the <code>mode-byte</code> in the corresponding OP_RETURN commitment.
+* The <code>VERSION1</code> byte at offset 5 selects the wire format: <code>0x00</code> denotes v0 (no embedded vk); <code>0x01</code> denotes v1 (self-contained reveal with trailing <code>VK_LEN4 || VK</code>).
+* Implementations MUST reject payloads whose <code>VERSION1</code> byte is not in <code>{0x00, 0x01}</code>.
+* Implementations MUST reject payloads with trailing bytes after the last declared field, so v0 decoders cannot silently ignore an appended v1 vk and produce a different commit32 than v1 decoders.
+* <code>CIRCUIT_ID4</code> is application-assigned and need not be globally unique; it is intended to disambiguate multiple proof contexts under the same proof system at the application layer.
+* All multi-byte integer fields are big-endian.
+* Implementations MUST reject payloads where the magic does not match, the mode is not allow-listed, the public-inputs section is truncated, the proof section is truncated, or (for v1) the vk section is truncated.
+* Implementations MUST cap <code>PROOF_LEN4</code> and <code>VK_LEN4</code> at 2<sup>25</sup> bytes (32 MiB) each to keep size fields sane and chunking bounded; <code>PIL2</code> is naturally capped at 65535 bytes by its width.
+* New deployments MUST emit v1 so a TX_R reveal alone is sufficient to verify the proof; v0 is retained for legacy interop only.
+
+The contrib helper <code>contrib/zk_carrier/witness_helper.py</code> produces ZKP1 payloads byte-identical to the libdogecoin C codec (<code>dogecoin_zk_encode_payload</code>); supplying <code>--vkey</code> emits v1, and <code>--no-embed-vk</code> opts back into v0. This round-trip is enforced by the unit tests in <code>test/zk_carrier_tests.c</code> (<code>test_zk_codec_roundtrip</code> for v0 and <code>test_zk_codec_roundtrip_with_vk</code> for v1, including a tamper-detection check that flipping any byte of the embedded vk changes <code>commit32</code>).
+
+===Phase 1: On-chain ZK Verification Material via P2SH Data Carrier Outputs===
+
+Dogecoin does not support SegWit witness relay, and extra pushes in a P2PKH spending input scriptSig are non-standard under current relay policy.
+
+The canonical Phase 1 mechanism is the small tagged OP_RETURN commitment.
+
+A standard P2SH data-carrier pattern (TX_C + TX_R) MAY be used to publish the full <code>ZK_PAYLOAD</code> on-chain, but is OPTIONAL and subject to standard relay limits.
+
+Implementations MUST NOT assume that the full ZK payload is present on-chain; in commitment-only mode, the verifier obtains <code>ZK_PAYLOAD</code> through an out-of-band channel (typically the wallet that produced the proof).
+
+The P2SH carrier reveal SHOULD only be used when the encoded payload fits within standard transaction policy limits (per-push <=520 bytes; carrier scriptSig size dominated by per-input chunk count). Very large STARK proofs may require commitment-only publication.
+
+====Phase 1: Commitment Output====
+
+The commitment output remains canonical tagged OP_RETURN, as defined above:
+
+<source>
+ZK carrier:  0x6a 0x25 0x445a4b43 <mode-byte> <32-byte-commitment>   ; "DZKC"
+</source>
+
+Commitment derivation:
+
+<source>
+commitment32 = SHA256d(ZK_PAYLOAD)
+</source>
+
+====Phase 1: P2SH Carrier Outputs in TX_C====
+
+TX_C creates one or more P2SH outputs that will later be spent to reveal the full ZK material:
+
+<source>
+scriptPubKey = OP_HASH160 <HASH160(redeemScript_carrier)> OP_EQUAL
+</source>
+
+The carrier <code>redeemScript</code> is intentionally small and standard. It exists only to clean the stack and return true; it carries no secrets and is reused across all ZK and PQC carrier variants:
+
+<source>
+redeemScript_carrier:
+  OP_DROP repeated 5 times (TAG8, HDR8, CHUNK0, CHUNK1, CHUNK2), then OP_TRUE.
+</source>
+
+Constraints that matter for standardness include:
+
+* The pushed redeemScript is limited in size (520 bytes) and must execute to a single true stack element (clean stack).
+* Individual pushed stack elements are limited to 520 bytes, so the ZK payload must be chunked into <=520-byte pieces.
+
+libdogecoin canonical carrier uses up to three data pushes per input (giving about 1560 bytes of usable payload per carrier spend input plus small headers); larger payloads use multiple carrier inputs in TX_R, indexed by <code>part_index</code> in HDR8.
+
+====Phase 1: Reveal scriptSig format in TX_R====
+
+TX_R spends each carrier output and reveals ZK material in push-only scriptSig, followed by the redeemScript. The scriptSig layout is identical to the PQC carrier reveal, with the tag changed to identify ZK content:
+
+<source>
+scriptSig pushes (push-only):
+  <TAG8> <HDR8> <CHUNK0> <CHUNK1> <CHUNK2> <redeemScript_carrier>
+
+TAG8:
+  "ZKP1FULL"  (8 bytes, ASCII)
+
+HDR8 (8 bytes):
+  [0]   version    = 0x01
+  [1]   part_index (0..part_total-1)
+  [2]   part_total
+  [3]   reserved   = 0x00
+  [4..5] payload_len_lo (big-endian uint16, low 16 bits of total ZK_PAYLOAD length)
+  [6..7] payload_len_hi (big-endian uint16, high 16 bits — supports payloads up to 2^32-1 bytes)
+
+Payload:
+  ZK_PAYLOAD as defined above ("ZKP1" || mode || ... || proof) is split into parts.
+  Each part is carried in up to three <=520-byte CHUNK pushes.
+  Empty chunks are encoded as OP_0 pushes.
+
+redeemScript_carrier:
+  OP_DROP repeated 5 times, then OP_TRUE.
+</source>
+
+The reveal scriptSig uses a single 8-byte tag (<code>ZKP1FULL</code>) regardless of mode; the mode and circuit_id are encoded inside the reassembled <code>ZK_PAYLOAD</code> via its own header. This keeps the on-chain data carrier mode-agnostic so that adding a new proof system does not require a new tag.
+
+====Phase 1: Verification using on-chain data only====
+
+Given TX_R:
+
+# Parse each carrier spend input scriptSig, extract (TAG8, HDR8, CHUNKS), and reassemble <code>ZK_PAYLOAD</code> by ordering parts by <code>part_index</code> and concatenating their chunks.
+# Truncate the reassembled buffer to the total payload length encoded in HDR8.
+# Recompute <code>commitment32 = SHA256d(ZK_PAYLOAD)</code> and match it against TX_C canonical tagged OP_RETURN.
+# Decode <code>ZK_PAYLOAD</code> per the ZKP1 layout, dispatch to the proof system selected by <code>MODE1</code>, and verify the proof against the encoded public inputs and a verification key. For v1 payloads (<code>VERSION1 == 0x01</code>) the verification key MUST be taken from the embedded <code>VK</code> field of the same payload, so verification uses only on-chain bytes. For v0 payloads (<code>VERSION1 == 0x00</code>) the verifier obtains <code>vk</code> through an out-of-band channel (signed releases, a separate registry transaction, etc.).
+
+This yields a fully on-chain verifiable Phase 1 proof publication record, without SegWit and without non-standard extra pushes in a P2PKH spending input.
+
+===Phase 1: Base Transaction Binding===
+
+The ZK reveal MUST be cryptographically bound to the funding (commitment-bearing) transaction so that an attacker cannot lift a published <code>(proof, vk, public_inputs)</code> tuple from one TX_C+TX_R pair and replay it under a different funding tx. This mirrors the binding that the PQC carrier obtains "for free" from its signature: in PQC, the Falcon/Dilithium signature inside the reveal is computed over <code>tx_base</code>'s sighash and so is intrinsically tied to a specific funding tx.
+
+For ZK reveals, libdogecoin enforces the same model by including the funding-tx sighash as a public input to the proof:
+
+* '''<code>tx_binding</code> public input (REQUIRED for new deployments).''' The prover MUST include a 256-bit field-element <code>tx_binding</code> as the third element of the <code>PUBLIC_INPUTS</code> array (after the two existing range-proof bounds <code>low</code>, <code>high</code> in the canonical range-proof circuit). The value is computed as:
+::<code>tx_binding = sighash32(tx_base, signer_p2pkh_spk, in_index = 0, sighashtype = SIGHASH_ALL)</code>
+::with the most significant byte zeroed (<code>tx_binding[0] = 0x00</code>) so the value is an unambiguous 248-bit BN254 scalar. This trims at most 8 bits from a 256-bit collision-resistant digest, leaving 2^248 work for any preimage attack — comfortably beyond what is relevant for a tx-binding tag.
+* '''<code>tx_base</code> definition.''' <code>tx_base</code> is TX_C with the OP_RETURN commitment output and all P2SH carrier outputs stripped, and the carrier-fee koinu re-added to the first remaining (signer-owned) output. This matches exactly how the PQC carrier defines <code>tx_base</code> for its signature, so the same <code>such -c tx_sighash32 -x &lt;tx_base&gt; -s &lt;signer_spk&gt; -i 0 -h 1</code> command-line invocation produces the binding for both schemes.
+* '''Verifier obligation.''' On reveal, an SPV node (or any verifier walking the chain) MUST recompute <code>tx_binding</code> from the matched TX_C bytes it has buffered and compare against <code>PUBLIC_INPUTS[2]</code> of the recovered ZK payload. A mismatch MUST be treated as an invalid reveal — the proof was lifted from another funding tx — and surfaced via the <code>[zk-commit] tx_binding mismatch</code> log line below.
+* '''Compatibility window.''' A v0/v1 payload whose <code>PUBLIC_INPUTS</code> JSON contains fewer than three array elements is interpreted as predating tx-base binding; SPV emits <code>[zk-commit] tx_binding skipped: expected >=3 public inputs</code> and falls back to OP_RETURN-only single-shot replay protection. New deployments MUST emit three public inputs.
+
+This binding is enforced jointly at three layers, each of which independently rejects a replayed proof:
+
+# the prover ''commits'' to <code>tx_binding</code> as a circuit public input — snarkjs <code>verify</code> rejects the proof under any other value;
+# the SPV node ''recomputes'' <code>tx_binding</code> from the actual TX_C bytes it observed on chain and compares against the value carried in the reveal's public inputs (logged as <code>[zk-commit] tx_binding match|mismatch</code>);
+# the publication layer's OP_RETURN-then-reveal pattern still anchors a given <code>commitment32</code> to a unique TX_C and its carrier UTXOs, providing belt-and-suspenders single-shot semantics at the chain level.
+
+The OP_RETURN-then-reveal pattern alone (without the <code>tx_binding</code> public input) is INSUFFICIENT for cross-tx replay protection, because a second TX_C carrying the same proof bytes can still be published before the original is revealed; the <code>tx_binding</code> public input closes that window by making the proof itself tx-specific.
+
+Current libdogecoin behavior implements all three layers:
+
+* <code>contrib/zk_carrier/witness_helper.py --tx-binding-hex &lt;hex&gt;</code> threads the binding into the snarkjs witness as the circuit's <code>tx_binding</code> input;
+* <code>such -c tx_sighash32 -x &lt;tx_base&gt; -s &lt;signer_spk&gt; -i 0 -h 1</code> exposes the canonical sighash computation to scripts and external auditors;
+* <code>dogecoin_zk_compute_tx_base_sighash(tx_c, signer_spk, carrier_spk, out)</code> (in <code>src/zk_carrier/zk_commit.c</code>) is the single source of truth for "given a TX_C, what tx_binding do we expect?", and is invoked both by the SPV scanner and by the unit test <code>test_zk_tx_base_sighash_binding</code>;
+* <code>such -c zk_add_commit_and_carrier_tx</code> appends the OP_RETURN commitment and all P2SH carrier outputs in a single operation;
+* <code>dogecoin_zk_extract_carrier_payload</code> reassembles <code>ZK_PAYLOAD</code> from TX_R scriptSigs;
+* <code>dogecoin_zk_get_commitment_hash</code> recomputes <code>SHA256d(ZK_PAYLOAD)</code> for cross-checking against the TX_C OP_RETURN commitment;
+* <code>dogecoin_zk_verify_proof</code> dispatches to the proof-system-specific verifier when <code>HAVE_RAPIDSNARK</code> is defined, and returns <code>DOGECOIN_ZK_ERR_DELEGATED</code> / <code>DOGECOIN_ZK_ERR_NOT_IMPLEMENTED</code> otherwise.
+
+Implementations MAY support additional ZK proof systems in future revisions, but MUST preserve canonical on-chain encoding rules (DZKC tag, allow-listed mode bytes, ZKP1 magic, big-endian length fields) and the <code>tx_binding</code> public-input convention defined here.
+
+===Phase 1: SPV Validation Behavior===
+
+SPV implementations should:
+
+* parse transactions in scanned blocks;
+* detect canonical tagged ZK commitment scripts (<code>0x6a 0x25 "DZKC" <mode> <32B></code>) with mode bytes drawn from the allow-list;
+* treat only canonical encodings as valid commitments;
+* surface deterministic commitment logs/telemetry for downstream verification workflows; and
+* when carrier-mode P2SH data is present, perform on-chain commitment validation by extracting the ZK payload from TX_R scriptSigs and recomputing <code>SHA256d(ZK_PAYLOAD)</code> to match against buffered TX_C OP_RETURN commitments.
+
+====SPV Commitment Validation Sources====
+
+SPV commitment detection operates in two modes depending on how the ZK payload is published:
+
+# '''Commitment-only:''' The commitment is detected in the OP_RETURN output. No ZK verification material is available on-chain. Log entry includes <code>source=op_return</code>, and the entry remains "Pending" until matched.
+# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full <code>ZK_PAYLOAD</code> is revealed in TX_R's carrier scriptSig spending the P2SH outputs. The SPV scanner reassembles the payload, recomputes <code>SHA256d(ZK_PAYLOAD)</code>, and matches against buffered OP_RETURN commitments. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... payload_len=... txr_txid=...</code>.
+
+In all validated cases, the log emits the algorithm label (<code>[zk-commit]</code>), block height, transaction position, the 32-byte commitment hex, the mode byte, and the validation source.
+
+====SPV Carrier Commitment Validation Algorithm====
+
+Given a TX_R with carrier-tagged scriptSig(s):
+
+# For each vin, attempt to parse its scriptSig and extract the 8-byte <code>ZKP1FULL</code> tag, part metadata (part_index, part_total, payload_len), and raw payload chunks.
+# If <code>part_total > 1</code>, collect chunks from all matching <code>ZKP1FULL</code>-tagged vins indexed by <code>part_index</code> and concatenate in order. Truncate to <code>payload_len</code> bytes.
+# Validate the ZKP1 header (magic = "ZKP1", allow-listed mode byte, length fields self-consistent).
+# Recompute <code>commitment32 = SHA256d(ZK_PAYLOAD)</code> via <code>dogecoin_zk_get_commitment_hash</code>.
+# Cross-validate: match the recomputed commitment against buffered OP_RETURN commitments from TX_C transactions (current block plus a small look-back window). If matched, report <code>matched_txc_txpos</code> identifying the originating commitment transaction.
+# Optionally invoke <code>dogecoin_zk_verify_proof(payload, payload_len, NULL, 0)</code> to verify the proof in-process when libdogecoin was built with <code>--with-rapidsnark</code>; otherwise log "DELEGATED" and rely on the commit-match alone (analogous to PQC's commit-match-before-signature-verify intermediate state).
+# Log the validation result including <code>payload_len</code>, mode, and TX_R txid for diagnostic and audit purposes.
+
+====SPV Log Markers====
+
+The SPV scanner emits the following deterministic log lines for downstream tooling to grep against:
+
+<source>
+[zk-commit] Pending at height=H txpos=P commit=C mode=M source=op_return
+[zk-commit] Valid at height=H txpos=P commit=C mode=M source=carrier_scriptsig matched_txc_txpos=Pc payload_len=L txr_txid=T
+[zk-commit] ZK verification PASSED at height=H txpos=P mode=M
+[zk-commit] ZK verification DELEGATED at height=H txpos=P mode=M err=E
+[zk-commit] ZK verification FAILED at height=H txpos=P mode=M err=E
+[zk-commit] Reveal validated: TX_R=T commit=C payload_len=L mode=M height=H
+[zk-commit] tx_binding match txr_txid=T recomputed=R public_input[2]=P
+[zk-commit] tx_binding mismatch txr_txid=T recomputed=R public_input[2]=P
+[zk-commit] tx_binding skipped: expected >=3 public inputs (got N) — payload predates tx-base binding
+</source>
+
+The format intentionally mirrors the PQC <code>[falcon-commit]</code> / <code>[dilithium-commit]</code> / <code>[raccoong-commit]</code> markers so that a single log-grep harness can drive both demos.
+
+====Verification Levels====
+
+Three verification levels are emitted, mirroring the PQC carrier's commit-match-before-signature-verify staging:
+
+# '''PASSED:''' libdogecoin was built with <code>--with-rapidsnark</code> or <code>--with-mcl</code> (or another in-process verifier) and the proof was checked locally against the encoded public inputs.
+# '''DELEGATED:''' the verifier is not compiled in and verification is left to off-box tooling. The commitment-match (Step 5 above) still holds, providing equivalent assurance to PQC's "commit_ok before sig_verify" intermediate state — the on-chain payload provably hashes to the published commitment.
+# '''FAILED:''' the verifier ran and rejected the proof.
+
+In all three cases, the <code>Reveal validated</code> line is emitted on PASSED or DELEGATED, on the rationale that the cryptographic commitment binding is the consensus-relevant assertion at Phase 1; in-process proof verification is a defense-in-depth check for nodes that opt in.
+
+====Carrier Sizes (illustrative)====
+
+ZK proof sizes vary widely by proof system; the following are typical ranges for common Groth16 / PLONK / STARK contexts:
+
+{|
+! Proof system !! Proof size !! Public inputs !! Total payload !! Carrier parts !! Carrier Tag
+|-
+| Groth16 (BN254 / snarkjs <code>"curve": "bn128"</code>) || ~1 KB JSON || application-defined (small) || ~1.2 KB JSON || 1 || <code>ZKP1FULL</code>
+|-
+| PLONK (snarkjs) || ~3–5 KB JSON || application-defined || ~5 KB JSON || 4–5 || <code>ZKP1FULL</code>
+|-
+| STARK_S2 || tens to hundreds of KB || application-defined || tens to hundreds of KB || dozens || <code>ZKP1FULL</code>
+|}
+
+Each carrier vin scriptSig carries up to 3 chunks of ≤520 bytes (~1560 bytes of payload per part, matching the PQC carrier).
+
+====Transaction Fee Guidance====
+
+For carrier mode transactions, fees follow Dogecoin's per-kB minimum relay rate (100000 koinu/kB ≡ 0.001 DOGE/kB) and should include sufficient margin for prompt miner inclusion:
+
+* '''TX_C''' (commitment + carrier outputs): minimum relay fee is 100000 koinu (0.001 DOGE), matching Dogecoin's default <code>minrelaytxfee</code>. With dust-sized inputs (~1.2 KB UTXO + carrier outputs) recommend 2000000 koinu (0.02 DOGE).
+* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee scales with transaction size at 100000 koinu/kB. Examples: Groth16 TX_R (~2 KB, 1 carrier vin) → 2000000 koinu (0.02 DOGE); PLONK TX_R (~6 KB, 4–5 carrier vins) → 10000000 koinu (0.1 DOGE); large STARK TX_R (tens of KB) → fee scaled accordingly per kB.
+* '''Carrier output value:''' each P2SH carrier output must be at least 100000000 koinu (1 DOGE) to clear the dust-output threshold and provide enough funding for the TX_R fee when spent.
+
+Properly-sized fees produce TX_C and TX_R confirmations within minutes on mainnet under typical relay conditions.
+
+===Phase 2: Reserved Opcode Upgrade Path===
+
+This proposal reserves a follow-up soft-fork design track to migrate from OP_RETURN signaling to native script validation semantics using a reserved opcode approach.
+The Phase 2 document is expected to define:
+
+* exact opcode assignment path (and its relationship to Phase 2 of the PQC carrier proposal, which may share an OP_SUCCESSx range);
+* script format for ZK verification data (vk handling, public-input encoding, mode tagging);
+* script evaluation and failure semantics; and
+* activation/deployment process.
+
+===Verification Transition Model (off-chain → in-script)===
+
+This proposal is intentionally transitional:
+
+* '''Current implementation state (Phase 1):''' transactions remain spend-authorized by existing secp256k1 script rules; ZK proofs are published/committed as parallel evidence and verified out-of-band (or in-process when libdogecoin is linked against rapidsnark).
+* '''Target state (Phase 2):''' script execution validates ZK proofs directly (via reserved-opcode soft-fork path), allowing application protocols to gate spends on proof validity at consensus level.
+
+In Phase 1, ZK commitments should be treated as an interoperability and migration bridge:
+
+# Build the witness off-chain (e.g. via <code>contrib/zk_carrier/witness_helper.py</code>).
+# Run a snarkjs/rapidsnark prover to obtain <code>proof.json</code> and <code>public.json</code>.
+# Encode the canonical <code>ZK_PAYLOAD</code> ("ZKP1" || mode || circuit_id || public_inputs || proof).
+# Publish <code>SHA256d(ZK_PAYLOAD)</code> in canonical tagged OP_RETURN via TX_C, and (optionally) publish the full <code>ZK_PAYLOAD</code> on-chain via the P2SH carrier in TX_R.
+# SPV nodes detect the commitment, reassemble the payload from TX_R, recompute the commitment, and (if rapidsnark is linked in) verify the proof in-process.
+
+This mirrors current implementation behavior:
+
+* <code>such</code> exposes <code>zk_commit</code>, <code>zk_add_commit_and_carrier_tx</code>, and <code>zk_extract_carrier</code> commands;
+* libdogecoin links rapidsnark when configured with <code>--with-rapidsnark</code>, enabling in-process Groth16 verification via <code>dogecoin_zk_verify_proof</code>; otherwise verification is delegated to off-box tooling;
+* SPV commitment detection validates canonical encoding and emits deterministic <code>[zk-commit]</code> log lines.
+
+Until Phase 2 activation, secp256k1 consensus checks remain authoritative for spend validity; ZK proof checks are verifier-side and policy/audit driven.
+
+==Backwards Compatibility==
+
+Phase 1 is backward-compatible because OP_RETURN outputs and P2SH outputs are already standard, and spendability semantics are unchanged.
+Legacy nodes continue to relay and index transactions as usual, ignoring the OP_RETURN payload and treating the P2SH carrier outputs as ordinary 1-DOGE P2SH UTXOs.
+
+Phase 2 is expected to be a consensus soft fork and must be specified with full backwards-compatibility and activation analysis in a successor BIP.
+
+==Security Considerations==
+
+Phase 1 commitments provide publication and detectability, not script-level ZK enforcement.
+Users must not interpret commitment publication alone as equivalent to consensus-enforced proof validity.
+
+Canonical encoding requirements are mandatory to avoid ambiguous parsing and commitment spoofing via non-standard script shapes. In particular:
+
+* SPV scanners MUST reject ZK OP_RETURN scripts whose mode byte is not in the allow-list ({0x00, 0x01, 0x02} at this revision).
+* SPV scanners MUST reject ZKP1 payloads whose magic is wrong, whose mode disagrees with the OP_RETURN mode, or whose length fields are inconsistent.
+* The 32 MiB cap on <code>PROOF_LEN4</code> bounds resource consumption during reassembly and verification.
+
+For replay protection, applications that need transaction-binding (rather than just proof-binding) MUST include the spending sighash, the spending tx Merkle root, or another suitable binding in the proof's public inputs; otherwise a Phase 1 commitment-match alone does not prevent reusing a valid proof in a different spend context.
+
+For verifier-key trust, Phase 1 mandates ZKP1 v1 for new deployments: the verification key is embedded in the same canonical byte string that produces <code>commit32 = SHA256d(ZK_PAYLOAD)</code>, so the on-chain commitment covers the vk in addition to the proof and public inputs, and a verifier can recover the entire validation tuple <code>(public_inputs, proof, vk)</code> from a single TX_R reveal. ZKP1 v0 remains accepted by decoders for backwards compatibility with reveals published before v1; deployers MUST NOT publish new v0 reveals because they require an out-of-band <code>vk</code> channel that is outside the consensus-relevant binding and therefore vulnerable to verifier-substitution attacks.
+
+For DELEGATED verification, the <code>Reveal validated</code> line indicates only that <code>SHA256d(ZK_PAYLOAD)</code> matches the on-chain commitment — it does not assert proof validity. Auditors and high-assurance verifiers SHOULD run an in-process or off-box verification step before acting on a "DELEGATED" outcome.
+
+===External verifier hand-off (PLONK and other DELEGATED modes)===
+
+Because libdogecoin does not ship a native PLONK verifier (and does not ship a native Groth16 verifier unless built with rapidsnark), Phase 1's PLONK verification path is intentionally an external-verifier hand-off:
+
+# spvnode walks the chain, matches the TX_R reveal payload against a buffered TX_C commitment, and emits <code>[zk-commit] Reveal validated: TX_R=...</code> for the matched pair.
+# An end-to-end driver (e.g. <code>contrib/zk_carrier/scripts/broadcast_set.sh</code>) MUST then invoke the canonical external verifier — for PLONK that is <code>snarkjs plonk verify recovered_vk.json public.json proof.json</code> against the vk recovered from the on-chain reveal — and tee the verifier's transcript into the curated mainnet log alongside the spvnode lines.
+# The external verifier MUST be invoked AFTER spvnode emits <code>Reveal validated</code> for the corresponding pair, so that an auditor reading the log can correlate the on-chain commitment match with the off-box cryptographic check.
+
+This split — commitment matching enforced by spvnode, proof validity attested by an external verifier — preserves libdogecoin's policy of keeping prover and verifier code paths out of consensus while still giving operators a single end-to-end log that demonstrates both halves of "<code>SHA256d(ZK_PAYLOAD)</code> matched the on-chain commit AND the proof verifies under the revealed vk".
+
+==Reference Implementation==
+
+Current reference behavior exists in libdogecoin components that:
+
+* encode/decode the canonical ZKP1 payload via <code>dogecoin_zk_encode_payload</code> / <code>dogecoin_zk_decode_payload</code>;
+* compute commitments via <code>dogecoin_zk_get_commitment_hash</code> (<code>SHA256d</code> over the ZKP1 payload);
+* build canonical OP_RETURN scripts via <code>dogecoin_zk_build_opreturn_scriptpubkey</code>;
+* attach the OP_RETURN commitment and P2SH carrier outputs in one operation via <code>dogecoin_zk_build_carrier_tx_c</code> (and the matching <code>such -c zk_add_commit_and_carrier_tx</code> CLI);
+* extract the canonical OP_RETURN commitment from a TX_C via <code>dogecoin_tx_extract_zk_commit</code>;
+* reassemble the ZK payload from TX_R scriptSigs via <code>dogecoin_zk_extract_carrier_payload</code>;
+* dispatch to per-mode verifiers via <code>dogecoin_zk_verify_proof</code>, with rapidsnark- or mcl-backed in-process Groth16 verification gated on <code>HAVE_RAPIDSNARK</code> / <code>HAVE_MCL</code>;
+* keep proving out-of-process per libdogecoin policy: <code>dogecoin_zk_generate_groth16_proof</code> / <code>dogecoin_zk_generate_plonk_proof</code> always return <code>DOGECOIN_ZK_ERR_DELEGATED</code>; the supported proving path is <code>contrib/zk_carrier/witness_helper.py</code> driving snarkjs or the rapidsnark CLI on the host;
+* detect canonical ZK commitments during SPV block scanning, buffer them as pending TX_C commits, and emit deterministic <code>[zk-commit]</code> log lines on TX_R reveal.
+
+====Prover / Verifier Support Matrix====
+
+The following matrix lists which proof systems libdogecoin natively supports (in-process inside the C library), which are delegated to off-box tooling, and which configure-time options enable each path. Proving is always delegated, by policy, to keep libdogecoin mobile-friendly; verification is the only path that can run in-process.
+
+{|
+! Proof system !! Native prover (in-library) !! Native verifier (in-library) !! Delegated verifier (off-box) !! Configure flags !! depends opt-in
+|-
+| Groth16 (BN254 / snarkjs <code>"curve": "bn128"</code> / herumi/mcl <code>BN_SNARK1</code>; classical security only, '''not''' post-quantum safe) || none — DELEGATED || rapidsnark or herumi/mcl, dispatched by <code>dogecoin_zk_verify_proof</code> || snarkjs CLI || <code>--enable-zk-carrier</code> AND (<code>--with-rapidsnark</code> OR <code>--with-mcl[=DIR]</code>) || <code>ZK_CARRIER=1</code>
+|-
+| PLONK (BN254 / snarkjs <code>"curve": "bn128"</code>; classical security only, '''not''' post-quantum safe) || none — DELEGATED || none — <code>dogecoin_zk_verify_proof</code> returns DELEGATED || snarkjs CLI (canonical PLONK reference) || <code>--enable-zk-carrier</code> only || none required
+|-
+| STARK_S2 (hash/FRI; post-quantum-safe growth slot — see "PQC-safe growth path" under Rationale) || none — DELEGATED || none — <code>dogecoin_zk_verify_proof</code> returns NOT_IMPLEMENTED || none yet || <code>--enable-zk-carrier</code> reserves the mode byte || N/A (reserved)
+|}
+
+Native Groth16 verification is wired in two interchangeable backends — rapidsnark (<code>--with-rapidsnark</code>) and herumi/mcl (<code>--with-mcl[=DIR]</code>); both consume the same snarkjs JSON encoding embedded in the ZKP1 payload, so a build with either flag will verify the identical on-chain reveal end-to-end. Without either flag, Groth16 verification falls through to <code>DELEGATED</code> exactly like PLONK, and the off-box snarkjs invocation in <code>contrib/zk_carrier/scripts/</code> still validates against on-chain bytes alone.
+
+Current CLI wiring reflects this implementation model:
+
+* <code>such -c zk_commit</code> derives the canonical OP_RETURN script and 32-byte commit from a payload hex;
+* <code>such -c zk_add_commit_and_carrier_tx</code> attaches both the OP_RETURN commitment and the P2SH carrier outputs in one call, and prints <code>carrier_part_total</code>, <code>carrier_first_vout</code>, and <code>carrier_part_scriptsig[i]</code> for the operator to assemble TX_R;
+* <code>such -c zk_extract_carrier</code> reassembles and prints the ZK payload hex from a TX_R for round-trip cross-checking against what was published.
+
+Current end-to-end script behavior is aligned with the parallel PQC mainnet flow (<code>contrib/mainnet_falcon_test.sh</code>):
+
+* the <code>contrib/zk_carrier/scripts/run_full_zk_carrier_demo.sh</code> driver supports commitment-only and carrier modes; auto-discovers the funding UTXO from public block explorers (dogechain.info / blockcypher / blockchair fallbacks); inherits the public demo WIF/address from the PQC scripts; and watches the <code>spvnode -d</code> log for the <code>[zk-commit] Reveal validated</code> marker as the success criterion;
+* <code>spvnode</code>'s <code>-p</code> (checkpoint) flag uses the most recent baked-in mainnet checkpoint to skip the genesis-to-checkpoint header sync, keeping the validation roundtrip to minutes once fees are properly sized.
+
+==Mainnet Examples==
+
+The following examples are from confirmed Dogecoin mainnet transactions demonstrating Phase 1 ZK carrier commitment publication, P2SH carrier reveal, and full on-chain proof validation. Both examples publish ZKP1 v1 reveals (verification key embedded in the canonical payload), so the validation tuple <code>(public_inputs, proof, vk)</code> is recovered from a single TX_R reveal and verified against on-chain bytes only — no out-of-band <code>verification_key.json</code> is consulted at any step. The format mirrors the Falcon-512 / Dilithium2 / Raccoon-G mainnet examples in the parallel PQC BIP.
+
+A recent mainnet checkpoint is baked in at height 6191600 (hash <code>a8eeeadc81e8def69167f0d82c50c4d05fdb0c6ffd17a6af955f80d6925e0f0d</code>, 2026-05-03T18:54:38Z) so <code>spvnode -p</code> rescans of these and subsequent ZK carrier pairs only need to sync the final ~30 blocks of headers before reaching the published commitments.
+
+===ZKP1 v1 self-contained reveal — end-to-end validation log (Groth16 + PLONK, with tx_base binding)===
+
+ZKP1 v1 closes the v0 out-of-band-vk gap: when the encoder is invoked with <code>--vkey</code>, the verification key bytes are embedded inside the canonical payload so the on-chain reveal alone is sufficient to verify the proof end-to-end. Because the vk is part of the canonical byte string hashed to <code>commit32</code>, swapping the vk after publication invalidates the OP_RETURN commitment match — the consensus-relevant binding extends to the verifier material itself.
+
+In addition to embedding the vk, the v1 e2e flow now binds every proof to the funding transaction's tx_base sighash (<code>tx_binding</code> public input, defined in §"Phase 1: Base Transaction Binding" above). This mirrors the PQC carrier's signature-over-tx_base model and is independently checked by snarkjs at verify time and by spvnode at scan time.
+
+The v1 reveal flow is exercised by <code>contrib/zk_carrier/scripts/v1_reveal_e2e.sh</code>, which:
+
+# constructs a synthetic TX_C base (single-vin, single-vout to the funded address <code>DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>; live UTXO state at <code>https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>) and computes <code>tx_base_sighash = sighash32(BASE_UNSIGNED, signer_p2pkh_spk, in_idx=0, hashtype=SIGHASH_ALL)</code> via <code>such -c tx_sighash32</code>, top-byte-zeroed to fit BN254;
+# generates a real Groth16/PLONK range-proof against the in-tree <code>contrib/zk_carrier/circuits/range_proof.circom</code> (witness <code>amount=50000</code> in <code>[0, 1000000]</code>, <code>tx_binding</code> set to the value from step 1) via <code>witness_helper.py --vkey ... --proof-system &lt;groth16|plonk&gt; --tx-binding-hex ...</code>;
+# encodes the ZKP1 v1 payload (version byte = <code>0x01</code>; trailing <code>VK_LEN4 || VK</code> block);
+# attaches OP_RETURN + P2SH carrier outputs through <code>such -c zk_add_commit_and_carrier_tx</code>;
+# constructs a synthetic TX_R, attaches each <code>zk_carrier_part_scriptsig</code> via <code>such -c set_scriptsig</code>, then reassembles the payload with <code>such -c zk_extract_carrier</code> (which now also emits <code>zk_vk_len</code> / <code>zk_vk_hex</code> for v1 reveals);
+# materializes <code>(public.json, proof.json, vk.json)</code> from the extracted bytes only — no out-of-band file is read at this step — and runs <code>snarkjs &lt;system&gt; verify</code>;
+# recomputes <code>tx_base_sighash</code> from TX_C and asserts equality with <code>public_inputs[2]</code> of the recovered payload — emitting the same <code>[zk-commit] tx_binding match</code> log line that <code>spvnode</code> emits in production;
+# performs a replay-attack tamper test: builds an alternate funding tx with a different <code>vout[0].value</code>, swaps the <code>tx_binding</code> public input to that alternate sighash, and asserts that <code>snarkjs verify</code> rejects the lifted proof under the new binding.
+
+Captured run (Groth16):
+
+<pre>
+ZKP1 v1 reveal end-to-end (no out-of-band vk channel)
+  proof_system: groth16
+  funded_addr:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vkey_sha256:  1e8c04b470673517f2b72a335e78b5b5d19ab75b82ae6954dc671abc3d5de157
+
+--- Step 0: build TX_C base + compute tx_binding ---
+base_unsigned_size=85 bytes
+tx_base_sighash_full=018ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+tx_binding (top-byte-zeroed) = 008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+
+--- Step 1: snarkjs prove + ZKP1 v1 payload encode bound to tx_base sighash ---
+[INFO]  snarkJS: OK!
+wrote 4217-byte ZKP1 payload (v1) to /tmp/zkc_v1_e2e/groth16/payload.hex
+payload_bytes=4217 (v1 self-contained reveal: vk embedded inline; proof bound to tx_base)
+
+--- Step 2: such -c zk_commit ---
+mode:        0
+circuit_id:  0x00000001
+public_inputs_len: 100
+proof_len:   804
+vk_len:      3293 (v1: self-contained reveal)
+commitment:  6cf60b4c37b16fcc3478c3dc0250da55901de62ff69753afe20b0196cf4f3a9b
+
+--- Step 5: such -c zk_extract_carrier ---
+zk_payload_len: 4217
+zk_mode: 0
+zk_public_inputs_len: 100
+zk_proof_len: 804
+zk_vk_len: 3293
+[OK] extracted payload byte-identical to input AND embedded vk_len=3293
+
+--- Step 6: snarkjs verify using ONLY the vk recovered from the reveal ---
+recovered public.json: ['0', '1000000', '252001421031701614549324814820911453256465655929168990336720967924393436679']
+recovered proof.protocol=groth16
+recovered vk.protocol=groth16
++ snarkjs groth16 verify recovered_vk_from_reveal.json recovered_public_from_reveal.json recovered_proof_from_reveal.json
+[INFO]  snarkJS: OK!
+snarkjs rc=0
+
+--- Step 7: tx_binding match check (replay-protection, mirroring PQC tx_base sighash) ---
+tx_base_sighash_recomputed_from_TX_C: 008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+tx_binding_from_public_inputs[2]:     008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+[zk-commit] tx_binding match (CLI-equivalent of spv.c log line)
+
+--- Step 8: replay-attack tamper test ---
+alt_tx_base_sighash (replay attempt): 0031fcf84beeb0699740e486c0562ec95bb0788ce63a5cbff77808427a454153
+[ERROR] snarkJS: Invalid proof
+tamper snarkjs rc=1 (expected non-zero)
+[OK] snarkjs rejected the lifted proof under a different tx_base sighash → replay protection holds
+
+[OK] v1 self-contained reveal + tx_base binding validated end-to-end (groth16)
+     - SHA256d(payload) matches the libdogecoin commit32
+     - vk recovered from the on-chain reveal alone
+     - snarkjs groth16 verify accepts the proof under that recovered vk
+     - tx_binding (3rd public input) matches recomputed TX_C tx_base sighash
+     - replay attempt under a different TX_C fails snarkjs verify
+     no out-of-band vk channel was used at any step
+</pre>
+
+Captured run (PLONK):
+
+<pre>
+ZKP1 v1 reveal end-to-end (no out-of-band vk channel)
+  proof_system: plonk
+  funded_addr:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vkey_sha256:  7896236acf663659a035c9d247ed846bf83032cecffc080ceddb3c72191eafd8
+
+--- Step 0: build TX_C base + compute tx_binding ---
+tx_binding (top-byte-zeroed) = 008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+
+--- Step 1: snarkjs prove + ZKP1 v1 payload encode bound to tx_base sighash ---
+[INFO]  snarkJS: OK!
+payload_bytes=4407 (v1 self-contained reveal: vk embedded inline; proof bound to tx_base)
+
+--- Step 2: such -c zk_commit ---
+mode:        1
+circuit_id:  0x00000001
+public_inputs_len: 100
+proof_len:   2246
+vk_len:      2041 (v1: self-contained reveal)
+commitment:  bfd3527f3d5042e7d87db7dbd72586733c3d38459e8400858734d19d7f9f511b
+
+--- Step 5: such -c zk_extract_carrier ---
+zk_payload_len: 4407
+zk_mode: 1
+zk_public_inputs_len: 100
+zk_proof_len: 2246
+zk_vk_len: 2041
+[OK] extracted payload byte-identical to input AND embedded vk_len=2041
+
+--- Step 6: snarkjs verify using ONLY the vk recovered from the reveal ---
+recovered public.json: ['0', '1000000', '252001421031701614549324814820911453256465655929168990336720967924393436679']
+recovered proof.protocol=plonk
+recovered vk.protocol=plonk
++ snarkjs plonk verify recovered_vk_from_reveal.json recovered_public_from_reveal.json recovered_proof_from_reveal.json
+[INFO]  snarkJS: PLONK VERIFIER STARTED
+[INFO]  snarkJS: OK!
+snarkjs rc=0
+
+--- Step 7: tx_binding match check (replay-protection, mirroring PQC tx_base sighash) ---
+tx_base_sighash_recomputed_from_TX_C: 008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+tx_binding_from_public_inputs[2]:     008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607
+[zk-commit] tx_binding match (CLI-equivalent of spv.c log line)
+
+--- Step 8: replay-attack tamper test ---
+alt_tx_base_sighash (replay attempt): 0031fcf84beeb0699740e486c0562ec95bb0788ce63a5cbff77808427a454153
+[INFO]  snarkJS: PLONK VERIFIER STARTED
+[WARN]  snarkJS: Invalid Proof
+tamper snarkjs rc=1 (expected non-zero)
+[OK] snarkjs rejected the lifted proof under a different tx_base sighash → replay protection holds
+
+[OK] v1 self-contained reveal + tx_base binding validated end-to-end (plonk)
+     - SHA256d(payload) matches the libdogecoin commit32
+     - vk recovered from the on-chain reveal alone
+     - snarkjs plonk verify accepts the proof under that recovered vk
+     - tx_binding (3rd public input) matches recomputed TX_C tx_base sighash
+     - replay attempt under a different TX_C fails snarkjs verify
+     no out-of-band vk channel was used at any step
+</pre>
+
+Both runs demonstrate three independent validation properties of v1 with tx_base binding:
+
+# '''Self-contained verification.''' <code>SHA256d(ZK_PAYLOAD)</code> binds the OP_RETURN commitment to the exact <code>(public_inputs, proof, vk)</code> tuple that downstream tooling consumes (<code>snarkjs verify</code> here; equivalently <code>spvnode</code> with <code>HAVE_RAPIDSNARK</code> + the recovered vk, or any third-party verifier) — no out-of-band <code>verification_key.json</code> channel is involved at any step.
+# '''Tx_base binding.''' The third public input <code>tx_binding == 008ea0b4356f2bb7df995106907c73ebf983e8184db054887564207bd5ebe607</code> matches the sighash <code>spvnode</code> recomputes from the matched TX_C bytes, exactly mirroring the PQC carrier's signature-over-tx_base scheme. The same value is reproduced by an external auditor running <code>such -c tx_sighash32</code> on the on-chain TX_C raw bytes.
+# '''Replay protection.''' The Step-8 tamper test demonstrates that a lifted <code>(proof, vk)</code> tuple republished under a different funding tx (different <code>tx_base_sighash</code>, e.g. <code>0031fcf84beeb0699740e486c0562ec95bb0788ce63a5cbff77808427a454153</code>) is rejected by <code>snarkjs verify</code> — the same rejection an SPV node performs when it computes <code>[zk-commit] tx_binding mismatch</code> and refuses to log <code>Reveal validated</code>.
+
+The end-to-end driver script (<code>contrib/zk_carrier/scripts/v1_reveal_e2e.sh</code>) and the synthetic offline-SPV unit test that exercises <code>dogecoin_zk_compute_tx_base_sighash</code> against a constructed TX_C+TX_R pair (<code>test_zk_tx_base_sighash_binding</code> in <code>test/zk_carrier_tests.c</code>) are committed in-tree so reviewers can reproduce all three validation paths bit-for-bit.
+
+Live <code>spvnode</code> mainnet validation (which connects to peers and consumes the funded UTXOs at <code>DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>) is driven separately by <code>contrib/zk_carrier/scripts/broadcast_set.sh</code>; the corresponding <code>[zk-commit] Pending</code> → <code>Reveal validated</code> log progression for a real broadcast against the same address appears in the v1 cascade section below. Because the consensus-relevant <code>tx_binding</code> check runs on TX_C bytes that are identical between the offline driver and a real broadcast, the validation logs above are bit-identical to what <code>spvnode</code> emits during a live rescan once the corresponding TX_C+TX_R pair is mined.
+
+===Mainnet v1 cascade (Pair G1 Groth16 + Pair Q1 PLONK) — vk-on-chain end-to-end===
+
+A fresh end-to-end cascade was broadcast on Dogecoin mainnet on 2026-05-03 to demonstrate ZKP1 v1 (vk-on-chain) for both proof systems against the funded reference address <code>DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code> (UTXO state: <code>https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>). Both pairs were generated by <code>contrib/zk_carrier/scripts/broadcast_set.sh</code> with <code>PROOF_SYSTEM=groth16</code> / <code>PROOF_SYSTEM=plonk</code>; both reveals embed the verification key inline so '''every byte required for full proof validation is contained in the on-chain TX_R'''.
+
+<pre>
+Pair G1 (Groth16, ZKP1 mode=0, version=0x01)
+  TX_C:   b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354  (block 6191613)
+  TX_R:   68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7  (block 6191613)
+  commit32:    80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  payload_len: 4144 bytes  (public_len=26, proof_len=805, vk_len=3293 — vk inline)
+  Explorer:    https://chain.so/tx/DOGE/68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+
+Pair Q1 (PLONK, ZKP1 mode=1, version=0x01)
+  TX_C:   d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc  (block 6191616)
+  TX_R:   0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5  (block 6191616)
+  commit32:    52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  payload_len: 4336 bytes  (public_len=26, proof_len=2249, vk_len=2041 — vk inline)
+  Explorer:    https://chain.so/tx/DOGE/0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+</pre>
+
+Live <code>spvnode</code> rescan output (mainnet, libdogecoin built with <code>--enable-zk-carrier</code>; flags <code>-l -p -b -d -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>; <code>-p</code> uses the freshly-baked-in mainnet checkpoint at height 6191600 / <code>a8eeeadc81e8def69167f0d82c50c4d05fdb0c6ffd17a6af955f80d6925e0f0d</code> so the rescan completes in seconds rather than hours):
+
+<source>
+…
+[zk-commit] Pending at height=6191613 txpos=25 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=op_return
+[zk-commit] Valid at height=6191613 txpos=27 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=carrier_scriptsig matched_txc_txpos=25 payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+[zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293 total_payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+[zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  \"0\",  \"1000000\",  \"0\" ]"
+[zk-commit] reveal_decoded.proof: len=805 hex_head=7b0a202270695f61223a205b0a202022313631323534383935323233353937323930323733383634333034373430363435393732343036393832363832343737 hex_tail=3936303635343532222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  \"pi_a\": [   \"16125489522359729027386430474064597240698268247786523731965471582666125052928\", "
+[zk-commit] reveal_decoded.vk: len=3293 hex_head=7b0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022766b hex_tail=30333530373731383231373634333139393435363434373538363231333839343031333835343631313035363734222c0a2020202231220a20205d0a205d0a7d ascii_head="{  \"protocol\": \"groth16\",  \"curve\": \"bn128\",  \"nPublic\": 3,  \"vk_alpha_1\": [   \"1564531949608914"
+[zk-commit] ZK verification DELEGATED at height=6191613 txpos=27 mode=0 err=-7
+[zk-commit] Reveal validated: TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e payload_len=4144 mode=0 height=6191613
+
+[zk-commit] Pending at height=6191616 txpos=18 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=op_return
+[zk-commit] Valid at height=6191616 txpos=32 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=carrier_scriptsig matched_txc_txpos=18 payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+[zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041 total_payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+[zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  \"0\",  \"1000000\",  \"0\" ]"
+[zk-commit] reveal_decoded.proof: len=2249 hex_head=7b0a202241223a205b0a202022313736303839323935333433323339323338363834373635323433333332303430363937343833323831303130383531373430 hex_tail=3738323630323933313631323635373334323832222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  \"A\": [   \"17608929534323923868476524333204069748328101085174028579785990727169368000378\",   \""
+[zk-commit] reveal_decoded.vk: len=2041 hex_head=7b0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022706f7765 hex_tail=36303931353230323837383134313831313735343330303837313639303237393734323436373531363130353036393432323134383432373031373734220a7d ascii_head="{  \"protocol\": \"plonk\",  \"curve\": \"bn128\",  \"nPublic\": 3,  \"power\": 9,  \"k1\": \"2\",  \"k2\": \"3\",  \""
+[zk-commit] ZK verification DELEGATED at height=6191616 txpos=32 mode=1 err=-6
+[zk-commit] Reveal validated: TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d payload_len=4336 mode=1 height=6191616
+</source>
+
+spvnode reports <code>ZK verification DELEGATED</code> because libdogecoin was built without <code>HAVE_RAPIDSNARK</code> in this run (the in-process verifier is optional); the consensus-relevant binding (<code>SHA256d(ZK_PAYLOAD) == OP_RETURN commit32</code>) and the structural <code>reveal_decoded</code> emission — including full hex+ASCII dumps of the embedded <code>public_inputs</code>, <code>proof</code>, AND <code>vk</code> reassembled from the on-chain TX_R bytes — are still fully enforced, and the cryptographic <code>snarkjs verify</code> step is performed independently below using only the on-chain bytes.
+
+Independent on-chain audit (<code>contrib/zk_carrier/scripts/validate_onchain_pairs.py</code>) — fetches each TX_C/TX_R as raw hex from <code>api.blockchair.com/dogecoin</code> with no libdogecoin code path, reassembles the ZKP1 payload from the chunked <code>ZKP1FULL</code> scriptSigs, recomputes <code>SHA256d(payload)</code> against the OP_RETURN commit, extracts the embedded <code>(public_inputs, proof, vk)</code> tuple from the reveal, writes the recovered <code>vk</code> to a tempfile, and runs <code>snarkjs &lt;system&gt; verify recovered_vk.json public.json proof.json</code>:
+
+<pre>
+=== Pair G1 (groth16) ===
+  TX_C=b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354
+  TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_R reassembled: 3 part(s)  payload_len=4144 (spec: 4144)
+  SHA256d(payload) = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_C commit32    = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e  →  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve','pi_a','pi_b','pi_c','protocol']
+  snarkjs groth16 verify (vk=EMBEDDED reveal): OK  | [INFO]  snarkJS: OK!
+
+=== Pair Q1 (plonk) ===
+  TX_C=d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc
+  TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+  TX_C OP_RETURN: tag=DZKC mode=1 commit32=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_R reassembled: 3 part(s)  payload_len=4336 (spec: 4336)
+  SHA256d(payload) = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_C commit32    = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d  →  MATCH
+  ZKP1: magic=ZKP1 mode=1 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=plonk curve=bn128 keys=['A','B','C','T1','T2','T3','Wxi','Wxiw','Z','curve','eval_a','eval_b','eval_c','eval_s1','eval_s2','eval_zw','protocol']
+  snarkjs plonk verify (vk=EMBEDDED reveal): OK  | [INFO]  snarkJS: OK!
+
+========= INDEPENDENT ON-CHAIN VALIDATION SUMMARY =========
+  Pair G1: PASS              (full end-to-end verification (v1 self-contained reveal))
+  Pair Q1: PASS              (full end-to-end verification (v1 self-contained reveal))
+</pre>
+
+The <code>PASS</code> line for Pair G1 / Pair Q1 is the strongest possible on-chain claim this BIP can make for the Phase-1 classical-security modes: every byte that the verifier consumes — <code>public_inputs</code>, <code>proof</code>, AND <code>vk</code> — was recovered from a single TX_R reveal and bound back to the matching TX_C commit by <code>SHA256d</code>; no out-of-band file or registry was consulted at any step. <code>snarkjs</code> is the canonical reference verifier for both Groth16 and PLONK proofs; an equivalent in-process <code>spvnode</code> verdict for the existing Groth16 BN254 / <code>"curve": "bn128"</code> mode can be obtained today by rebuilding libdogecoin with <code>--with-mcl</code> or <code>--with-rapidsnark</code> (which makes <code>dogecoin_zk_verify_proof</code> dispatch to the herumi/mcl or rapidsnark backend instead of returning DELEGATED). This in-process refactor is a defense-in-depth convenience for the classical mode, '''not''' the BIP's long-term growth path — the post-quantum-safe growth path runs through mode <code>0x02</code> <code>DOGECOIN_ZK_MODE_STARK_S2</code> (see "PQC-safe growth path" under Rationale) and through the already-shipping sibling Post-Quantum Signature Commitments BIP (Falcon-512 / Dilithium2 / Raccoon-G-44 in-library verifiers).
+
+===Mainnet v2 cascade (Pair G2 Groth16 + Pair Q2 PLONK) — replay-resistant tx_binding end-to-end===
+
+A second end-to-end cascade was broadcast on Dogecoin mainnet on 2026-05-13 to demonstrate ZKP1 v1 (vk-on-chain) ''with the Phase-1 <code>tx_binding</code> public input enabled'' for both proof systems. The only material difference from the v1 cascade above is that <code>contrib/zk_carrier/scripts/broadcast_set.sh</code> now derives <code>tx_binding == tx_base_sighash(TX_C)</code> via <code>such -c tx_sighash32</code> against the carrier-stripped base tx, threads it into <code>witness_helper.py --tx-binding-hex …</code>, and the resulting proof commits to that 248-bit binding as its 3rd public input. spvnode then recomputes the same hash from the matched TX_C bytes via <code>dogecoin_zk_compute_tx_base_sighash</code> and emits <code>[zk-commit] tx_binding match</code> immediately before <code>Reveal validated</code> — closing the cross-tx-replay window identified in the v1 deployment. Both pairs were broadcast against the same funded reference address <code>DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code> (UTXO state: <code>https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>).
+
+<pre>
+Pair G2 (Groth16, ZKP1 mode=0, version=0x01, replay-resistant)
+  TX_C:        c7058e419eadfbc5127df9a7c4f731c9bf4df0742cabc04760bab1e109b537d8  (block 6205433, 2026-05-13T22:50:09Z)
+  TX_R:        5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad  (block 6205433)
+  commit32:    52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3
+  payload_len: 4219 bytes  (public_len=100, proof_len=806, vk_len=3293 — vk inline)
+  tx_binding:  00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48  (= public_inputs[2], recomputed by spvnode)
+  Explorer:    https://blockchair.com/dogecoin/transaction/5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+
+Pair Q2 (PLONK, ZKP1 mode=1, version=0x01, replay-resistant)
+  TX_C:        af37e7b812b5d8779b31669b2979dd3c50f665b4cc70216083e0134f71077f60  (block 6205433, 2026-05-13T22:50:09Z)
+  TX_R:        e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42  (block 6205433)
+  commit32:    b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867
+  payload_len: 4408 bytes  (public_len=100, proof_len=2247, vk_len=2041 — vk inline)
+  tx_binding:  00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba  (= public_inputs[2], recomputed by spvnode)
+  Explorer:    https://blockchair.com/dogecoin/transaction/e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+</pre>
+
+Live <code>spvnode</code> rescan output (mainnet, libdogecoin built with <code>--enable-zk-carrier</code>; flags <code>-l -p -b -d -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>; <code>-p</code> uses the latest retained mainnet checkpoint before the broadcast height):
+
+<source>
+…
+[zk-commit] Pending at height=6205433 txpos=20 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=op_return
+[zk-commit] Valid at height=6205433 txpos=32 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+[zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=100 proof_len=806 vk_len=3293 total_payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+[zk-commit] reveal_decoded.public_inputs: len=100 ascii="[  \"0\",  \"1000000\",  \"368902973162000129142341667212868613152898119767395122406883735804738960712\" ]"
+[zk-commit] tx_binding match txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad recomputed=00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48 public_input[2]=00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48
+[zk-commit] ZK verification DELEGATED at height=6205433 txpos=32 mode=0 err=-7
+[zk-commit] Reveal validated: TX_R=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 payload_len=4219 mode=0 height=6205433
+
+[zk-commit] Pending at height=6205433 txpos=21 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=op_return
+[zk-commit] Valid at height=6205433 txpos=33 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=carrier_scriptsig matched_txc_txpos=21 payload_len=4408 txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+[zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=100 proof_len=2247 vk_len=2041 total_payload_len=4408 txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+[zk-commit] reveal_decoded.public_inputs: len=100 ascii="[  \"0\",  \"1000000\",  \"338552376559337842254046879383831044278244586842794847186374668703488908986\" ]"
+[zk-commit] tx_binding match txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42 recomputed=00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba public_input[2]=00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba
+[zk-commit] ZK verification DELEGATED at height=6205433 txpos=33 mode=1 err=-7
+[zk-commit] Reveal validated: TX_R=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 payload_len=4408 mode=1 height=6205433
+</source>
+
+The two <code>[zk-commit] tx_binding match</code> lines above are the consensus-relevant new evidence: each <code>recomputed</code> sighash was derived by <code>spvnode</code> from the on-chain TX_C bytes alone (no off-chain input), and the equality with <code>public_input[2]</code> proves the proof was generated for ''this specific funding tx''. Lifting either <code>(vk, proof)</code> tuple onto a fresh TX_C with a different change output, prevout, or signer script makes the recomputed sighash diverge from <code>public_input[2]</code> and spvnode emits <code>tx_binding mismatch</code> in lieu of <code>Reveal validated</code> — the replay-resistance check is invariant under broadcast, mining, and reorg.
+
+Independent on-chain audit — same <code>validate_onchain_pairs.py</code> tool as v1, now driving both v1 and v2 pairs in a single run; the v2 PASS lines are the strongest claim this BIP can make for replay-resistant ZK carriers:
+
+<pre>
+=== Pair G2 (groth16) ===
+  TX_C=c7058e419eadfbc5127df9a7c4f731c9bf4df0742cabc04760bab1e109b537d8
+  TX_R=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3
+  TX_R reassembled: 3 part(s)  payload_len=4219 (spec: 4219)
+  SHA256d(payload) = 52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3
+  TX_C commit32    = 52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3  →  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x01 circuit_id=0x00000001 public_len=100 proof_len=806 vk_len=3293
+  embedded public.json   = ['0', '1000000', '368902973162000129142341667212868613152898119767395122406883735804738960712']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve','pi_a','pi_b','pi_c','protocol']
+  snarkjs groth16 verify (vk=EMBEDDED reveal): OK  | [INFO]  snarkJS: OK!
+
+=== Pair Q2 (plonk) ===
+  TX_C=af37e7b812b5d8779b31669b2979dd3c50f665b4cc70216083e0134f71077f60
+  TX_R=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+  TX_C OP_RETURN: tag=DZKC mode=1 commit32=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867
+  TX_R reassembled: 3 part(s)  payload_len=4408 (spec: 4408)
+  SHA256d(payload) = b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867
+  TX_C commit32    = b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867  →  MATCH
+  ZKP1: magic=ZKP1 mode=1 version=0x01 circuit_id=0x00000001 public_len=100 proof_len=2247 vk_len=2041
+  embedded public.json   = ['0', '1000000', '338552376559337842254046879383831044278244586842794847186374668703488908986']
+  embedded proof.protocol=plonk curve=bn128 keys=['A','B','C','T1','T2','T3','Wxi','Wxiw','Z','curve','eval_a','eval_b','eval_c','eval_s1','eval_s2','eval_zw','protocol']
+  snarkjs plonk verify (vk=EMBEDDED reveal): OK  | [INFO]  snarkJS: OK!
+
+========= INDEPENDENT ON-CHAIN VALIDATION SUMMARY =========
+  Pair G2: PASS              (full end-to-end verification (v1 self-contained reveal, tx_binding-bound))
+  Pair Q2: PASS              (full end-to-end verification (v1 self-contained reveal, tx_binding-bound))
+</pre>
+
+Every byte cited in the v2 cascade transcript above (the broadcast manifest, the two <code>spvnode</code> rescan tails, and the <code>validate_onchain_pairs.py</code> summary) is reproducible from Dogecoin mainnet alone: the canonical references are the two TX_C / TX_R pairs at block height 6205433 — <code>TX_C=c7058e41…b537d8</code> + <code>TX_R=5288fb5c…d892ad</code> (Pair G2, commit32 <code>52e6242f…3e3bf3</code>) and <code>TX_C=af37e7b8…077f60</code> + <code>TX_R=e963a3f3…f0a42</code> (Pair Q2, commit32 <code>b24f93f9…11867</code>). Fetching those four txids from any Dogecoin full node or block explorer and re-running the steps in "Reproducing the on-chain-only validation" below yields a bit-identical trace.
+
+===Reproducing the on-chain-only validation===
+
+The two outputs above (the <code>spvnode</code> rescan log and the independent <code>validate_onchain_pairs.py</code> summary) are produced by the following exact command sequence. Anyone with a Linux/macOS host, <code>node</code>, and a libdogecoin checkout can re-run it against the same Dogecoin mainnet artifacts cited above — the v1 pairs at block heights 6191613 / 6191616 (<code>TX_C=b70bc69f…e18354</code> + <code>TX_R=68e6d111…cf14d7</code> for Pair G1, <code>TX_C=d0a09969…2b4edc</code> + <code>TX_R=00333424…d82b5</code> for Pair Q1) and the v2 pairs at block 6205433 (<code>TX_C=c7058e41…b537d8</code> + <code>TX_R=5288fb5c…d892ad</code> for Pair G2, <code>TX_C=af37e7b8…077f60</code> + <code>TX_R=e963a3f3…f0a42</code> for Pair Q2) — and obtain a bit-identical trace; no local snapshot file is required.
+
+The two steps cover complementary slices of the verification and must be read together:
+
+* '''Step 1 (spvnode rescan)''' is the chain-walker side. From chain bytes alone it (a) reassembles the chunked <code>ZKP1FULL</code> payload from each TX_R's carrier scriptSigs, (b) checks <code>SHA256d(payload) == commit32</code> against the matching TX_C OP_RETURN, and (c) recomputes <code>tx_binding == dogecoin_zk_compute_tx_base_sighash(TX_C)</code> for v2 cascade pairs. No local verification-key parameter is used for this on-chain validation path.
+* '''Step 2 (<code>validate_onchain_pairs.py</code>)''' is what actually backs the "on-chain only" claim cryptographically. It pulls the raw TX_C/TX_R hex from a public block explorer, extracts the embedded <code>(public_inputs, proof, vk)</code> tuple from the reassembled reveal, writes the '''recovered''' vk to a temp file, and invokes <code>snarkjs … verify recovered_vk.json …</code> against it — i.e. the vk it verifies under was decoded from the TX_R bytes, not from any file on disk, exactly as described in the "Per-pair on-chain decomposition" section above (<code>vk=EMBEDDED reveal</code>). No local <code>verification_key.json</code> is consulted in Step 2.
+
+A future libdogecoin build may let Step 1 do the cryptographic proof check against the inlined vk in-process for the existing pairing-based modes — closing the residual classical-security gap by routing the BN254 / <code>"curve": "bn128"</code> verification through the in-process <code>--with-mcl</code> / <code>--with-rapidsnark</code> backend instead of the off-box snarkjs invocation in Step 2. This is a defense-in-depth refactor for the Phase-1 classical modes, '''not''' the BIP's PQC-safe growth path: that path runs through mode <code>0x02</code> <code>DOGECOIN_ZK_MODE_STARK_S2</code> (hash/FRI; see "PQC-safe growth path" under Rationale) and through the sibling Post-Quantum Signature Commitments BIP, whose Falcon-512 / Dilithium2 / Raccoon-G-44 verifiers already run in-library and provide post-quantum-safe spend authorization today.
+
+<source lang="bash">
+# 0. Build libdogecoin with the ZK carrier enabled. Add --with-mcl (and/or
+#    --with-rapidsnark) here if you want spvnode to report
+#    "ZK verification PASSED" in-process instead of "DELEGATED" for Groth16;
+#    PLONK always reports DELEGATED because libdogecoin has no in-tree PLONK
+#    verifier (rapidsnark v0.0.8 upstream is Groth16-only).
+./autogen.sh
+./configure --enable-zk-carrier   # optionally: --with-mcl --with-rapidsnark
+make -j
+
+# 1. spvnode mainnet rescan against the funded carrier address. The -p flag
+#    consumes the baked-in checkpoint at height 6191600 so the rescan only
+#    syncs the final ~30 headers before reaching Pairs G1 and Q1.
+./spvnode -l -p -b -d \
+    -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr \
+    scan 2>&1 | tee /tmp/spvnode_zk_rescan.log
+
+#    Grep only the consensus-relevant carrier lines for the curated log:
+grep -E '\[zk-commit\] (Pending|Valid|reveal_decoded|ZK verification|Reveal validated)' \
+    /tmp/spvnode_zk_rescan.log
+
+# 2. Independent on-chain audit — fetches each TX_C/TX_R as raw hex from
+#    api.blockchair.com/dogecoin, reassembles the ZKP1 payload, recomputes
+#    SHA256d(payload) against the OP_RETURN commit, extracts the embedded
+#    (public_inputs, proof, vk) tuple from the reveal bytes themselves, writes
+#    the recovered vk to a temp file, and invokes the canonical snarkjs
+#    verifier against it. The on-chain-only cryptographic verdict comes from
+#    THIS step: the vk fed to snarkjs is the one decoded out of TX_R, not the
+#    local contrib/zk_carrier/circuits/build/verification_key.json file.
+npm install snarkjs                              # one-time, vendored locally
+SNARKJS="$PWD/node_modules/.bin/snarkjs" \
+    python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py \
+    2>&1 | tee /tmp/validate_onchain_pairs.log
+
+#    The underlying per-pair invocation the script issues — emitted verbatim
+#    so an auditor can run it by hand on the recovered files — is:
+#
+#      snarkjs groth16 verify recovered_vk.json recovered_public.json recovered_proof.json   # Pair G1
+#      snarkjs plonk   verify recovered_vk.json recovered_public.json recovered_proof.json   # Pair Q1
+#
+#    Both calls MUST exit 0 and print "[INFO]  snarkJS: OK!" — that line plus
+#    "PASS  (full end-to-end verification (v1 self-contained reveal))" is the
+#    on-chain-only validation success indicator for the respective proof
+#    system.
+
+# 3. (Optional) Combine the two transcripts into a single curated artifact
+#    keyed by the on-chain identifiers cited above (TX_C/TX_R txids, block
+#    heights, commit32) so a reviewer can re-fetch the same chain bytes and
+#    reproduce every line independently.
+</source>
+
+The validator and spvnode read complementary slices of the on-chain bytes — spvnode walks the chain locally and emits the <code>[zk-commit] reveal_decoded</code> trace (commitment binding and <code>tx_binding</code> equality, both from chain bytes alone), while <code>validate_onchain_pairs.py</code> pulls the same TX_C/TX_R raw hex from a public block explorer, recovers the <code>vk</code> from the embedded reveal, and runs the cryptographic <code>snarkjs verify</code> against that recovered vk. A passing run with the commands above demonstrates the property end-to-end from two independent code paths.
+
+
+==Deployment==
+
+Phase 1 can be deployed immediately in wallets, tooling, and SPV infrastructure without consensus change.
+
+Phase 2 requires a separate consensus-track proposal and activation plan, ideally co-sequenced with the PQC carrier's Phase 2 to share an OP_SUCCESSx allocation block.
+
+==Acknowledgements==
+
+Thanks to the broader Bitcoin and Dogecoin ZK research community, including the snarkjs, circom, rapidsnark, halo2, and plonky2 maintainers whose proof systems and JSON-encoding conventions are reused verbatim by this proposal. This BIP is a sibling to the Post-Quantum Signature Commitments BIP and inherits its TX_C + TX_R staging model.

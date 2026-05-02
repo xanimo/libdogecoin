@@ -10,6 +10,7 @@ NO_YUBIKEY ?=
 NO_LIBOQS ?=
 LIBOQS_RACCOON ?=
 RACCOON_G ?=
+ZK_CARRIER ?=
 MULTIPROCESS ?=
 FALLBACK_DOWNLOAD_PATH ?= https://bitcoincore.org/depends-sources
 
@@ -125,6 +126,10 @@ liboqs_packages_$(NO_LIBOQS) = $(liboqs_packages)
 # Python reference. They are independent of liboqs.
 ifeq ($(RACCOON_G),y)
 raccoon_g_packages_ = $(raccoon_g_packages)
+endif
+
+ifeq ($(ZK_CARRIER),1)
+packages += $(zk_carrier_packages)
 endif
 
 packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_) $(yubikey_packages_) $(liboqs_packages_) $(raccoon_g_packages_) $(qrencode_packages_)

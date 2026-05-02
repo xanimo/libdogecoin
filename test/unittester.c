@@ -101,6 +101,10 @@ extern void test_raccoong_buff_mu();
 extern void test_raccoong_sign();
 #endif
 
+#ifdef USE_ZK_CARRIER
+extern void test_zk_carrier();
+#endif
+
 #ifdef WITH_LOGDB
 extern void test_red_black_tree();
 extern void test_logdb_memdb();
@@ -205,6 +209,10 @@ int main()
     u_run_test(test_raccoong_hash_vec);
     u_run_test(test_raccoong_buff_mu);
     u_run_test(test_raccoong_sign);
+#endif
+
+#ifdef USE_ZK_CARRIER
+    u_run_test(test_zk_carrier);
 #endif
 
 #ifdef WITH_LOGDB

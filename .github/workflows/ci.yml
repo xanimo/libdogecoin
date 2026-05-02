@@ -34,6 +34,7 @@ jobs:
           - x86_64-linux-dbg
           - x86_64-linux-openenclave
           - x86_64-linux-raccoon-g
+          - x86_64-linux-zk-carrier
           - x86_64-macos
           # - arm64-macos
           - x86_64-win
@@ -91,9 +92,9 @@ jobs:
             host: x86_64-pc-linux-gnu
             os: ubuntu-22.04
             run-tests: true
-            packages: python3-dev python3-dbg
+            packages: python3-dev python3-dbg libgmp-dev
             dep-opts: "DEBUG=1 SPEED=slow V=1"
-            config-opts: "--enable-debug"
+            config-opts: "--enable-debug --enable-test-passwd"
             goal: install
           - name: x86_64-linux-openenclave
             host: x86_64-pc-linux-gnu
@@ -209,6 +210,14 @@ jobs:
             run-tests: true
             dep-opts: "SPEED=slow V=1"
             config-opts: "--enable-static --disable-shared --enable-raccoon-g"
+            goal: install
+          - name: x86_64-linux-zk-carrier
+            host: x86_64-pc-linux-gnu
+            os: ubuntu-22.04
+            run-tests: true
+            packages: python3-dev python3-dbg libgmp-dev
+            dep-opts: "DEBUG=1 SPEED=slow V=1 ZK_CARRIER=1"
+            config-opts: "--enable-debug --enable-test-passwd --enable-zk-carrier --with-rapidsnark"
             goal: install
 
     runs-on: ${{ matrix.os }}

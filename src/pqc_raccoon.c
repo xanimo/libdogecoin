@@ -36,23 +36,7 @@
 #include <dogecoin/random.h>
 
 #ifndef USE_LIBOQS
-/* When liboqs is disabled, pqc_falcon.c is not compiled, so provide the
- * shared sighash helper here for the Raccoon-G backend. */
-dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
-                                    const cstring* fromPubKey,
-                                    size_t in_num, int hashtype,
-                                    uint8_t out32[32])
-{
-    if (!tx_to || !fromPubKey || !out32) {
-        return false;
-    }
-    uint256_t hash;
-    if (!dogecoin_tx_sighash(tx_to, fromPubKey, in_num, hashtype, hash)) {
-        return false;
-    }
-    memcpy(out32, hash, 32);
-    return true;
-}
+/* dogecoin_tx_sighash32 is now defined unconditionally in src/tx.c. */
 #endif
 
 /**
