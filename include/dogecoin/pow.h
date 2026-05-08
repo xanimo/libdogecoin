@@ -39,7 +39,7 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-dogecoin_bool check_pow(uint256_t* hash, unsigned int nbits, const dogecoin_chainparams *params, uint256_t* chainwork);
+dogecoin_bool check_pow(uint256_t* hash, unsigned int nbits, const dogecoin_chainparams *params, arith_uint256* chainwork);
 
 LIBDOGECOIN_END_DECL
 

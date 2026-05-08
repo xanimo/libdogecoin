@@ -762,11 +762,13 @@ int main(int argc, char* argv[]) {
                             dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
                         uint256_t hash;
                         utils_uint256_sethex((char*)checkpoints[selected_checkpoint_index].hash, (uint8_t*)&hash);
+                        arith_uint256 checkpoint_chainwork;
+                        uint_to_arith(&checkpoint_chainwork, &client->chainparams->minimumchainwork);
                         client->headers_db->set_checkpoint_start(
                             client->headers_db_ctx,
                             hash,
                             checkpoints[selected_checkpoint_index].height,
-                            (uint8_t*)client->chainparams->minimumchainwork);
+                            checkpoint_chainwork);
                         printf("Selected checkpoint height %u\n", checkpoints[selected_checkpoint_index].height);
                     }
                 }

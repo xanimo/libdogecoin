@@ -320,7 +320,7 @@ void print_block(dogecoin_auxpow_block* block) {
  *
  * @return 1 if deserialization was successful, 0 otherwise.
  */
-int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, uint256_t* chainwork) {
+int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, arith_uint256* chainwork) {
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
     if (!deser_s32(&block->header->version, buf))
         return false;
@@ -346,7 +346,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
     return true;
     }
 
-int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, uint256_t* chainwork) {
+int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, arith_uint256* chainwork) {
     if (buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
         return printf("\ntransaction is invalid or to large.\n\n");
         }

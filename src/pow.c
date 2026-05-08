@@ -40,21 +40,19 @@ dogecoin_bool uint256_cmp(const uint256_t a, const uint256_t b) {
     return false; // Return false if all bytes are equal
 }
 
-dogecoin_bool check_pow(uint256_t* hash, unsigned int nbits, const dogecoin_chainparams *params, uint256_t* chainwork) {
+dogecoin_bool check_pow(uint256_t* hash, unsigned int nbits, const dogecoin_chainparams *params, arith_uint256* chainwork) {
     dogecoin_bool f_negative, f_overflow;
     arith_uint256* target = init_arith_uint256();
     target = set_compact(target, nbits, &f_negative, &f_overflow);
-    uint8_t* target_uint256 = dogecoin_malloc(sizeof(uint256_t));
-    memcpy(target_uint256, target, sizeof(arith_uint256));
-    if (f_negative || arith_uint256_is_zero(target) || f_overflow || uint256_cmp(target_uint256, params->pow_limit)) {
+    const uint8_t* target_bytes = (const uint8_t*)target->pn;
+    if (f_negative || arith_uint256_is_zero(target) || f_overflow || uint256_cmp(target_bytes, params->pow_limit)) {
         printf("%d:%s: f_negative: %d target == 0: %d f_overflow: %d\n",
         __LINE__, __func__, f_negative, (const uint8_t*)target == 0, f_overflow);
         dogecoin_free(target);
-        dogecoin_free(target_uint256);
         return false;
     }
     swap_bytes((uint8_t*)hash, sizeof(uint256_t));
-    if (uint256_cmp((const uint8_t*)hash, target_uint256)) {
+    if (uint256_cmp((const uint8_t*)hash, target_bytes)) {
         char* rtn_str = utils_uint8_to_hex((const uint8_t*)hash, 32);
         char hash_str[65] = "";
         strncpy(hash_str, rtn_str, 64);
@@ -62,33 +60,29 @@ dogecoin_bool check_pow(uint256_t* hash, unsigned int nbits, const dogecoin_chai
         printf("%d:%s: hash: %s target: %s\n",
         __LINE__, __func__, hash_str, target_str);
         dogecoin_free(target);
-        dogecoin_free(target_uint256);
         return false;
     }
-    dogecoin_free(target_uint256);
 
     // Calculate number of hashes done
     // hashes = ~target / (target + 1) + 1
-    arith_uint256* neg_target = init_arith_uint256();
-    memcpy(neg_target, target, sizeof(arith_uint256));
-    arith_negate(neg_target);
+    arith_uint256 neg_target = *target;
+    arith_negate(&neg_target);
 
     arith_uint256* one = init_arith_uint256();
     one->pn[0] = 1; // Set the lowest word to 1
 
     // hashes = ~target / (target + 1)
     arith_uint256* target_plus_one = add_arith_uint256(target, one);
-    arith_uint256* hashes = div_arith_uint256(neg_target, target_plus_one);
+    arith_uint256* hashes = div_arith_uint256(&neg_target, target_plus_one);
 
     // Add one to hashes for ~target / (target + 1) + 1
     arith_uint256* final_hashes = add_arith_uint256(hashes, one);
 
     if (chainwork != NULL) {
-        memcpy(chainwork, (const arith_uint256*) final_hashes, sizeof(uint256_t));
+        *chainwork = *final_hashes;
     }
 
     // Clean up
-    dogecoin_free(neg_target);
     dogecoin_free(one);
     dogecoin_free(target_plus_one);
     dogecoin_free(hashes);

@@ -52,7 +52,7 @@ typedef struct dogecoin_headers_db_interface_
     dogecoin_blockindex* (*getchaintip)(void *db);
     dogecoin_bool (*disconnect_tip)(void *db);
     dogecoin_bool (*has_checkpoint_start)(void *db);
-    void (*set_checkpoint_start)(void *db, uint256_t hash, uint32_t height, uint256_t chainwork);
+    void (*set_checkpoint_start)(void *db, uint256_t hash, uint32_t height, arith_uint256 chainwork);
 } dogecoin_headers_db_interface;
 
 LIBDOGECOIN_END_DECL
