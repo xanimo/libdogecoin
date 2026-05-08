@@ -47,7 +47,7 @@ jobs:
             os: ubuntu-22.04
             packages: g++-arm-linux-gnueabihf qemu-user-static qemu-user
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "--enable-static --disable-shared --enable-test-passwd"
+            config-opts: "--enable-static --disable-shared"
             run-tests: true
             goal: install
           - name: aarch64-linux
@@ -55,7 +55,7 @@ jobs:
             os: ubuntu-22.04
             packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "LIBS='-levent_pthreads' --enable-static --disable-shared --enable-test-passwd --with-armv8-crypto --with-armv82-crypto"
+            config-opts: "LIBS='-levent_pthreads' --enable-static --disable-shared --with-armv8-crypto --with-armv82-crypto"
             run-tests: true
             goal: install
           - name: aarch64-linux-optee
@@ -65,14 +65,14 @@ jobs:
             run-container: true
             packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-Wp,-D_FORTIFY_SOURCE=0"
+            config-opts: "LIBS=-levent_pthreads --enable-static --disable-shared --enable-optee CFLAGS=-Wp,-D_FORTIFY_SOURCE=0"
             goal: install
           - name: aarch64-android
             host: aarch64-linux-android
             os: ubuntu-22.04
             packages: unzip
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "--enable-static --disable-shared --enable-test-passwd"
+            config-opts: "--enable-static --disable-shared"
             run-tests: true
             goal: install
             android-ndk: android-ndk-r25c-linux
@@ -82,7 +82,7 @@ jobs:
             os: ubuntu-22.04
             packages: docker.io containerd
             dep-opts: "SPEED=slow V=1"
-            config-opts: "--enable-static --disable-shared --enable-test-passwd"
+            config-opts: "--enable-static --disable-shared"
             run-tests: true
             run-container: true
             goal: install
@@ -92,7 +92,7 @@ jobs:
             run-tests: true
             packages: python3-dev python3-dbg
             dep-opts: "DEBUG=1 SPEED=slow V=1"
-            config-opts: "--enable-debug --enable-test-passwd"
+            config-opts: "--enable-debug"
             goal: install
           - name: x86_64-linux-openenclave
             host: x86_64-pc-linux-gnu
@@ -101,14 +101,14 @@ jobs:
             run-container: true
             packages: python3-dev python3-dbg
             dep-opts: "DEBUG=1 SPEED=slow V=1"
-            config-opts: "--enable-openenclave --enable-test-passwd CFLAGS=-Wp,-D_FORTIFY_SOURCE=0"
+            config-opts: "--enable-openenclave CFLAGS=-Wp,-D_FORTIFY_SOURCE=0"
             goal: install
           - name: x86_64-macos
             host: x86_64-apple-darwin15
             os: macos-14
             run-tests: true
             dep-opts: "SPEED=slow V=1"
-            config-opts: "--enable-static --disable-shared --enable-test-passwd"
+            config-opts: "--enable-static --disable-shared"
             packages: cmake zlib xorriso libtool
             goal: install
             mac-sdk: 12.2
@@ -119,7 +119,7 @@ jobs:
           #   os: macos-13-xlarge
           #   run-tests: true
           #   dep-opts: "SPEED=slow V=1"
-          #   config-opts: "--enable-static --disable-shared --enable-test-passwd"
+          #   config-opts: "--enable-static --disable-shared"
           #   packages: cmake zlib xorriso libtool
           #   goal: install
           #   mac-sdk: 12.2
@@ -136,7 +136,7 @@ jobs:
               sudo update-alternatives --set x86_64-w64-mingw32-g++  /usr/bin/x86_64-w64-mingw32-g++-posix
               sudo update-binfmts --import /usr/share/binfmts/wine
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "--enable-test-passwd"
+            config-opts: ""
             run-tests: true
           - name: x86_64-win-native
             host: x86_64-pc-windows-msvc
@@ -146,7 +146,7 @@ jobs:
               choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
             dep-opts: "CROSS_COMPILE='no' SPEED=slow V=1"
             config-opts: ""
-            run-tests: false
+            run-tests: true
             goal: install
           - name: x86_64-win-native-rel
             host: x86_64-pc-windows-msvc
@@ -187,7 +187,7 @@ jobs:
               sudo update-alternatives --set i686-w64-mingw32-g++  /usr/bin/i686-w64-mingw32-g++-posix
               sudo update-binfmts --import /usr/share/binfmts/wine
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "--enable-test-passwd"
+            config-opts: ""
             run-tests: true
             goal: install
           - name: i686-linux
@@ -196,7 +196,7 @@ jobs:
             packages: g++-multilib bc
             run-tests: true
             dep-opts: "SPEED=slow V=1"
-            config-opts: "--enable-static --disable-shared --enable-test-passwd"
+            config-opts: "--enable-static --disable-shared"
             goal: install
 
     runs-on: ${{ matrix.os }}
@@ -309,7 +309,7 @@ jobs:
           build_dir=./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}
           mkdir -p $build_dir/bin $build_dir/docs $build_dir/examples $build_dir/include $build_dir/lib $build_dir/test/ $build_dir/test/wordlist
           if ([ "${{ matrix.name }}" == "x86_64-win-native" ]); then
-            cmake -B $build_dir -DBUILD_SHARED_LIBS=1
+            cmake -B $build_dir -DBUILD_SHARED_LIBS=1 -DTEST_TPM_AUTO=ON
             cmake --build $build_dir
           elif ([ "${{ matrix.name }}" == "x86_64-win-native-rel" ]); then
             cmake -B $build_dir -DBUILD_SHARED_LIBS=1 -DCMAKE_BUILD_TYPE=Release
@@ -340,6 +340,7 @@ jobs:
 
       - name: test libdogecoin
         if: ${{ matrix.run-tests }}
+        shell: bash
         run: |
             case "${{ matrix.name }}" in
               "armhf-linux")
@@ -354,14 +355,22 @@ jobs:
               sudo ./rpctest/fetch.py --host x86_64-linux-gnu
               sudo rm /usr/local/bin/dogecoind
               ;;
-              "aarch64-android"):
+              "x86_64-win-native")
+              test_exe="./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/Debug/tests.exe"
+              [ -f "$test_exe" ] || test_exe="./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/tests.exe"
+              "$test_exe"
+              ;;
+              "aarch64-android")
               wget https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip
               unzip commandlinetools-linux-6858069_latest.zip
               mkdir -p ~/.android-sdk/cmdline-tools/latest
               mv cmdline-tools/* ~/.android-sdk/cmdline-tools/latest
               export ANDROID_SDK_ROOT=~/.android-sdk
               export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools
+              # `yes` is expected to receive SIGPIPE once sdkmanager exits after accepting licenses.
+              set +o pipefail
               yes | sdkmanager --licenses --sdk_root=$ANDROID_SDK_ROOT
+              set -o pipefail
               sdkmanager --update --sdk_root=$ANDROID_SDK_ROOT
               sdkmanager "platform-tools" --sdk_root=$ANDROID_SDK_ROOT
               DOCKER_IMAGE=us-docker.pkg.dev/android-emulator-268719/images/r-google-x64:30.0.23
@@ -396,7 +405,7 @@ jobs:
         shell: bash
         run: |
             case "${{ matrix.name }}" in
-              "x86_64-linux-openenclave" | "aarch64-linux-optee" | "x86_64-nixos"):
+              "x86_64-linux-openenclave" | "aarch64-linux-optee" | "x86_64-nixos")
               if ([ "${{ matrix.name }}" == "aarch64-linux-optee" ]); then
                 make install
                 if [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
@@ -490,7 +499,7 @@ jobs:
 
                     # Build libdogecoin for Host
                     cd /src/ && \
-                    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd HOST=aarch64-linux-gnu && \
+                    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared HOST=aarch64-linux-gnu && \
                     make -j 4 && \
                     make install && \
 
@@ -531,7 +540,7 @@ jobs:
                 make install && \
                 mkdir -p src/openenclave/build && \
                 make -j 4 -C depends HOST=x86_64-pc-linux-gnu/host && \
-                ./configure --prefix=${{ github.workspace }}/depends/x86_64-pc-linux-gnu/host --enable-test-passwd && \
+                ./configure --prefix=${{ github.workspace }}/depends/x86_64-pc-linux-gnu/host && \
                 make && \
                 make install && \
                 if [[ "${{ github.ref }}" == refs/tags/* ]]; then
