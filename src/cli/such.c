@@ -48,6 +48,7 @@
 #include <dogecoin/uthash.h>
 
 #include <dogecoin/address.h>
+#include <dogecoin/base58.h>
 #include <dogecoin/bip32.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/bip44.h>
@@ -59,6 +60,7 @@
 #include <dogecoin/seal.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/sign.h>
+#include <dogecoin/script.h>
 #include <dogecoin/tool.h>
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
@@ -73,6 +75,10 @@
 #ifdef USE_ZK_CARRIER
 #include <dogecoin/zk_carrier.h>
 #endif
+
+#define SUCH_ADDRESS_MAX_LEN 128
+static const char* SUCH_MULTISIG_REDEEM_SCRIPT_LABEL = "multisig redeem script: %s\n";
+static const char* SUCH_MULTISIG_P2SH_ADDRESS_LABEL = "multisig p2sh address: %s\n";
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
 #ifdef WITH_NET
@@ -160,51 +166,148 @@ void signing_menu(int txindex, int is_testnet) {
     int running = 1;
     int input_to_sign;
     char* raw_hexadecimal_tx;
-    char* script_pubkey;
     char* private_key_wif;
+    char redeem_script_hex[1200]; /* large enough for up to 15-of-15 multisig */
     while (running) {
         printf("\n 1. sign input (from current working transaction)\n");
         printf(" 2. sign input (raw hexadecimal transaction)\n");
         printf(" 3. print signed transaction\n");
         printf(" 4. go back\n\n");
-        switch (atoi(getl("command"))) {
+        int choice = atoi(getl("command"));
+        switch (choice) {
                 case 1:
+                case 2: {
                     input_to_sign = atoi(getl("input to sign")); // 0
                     private_key_wif = (char*)get_private_key("private_key"); // ci5prbqz7jXyFPVWKkHhPq4a9N8Dag3TpeRfuqqC2Nfr7gSqx1fy
-                    script_pubkey = dogecoin_private_key_wif_to_pubkey_hash(private_key_wif);
-                    // 76a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac
-                    raw_hexadecimal_tx = get_raw_transaction(txindex);
-                    // 76a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac
-                    if (!sign_indexed_raw_transaction(txindex, input_to_sign, raw_hexadecimal_tx, script_pubkey, 1, private_key_wif)) {
-                        printf("signing indexed raw transaction failed!\n");
+
+                    /* Optionally prompt for a P2SH multisig redeem script hex.
+                     * Leave blank to fall back to single-key P2PKH (the
+                     * traditional behavior). */
+                    snprintf(redeem_script_hex, sizeof(redeem_script_hex), "%s",
+                             getl("redeem script hex (blank for single-key P2PKH)"));
+
+                    if (choice == 1) {
+                        raw_hexadecimal_tx = get_raw_transaction(txindex);
+                    } else {
+                        raw_hexadecimal_tx = (char*)get_raw_tx("raw transaction");
+                    }
+
+                    int ok = 0;
+                    if (redeem_script_hex[0] != '\0') {
+                        /* P2SH multisig: sign_indexed_raw_transaction_ex updates
+                         * the in-memory tx_in's scriptSig (OP_0 <sig...> <redeem>).
+                         * Pass a buffer big enough to hold a fully-signed tx hex
+                         * back. */
+                        char signed_buf[TXHEXMAXLEN + 1];
+                        snprintf(signed_buf, sizeof(signed_buf), "%s", raw_hexadecimal_tx);
+                        ok = sign_indexed_raw_transaction_ex(txindex, input_to_sign,
+                                                             redeem_script_hex,
+                                                             1 /* SIGHASH_ALL */,
+                                                             private_key_wif,
+                                                             signed_buf, sizeof(signed_buf));
+                        if (ok) {
+                            printf("signed tx hex: %s\n", signed_buf);
                         }
-                    else printf("transaction input successfully signed!\n");
-                    break;
-                case 2:
-                    input_to_sign = atoi(getl("input to sign")); // 0
-                    private_key_wif = (char*)get_private_key("private_key"); // ci5prbqz7jXyFPVWKkHhPq4a9N8Dag3TpeRfuqqC2Nfr7gSqx1fy
-                    script_pubkey = dogecoin_private_key_wif_to_pubkey_hash(private_key_wif);
-                    raw_hexadecimal_tx = (char*)get_raw_tx("raw transaction");
-                    // 76a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac
-                    debug_print("input_to_sign: %d\n", input_to_sign);
-                    debug_print("raw_hexadecimal_transaction: %s\n", raw_hexadecimal_tx);
-                    debug_print("script_pubkey: %s\n", script_pubkey);
-                    debug_print("input_to_sign: %d\n", input_to_sign);
-                    debug_print("private_key: %s\n", private_key_wif);
-                    if (!sign_indexed_raw_transaction(txindex, input_to_sign, raw_hexadecimal_tx, script_pubkey, 1, private_key_wif)) {
+                    } else {
+                        char* script_pubkey = dogecoin_private_key_wif_to_pubkey_hash(private_key_wif);
+                        // 76a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac
+                        ok = sign_indexed_raw_transaction(txindex, input_to_sign,
+                                                          raw_hexadecimal_tx, script_pubkey,
+                                                          1, private_key_wif);
+                    }
+
+                    if (!ok) {
                         printf("signing indexed raw transaction failed!\n");
-                        }
-                    else printf("transaction input successfully signed!\n");
+                    } else {
+                        printf("transaction input successfully signed!\n");
+                    }
                     break;
+                }
                 case 3:
                     printf("raw_tx: %s\n", get_raw_transaction(txindex));
                     break;
                 case 4:
                     running = 0;
                     break;
-            }
         }
     }
+}
+
+static void print_multisig_info(const dogecoin_chainparams* chain, const char* pubkey_list, unsigned int required_signatures)
+{
+    if (!pubkey_list || strlen(pubkey_list) == 0) {
+        printf("Error: Missing public keys (comma-separated compressed pubkeys)\n");
+        return;
+    }
+    if (required_signatures == 0) {
+        printf("Error: Missing required signatures\n");
+        return;
+    }
+
+    char* pubkeys_input_copy = dogecoin_char_vla(strlen(pubkey_list) + 1);
+    memcpy_safe(pubkeys_input_copy, pubkey_list, strlen(pubkey_list) + 1);
+
+    /* 16 is the consensus/script limit enforced by dogecoin_script_build_multisig */
+    vector_t* pubkeys = vector_new(16, dogecoin_free);
+    char* token = strtok(pubkeys_input_copy, ",");
+    while (token) {
+        while (*token == ' ')
+            token++;
+        if (strlen(token) != 66) {
+            printf("Error: Public keys must be compressed hex (66 chars each)\n");
+            vector_free(pubkeys, true);
+            free(pubkeys_input_copy);
+            return;
+        }
+
+        dogecoin_pubkey* pk = dogecoin_malloc(sizeof(*pk));
+        dogecoin_pubkey_init(pk);
+        pk->compressed = 1;
+
+        size_t outlen = 0;
+        utils_hex_to_bin(token, pk->pubkey, strlen(token), &outlen);
+        if (outlen != 33 || !dogecoin_pubkey_is_valid(pk)) {
+            printf("Error: Invalid compressed public key in list\n");
+            dogecoin_free(pk);
+            vector_free(pubkeys, true);
+            free(pubkeys_input_copy);
+            return;
+        }
+        vector_add(pubkeys, pk);
+        token = strtok(NULL, ",");
+    }
+
+    cstring* redeem_script = cstr_new_sz(550); /* max ~547 bytes for 16 compressed pubkeys */
+    if (!dogecoin_script_build_multisig(redeem_script, required_signatures, pubkeys)) {
+        printf("Error: Failed to build multisig redeem script\n");
+        cstr_free(redeem_script, true);
+        vector_free(pubkeys, true);
+        free(pubkeys_input_copy);
+        return;
+    }
+
+    /* utils_uint8_to_hex() returns an internal static buffer */
+    const char* redeem_script_hex = utils_uint8_to_hex((const uint8_t*)redeem_script->str, redeem_script->len);
+    uint160_t script_hash;
+    dogecoin_script_get_scripthash(redeem_script, script_hash);
+
+    /* keep ample room for all base58 address variants plus terminator */
+    char p2sh_address[SUCH_ADDRESS_MAX_LEN];
+    if (!dogecoin_p2sh_addr_from_hash160(script_hash, chain, p2sh_address, sizeof(p2sh_address))) {
+        printf("Error: Failed to derive p2sh address from redeem script\n");
+        cstr_free(redeem_script, true);
+        vector_free(pubkeys, true);
+        free(pubkeys_input_copy);
+        return;
+    }
+
+    printf(SUCH_MULTISIG_REDEEM_SCRIPT_LABEL, redeem_script_hex);
+    printf(SUCH_MULTISIG_P2SH_ADDRESS_LABEL, p2sh_address);
+
+    cstr_free(redeem_script, true);
+    vector_free(pubkeys, true);
+    free(pubkeys_input_copy);
+}
 
 void sub_menu(int txindex, int is_testnet) {
     int running = 1;
@@ -216,14 +319,18 @@ void sub_menu(int txindex, int is_testnet) {
     char* desired_fee;
     char* total_amount_for_verification;
     char* public_key;
+    char* multisig_pubkeys = NULL;
+    unsigned int multisig_required_signatures = 0;
     char* raw_hexadecimal_transaction;
+    const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     while (running) {
         printf("\n 1. add input\n");
         printf(" 2. add output\n");
         printf(" 3. finalize transaction\n");
         printf(" 4. sign transaction\n");
+        printf(" 5. multisig script/address\n");
 #ifdef WITH_NET
-        printf(" 5. broadcast transaction\n");
+        printf(" 6. broadcast transaction\n");
 #endif
         printf(" 8. print transaction\n");
         printf(" 9. main menu\n\n");
@@ -236,27 +343,51 @@ void sub_menu(int txindex, int is_testnet) {
                     printf("raw_tx: %s\n", get_raw_transaction(txindex));
                     break;
                 case 2:
-                    temp_amt = (char*)getl("amount to send to destination address"); // 5
-                    temp_ext_p2pkh = getl("destination address"); // nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde
-                    printf("destination: %s\n", temp_ext_p2pkh);
-                    printf("addout success: %d\n", add_output(txindex, (char*)temp_ext_p2pkh, temp_amt));
+                    /* getl() returns a pointer into a single static buffer,
+                     * so the second getl() below would overwrite the amount
+                     * before add_output() reads it. Snapshot it first. */
+                    {
+                        char temp_amt_buf[64];
+                        const char* _amt = getl("amount to send to destination address"); // 5
+                        snprintf(temp_amt_buf, sizeof(temp_amt_buf), "%s", _amt);
+                        temp_ext_p2pkh = getl("destination address"); // nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde
+                        printf("destination: %s\n", temp_ext_p2pkh);
+                        printf("addout success: %d\n", add_output(txindex, (char*)temp_ext_p2pkh, temp_amt_buf));
+                    }
                     char* str = get_raw_transaction(txindex);
                     printf("raw_tx: %s\n", str);
                     break;
                 case 3:
-                    output_address = (char*)getl("re-enter destination address for verification"); // nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde
-                    desired_fee = (char*)getl("desired fee"); // .00226
-                    total_amount_for_verification = (char*)getl("total amount for verification"); // 12
-                    public_key = (char*)getl("senders address");
-                    // noxKJyGPugPRN4wqvrwsrtYXuQCk7yQEsy
-                    raw_hexadecimal_transaction = finalize_transaction(txindex, output_address, desired_fee, total_amount_for_verification, public_key);
+                    /* getl() returns a pointer into a single static buffer,
+                     * so each subsequent call overwrites the previous return
+                     * value. Snapshot every prompt into its own buffer before
+                     * passing them to finalize_transaction(). */
+                    {
+                        char out_addr_buf[128], fee_buf[64], total_buf[64], change_buf[128];
+                        snprintf(out_addr_buf, sizeof(out_addr_buf), "%s",
+                                 getl("re-enter destination address for verification"));
+                        snprintf(fee_buf, sizeof(fee_buf), "%s",
+                                 getl("desired fee"));
+                        snprintf(total_buf, sizeof(total_buf), "%s",
+                                 getl("total amount for verification"));
+                        snprintf(change_buf, sizeof(change_buf), "%s",
+                                 getl("senders address"));
+                        raw_hexadecimal_transaction = finalize_transaction(
+                            txindex, out_addr_buf, fee_buf, total_buf, change_buf);
+                    }
                     printf("raw_tx: %s\n", raw_hexadecimal_transaction);
                     break;
                 case 4:
                     signing_menu(txindex, is_testnet);
                     break;
-#ifdef WITH_NET
                 case 5:
+                    /* get_raw_tx allows inputs larger than getl's 100-byte buffer */
+                    multisig_pubkeys = (char*)get_raw_tx("comma-separated compressed pubkeys");
+                    multisig_required_signatures = (unsigned int)strtoul(getl("required signatures"), (char**)NULL, 10);
+                    print_multisig_info(chain, multisig_pubkeys, multisig_required_signatures);
+                    break;
+#ifdef WITH_NET
+                case 6:
                     broadcasting_menu(txindex, is_testnet);
                     break;
 #endif

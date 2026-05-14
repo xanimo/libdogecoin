@@ -323,13 +323,12 @@ When you start the interactive `such` transaction tool with `./such -c transacti
 | delete all transactions   | Remove all existing transactions from memory. |
 | print transactions        | Start building a new transaction. |
 | import raw transaction    | Saves the entered transaction hex as a transaction object in memory. |
+| multisig script/address   | Builds multisig redeem script and prints the corresponding P2SH address from comma-separated compressed pubkeys and required signatures. |
 | broadcast transaction     | Performs the same operation as [`./sendtx`] (#the-sendtx-tool) (`sendtx` recommended) |
 | change network            | Specify the network for building transactions. |
 | quit                      | Exit the tool. |
 
-Once you choose a command, there will be on-screen prompts to guide your next actions. All of these commands internally call the functions that make up Libdogecoin, so for more information on what happens when these commands are run, please refer to the [Libdogecoin Essential Transaction API](doc/../transaction.md).
-
-
+Once you choose a command, there will be on-screen prompts to guide your next actions. All of these commands internally call the functions that make up Libdogecoin, so for more information on what happens when these commands are run, please refer to the [Libdogecoin Essential Transaction API](./transaction.md). For a full end-to-end CLI workflow (multisig key generation, address creation, UTXO scanning, signing, and broadcast), see [End-to-End CLI Multisig Workflow](./transaction_extended.md#end-to-end-cli-multisig-workflow-such--spvnode--sendtx) in the extended transaction documentation.
 
 ## The `sendtx` Tool
 
