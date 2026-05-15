@@ -1,6 +1,11 @@
 packages:=libevent
 native_packages := native_ccache
 
+# NASM=1 builds native_nasm for Intel AVX2/SSE assembly (src/intel).
+ifneq ($(NASM),)
+native_packages += native_nasm
+endif
+
 wallet_packages=
 
 upnp_packages=

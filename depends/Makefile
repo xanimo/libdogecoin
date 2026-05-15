@@ -11,6 +11,7 @@ LIBOQS_RACCOON ?=
 RACCOON_G ?=
 ZK_CARRIER ?=
 YUBIKEY ?=
+NASM ?=
 MULTIPROCESS ?=
 FALLBACK_DOWNLOAD_PATH ?= https://bitcoincore.org/depends-sources
 

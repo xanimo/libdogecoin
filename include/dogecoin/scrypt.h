@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
+#include <config/libdogecoin-config.h>
+#endif
+
 #define SCRYPT_SCRATCHPAD_SIZE 131072 + 63
 
 void scrypt_1024_1_1_256(const char *input, char *output);

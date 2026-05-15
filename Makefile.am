@@ -165,56 +165,48 @@ libdogecoin_la_SOURCES += src/zk_carrier/zk_groth16_mcl.cpp
 endif
 endif
 
+# NASM assembler setup (absolute path resolved by configure, e.g. from
+# depends/${host}/native/bin via config.site, falling back to system nasm)
+NASM = @NASM@
+CLEANFILES =
 
-# NASM assembler setup
-NASM = nasm
+%.o: %.asm
+	$(NASM) $(NASMFLAGS) -I$(DIR_ASM_INCLUDE) -o $@ $<
+
+%.a: %.o
+	$(AR) $(ARFLAGS) $@ $<
 
 if USE_AVX2
-# Directory containing assembly source files and includes
 DIR_ASM_SOURCE = src/intel/avx_t1
 DIR_ASM_INCLUDE = src/intel/
 
-# Find all assembly source files and define corresponding object files
 ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
 ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
 ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
 
-# Add the assembly object files to the list of dependencies
 libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
 
-# Pattern rule for building .o files from .asm files
-%.o: %.asm
-	$(NASM) $(NASMFLAGS) -I$(DIR_ASM_INCLUDE) -o $@ $<
-
-# Pattern rule for custom static library from .o files
-%.a: %.o
-	$(AR) $(ARFLAGS) $@ $<
-
-CLEANFILES = $(ASM_OBJECT_FILES)
+CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
 endif
 
 if USE_SSE
-# Directory containing assembly source files and includes
+if !USE_AVX2
+# SSE only when AVX2 is off: src/sha2.c's C preprocessor path checks USE_AVX2
+# first, then USE_SSE. If both --enable-intel-avx2 and --enable-intel-sse are
+# specified, AVX2 takes precedence; building SSE asm alongside AVX2-defined C
+# would produce a library whose internal calls don't match the assembled symbols.
+# In that case, only AVX2 assembly is built and linked into the library.
 DIR_ASM_SOURCE = src/intel/sse_t1
 DIR_ASM_INCLUDE = src/intel/
 
-# Find all assembly source files and define corresponding object files
 ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
 ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
 ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
 
-# Add the assembly object files to the list of dependencies
 libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
 
-# Pattern rule for building .o files from .asm files
-%.o: %.asm
-	$(NASM) $(NASMFLAGS) -I$(DIR_ASM_INCLUDE) -o $@ $<
-
-# Pattern rule for custom static library from .o files
-%.a: %.o
-	$(AR) $(ARFLAGS) $@ $<
-
-CLEANFILES = $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
+CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
+endif
 endif
 
 if USE_SSE2
@@ -223,6 +215,10 @@ libdogecoin_la_SOURCES += \
 endif
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC
+# Linking $(ASM_LIB_FILES) here triggers a libtool "non-portable" warning
+# but is needed so libdogecoin.so ships the asm symbols. Only one of the
+# USE_AVX2 / USE_SSE asm blocks above is active at a time (the SSE block
+# is gated by !USE_AVX2), so $(ASM_LIB_FILES) is unambiguous.
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
 
 if HAVE_MCL

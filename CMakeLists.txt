@@ -109,12 +109,44 @@ ENDIF()
 
 # NASM integration for AVX2
 if(USE_AVX2 OR USE_SSE)
+    # Prefer depends-built nasm when present, so the build does not rely on nasm
+    # being on $PATH. HOST may be passed in by callers; otherwise also scan the
+    # usual depends/*/native/bin outputs.
+    set(LIBDOGECOIN_NASM_HINTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/depends/native/bin")
+    if(DEFINED HOST AND NOT "${HOST}" STREQUAL "")
+        list(PREPEND LIBDOGECOIN_NASM_HINTS
+            "${CMAKE_CURRENT_SOURCE_DIR}/depends/${HOST}/native/bin")
+    endif()
+    file(GLOB LIBDOGECOIN_DEPENDS_NATIVE_BIN_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/depends/*/native/bin")
+    list(APPEND LIBDOGECOIN_NASM_HINTS ${LIBDOGECOIN_DEPENDS_NATIVE_BIN_DIRS})
+
+    if(CMAKE_ASM_NASM_COMPILER AND NOT EXISTS "${CMAKE_ASM_NASM_COMPILER}")
+        unset(CMAKE_ASM_NASM_COMPILER CACHE)
+        unset(LIBDOGECOIN_NASM_COMPILER CACHE)
+    elseif(NOT CMAKE_ASM_NASM_COMPILER AND LIBDOGECOIN_NASM_COMPILER AND NOT EXISTS "${LIBDOGECOIN_NASM_COMPILER}")
+        unset(CMAKE_ASM_NASM_COMPILER CACHE)
+        unset(LIBDOGECOIN_NASM_COMPILER CACHE)
+    endif()
+
+    if(NOT CMAKE_ASM_NASM_COMPILER OR NOT EXISTS "${CMAKE_ASM_NASM_COMPILER}")
+        find_program(LIBDOGECOIN_NASM_COMPILER
+            NAMES nasm
+            HINTS ${LIBDOGECOIN_NASM_HINTS}
+        )
+        if(LIBDOGECOIN_NASM_COMPILER)
+            set(CMAKE_ASM_NASM_COMPILER "${LIBDOGECOIN_NASM_COMPILER}" CACHE FILEPATH "NASM assembler" FORCE)
+        endif()
+    endif()
+    if(NOT CMAKE_ASM_NASM_COMPILER)
+        message(FATAL_ERROR "Can't find NASM assembler")
+    endif()
+
     enable_language(ASM_NASM)
     if(NOT CMAKE_ASM_NASM_COMPILER_LOADED)
         message(FATAL_ERROR "Can't find NASM assembler")
     endif()
-
-    set(CMAKE_ASM_NASM_COMPILER nasm)
 
     set(NASM_VERSION_REQUIRED "2.14")
     execute_process(
