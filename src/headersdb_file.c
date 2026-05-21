@@ -196,10 +196,14 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
              memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
         {
             fprintf(stderr, "Error reading database file\n");
+            fclose(db->headers_tree_file);
+            db->headers_tree_file = NULL;
             return false;
         }
         if (le32toh(*(buf+sizeof(file_hdr_magic))) > current_version) {
             fprintf(stderr, "Unsupported file version\n");
+            fclose(db->headers_tree_file);
+            db->headers_tree_file = NULL;
             return false;
         }
     }
@@ -568,4 +572,9 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t 
     memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256_t));
     db->chainbottom->chainwork = chainwork;
     db->chaintip = db->chainbottom;
+    /* Add to tree so dogecoin_btree_tdestroy (in dogecoin_headers_db_free) and
+       the trim path (dogecoin_btree_tdelete) can properly free this block. */
+    if (db->use_binary_tree) {
+        dogecoin_btree_tsearch(db->chainbottom, &db->tree_root, dogecoin_header_compare);
+    }
 }

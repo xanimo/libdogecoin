@@ -51,6 +51,9 @@
 #include <dogecoin/random.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/pqc_falcon.h>
+#ifdef USE_RACCOON_G
+#include <dogecoin/pqc_raccoon.h>
+#endif
 #include <dogecoin/ecc.h>
 
 #define BUFFER_SIZE (1000 * 1000)
@@ -80,6 +83,16 @@ typedef struct {
 /* Global storage for all benchmark results */
 static benchmark_result results[MAX_BENCHMARKS];
 static int num_results = 0;
+
+#if defined(__GNUC__) || defined(__clang__)
+static void bench_require(int ok, const char* op) __attribute__((unused));
+#endif
+static void bench_require(int ok, const char* op) {
+    if (!ok) {
+        fprintf(stderr, "Benchmark fatal: %s failed\n", op);
+        exit(EXIT_FAILURE);
+    }
+}
 
 /* ---- timing helpers ---- */
 static double gettimedouble(void) {
@@ -276,6 +289,130 @@ static void falcon512_commit_bytes_bench(benchmark_context *ctx) {
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
 
+#ifdef USE_RACCOON_G
+/* ---- Raccoon-G (requires --enable-raccoon-g) ---- */
+static void raccoong44_keypair_bench(benchmark_context *ctx) {
+    uint8_t *pk = NULL;
+    uint8_t *sk = NULL;
+    size_t pk_len = 0;
+    size_t sk_len = 0;
+    bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+    if (pk) dogecoin_free(pk);
+    if (sk) dogecoin_free(sk);
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
+
+static void raccoong44_sign_bench(benchmark_context *ctx) {
+    static uint8_t *pk = NULL;
+    static uint8_t *sk = NULL;
+    static size_t pk_len = 0;
+    static size_t sk_len = 0;
+    uint8_t *sig = NULL;
+    size_t sig_len = 0;
+    if (!pk || !sk) bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+    bench_require(dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len), "dogecoin_raccoong44_sign");
+    if (sig) dogecoin_free(sig);
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
+
+static void raccoong44_verify_bench(benchmark_context *ctx) {
+    static uint8_t *pk = NULL;
+    static uint8_t *sk = NULL;
+    static uint8_t *sig = NULL;
+    static size_t pk_len = 0;
+    static size_t sk_len = 0;
+    static size_t sig_len = 0;
+    static int primed = 0;
+    if (!primed) {
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+        bench_require(dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len), "dogecoin_raccoong44_sign");
+        primed = 1;
+    }
+    bench_require(dogecoin_raccoong44_verify(pk, pk_len, ctx->input, 32, sig, sig_len), "dogecoin_raccoong44_verify");
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
+
+static void raccoong44_commit_bytes_bench(benchmark_context *ctx) {
+    static uint8_t *pk = NULL;
+    static uint8_t *sk = NULL;
+    static uint8_t *sig = NULL;
+    static size_t pk_len = 0;
+    static size_t sk_len = 0;
+    static size_t sig_len = 0;
+    static int primed = 0;
+    if (!primed) {
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+        bench_require(dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len), "dogecoin_raccoong44_sign");
+        primed = 1;
+    }
+    uint8_t commit32[32];
+    bench_require(dogecoin_raccoong44_commit_bytes(pk, pk_len, sig, sig_len, commit32), "dogecoin_raccoong44_commit_bytes");
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
+
+static void raccoong44_hd_hardened_bench(benchmark_context *ctx) {
+    static uint8_t *pk = NULL;
+    static uint8_t *sk = NULL;
+    static size_t pk_len = 0;
+    static size_t sk_len = 0;
+    static int primed = 0;
+    if (!primed) {
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+        primed = 1;
+    }
+    uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+    sha256_raw(ctx->input, BUFFER_SIZE, chaincode);
+    uint8_t *child_sk = NULL;
+    uint8_t *child_pk = NULL;
+    size_t child_sk_len = 0;
+    size_t child_pk_len = 0;
+    bench_require(dogecoin_raccoong44_hd_derive_priv(sk, sk_len, pk, pk_len, chaincode, 0, true,
+                                                     &child_sk, &child_sk_len, &child_pk, &child_pk_len),
+                  "dogecoin_raccoong44_hd_derive_priv");
+    if (child_sk) dogecoin_free(child_sk);
+    if (child_pk) dogecoin_free(child_pk);
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
+
+static void raccoong44_hd_nonhardened_bench(benchmark_context *ctx) {
+    static uint8_t *pk = NULL;
+    static uint8_t *sk = NULL;
+    static size_t pk_len = 0;
+    static size_t sk_len = 0;
+    static int primed = 0;
+    if (!primed) {
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+        primed = 1;
+    }
+    uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+    sha256_raw(ctx->input, BUFFER_SIZE, chaincode);
+    uint8_t *child_pk = NULL;
+    size_t child_pk_len = 0;
+    bench_require(dogecoin_raccoong44_hd_derive_pub(pk, pk_len, chaincode, 1, &child_pk, &child_pk_len),
+                  "dogecoin_raccoong44_hd_derive_pub");
+    if (child_pk) dogecoin_free(child_pk);
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
+#endif /* USE_RACCOON_G */
+
 /* ---- Other PQC Algorithms (Dilithium, SPHINCS+) ---- */
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
@@ -355,7 +492,10 @@ static void pqc_keypair_bench_generic(benchmark_context *ctx, const char *alg_na
     uint8_t *sk = (uint8_t*)dogecoin_malloc(alg->length_secret_key);
     
     if (pk && sk) {
-        OQS_SIG_keypair(alg, pk, sk);
+        OQS_STATUS st = OQS_SIG_keypair(alg, pk, sk);
+        if (st != OQS_SUCCESS) {
+            bench_require(0, "OQS_SIG_keypair");
+        }
         dogecoin_free(pk);
         dogecoin_free(sk);
     }
@@ -370,7 +510,10 @@ static void pqc_sign_bench_generic(benchmark_context *ctx, pqc_bench_state *stat
     if (!state->alg) return;
     
     size_t sig_len = 0;
-    OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+    OQS_STATUS st = OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+    if (st != OQS_SUCCESS) {
+        bench_require(0, "OQS_SIG_sign");
+    }
     
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
@@ -381,12 +524,18 @@ static void pqc_verify_bench_generic(benchmark_context *ctx, pqc_bench_state *st
         pqc_init_state(state, alg_name);
         if (state->alg) {
             size_t sig_len = 0;
-            OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            OQS_STATUS st = OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            if (st != OQS_SUCCESS) {
+                bench_require(0, "OQS_SIG_sign");
+            }
         }
     }
     if (!state->alg) return;
     
-    OQS_SIG_verify(state->alg, ctx->input, 32, state->sig, state->alg->length_signature, state->pk);
+    OQS_STATUS st = OQS_SIG_verify(state->alg, ctx->input, 32, state->sig, state->alg->length_signature, state->pk);
+    if (st != OQS_SUCCESS) {
+        bench_require(0, "OQS_SIG_verify");
+    }
     
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
@@ -397,7 +546,10 @@ static void pqc_commit_bench_generic(benchmark_context *ctx, pqc_bench_state *st
         pqc_init_state(state, alg_name);
         if (state->alg) {
             size_t sig_len = 0;
-            OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            OQS_STATUS st = OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            if (st != OQS_SUCCESS) {
+                bench_require(0, "OQS_SIG_sign");
+            }
         }
     }
     if (!state->alg) return;
@@ -600,6 +752,7 @@ static benchmark_result* find_result(const char *name) {
 static dogecoin_bool is_pqc_result_name(const char *name) {
     if (!name) return false;
     return (strncmp(name, "Falcon", 6) == 0 ||
+            strncmp(name, "Raccoon", 7) == 0 ||
             strncmp(name, "Dilith", 6) == 0 ||
             strncmp(name, "SPHNCS", 6) == 0);
 }
@@ -633,10 +786,11 @@ static void print_analysis(void) {
         {"PQC Key Generation", "pqc-keypair", NULL},
         {"PQC Signing", "pqc-sign", NULL},
         {"PQC Verification", "pqc-verify", NULL},
-        {"PQC Commits", "pqc-commit", NULL}
+        {"PQC Commits", "pqc-commit", NULL},
+        {"PQC HD Derivations", "pqc-hd", NULL}
     };
     
-    for (int cat = 0; cat < 6; cat++) {
+    for (int cat = 0; cat < 7; cat++) {
         const char *cat_name = categories[cat][0];
         const char *cat_prefix = categories[cat][1];
         
@@ -700,6 +854,9 @@ static void print_analysis(void) {
     benchmark_result *falcon_kp = find_result("Falcon512-kp");
     benchmark_result *falcon_sig = find_result("Falcon512-sig");
     benchmark_result *falcon_ver = find_result("Falcon512-ver");
+    benchmark_result *raccoon_kp = find_result("RaccoonG-kp");
+    benchmark_result *raccoon_sig = find_result("RaccoonG-sig");
+    benchmark_result *raccoon_ver = find_result("RaccoonG-ver");
     benchmark_result *secp_kp = find_result("secp-kp");
     benchmark_result *secp_sig = find_result("secp-sig");
     benchmark_result *secp_ver = find_result("secp-ver");
@@ -737,6 +894,11 @@ static void print_analysis(void) {
         double ratio = falcon_ver->avgTime / secp_ver->avgTime;
         printf("  - Falcon512 verification is %.2fx vs secp256k1 (%.6f vs %.6f sec)\n",
                ratio, falcon_ver->avgTime, secp_ver->avgTime);
+    }
+    if (secp_ver && raccoon_ver) {
+        double ratio = raccoon_ver->avgTime / secp_ver->avgTime;
+        printf("  - Raccoon-G verification is %.2fx vs secp256k1 (%.6f vs %.6f sec)\n",
+               ratio, raccoon_ver->avgTime, secp_ver->avgTime);
     }
     
     if (falcon_kp && sphincs_s_kp) {
@@ -819,6 +981,9 @@ static void print_analysis(void) {
     if (falcon_ver || dilith2_ver || sphincs_s_sig) {
         printf("• Tagged PQC commitments are benchmarked in the PQC Commits section above\n");
     }
+    if (raccoon_kp || raccoon_sig) {
+        printf("• Raccoon-G HD derivation throughput is benchmarked in PQC HD Derivations above\n");
+    }
 
     /* Security-strength characteristic table for quick PQC comparison context */
 #ifdef USE_LIBOQS
@@ -826,11 +991,13 @@ static void print_analysis(void) {
     printf("  %-14s %-12s %-s\n", "Algorithm", "Category", "Approx. classical security");
     if (find_result("secp-kp"))        printf("  %-14s %-12s %-s\n", "secp256k1", "N/A", "~128-bit (ECDLP, non-PQC)");
     if (find_result("Falcon512-kp"))   printf("  %-14s %-12s %-s\n", "Falcon-512", "Level 1", "~128-bit");
+    if (find_result("RaccoonG-kp"))    printf("  %-14s %-12s %-s\n", "Raccoon-G", "Level 2*", "~128-192-bit*");
     if (find_result("Dilith2-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium2", "Level 2", "~128-bit");
     if (find_result("Dilith3-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium3", "Level 3", "~192-bit");
     if (find_result("Dilith5-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium5", "Level 5", "~256-bit");
     if (find_result("SPHNCS128s-kp"))  printf("  %-14s %-12s %-s\n", "SPHINCS128s", "Level 1", "~128-bit");
     if (find_result("SPHNCS128f-kp"))  printf("  %-14s %-12s %-s\n", "SPHINCS128f", "Level 1", "~128-bit");
+    if (find_result("RaccoonG-kp"))    printf("  %-14s %-12s %-s\n", "", "*", "Raccoon-G security estimate depends on parameter-set target");
     printf("  Note: These are algorithm strength targets, separate from measured throughput above.\n");
 #endif
 }
@@ -868,6 +1035,21 @@ int main(void) {
     run_benchmark(falcon512_sign_bench,         "Falcon512-sig", "pqc-sign");
     run_benchmark(falcon512_verify_bench,       "Falcon512-ver", "pqc-verify");
     run_benchmark(falcon512_commit_bytes_bench, "Falcon512-cmt", "pqc-commit");
+
+    /* Raccoon-G (includes HD derivation primitives) */
+#ifdef USE_RACCOON_G
+    printf("\n--- Raccoon-G (PQC + HD Derivation) ---\n");
+    if (dogecoin_raccoong44_is_available()) {
+        run_benchmark(raccoong44_keypair_bench,      "RaccoonG-kp", "pqc-keypair");
+        run_benchmark(raccoong44_sign_bench,         "RaccoonG-sig", "pqc-sign");
+        run_benchmark(raccoong44_verify_bench,       "RaccoonG-ver", "pqc-verify");
+        run_benchmark(raccoong44_commit_bytes_bench, "RaccoonG-cmt", "pqc-commit");
+        run_benchmark(raccoong44_hd_hardened_bench,  "RaccoonG-hdh", "pqc-hd");
+        run_benchmark(raccoong44_hd_nonhardened_bench, "RaccoonG-hdn", "pqc-hd");
+    } else {
+        printf("%-16s %s\n", "RaccoonG", "not available");
+    }
+#endif
 
     /* Dilithium variants - compare against Falcon */
     printf("\n--- Dilithium (NIST PQC Standard) - Compare vs Falcon ---\n");
@@ -920,6 +1102,7 @@ int main(void) {
 #else
     printf("\n--- PQC Algorithms (liboqs disabled) ---\n");
     printf("%-16s %s\n", "Falcon512",    "skipped (liboqs disabled)");
+    printf("%-16s %s\n", "RaccoonG",     "skipped (liboqs disabled)");
     printf("%-16s %s\n", "Dilithium",    "skipped (liboqs disabled)");
     printf("%-16s %s\n", "SPHINCS+",     "skipped (liboqs disabled)");
 #endif
@@ -943,6 +1126,9 @@ int main(void) {
 #ifdef USE_LIBOQS
     printf("  liboqs enabled:\n");
     printf("    - Falcon-512 (primary PQC baseline)\n");
+#ifdef USE_RACCOON_G
+    printf("    - Raccoon-G (PQC + BIP32-style HD derivations)\n");
+#endif
     printf("    - Dilithium-2/3/5 (NIST standard, lattice-based)\n");
     printf("    - SPHINCS+ (hash-based, conservative security)\n");
 #endif

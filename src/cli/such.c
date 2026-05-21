@@ -66,6 +66,10 @@
 #include <dogecoin/wow.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_carrier.h>
+#ifdef USE_RACCOON_G
+#include <dogecoin/pqc_raccoon.h>
+#endif
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
 #ifdef WITH_NET
@@ -611,8 +615,11 @@ void main_menu() {
 static struct option long_options[] =
     {
         {"privkey", required_argument, NULL, 'p'},
+        {"sk_file", required_argument, NULL, 0x100},
+        {"sk-file", required_argument, NULL, 0x100},
         {"pubkey", required_argument, NULL, 'k'},
         {"derived_path", required_argument, NULL, 'm'},
+        {"chunks", required_argument, NULL, 'm'},
         {"sighash", required_argument, NULL, 'h'},
         {"script", required_argument, NULL, 's'},
         {"input_index", required_argument, NULL, 'i'},
@@ -661,8 +668,14 @@ static void print_usage()
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
+        printf("set_scriptsig (-x <raw hex tx> -i <input index> -s <scriptSig hex>),\n");
+        printf("pqc_chunk_hex (-x <hex_payload> [-h <max_chunk_bytes, default 520>]),\n");
 #ifdef USE_LIBOQS
     printf("tx_sighash32 (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>),\n");
+    printf("pqc_carrier_redeemscript,\n");
+    printf("pqc_carrier_scriptpubkey,\n");
+    printf("pqc_carrier_mkpart (-k <tag4_hex> -p <pqc_pubkey_hex> -s <pqc_signature_hex> -i <part_index>),\n");
+    printf("pqc_carrier_parsepart (-x <scriptsig_hex>),\n");
 #endif
     printf("comp2der (-s <compact signature>),\n");
     printf("bip32maintotest (-p <extended hd master key>),\n");
@@ -671,15 +684,35 @@ static void print_usage()
     printf("transaction,\n");
 #ifdef USE_LIBOQS
     printf("falcon_keygen (generates Falcon-512 keypair),\n");
-    printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("falcon_sign (requires -p <falcon_secret_key_hex>|--sk-file <path> and -x <message_hex|tx_sighash_hex>),\n");
     printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
     printf("dilithium2_keygen (generates Dilithium2 keypair),\n");
-    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex>|--sk-file <path> and -x <message_hex|tx_sighash_hex>),\n");
     printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("dilithium2_commit (requires -k <dilithium2_public_key_hex> -s <signature_hex>),\n");
+#endif
+#ifdef USE_RACCOON_G
+    printf("raccoong_keygen (generates Raccoon-G-44 keypair),\n");
+    printf("raccoong_sign (requires -p <raccoong_secret_key_hex>|--sk-file <path> and -x <message_hex|tx_sighash_hex>),\n");
+    printf("raccoong_verify (requires -k <raccoong_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
+    printf("raccoong_commit (requires -k <raccoong_public_key_hex> -s <signature_hex>),\n");
+    printf("raccoong_hd_derive (requires -p <raccoong_secret_key_hex>|--sk-file <path>, -s <chaincode_hex>, -i <child_index>, optional -g <0|1 hardened>),\n");
+    printf("raccoong_hd_derive_pub (requires -k <raccoong_public_key_hex> -s <chaincode_hex> -i <child_index>),\n");
+#endif
+#ifdef USE_LIBOQS
     printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>),\n");
     printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>),\n");
+#endif
+#ifdef USE_RACCOON_G
+    printf("raccoong_add_commit_tx (requires -x <raw_tx_hex> -s <raccoong_commitment_hex>),\n");
+#endif
+#ifdef USE_LIBOQS
+    printf("falcon_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <falcon_commitment_hex> -k <falcon_pubkey_hex> -s <falcon_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
+    printf("dilithium2_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <dilithium2_commitment_hex> -k <dilithium2_pubkey_hex> -s <dilithium2_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
+#endif
+#ifdef USE_RACCOON_G
+    printf("raccoong_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <raccoong_commitment_hex> -k <raccoong_pubkey_hex> -s <raccoong_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
 #endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
@@ -694,11 +727,317 @@ static bool showError(const char* er)
     return 1;
     }
 
+static void such_cstring_free_cb(void* data)
+{
+    cstr_free((cstring*)data, true);
+}
+
+static dogecoin_bool such_hex_payload_chunks(const char* payload_hex, size_t max_chunk_bytes, vector_t* chunks_out)
+{
+    if (!payload_hex || !chunks_out) {
+        return false;
+    }
+    size_t payload_hex_len = strlen(payload_hex);
+    if ((payload_hex_len % 2) != 0) {
+        return false;
+    }
+    if (max_chunk_bytes == 0) {
+        return false;
+    }
+    size_t chunk_hex_len = max_chunk_bytes * 2;
+    if (chunk_hex_len == 0) {
+        return false;
+    }
+    if (payload_hex_len == 0) {
+        return true;
+    }
+
+    for (size_t off = 0; off < payload_hex_len; off += chunk_hex_len) {
+        size_t take = payload_hex_len - off;
+        if (take > chunk_hex_len) {
+            take = chunk_hex_len;
+        }
+        cstring* chunk = cstr_new_sz(take + 1);
+        if (!chunk) {
+            return false;
+        }
+        cstr_append_buf(chunk, payload_hex + off, take);
+        if (!vector_add(chunks_out, chunk)) {
+            cstr_free(chunk, true);
+            return false;
+        }
+    }
+    return true;
+}
+
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
+#if defined(__GNUC__) || defined(__clang__)
+static dogecoin_bool such_tag4_hex_to_tag8(const char* tag4_hex, char out_tag8[8]) __attribute__((unused));
+#endif
+static dogecoin_bool such_tag4_hex_to_tag8(const char* tag4_hex, char out_tag8[8])
+{
+    if (!tag4_hex || !out_tag8 || strlen(tag4_hex) != 8) {
+        return false;
+    }
+    uint8_t tag4[4];
+    size_t outlen = 0;
+    utils_hex_to_bin(tag4_hex, tag4, 8, &outlen);
+    if (outlen != 4) {
+        return false;
+    }
+    memcpy(out_tag8, tag4, 4);
+    memcpy(out_tag8 + 4, "FULL", 4);
+    return true;
+}
+
+static dogecoin_bool such_commit_hex_to_bytes32(const char* commit_hex, uint8_t out_commit32[32])
+{
+    if (!commit_hex || !out_commit32) {
+        return false;
+    }
+    if (strlen(commit_hex) != 64) {
+        return false;
+    }
+    for (size_t i = 0; i < 64; i++) {
+        if (!isxdigit((unsigned char)commit_hex[i])) {
+            return false;
+        }
+    }
+    size_t commit_len = 0;
+    utils_hex_to_bin(commit_hex, out_commit32, 64, &commit_len);
+    return commit_len == 32;
+}
+
+/* Read a PQC secret key (hex) from a file. Caller owns the returned heap
+   buffer and must release it with dogecoin_mem_zero() + dogecoin_free().
+   Whitespace (newlines, spaces, tabs, CR) inside the file is ignored so a
+   trailing newline from `echo "...hex..." > sk.hex` is accepted. Reading
+   from a file avoids exposing secret bytes through argv / /proc/<pid>/cmdline.
+   Returns a NUL-terminated hex string on success, NULL on any error. */
+static char* such_read_sk_hex_from_file(const char* path)
+{
+    if (!path) return NULL;
+    FILE* f = fopen(path, "rb");
+    if (!f) return NULL;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+    long raw_len = ftell(f);
+    if (raw_len < 0 || raw_len > (1L << 22) /* 4 MiB hard cap */) {
+        fclose(f);
+        return NULL;
+    }
+    rewind(f);
+    char* raw = (char*)dogecoin_malloc((size_t)raw_len + 1);
+    if (!raw) { fclose(f); return NULL; }
+    size_t got = fread(raw, 1, (size_t)raw_len, f);
+    fclose(f);
+    if (got != (size_t)raw_len) {
+        dogecoin_mem_zero(raw, (size_t)raw_len);
+        dogecoin_free(raw);
+        return NULL;
+    }
+    raw[raw_len] = '\0';
+
+    char* out = (char*)dogecoin_malloc((size_t)raw_len + 1);
+    if (!out) {
+        dogecoin_mem_zero(raw, (size_t)raw_len);
+        dogecoin_free(raw);
+        return NULL;
+    }
+    size_t w = 0;
+    for (long i = 0; i < raw_len; i++) {
+        unsigned char c = (unsigned char)raw[i];
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+        if (!isxdigit(c)) {
+            dogecoin_mem_zero(raw, (size_t)raw_len);
+            dogecoin_free(raw);
+            dogecoin_mem_zero(out, (size_t)raw_len + 1);
+            dogecoin_free(out);
+            return NULL;
+        }
+        out[w++] = (char)c;
+    }
+    out[w] = '\0';
+    dogecoin_mem_zero(raw, (size_t)raw_len);
+    dogecoin_free(raw);
+    if (w == 0 || (w % 2) != 0) {
+        dogecoin_mem_zero(out, w);
+        dogecoin_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+/* Resolve which secret-key hex string the PQC sign/derive commands should
+   use. Prefers --sk-file (safer: not visible in /proc/<pid>/cmdline) over
+   -p. On success returns a heap buffer the caller must release via
+   such_release_sk_hex(); on failure returns NULL. If both -p and --sk-file
+   are supplied -p wins for backward compatibility but a warning is printed
+   so users know the argv path leaks the secret. */
+static char* such_resolve_sk_hex(const char* pkey, const char* sk_file, dogecoin_bool* out_owned)
+{
+    if (out_owned) *out_owned = false;
+    if (pkey) {
+        if (sk_file) {
+            fprintf(stderr,
+                    "warning: both -p and --sk-file supplied; using -p. "
+                    "Note: secret bytes passed on argv are visible to other "
+                    "users via /proc/<pid>/cmdline — prefer --sk-file.\n");
+        } else {
+            fprintf(stderr,
+                    "warning: PQC secret key passed via -p is visible to other "
+                    "users via /proc/<pid>/cmdline. Prefer --sk-file <path>.\n");
+        }
+        return (char*)pkey;
+    }
+    if (sk_file) {
+        char* loaded = such_read_sk_hex_from_file(sk_file);
+        if (!loaded) return NULL;
+        if (out_owned) *out_owned = true;
+        return loaded;
+    }
+    return NULL;
+}
+
+static void such_release_sk_hex(char* sk_hex, dogecoin_bool owned)
+{
+    if (owned && sk_hex) {
+        dogecoin_mem_zero(sk_hex, strlen(sk_hex));
+        dogecoin_free(sk_hex);
+    }
+}
+
+static dogecoin_bool such_tx_add_commit_and_carrier_outputs(
+    dogecoin_tx* tx,
+    const uint8_t commit32[32],
+    dogecoin_bool (*add_commit_fn)(dogecoin_tx* tx, const uint8_t commitment32[32]),
+    const char tag4[4],
+    const char* pqc_pubkey_hex,
+    const char* pqc_signature_hex,
+    uint64_t carrier_value_koinu,
+    cstring** out_carrier_spk,
+    uint8_t* out_part_total,
+    uint32_t* out_carrier_first_vout)
+{
+    if (!tx || !add_commit_fn || !tag4 || !pqc_pubkey_hex || !pqc_signature_hex ||
+        !out_carrier_spk || !out_part_total || !out_carrier_first_vout) {
+        return false;
+    }
+    if ((strlen(pqc_pubkey_hex) % 2) != 0 || (strlen(pqc_signature_hex) % 2) != 0) {
+        return false;
+    }
+    size_t pk_len = strlen(pqc_pubkey_hex) / 2;
+    size_t sig_len = strlen(pqc_signature_hex) / 2;
+    if (pk_len == 0 || sig_len == 0) {
+        return false;
+    }
+    uint8_t* pk = dogecoin_malloc(pk_len + 1);
+    uint8_t* sig = dogecoin_malloc(sig_len + 1);
+    if (!pk || !sig) {
+        if (pk) dogecoin_free(pk);
+        if (sig) dogecoin_free(sig);
+        return false;
+    }
+    size_t outlen = 0;
+    utils_hex_to_bin(pqc_pubkey_hex, pk, strlen(pqc_pubkey_hex), &outlen);
+    if (outlen != pk_len) {
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        return false;
+    }
+    utils_hex_to_bin(pqc_signature_hex, sig, strlen(pqc_signature_hex), &outlen);
+    if (outlen != sig_len) {
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        return false;
+    }
+
+    size_t full_len = pk_len + sig_len;
+    uint8_t* full = dogecoin_malloc(full_len + 1);
+    if (!full) {
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        return false;
+    }
+    memcpy(full, pk, pk_len);
+    memcpy(full + pk_len, sig, sig_len);
+    dogecoin_free(pk);
+    dogecoin_free(sig);
+
+    if (!add_commit_fn(tx, commit32)) {
+        dogecoin_free(full);
+        return false;
+    }
+
+    cstring* redeem = NULL;
+    cstring* carrier_spk = NULL;
+    if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+        dogecoin_free(full);
+        return false;
+    }
+    if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(redeem, &carrier_spk)) {
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        return false;
+    }
+
+    size_t part_payload_max = DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX;
+    uint8_t part_total = (uint8_t)((full_len + part_payload_max - 1) / part_payload_max);
+    if (part_total == 0) {
+        cstr_free(carrier_spk, true);
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        return false;
+    }
+
+    uint32_t first_vout = (uint32_t)(tx->vout->len);
+    if (!dogecoin_tx_add_pqc_carrier_outputs(tx, carrier_spk, carrier_value_koinu, part_total)) {
+        cstr_free(carrier_spk, true);
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        return false;
+    }
+
+    /* Deduct the total carrier cost from the first output (change/send-back)
+       so that the miner fee stays intact instead of being consumed by carriers. */
+    uint64_t carrier_total = (uint64_t)part_total * carrier_value_koinu;
+    if (tx->vout->len > 0) {
+        dogecoin_tx_out* change_out = vector_idx(tx->vout, 0);
+        if ((uint64_t)change_out->value < carrier_total) {
+            printf("Error: change output (%llu) too small for carrier total (%llu)\n",
+                   (unsigned long long)change_out->value, (unsigned long long)carrier_total);
+            cstr_free(carrier_spk, true);
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            return false;
+        }
+        change_out->value -= carrier_total;
+    }
+
+    *out_carrier_spk = carrier_spk;
+    *out_part_total = part_total;
+    *out_carrier_first_vout = first_vout;
+    cstr_free(redeem, true);
+    dogecoin_free(full);
+    return true;
+}
+#endif
+
 int main(int argc, char* argv[])
     {
     int long_index = 0;
     int opt = 0;
     char* pkey = 0;
+    /* Path to a file containing the PQC secret key as hex (one line). Used by
+       PQC sign/derive commands as a safer alternative to -p, which exposes
+       secret bytes through /proc/<pid>/cmdline on multi-user hosts and in CI
+       runners. Mutually exclusive with passing the secret directly via -p. */
+    char* sk_file = 0;
+#if !defined(USE_LIBOQS) && !defined(USE_RACCOON_G)
+    /* sk_file is consumed by PQC sign/derive command branches only; mark it
+       read here so default builds without a PQC backend do not warn about
+       a set-but-not-used variable. */
+    (void)sk_file;
+#endif
     char* pubkey = 0;
     char* cmd = 0;
     char* derived_path = 0;
@@ -728,8 +1067,9 @@ int main(int argc, char* argv[])
         switch (opt) {
                 case 'p':
                     pkey = optarg;
-                    if (strlen(pkey) < 50)
-                        return showError("Private key must be WIF encoded");
+                    break;
+                case 0x100:
+                    sk_file = optarg;
                     break;
                 case 'c':
                     cmd = optarg;
@@ -1126,6 +1466,258 @@ int main(int argc, char* argv[])
         dogecoin_tx_free(tx);
         }
 #ifdef USE_LIBOQS
+    else if (strcmp(cmd, "pqc_carrier_redeemscript") == 0) {
+        cstring* redeem = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            return showError("Failed to build carrier redeemScript");
+        }
+        char* hex = utils_uint8_to_hex((const uint8_t*)redeem->str, redeem->len);
+        printf("redeemScript: %s\n", hex ? hex : "");
+        cstr_free(redeem, true);
+    }
+    else if (strcmp(cmd, "pqc_carrier_scriptpubkey") == 0) {
+        cstring* redeem = NULL;
+        cstring* spk = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            return showError("Failed to build carrier redeemScript");
+        }
+        if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(redeem, &spk)) {
+            cstr_free(redeem, true);
+            return showError("Failed to build carrier scriptPubKey");
+        }
+        char* hex = utils_uint8_to_hex((const uint8_t*)spk->str, spk->len);
+        printf("carrier_p2sh_scriptpubkey: %s\n", hex ? hex : "");
+        cstr_free(spk, true);
+        cstr_free(redeem, true);
+    }
+    else if (strcmp(cmd, "pqc_carrier_mkpart") == 0) {
+        /* CLI uses:
+         * -k tag4 hex ("FLC1"/"DIL2"/"RCG4" as 8 hex chars),
+         * -p PQ public key hex, -s PQ signature hex, -i part_index.
+         * Note: -p/-s/-i reuse existing parser slots (pkey/scripthex/inputindex).
+         */
+        if (!pubkey || !pkey || !scripthex) {
+            return showError("Missing tag4 (-k), pqc pubkey (-p), or pqc signature (-s)");
+        }
+        char tag8[8];
+        if (!such_tag4_hex_to_tag8(pubkey, tag8)) {
+            return showError("Invalid tag4 hex; expected 8 hex chars");
+        }
+
+        size_t pk_len = strlen(pkey) / 2;
+        size_t sig_len = strlen(scripthex) / 2;
+        if ((strlen(pkey) % 2) != 0 || (strlen(scripthex) % 2) != 0) {
+            return showError("Invalid pubkey/signature hex");
+        }
+        uint8_t* pk = dogecoin_malloc(pk_len + 1);
+        uint8_t* sig = dogecoin_malloc(sig_len + 1);
+        if (!pk || !sig) {
+            if (pk) dogecoin_free(pk);
+            if (sig) dogecoin_free(sig);
+            return showError("OOM");
+        }
+        size_t outlen = 0;
+        utils_hex_to_bin(pkey, pk, strlen(pkey), &outlen);
+        if (outlen != pk_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("Invalid pubkey hex");
+        }
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &outlen);
+        if (outlen != sig_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("Invalid signature hex");
+        }
+
+        size_t full_len = pk_len + sig_len;
+        uint8_t* full = dogecoin_malloc(full_len + 1);
+        if (!full) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("OOM");
+        }
+        memcpy(full, pk, pk_len);
+        memcpy(full + pk_len, sig, sig_len);
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+
+        size_t part_payload_max = DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX;
+        uint8_t part_total = (uint8_t)((full_len + part_payload_max - 1) / part_payload_max);
+        uint8_t part_index = (uint8_t)inputindex; /* explicit part index from -i */
+        if (part_total == 0 || part_index >= part_total) {
+            dogecoin_free(full);
+            return showError("part_index out of range");
+        }
+        size_t part_off = (size_t)part_index * part_payload_max;
+        size_t part_len = full_len - part_off;
+        if (part_len > part_payload_max) part_len = part_payload_max;
+
+        cstring* redeem = NULL;
+        cstring* scriptsig = NULL;
+        cstring* carrier_spk = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            dogecoin_free(full);
+            return showError("Failed to build carrier redeemScript");
+        }
+        if (!dogecoin_pqc_carrier_build_part_scriptsig(tag8, part_index, part_total, (uint16_t)pk_len, (uint16_t)full_len,
+                                                       full + part_off, part_len, redeem, &scriptsig)) {
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            return showError("Failed to build carrier part scriptsig");
+        }
+        if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(redeem, &carrier_spk)) {
+            cstr_free(scriptsig, true);
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            return showError("Failed to build carrier scriptPubKey");
+        }
+        dogecoin_free(full);
+
+        char* scriptsig_hex_tmp = utils_uint8_to_hex((const uint8_t*)scriptsig->str, scriptsig->len);
+        char* scriptsig_hex = scriptsig_hex_tmp ? strdup(scriptsig_hex_tmp) : NULL;
+        char* spk_hex_tmp = utils_uint8_to_hex((const uint8_t*)carrier_spk->str, carrier_spk->len);
+        char* spk_hex = spk_hex_tmp ? strdup(spk_hex_tmp) : NULL;
+        printf("carrier_part_total: %u\n", (unsigned)part_total);
+        printf("carrier_part_index: %u\n", (unsigned)part_index);
+        printf("carrier_p2sh_scriptpubkey: %s\n", spk_hex ? spk_hex : "");
+        printf("carrier_part_scriptsig: %s\n", scriptsig_hex ? scriptsig_hex : "");
+        if (scriptsig_hex) dogecoin_free(scriptsig_hex);
+        if (spk_hex) dogecoin_free(spk_hex);
+
+        cstr_free(carrier_spk, true);
+        cstr_free(scriptsig, true);
+        cstr_free(redeem, true);
+    }
+    else if (strcmp(cmd, "pqc_carrier_parsepart") == 0) {
+        if (!txhex || (strlen(txhex) % 2) != 0) {
+            return showError("Missing/invalid scriptsig hex (-x)");
+        }
+        size_t blen = strlen(txhex) / 2;
+        uint8_t* b = dogecoin_malloc(blen + 1);
+        if (!b) {
+            return showError("OOM");
+        }
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, b, strlen(txhex), &outlen);
+        if (outlen != blen) {
+            dogecoin_free(b);
+            return showError("Invalid scriptsig hex");
+        }
+        cstring* scriptsig = cstr_new_buf(b, blen);
+        dogecoin_free(b);
+        if (!scriptsig) {
+            return showError("OOM");
+        }
+
+        char tag8[9];
+        uint8_t part_index = 0, part_total = 0;
+        uint16_t pk_len = 0, full_len = 0;
+        uint8_t* part_data = NULL;
+        size_t part_data_len = 0;
+        cstring* redeem = NULL;
+        if (!dogecoin_pqc_carrier_parse_part_scriptsig(scriptsig, tag8, &part_index, &part_total, &pk_len, &full_len,
+                                                       &part_data, &part_data_len, &redeem)) {
+            cstr_free(scriptsig, true);
+            return showError("Carrier part parse failed");
+        }
+        char* part_hex_tmp = utils_uint8_to_hex(part_data, part_data_len);
+        char* part_hex = part_hex_tmp ? strdup(part_hex_tmp) : NULL;
+        char* redeem_hex_tmp = utils_uint8_to_hex((const uint8_t*)redeem->str, redeem->len);
+        char* redeem_hex = redeem_hex_tmp ? strdup(redeem_hex_tmp) : NULL;
+        printf("tag8: %s\n", tag8);
+        printf("part_index: %u\n", (unsigned)part_index);
+        printf("part_total: %u\n", (unsigned)part_total);
+        printf("pk_len: %u\n", (unsigned)pk_len);
+        printf("full_len: %u\n", (unsigned)full_len);
+        printf("part_data: %s\n", part_hex ? part_hex : "");
+        printf("redeemScript: %s\n", redeem_hex ? redeem_hex : "");
+        if (part_hex) dogecoin_free(part_hex);
+        if (redeem_hex) dogecoin_free(redeem_hex);
+
+        if (part_data) dogecoin_free(part_data);
+        cstr_free(redeem, true);
+        cstr_free(scriptsig, true);
+    }
+#endif
+    else if (strcmp(cmd, "set_scriptsig") == 0) {
+        if (!txhex || !scripthex) {
+            return showError("Missing tx-hex or scriptSig-hex (use -x, -s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0 || (strlen(scripthex) % 2) != 0) {
+            return showError("Invalid tx/scriptSig hex\n");
+        }
+        if (strlen(txhex) > 1024 * 100) {
+            return showError("tx too large (max 100kb)\n");
+        }
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+        }
+        dogecoin_free(data_bin);
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+        }
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, inputindex);
+        if (!tx_in->script_sig) {
+            tx_in->script_sig = cstr_new_sz(32);
+            if (!tx_in->script_sig) {
+                dogecoin_tx_free(tx);
+                return showError("Failed to allocate scriptSig");
+            }
+        }
+        size_t ss_len = strlen(scripthex) / 2;
+        uint8_t* ss_bin = dogecoin_malloc(ss_len + 1);
+        if (!ss_bin) {
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        utils_hex_to_bin(scripthex, ss_bin, strlen(scripthex), &outlen);
+        if (outlen != ss_len) {
+            dogecoin_free(ss_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid scriptSig hex");
+        }
+        cstr_resize(tx_in->script_sig, 0);
+        cstr_append_buf(tx_in->script_sig, ss_bin, ss_len);
+        dogecoin_free(ss_bin);
+        cstring* out_tx = cstr_new_sz(1024);
+        dogecoin_tx_serialize(out_tx, tx);
+        char* out_tx_hex = dogecoin_char_vla(out_tx->len * 2 + 1);
+        utils_bin_to_hex((unsigned char*)out_tx->str, out_tx->len, out_tx_hex);
+        printf("tx with scriptsig set: %s\n", out_tx_hex);
+        cstr_free(out_tx, true);
+        free(out_tx_hex);
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "pqc_chunk_hex") == 0) {
+        if (!txhex) {
+            return showError("Missing payload hex (use -x)\n");
+        }
+        size_t max_chunk_bytes = sighashtype > 0 ? (size_t)sighashtype : 520;
+        if (max_chunk_bytes == 0 || max_chunk_bytes > 520) {
+            return showError("max_chunk_bytes must be in range 1..520 (use -h)");
+        }
+
+        vector_t* chunks = vector_new(8, such_cstring_free_cb);
+        if (!such_hex_payload_chunks(txhex, max_chunk_bytes, chunks)) {
+            vector_free(chunks, true);
+            return showError("Failed to chunk payload hex");
+        }
+        printf("chunks: %zu\n", chunks->len);
+        for (size_t i = 0; i < chunks->len; i++) {
+            cstring* chunk = vector_idx(chunks, i);
+            printf("chunk[%zu]: %s\n", i, chunk ? chunk->str : "");
+        }
+        vector_free(chunks, true);
+    }
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
     else if (strcmp(cmd, "tx_sighash32") == 0) {
         // ./such -c tx_sighash32 -x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>
         if (!txhex || !scripthex) {
@@ -1643,22 +2235,28 @@ int main(int argc, char* argv[])
         }
     else if (strcmp(cmd, "falcon_sign") == 0) {
         // ./such -c falcon_sign -p <secret_key_hex> -x <message_hex>
-        if (!pkey) {
-            return showError("Missing secret key (use -p)\n");
+        // or:    -c falcon_sign --sk-file <path> -x <message_hex>
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) {
+            return showError("Missing secret key (use -p <hex> or --sk-file <path>)\n");
         }
         if (!txhex) {
+            such_release_sk_hex(sk_hex, sk_hex_owned);
             return showError("Missing message (use -x)\n");
         }
         
         printf("Signing message with Falcon-512...\n");
         
-        if ((strlen(pkey) % 2) != 0) {
+        if ((strlen(sk_hex) % 2) != 0) {
+            such_release_sk_hex(sk_hex, sk_hex_owned);
             return showError("Invalid secret key hex\n");
         }
-        size_t sk_len = strlen(pkey) / 2;
+        size_t sk_len = strlen(sk_hex) / 2;
         uint8_t* sk = dogecoin_malloc(sk_len);
         size_t sk_outlen = 0;
-        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        utils_hex_to_bin(sk_hex, sk, strlen(sk_hex), &sk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
         if (sk_outlen != sk_len) {
             dogecoin_free(sk);
             return showError("Invalid secret key hex\n");
@@ -1868,13 +2466,16 @@ int main(int argc, char* argv[])
         dogecoin_free(sk);
     }
     else if (strcmp(cmd, "dilithium2_sign") == 0) {
-        if (!pkey) return showError("Missing secret key (use -p)\n");
-        if (!txhex) return showError("Missing message (use -x)\n");
-        if ((strlen(pkey) % 2) != 0) return showError("Invalid secret key hex\n");
-        size_t sk_len = strlen(pkey) / 2;
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) return showError("Missing secret key (use -p <hex> or --sk-file <path>)\n");
+        if (!txhex) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing message (use -x)\n"); }
+        if ((strlen(sk_hex) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid secret key hex\n"); }
+        size_t sk_len = strlen(sk_hex) / 2;
         uint8_t* sk = dogecoin_malloc(sk_len);
         size_t sk_outlen = 0;
-        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        utils_hex_to_bin(sk_hex, sk, strlen(sk_hex), &sk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
         if (sk_outlen != sk_len) { dogecoin_free(sk); return showError("Invalid secret key hex\n"); }
         if ((strlen(txhex) % 2) != 0) { dogecoin_free(sk); return showError("Invalid message hex\n"); }
         size_t msg_len = strlen(txhex) / 2;
@@ -1950,7 +2551,221 @@ int main(int argc, char* argv[])
         printf("OP_RETURN script (prefix 6a24 + tag 44494c32='DIL2'): 6a2444494c32%s\n", commit_hex);
         dogecoin_free(pk); dogecoin_free(sig);
     }
-    #endif
+#endif /* USE_LIBOQS (keygen/sign/verify/commit commands) */
+#ifdef USE_RACCOON_G
+    else if (strcmp(cmd, "raccoong_keygen") == 0) {
+        uint8_t *pk = NULL, *sk = NULL;
+        size_t pk_len = 0, sk_len = 0;
+        printf("Generating Raccoon-G-44 keypair...\n");
+        if (!dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len)) {
+            return showError("Failed to generate Raccoon-G-44 keypair\n");
+        }
+        char* pk_hex = dogecoin_malloc(pk_len * 2 + 1);
+        char* sk_hex = dogecoin_malloc(sk_len * 2 + 1);
+        if (!pk_hex || !sk_hex) {
+            if (pk_hex) dogecoin_free(pk_hex);
+            if (sk_hex) dogecoin_free(sk_hex);
+            dogecoin_free(pk);
+            dogecoin_free(sk);
+            return showError("Failed to allocate Raccoon-G key hex buffers\n");
+        }
+        utils_bin_to_hex(pk, pk_len, pk_hex);
+        utils_bin_to_hex(sk, sk_len, sk_hex);
+        printf("\n=== Raccoon-G-44 Keypair Generated ===\n");
+        printf("public key:  %s\n", pk_hex);
+        printf("secret key:  %s\n", sk_hex);
+        printf("pk length:   %zu bytes\n", pk_len);
+        printf("sk length:   %zu bytes\n", sk_len);
+        dogecoin_free(pk_hex);
+        dogecoin_free(sk_hex);
+        dogecoin_free(pk);
+        dogecoin_free(sk);
+    }
+    else if (strcmp(cmd, "raccoong_sign") == 0) {
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) return showError("Missing secret key (use -p <hex> or --sk-file <path>)\n");
+        if (!txhex) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing message (use -x)\n"); }
+        if ((strlen(sk_hex) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid secret key hex\n"); }
+        size_t sk_len = strlen(sk_hex) / 2;
+        uint8_t* sk = dogecoin_malloc(sk_len);
+        size_t sk_outlen = 0;
+        utils_hex_to_bin(sk_hex, sk, strlen(sk_hex), &sk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
+        if (sk_outlen != sk_len) { dogecoin_free(sk); return showError("Invalid secret key hex\n"); }
+        if ((strlen(txhex) % 2) != 0) { dogecoin_free(sk); return showError("Invalid message hex\n"); }
+        size_t msg_len = strlen(txhex) / 2;
+        uint8_t* msg = dogecoin_malloc(msg_len);
+        size_t msg_outlen = 0;
+        utils_hex_to_bin(txhex, msg, strlen(txhex), &msg_outlen);
+        if (msg_outlen != msg_len) { dogecoin_free(sk); dogecoin_free(msg); return showError("Invalid message hex\n"); }
+        uint8_t* sig = NULL; size_t sig_len = 0;
+        if (!dogecoin_raccoong44_sign(sk, sk_len, msg, msg_len, &sig, &sig_len)) {
+            dogecoin_free(sk); dogecoin_free(msg);
+            return showError("Failed to sign message with Raccoon-G-44\n");
+        }
+        char* sig_hex = utils_uint8_to_hex(sig, sig_len);
+        printf("\n=== Raccoon-G-44 Signature Generated ===\n");
+        printf("signature:   %s\n", sig_hex);
+        printf("sig length:  %zu bytes\n", sig_len);
+        printf("msg length:  %zu bytes\n", msg_len);
+        dogecoin_free(sk); dogecoin_free(msg); dogecoin_free(sig);
+    }
+    else if (strcmp(cmd, "raccoong_verify") == 0) {
+        if (!pubkey) return showError("Missing public key (use -k)\n");
+        if (!txhex) return showError("Missing message (use -x)\n");
+        if (!scripthex) return showError("Missing signature (use -s)\n");
+        if ((strlen(pubkey) % 2) != 0) return showError("Invalid public key hex\n");
+        size_t pk_len = strlen(pubkey) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len);
+        size_t pk_outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &pk_outlen);
+        if (pk_outlen != pk_len) { dogecoin_free(pk); return showError("Invalid public key hex\n"); }
+        if ((strlen(txhex) % 2) != 0) { dogecoin_free(pk); return showError("Invalid message hex\n"); }
+        size_t msg_len = strlen(txhex) / 2;
+        uint8_t* msg = dogecoin_malloc(msg_len);
+        size_t msg_outlen = 0;
+        utils_hex_to_bin(txhex, msg, strlen(txhex), &msg_outlen);
+        if (msg_outlen != msg_len) { dogecoin_free(pk); dogecoin_free(msg); return showError("Invalid message hex\n"); }
+        if ((strlen(scripthex) % 2) != 0) { dogecoin_free(pk); dogecoin_free(msg); return showError("Invalid signature hex\n"); }
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* sig = dogecoin_malloc(sig_len);
+        size_t sig_outlen = 0;
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &sig_outlen);
+        if (sig_outlen != sig_len) { dogecoin_free(pk); dogecoin_free(msg); dogecoin_free(sig); return showError("Invalid signature hex\n"); }
+        dogecoin_bool verified = dogecoin_raccoong44_verify(pk, pk_len, msg, msg_len, sig, sig_len);
+        printf("\n=== Raccoon-G-44 Verification Result ===\n");
+        printf("%s\n", verified ? "✓ VERIFIED: Signature is valid!" : "✗ FAILED: Signature is invalid!");
+        dogecoin_free(pk); dogecoin_free(msg); dogecoin_free(sig);
+        if (!verified) { dogecoin_ecc_stop(); return 1; }
+    }
+    else if (strcmp(cmd, "raccoong_commit") == 0) {
+        if (!pubkey) return showError("Missing public key (use -k)\n");
+        if (!scripthex) return showError("Missing signature (use -s)\n");
+        if ((strlen(pubkey) % 2) != 0) return showError("Invalid public key hex\n");
+        size_t pk_len = strlen(pubkey) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len);
+        size_t pk_outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &pk_outlen);
+        if (pk_outlen != pk_len) { dogecoin_free(pk); return showError("Invalid public key hex\n"); }
+        if ((strlen(scripthex) % 2) != 0) { dogecoin_free(pk); return showError("Invalid signature hex\n"); }
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* sig = dogecoin_malloc(sig_len);
+        size_t sig_outlen = 0;
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &sig_outlen);
+        if (sig_outlen != sig_len) { dogecoin_free(pk); dogecoin_free(sig); return showError("Invalid signature hex\n"); }
+        uint8_t commit[32];
+        if (!dogecoin_raccoong44_commit_bytes(pk, pk_len, sig, sig_len, commit)) {
+            dogecoin_free(pk); dogecoin_free(sig); return showError("Failed to generate Raccoon-G-44 commitment\n");
+        }
+        char commit_hex[65];
+        utils_bin_to_hex(commit, 32, commit_hex);
+        printf("\n=== Raccoon-G-44 Commitment Generated ===\n");
+        printf("commitment:  %s\n", commit_hex);
+        printf("length:      32 bytes\n");
+        printf("\nThis commitment can be included in an OP_RETURN output:\n");
+        printf("OP_RETURN script (prefix 6a24 + tag 52434734='RCG4'): 6a2452434734%s\n", commit_hex);
+        dogecoin_free(pk); dogecoin_free(sig);
+    }
+    else if (strcmp(cmd, "raccoong_hd_derive") == 0) {
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) return showError("Missing parent secret key (use -p <hex> or --sk-file <path>)\n");
+        if (!pubkey) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing parent public key (use -k)\n"); }
+        if (!scripthex) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing chaincode hex (use -s)\n"); }
+        if ((strlen(scripthex) % 2) != 0 || strlen(scripthex) != 64) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Chaincode must be 32 bytes (64 hex)\n"); }
+        if ((strlen(sk_hex) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid parent secret key hex\n"); }
+        if ((strlen(pubkey) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid parent public key hex\n"); }
+        size_t psk_len = strlen(sk_hex) / 2;
+        uint8_t* psk = dogecoin_malloc(psk_len);
+        size_t psk_outlen = 0;
+        utils_hex_to_bin(sk_hex, psk, strlen(sk_hex), &psk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
+        if (psk_outlen != psk_len) { dogecoin_free(psk); return showError("Invalid parent secret key hex\n"); }
+        size_t ppk_len = strlen(pubkey) / 2;
+        uint8_t* ppk = dogecoin_malloc(ppk_len);
+        size_t ppk_outlen = 0;
+        utils_hex_to_bin(pubkey, ppk, strlen(pubkey), &ppk_outlen);
+        if (ppk_outlen != ppk_len) { dogecoin_free(psk); dogecoin_free(ppk); return showError("Invalid parent public key hex\n"); }
+        uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+        size_t cc_outlen = 0;
+        utils_hex_to_bin(scripthex, chaincode, strlen(scripthex), &cc_outlen);
+        if (cc_outlen != DOGECOIN_PQC_RACCOON_CHAINCODE_LEN) { dogecoin_free(psk); dogecoin_free(ppk); return showError("Invalid chaincode hex\n"); }
+        uint8_t* child_pk = NULL; uint8_t* child_sk = NULL;
+        size_t child_pk_len = 0; size_t child_sk_len = 0;
+        int hardened = 0;
+        if (change_level) {
+            hardened = atoi(change_level) ? 1 : 0;
+        }
+        if (!dogecoin_raccoong44_hd_derive_priv(psk, psk_len, ppk, ppk_len, chaincode, inputindex, hardened, &child_sk, &child_sk_len, &child_pk, &child_pk_len)) {
+            dogecoin_free(psk);
+            dogecoin_free(ppk);
+            return showError("Raccoon-G-44 private child derivation failed\n");
+        }
+        char* child_pk_hex = dogecoin_malloc(child_pk_len * 2 + 1);
+        char* child_sk_hex = dogecoin_malloc(child_sk_len * 2 + 1);
+        if (!child_pk_hex || !child_sk_hex) {
+            if (child_pk_hex) dogecoin_free(child_pk_hex);
+            if (child_sk_hex) dogecoin_free(child_sk_hex);
+            dogecoin_free(psk);
+            dogecoin_free(ppk);
+            dogecoin_free(child_pk);
+            dogecoin_free(child_sk);
+            return showError("Failed to allocate child key hex buffers\n");
+        }
+        utils_bin_to_hex(child_pk, child_pk_len, child_pk_hex);
+        utils_bin_to_hex(child_sk, child_sk_len, child_sk_hex);
+        printf("\n=== Raccoon-G-44 HD Child Key (Private Derivation) ===\n");
+        printf("child index: %u%s\n", inputindex, hardened ? " (hardened)" : "");
+        printf("child public key:  %s\n", child_pk_hex);
+        printf("child secret key:  %s\n", child_sk_hex);
+        dogecoin_free(psk);
+        dogecoin_free(ppk);
+        dogecoin_free(child_pk);
+        dogecoin_free(child_sk);
+        dogecoin_free(child_pk_hex);
+        dogecoin_free(child_sk_hex);
+    }
+    else if (strcmp(cmd, "raccoong_hd_derive_pub") == 0) {
+        if (!pubkey) return showError("Missing parent public key (use -k)\n");
+        if (!scripthex) return showError("Missing chaincode hex (use -s)\n");
+        if ((strlen(scripthex) % 2) != 0 || strlen(scripthex) != 64) return showError("Chaincode must be 32 bytes (64 hex)\n");
+        if ((strlen(pubkey) % 2) != 0) return showError("Invalid parent public key hex\n");
+        size_t ppk_len = strlen(pubkey) / 2;
+        uint8_t* ppk = dogecoin_malloc(ppk_len);
+        size_t ppk_outlen = 0;
+        utils_hex_to_bin(pubkey, ppk, strlen(pubkey), &ppk_outlen);
+        if (ppk_outlen != ppk_len) { dogecoin_free(ppk); return showError("Invalid parent public key hex\n"); }
+        uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+        size_t cc_outlen = 0;
+        utils_hex_to_bin(scripthex, chaincode, strlen(scripthex), &cc_outlen);
+        if (cc_outlen != DOGECOIN_PQC_RACCOON_CHAINCODE_LEN) { dogecoin_free(ppk); return showError("Invalid chaincode hex\n"); }
+        if (inputindex & 0x80000000U) {
+            dogecoin_free(ppk);
+            return showError("raccoong_hd_derive_pub does not support hardened indices\n");
+        }
+        uint8_t* child_pk = NULL;
+        size_t child_pk_len = 0;
+        if (!dogecoin_raccoong44_hd_derive_pub(ppk, ppk_len, chaincode, inputindex, &child_pk, &child_pk_len)) {
+            dogecoin_free(ppk);
+            return showError("Raccoon-G-44 public child derivation failed\n");
+        }
+        char* child_pk_hex = dogecoin_malloc(child_pk_len * 2 + 1);
+        if (!child_pk_hex) {
+            dogecoin_free(ppk);
+            dogecoin_free(child_pk);
+            return showError("Failed to allocate child public key hex buffer\n");
+        }
+        utils_bin_to_hex(child_pk, child_pk_len, child_pk_hex);
+        printf("\n=== Raccoon-G-44 HD Child Key (Public Derivation) ===\n");
+        printf("child index: %u\n", inputindex);
+        printf("child public key:  %s\n", child_pk_hex);
+        dogecoin_free(ppk);
+        dogecoin_free(child_pk);
+        dogecoin_free(child_pk_hex);
+    }
+    #endif /* USE_RACCOON_G */
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
 #ifdef USE_LIBOQS
     else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
         // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <falcon_commitment_hex>
@@ -2061,6 +2876,224 @@ int main(int argc, char* argv[])
         printf("tx with commitment: %s\n", tx_with_commit_hex);
         cstr_free(tx_with_commit, true);
         dogecoin_free(tx_with_commit_hex);
+        dogecoin_tx_free(tx);
+    }
+#endif /* USE_LIBOQS (falcon/dilithium add_commit_tx) */
+#ifdef USE_RACCOON_G
+    else if (strcmp(cmd, "raccoong_add_commit_tx") == 0) {
+        if (!txhex || !scripthex) {
+            return showError("Missing tx hex or commitment hex (use -x, -s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0) {
+            return showError("Raw transaction hex length must be even\n");
+        }
+        if (strlen(scripthex) != 64) {
+            return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
+        }
+        for (size_t i = 0; i < strlen(scripthex); i++) {
+            if (!isxdigit((unsigned char)scripthex[i])) {
+                return showError("Commitment must be hex encoded\n");
+            }
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(data_bin);
+
+        uint8_t commit32[32];
+        size_t commit_len = 0;
+        utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
+        if (commit_len != sizeof(commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to decode commitment\n");
+        }
+
+        if (!dogecoin_tx_add_raccoong44_commit(tx, commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append Raccoon-G-44 commitment output\n");
+        }
+
+        cstring* tx_with_commit = cstr_new_sz(1024);
+        dogecoin_tx_serialize(tx_with_commit, tx);
+        char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
+        if (!tx_with_commit_hex) {
+            cstr_free(tx_with_commit, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate memory for tx hex\n");
+        }
+        utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
+        printf("tx with commitment: %s\n", tx_with_commit_hex);
+        cstr_free(tx_with_commit, true);
+        dogecoin_free(tx_with_commit_hex);
+        dogecoin_tx_free(tx);
+    }
+#endif /* USE_RACCOON_G */
+    else if (
+#ifdef USE_LIBOQS
+             strcmp(cmd, "falcon_add_commit_and_carrier_tx") == 0 ||
+             strcmp(cmd, "dilithium2_add_commit_and_carrier_tx") == 0 ||
+#endif
+#ifdef USE_RACCOON_G
+             strcmp(cmd, "raccoong_add_commit_and_carrier_tx") == 0 ||
+#endif
+             0) {
+        if (!txhex || !derived_path || !pubkey || !scripthex) {
+            return showError("Missing tx hex (-x), commitment hex (-m), pqc pubkey (-k), or pqc signature (-s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0) {
+            return showError("Raw transaction hex length must be even\n");
+        }
+        uint64_t carrier_value_koinu = (sighashtype > 0) ? (uint64_t)sighashtype : 100000000;
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(data_bin);
+
+        uint8_t commit32[32];
+        if (!such_commit_hex_to_bytes32(derived_path, commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
+        }
+
+        dogecoin_bool (*add_commit_fn)(dogecoin_tx*, const uint8_t*) = NULL;
+        const char* tag4_ascii = NULL;
+#ifdef USE_LIBOQS
+        if (strcmp(cmd, "falcon_add_commit_and_carrier_tx") == 0) {
+            add_commit_fn = dogecoin_tx_add_falcon512_commit;
+            tag4_ascii = "FLC1";
+        } else if (strcmp(cmd, "dilithium2_add_commit_and_carrier_tx") == 0) {
+            add_commit_fn = dogecoin_tx_add_dilithium2_commit;
+            tag4_ascii = "DIL2";
+        }
+#endif
+#ifdef USE_RACCOON_G
+        if (strcmp(cmd, "raccoong_add_commit_and_carrier_tx") == 0) {
+            add_commit_fn = dogecoin_tx_add_raccoong44_commit;
+            tag4_ascii = "RCG4";
+        }
+#endif
+
+        cstring* carrier_spk = NULL;
+        uint8_t part_total = 0;
+        uint32_t carrier_first_vout = 0;
+        if (!such_tx_add_commit_and_carrier_outputs(tx, commit32, add_commit_fn, tag4_ascii, pubkey, scripthex,
+                                                    carrier_value_koinu, &carrier_spk, &part_total, &carrier_first_vout)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append commitment + carrier outputs\n");
+        }
+
+        size_t pk_len = strlen(pubkey) / 2;
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len + 1);
+        uint8_t* sig = dogecoin_malloc(sig_len + 1);
+        if (!pk || !sig) {
+            if (pk) dogecoin_free(pk);
+            if (sig) dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &outlen);
+        if (outlen != pk_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("Invalid pqc pubkey hex");
+        }
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &outlen);
+        if (outlen != sig_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("Invalid pqc signature hex");
+        }
+        size_t full_len = pk_len + sig_len;
+        uint8_t* full = dogecoin_malloc(full_len + 1);
+        if (!full) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        memcpy(full, pk, pk_len);
+        memcpy(full + pk_len, sig, sig_len);
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+
+        char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN];
+        memcpy(tag8, tag4_ascii, 4);
+        memcpy(tag8 + 4, "FULL", 4);
+        cstring* redeem = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            dogecoin_free(full);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to build carrier redeemScript");
+        }
+
+        cstring* tx_out = cstr_new_sz(1024);
+        dogecoin_tx_serialize(tx_out, tx);
+        char* tx_out_hex = dogecoin_malloc(tx_out->len * 2 + 1);
+        if (!tx_out_hex) {
+            cstr_free(tx_out, true);
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        utils_bin_to_hex((unsigned char*)tx_out->str, tx_out->len, tx_out_hex);
+        char* carrier_spk_hex = utils_uint8_to_hex((const uint8_t*)carrier_spk->str, carrier_spk->len);
+        printf("tx with commitment and carrier outputs: %s\n", tx_out_hex);
+        printf("carrier_part_total: %u\n", (unsigned)part_total);
+        printf("carrier_output_value_koinu: %llu\n", (unsigned long long)carrier_value_koinu);
+        printf("carrier_first_vout: %u\n", carrier_first_vout);
+        printf("carrier_p2sh_scriptpubkey: %s\n", carrier_spk_hex ? carrier_spk_hex : "");
+
+        size_t part_payload_max = DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX;
+        for (uint8_t part_index = 0; part_index < part_total; part_index++) {
+            size_t part_off = (size_t)part_index * part_payload_max;
+            size_t part_len = full_len - part_off;
+            if (part_len > part_payload_max) part_len = part_payload_max;
+            cstring* part_scriptsig = NULL;
+            if (!dogecoin_pqc_carrier_build_part_scriptsig(tag8, part_index, part_total, (uint16_t)pk_len, (uint16_t)full_len,
+                                                           full + part_off, part_len, redeem, &part_scriptsig)) {
+                dogecoin_free(tx_out_hex);
+                cstr_free(tx_out, true);
+                cstr_free(redeem, true);
+                dogecoin_free(full);
+                cstr_free(carrier_spk, true);
+                dogecoin_tx_free(tx);
+                return showError("Failed to build carrier part scriptsig");
+            }
+            char* ss_hex = utils_uint8_to_hex((const uint8_t*)part_scriptsig->str, part_scriptsig->len);
+            printf("carrier_part_scriptsig[%u]: %s\n", (unsigned)part_index, ss_hex ? ss_hex : "");
+            cstr_free(part_scriptsig, true);
+        }
+
+        dogecoin_free(tx_out_hex);
+        cstr_free(tx_out, true);
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        cstr_free(carrier_spk, true);
         dogecoin_tx_free(tx);
     }
 #endif

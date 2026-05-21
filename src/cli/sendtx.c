@@ -87,6 +87,15 @@ static bool showError(const char* er) {
     return 1;
     }
 
+static void print_tx_debug(const dogecoin_tx* tx) {
+    if (!tx) return;
+    for (size_t vin_index = 0; vin_index < tx->vin->len; vin_index++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin_index);
+        size_t scriptsig_len = (tx_in && tx_in->script_sig) ? tx_in->script_sig->len : 0;
+        printf("input[%zu] scriptsig_len: %zu\n", vin_index, scriptsig_len);
+    }
+}
+
 int main(int argc, char* argv[]) {
     int ret = 0;
     int long_index = 0;
@@ -148,6 +157,7 @@ int main(int argc, char* argv[]) {
     dogecoin_tx* tx = dogecoin_tx_new();
     /* Deserializing the transaction and broadcasting it to the network. */
     if (dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+        if (debug) print_tx_debug(tx);
         broadcast_tx(chain, tx, ips, maxnodes, timeout, debug);
         }
     else {

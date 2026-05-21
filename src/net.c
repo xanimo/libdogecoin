@@ -1056,7 +1056,7 @@ dogecoin_bool broadcast_tx(const dogecoin_chainparams* chain, const dogecoin_tx*
     ctx.tx = tx;
     ctx.debuglevel = debug;
     ctx.timeout = timeout;
-    ctx.max_peers_to_inv = 2;
+    ctx.max_peers_to_inv = maxpeers;
     ctx.found_on_non_inved_peers = 0;
     ctx.getdata_from_peers = 0;
     ctx.inved_to_peers = 0;

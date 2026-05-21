@@ -136,7 +136,8 @@ char* get_hash_by_index(int index) {
  */
 void remove_hash(hash *hash) {
     HASH_DEL(hashes, hash); /* delete it (hashes advances to next) */
-    if (hash->data.u8) dogecoin_free(hash->data.u8);
+    /* hash->data.u8 is an embedded uint8_t[32], not heap-allocated, so it
+     * must not be freed independently. */
     dogecoin_free(hash);
 }
 

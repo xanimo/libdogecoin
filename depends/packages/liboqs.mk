@@ -1,4 +1,8 @@
 package=liboqs
+
+# Upstream liboqs (open-quantum-safe) — Falcon-512 and Dilithium2 only.
+# Raccoon-G-44 is provided by the in-tree port under src/raccoon_g (enabled via
+# RACCOON_G=y / --enable-raccoon-g) and does not require liboqs at all.
 $(package)_version=0.15.0
 $(package)_download_path=https://github.com/open-quantum-safe/liboqs/archive/refs/tags
 $(package)_file_name=$($(package)_version).tar.gz

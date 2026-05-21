@@ -84,6 +84,23 @@ extern void test_utils();
 extern void test_vector();
 extern void test_qr();
 
+#ifdef USE_RACCOON_G
+extern void test_raccoong_polyr();
+extern void test_raccoong_ntt();
+extern void test_raccoong_shake();
+extern void test_raccoong_xof_sample_q();
+extern void test_raccoong_matvec();
+extern void test_raccoong_keygen_t();
+extern void test_raccoong_keypair();
+extern void test_raccoong_gaussian();
+extern void test_raccoong_hd_derive();
+extern void test_raccoong_signature_serialize();
+extern void test_raccoong_chal_poly();
+extern void test_raccoong_hash_vec();
+extern void test_raccoong_buff_mu();
+extern void test_raccoong_sign();
+#endif
+
 #ifdef WITH_LOGDB
 extern void test_red_black_tree();
 extern void test_logdb_memdb();
@@ -172,6 +189,23 @@ int main()
     u_run_test(test_utils);
     u_run_test(test_vector);
     u_run_test(test_qr);
+
+#ifdef USE_RACCOON_G
+    u_run_test(test_raccoong_polyr);
+    u_run_test(test_raccoong_ntt);
+    u_run_test(test_raccoong_shake);
+    u_run_test(test_raccoong_xof_sample_q);
+    u_run_test(test_raccoong_matvec);
+    u_run_test(test_raccoong_keygen_t);
+    u_run_test(test_raccoong_keypair);
+    u_run_test(test_raccoong_gaussian);
+    u_run_test(test_raccoong_hd_derive);
+    u_run_test(test_raccoong_signature_serialize);
+    u_run_test(test_raccoong_chal_poly);
+    u_run_test(test_raccoong_hash_vec);
+    u_run_test(test_raccoong_buff_mu);
+    u_run_test(test_raccoong_sign);
+#endif
 
 #ifdef WITH_LOGDB
     u_run_test(test_red_black_tree);

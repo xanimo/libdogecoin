@@ -54,8 +54,10 @@ noinst_HEADERS = \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
     include/dogecoin/pow.h \
+    include/dogecoin/pqc_carrier.h \
     include/dogecoin/pqc_dilithium.h \
     include/dogecoin/pqc_falcon.h \
+    include/dogecoin/pqc_raccoon.h \
     include/qr/png.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
@@ -130,6 +132,24 @@ libdogecoin_la_SOURCES += \
     src/pqc_dilithium.c \
     src/pqc_falcon.c
 endif
+
+if USE_PQC_CARRIER
+libdogecoin_la_SOURCES += \
+    src/pqc_carrier.c
+endif
+
+if USE_RACCOON_G
+libdogecoin_la_SOURCES += \
+    src/pqc_raccoon.c \
+    src/raccoon_g/polyr.c \
+    src/raccoon_g/ntt.c \
+    src/raccoon_g/gaussian.c \
+    src/raccoon_g/shake256.c \
+    src/raccoon_g/keygen_kdf.c \
+    src/raccoon_g/thrc.c \
+    src/raccoon_g/raccoong.c
+endif
+
 
 # NASM assembler setup
 NASM = nasm
@@ -265,6 +285,39 @@ tests_SOURCES += \
     src/logdb/test/logdb_tests.c \
     src/logdb/test/tests_red_black_tree.c \
     src/logdb/test/logdb_tests_sample.h
+endif
+endif
+
+if USE_RACCOON_G
+if USE_TESTS
+tests_SOURCES += \
+    test/raccoong_polyr_tests.c \
+    test/raccoong_ntt_tests.c \
+    test/raccoong_gaussian_tests.c \
+    test/raccoong_shake_tests.c \
+    test/raccoong_xof_sample_q_tests.c \
+    test/raccoong_matvec_tests.c \
+    test/raccoong_keygen_t_tests.c \
+    test/raccoong_keypair_tests.c \
+    test/raccoong_hd_derive_tests.c \
+    test/raccoong_signature_serialize_tests.c \
+    test/raccoong_chal_poly_tests.c \
+    test/raccoong_hash_vec_tests.c \
+    test/raccoong_buff_mu_tests.c \
+    test/raccoong_sign_tests.c \
+    test/data/raccoong_polyr_vectors.h \
+    test/data/raccoong_ntt_vectors.h \
+    test/data/raccoong_gaussian_vectors.h \
+    test/data/raccoong_xof_sample_q_vectors.h \
+    test/data/raccoong_matvec_vectors.h \
+    test/data/raccoong_keygen_t_vectors.h \
+    test/data/raccoong_keypair_vectors.h \
+    test/data/raccoong_hd_derive_vectors.h \
+    test/data/raccoong_signature_serialize_vectors.h \
+    test/data/raccoong_chal_poly_vectors.h \
+    test/data/raccoong_hash_vec_vectors.h \
+    test/data/raccoong_buff_mu_vectors.h \
+    test/data/raccoong_sign_vectors.h
 endif
 endif
 

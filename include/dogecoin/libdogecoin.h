@@ -71,8 +71,8 @@ extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 
 // the mainnet checkpoints, needs a fix size
-extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[26];
-extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[20];
+extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[31];
+extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[24];
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
 int chain_from_b58_prefix_bool(char* address);
