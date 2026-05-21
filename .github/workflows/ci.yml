@@ -92,9 +92,9 @@ jobs:
             host: x86_64-pc-linux-gnu
             os: ubuntu-22.04
             run-tests: true
-            packages: python3-dev python3-dbg libgmp-dev
+            packages: python3-dev python3-dbg libgmp-dev libtss2-dev swtpm
             dep-opts: "DEBUG=1 SPEED=slow V=1"
-            config-opts: "--enable-debug --enable-test-passwd"
+            config-opts: "--enable-debug --enable-tss2"
             goal: install
           - name: x86_64-linux-openenclave
             host: x86_64-pc-linux-gnu
@@ -358,6 +358,37 @@ jobs:
           chmod +x ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/*
           fi
         shell: bash
+
+      - name: start swtpm (Linux TSS2 coverage)
+        if: ${{ matrix.name == 'x86_64-linux-dbg' }}
+        run: |
+          # Spin up a software TPM 2.0 emulator on a TCP socket so that the
+          # test_tpm() suite (test/tpm_tests.c) exercises the TSS2 / Esys
+          # encrypt/decrypt path on Linux. tcti-swtpm's default TCTI string
+          # already points at 127.0.0.1:2321 (data) / :2322 (control), so no
+          # extra TCTI env var is needed for libtss2 to find this swtpm.
+          mkdir -p "$RUNNER_TEMP/swtpm-state"
+          swtpm socket \
+            --tpm2 \
+            --server type=tcp,port=2321 \
+            --ctrl type=tcp,port=2322 \
+            --flags not-need-init \
+            --tpmstate dir="$RUNNER_TEMP/swtpm-state" \
+            --daemon
+          # Give the daemon a moment to bind its sockets before the tests run.
+          swtpm_ready=0
+          for i in $(seq 1 10); do
+            if ss -ltn | grep -q '127.0.0.1:2321'; then
+              echo "swtpm is listening on 127.0.0.1:2321"
+              swtpm_ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$swtpm_ready" != "1" ]; then
+            echo "swtpm did not start listening on 127.0.0.1:2321 after 10 seconds" >&2
+            exit 1
+          fi
 
       - name: test libdogecoin
         if: ${{ matrix.run-tests }}
@@ -639,7 +670,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win
 
@@ -700,7 +731,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native
 
@@ -754,7 +785,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-rel
 
@@ -808,7 +839,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-notpm
 
@@ -861,7 +892,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-i686-win
 
@@ -920,7 +951,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-macos
 
@@ -1094,7 +1125,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download Gitian artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.3
         with:
           name: libdogecoin-${{ github.sha }}-gitian
           path: gitian/builds/${{ github.ref_name }}

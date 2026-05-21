@@ -32,6 +32,7 @@ SET(USE_ARMV8 FALSE CACHE BOOL "enable armv8 crypto")
 SET(USE_ARMV82 FALSE CACHE BOOL "enable armv8.2 crypto")
 SET(USE_TPM2 TRUE CACHE BOOL "enable tpm2")
 SET(TEST_TPM_AUTO FALSE CACHE BOOL "disable TPM UI policy for automated tests")
+SET(USE_TSS2 FALSE CACHE BOOL "enable tss2 (Linux TPM2) functions")
 SET(USE_OPENENCLAVE FALSE CACHE BOOL "enable openenclave")
 SET(USE_YUBIKEY FALSE CACHE BOOL "enable yubikey")
 SET(USE_LIBOQS FALSE CACHE BOOL "enable liboqs")
@@ -103,6 +104,37 @@ IF(WITH_NET)
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+    ENDIF()
+ENDIF()
+
+# The TSS2 (Linux TPM2) seal backend does not depend on net, so detect it
+# independently of WITH_NET. This lets the seal API be built without net
+# (e.g. a TPM-only configuration), matching the autotools behaviour where
+# --enable-tss2 is handled separately from --enable-net.
+IF(USE_TSS2 AND NOT WIN32)
+    # Minimum recommended libtss2-esys version: 2.4.0
+    # Prefer pkg-config (handles transitive deps and version checking),
+    # but fall back to a plain library lookup so builds work even when
+    # pkg-config metadata for tss2-esys is missing.
+    FIND_PACKAGE(PkgConfig QUIET)
+    IF(PkgConfig_FOUND)
+        PKG_CHECK_MODULES(TSS2_ESYS QUIET tss2-esys>=2.4.0)
+    ENDIF()
+    IF(TSS2_ESYS_FOUND)
+        SET(LIBTSS2 ${TSS2_ESYS_LIBRARIES})
+        INCLUDE_DIRECTORIES(${TSS2_ESYS_INCLUDE_DIRS})
+    ELSE()
+        FIND_LIBRARY(LIBTSS2 tss2-esys)
+        IF(NOT LIBTSS2)
+            MESSAGE(FATAL_ERROR
+                "USE_TSS2 requested but libtss2-esys was not found. "
+                "Install libtss2-dev (>= 2.4.0) or disable USE_TSS2.")
+        ENDIF()
+    ENDIF()
+    FIND_PATH(TSS2_ESYS_HEADER tss2/tss2_esys.h)
+    IF(NOT TSS2_ESYS_HEADER)
+        MESSAGE(FATAL_ERROR
+            "tss2/tss2_esys.h not found; install libtss2-dev.")
     ENDIF()
 ENDIF()
 
@@ -211,6 +243,9 @@ ENDIF()
 IF(USE_TPM2)
     ADD_DEFINITIONS(-DUSE_TPM2=1)
 ENDIF()
+IF(USE_TSS2)
+    ADD_DEFINITIONS(-DUSE_TSS2=1)
+ENDIF()
 IF(USE_OPENENCLAVE)
     ADD_DEFINITIONS(-DUSE_OPENENCLAVE=1)
 ENDIF()
@@ -252,6 +287,7 @@ MESSAGE(STATUS "  USE_ARMV8      = ${USE_ARMV8}")
 MESSAGE(STATUS "  USE_ARMV82     = ${USE_ARMV82}")
 MESSAGE(STATUS "  USE_TPM2       = ${USE_TPM2}")
 MESSAGE(STATUS "  TEST_TPM_AUTO  = ${TEST_TPM_AUTO}")
+MESSAGE(STATUS "  USE_TSS2       = ${USE_TSS2}")
 MESSAGE(STATUS "")
 IF(USE_TESTS)
 MESSAGE(STATUS "  test password  = ${PASSWD_STR}")
@@ -375,6 +411,14 @@ IF(WIN32 AND USE_TPM2)
     TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} tbs ncrypt crypt32)
 ENDIF()
 
+# Link the Linux TPM2 (TSS2) backend into the core library regardless of net,
+# so the seal API works in a net-less build. When WITH_NET is enabled the net
+# link rule below also adds ${LIBTSS2}; linking the same library twice is
+# harmless.
+IF(USE_TSS2)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBTSS2})
+ENDIF()
+
 IF(USE_SSE2)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
     src/scrypt-sse2.c
@@ -474,13 +518,15 @@ ELSE()
     SET(LIBS ${LIBDOGECOIN_NAME})
 ENDIF()
 
-    IF (WIN32 AND USE_TPM2)
-        IF (TEST_TPM_AUTO)
-            TARGET_COMPILE_DEFINITIONS(tests PRIVATE TEST_TPM_AUTO=1)
-        ENDIF()
-        TARGET_LINK_LIBRARIES(tests ${LIBS} tbs ncrypt crypt32)
-    ELSE()
-        TARGET_LINK_LIBRARIES(tests ${LIBS})
+IF (WIN32 AND USE_TPM2)
+    IF (TEST_TPM_AUTO)
+        TARGET_COMPILE_DEFINITIONS(tests PRIVATE TEST_TPM_AUTO=1)
+    ENDIF()
+    TARGET_LINK_LIBRARIES(tests ${LIBS} tbs ncrypt crypt32)
+ELSEIF (USE_TSS2)
+    TARGET_LINK_LIBRARIES(tests ${LIBS} ${LIBTSS2})
+ELSE()
+    TARGET_LINK_LIBRARIES(tests ${LIBS})
 ENDIF()
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
     # move test/wordlist to build
@@ -549,6 +595,8 @@ IF(WITH_NET)
 
     IF(WIN32 AND USE_TPM2)
         TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS} tbs ncrypt crypt32)
+    ELSEIF(USE_TSS2)
+        TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS} ${LIBTSS2})
     ELSE()
         TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS})
     ENDIF()
@@ -572,6 +620,8 @@ IF(WITH_TOOLS)
     INSTALL(TARGETS such RUNTIME)
     IF (WIN32 AND USE_TPM2)
         TARGET_LINK_LIBRARIES(such ${LIBS} tbs ncrypt crypt32)
+    ELSEIF (USE_TSS2)
+        TARGET_LINK_LIBRARIES(such ${LIBS} ${LIBTSS2})
     ELSE()
         TARGET_LINK_LIBRARIES(such ${LIBS})
     ENDIF()
