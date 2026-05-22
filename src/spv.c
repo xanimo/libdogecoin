@@ -781,13 +781,11 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
 
     if ((client->stateflags & SPV_HEADER_SYNC_FLAG) == SPV_HEADER_SYNC_FLAG)
     {
-        client->last_headersrequest_time = 0;
         dogecoin_net_spv_request_headers(client);
     }
 
     if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG)
     {
-        node->time_last_request = 0;
         dogecoin_net_spv_request_headers(client);
     }
 

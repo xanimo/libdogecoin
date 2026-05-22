@@ -258,6 +258,7 @@ void node_periodical_timer(int fd, short int event, void* ctx)
     if (node->time_started_con + DOGECOIN_CONNECT_TIMEOUT_S < now && ((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
         node->state = 0;
         node->time_started_con = 0;
+        node->state |= NODE_ERRORED;
         node->state |= NODE_TIMEOUT;
         dogecoin_node_connection_state_changed(node);
     }
@@ -510,6 +511,11 @@ void dogecoin_node_group_shutdown(dogecoin_node_group *group) {
 
     if (group->http_server) {
         dogecoin_http_server_shutdown(group);
+    }
+
+    /* break the event loop if it's running */
+    if (group->event_base) {
+        event_base_loopbreak(group->event_base);
     }
 }
 
