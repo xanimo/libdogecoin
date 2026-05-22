@@ -78,7 +78,8 @@ noinst_HEADERS = \
     include/dogecoin/validation.h \
     include/dogecoin/vector.h \
     include/dogecoin/version.h \
-    include/dogecoin/wow.h
+    include/dogecoin/wow.h \
+    include/dogecoin/zk_carrier.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdogecoin.pc
@@ -150,6 +151,20 @@ libdogecoin_la_SOURCES += \
     src/raccoon_g/raccoong.c
 endif
 
+if USE_ZK_CARRIER
+libdogecoin_la_SOURCES += \
+    src/zk_carrier/zk_carrier.c \
+    src/zk_carrier/zk_commit.c \
+    src/zk_carrier/zk_groth16.c \
+    src/zk_carrier/zk_plonk.c \
+    src/zk_carrier/zk_stark.c
+
+if HAVE_MCL
+# Groth16 BN254 verifier via herumi/mcl.
+libdogecoin_la_SOURCES += src/zk_carrier/zk_groth16_mcl.cpp
+endif
+endif
+
 
 # NASM assembler setup
 NASM = nasm
@@ -209,6 +224,14 @@ endif
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
+
+if HAVE_MCL
+# mcl BN254 flags.
+libdogecoin_la_CFLAGS    += @MCL_CFLAGS@
+libdogecoin_la_CXXFLAGS   = -I$(top_srcdir)/include -fPIC @MCL_CFLAGS@ -std=c++14
+libdogecoin_la_LIBADD    += @MCL_LIBS@
+endif
+
 noinst_PROGRAMS =
 
 if USE_TESTS
@@ -250,6 +273,10 @@ tests_SOURCES = \
     test/unittester.c \
     test/utils_tests.c \
     test/vector_tests.c
+
+if USE_ZK_CARRIER
+tests_SOURCES += test/zk_carrier_tests.c
+endif
 
 tests_CFLAGS = $(libdogecoin_la_CFLAGS)
 tests_CPPFLAGS = -I$(top_srcdir)/src

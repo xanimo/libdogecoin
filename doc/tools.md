@@ -57,6 +57,10 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - raccoong_hd_derive_pub (requires --enable-raccoon-g)
 - raccoong_add_commit_tx (requires --enable-raccoon-g)
 - raccoong_add_commit_and_carrier_tx (requires --enable-raccoon-g)
+- zk_encode_payload (requires --enable-zk-carrier)
+- zk_commit (requires --enable-zk-carrier)
+- zk_add_commit_and_carrier_tx (requires --enable-zk-carrier)
+- zk_extract_carrier (requires --enable-zk-carrier)
 
 So an example run of `such` could be something like this:
 ```
@@ -985,3 +989,113 @@ Summary: 17 total validations (12 op_return_only TX_C, 5 carrier_scriptsig TX_R,
 - TX_R `3bee4f9c`: https://chain.so/tx/DOGE/3bee4f9c11c6e03ab7117e4198a272b08b61546d7da85edef9c5ec6f74dd5f55
 - TX_C `30792ead`: https://chain.so/tx/DOGE/30792ead6159203b9b87f3c5ad323e9086b51fc038a8e1f8da14c1e61dcfd961
 - TX_R `ff82dc5d`: https://chain.so/tx/DOGE/ff82dc5d1ba99528adc8754354c4c44149cfaf3d2e26fefd2ee7922280863813
+
+## Zero-Knowledge Proof Carrier (ZK) Commands
+
+> **Note**: ZK carrier commands require the `--enable-zk-carrier` configure flag (default **on**). In-process Groth16 verification additionally requires `--with-rapidsnark` or `--with-mcl[=DIR]`; without either, verification is *delegated* (the reveal payload is reassembled and logged, but the proof itself must be checked by an external `snarkjs` / `rapidsnark` invocation).
+
+The `such` tool exposes the on-chain side of the ZK carrier flow — a canonical `ZKP1` payload (Groth16 / PLONK / STARK), a 32-byte `SHA256d(payload)` commitment broadcast in a tagged `OP_RETURN DZKC` output, and a P2SH data-carrier reveal that publishes the full proof bytes on-chain.  The transaction shape is the same `OP_DROP×5 OP_TRUE` redeem script used by the PQC carrier — only the 8-byte tag differs (`ZKP1FULL` vs `FLC1FULL` / `DIL2FULL` / `RCG4FULL`).
+
+The `spvnode` tool exposes the on-chain reveal-scanning side of the ZK carrier flow.
+
+For the protocol-level encoding and rationale, see [`doc/spec/bip-zk-carrier-commitments.mediawiki`](spec/bip-zk-carrier-commitments.mediawiki); for the C API and module layout, see [`doc/zk.md`](zk.md); for end-to-end driver scripts, see [`contrib/zk_carrier/scripts/`](../contrib/zk_carrier/scripts/).
+
+### Available ZK Commands
+
+| Command | Required Flags | Description |
+| - | - | - |
+| zk_encode_payload | -m, -i, -k, -s | Encodes a canonical ZKP1 payload from `mode` (0=Groth16, 1=PLONK, 2=STARK_S2), 4-byte `circuit_id` (hex), public-inputs hex, and proof hex. Prints the resulting `zk_payload` (hex) and `zk_payload_len` |
+| zk_commit | -x | Decodes a ZKP1 payload hex, computes `SHA256d(payload)`, and prints the canonical `OP_RETURN DZKC <mode> <commit32>` scriptPubKey (39 bytes) |
+| zk_add_commit_and_carrier_tx | -x, -m, -s, (-h optional) | Appends both the OP_RETURN commitment and the chunked P2SH carrier outputs to a raw transaction. Prints `zk_carrier_part_total`, `zk_carrier_first_vout`, `zk_opreturn_vout`, `zk_carrier_p2sh_scriptpubkey`, and the per-part scriptSig hexes (`zk_carrier_part_scriptsig[i]`) the operator pastes into TX_R |
+| zk_extract_carrier | -x | Reassembles the ZKP1 payload from a TX_R hex (walking the per-part scriptSigs) and prints the decoded mode / `circuit_id` / `public_inputs_len` / `proof_len` |
+
+### Flag Usage for ZK Commands
+
+| Flag | Description | Format |
+| - | - | - |
+| -m | Proof-system mode | `0` = Groth16, `1` = PLONK, `2` = STARK_S2 |
+| -i | 4-byte `circuit_id` (registry key for `(mode, circuit)`) | Hex string (8 chars) |
+| -k | Public inputs (typically the snarkjs `public.json` blob) | Hex string |
+| -s | Proof bytes (typically the snarkjs `proof.json` blob), or ZKP1 payload hex (for `zk_add_commit_and_carrier_tx`) | Hex string |
+| -x | ZKP1 payload hex (for `zk_commit`), raw tx hex (for `zk_add_commit_and_carrier_tx`), or TX_R hex (for `zk_extract_carrier`) | Hex string |
+| -h | Carrier value in koinu (for `zk_add_commit_and_carrier_tx`, default `100000000` = 1 DOGE) | Integer |
+
+### Examples
+
+#### Encode a ZKP1 payload from snarkjs `proof.json` + `public.json`:
+
+```
+./such -c zk_encode_payload \
+       -m 0 \
+       -i 00000001 \
+       -k <public_json_hex> \
+       -s <proof_json_hex>
+```
+
+This is normally produced for you by `contrib/zk_carrier/witness_helper.py`.
+
+#### Compute the commitment + canonical OP_RETURN scriptPubKey:
+
+```
+./such -c zk_commit -x <payload_hex>
+```
+
+Output:
+
+```
+=== ZK Carrier Commitment ===
+zk_mode: 0
+zk_commit32: a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57
+zk_opreturn_scriptpubkey: 6a25445a4b4300a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57
+```
+
+#### Append the OP_RETURN + P2SH carrier outputs to a base unsigned tx:
+
+```
+./such -c zk_add_commit_and_carrier_tx \
+       -x <raw_tx_hex> \
+       -m 0 \
+       -s <payload_hex>
+```
+
+Output (excerpt):
+
+```
+zk_carrier_part_total: 1
+zk_carrier_output_value_koinu: 100000000
+zk_carrier_first_vout: 2
+zk_opreturn_vout: 1
+zk_carrier_p2sh_scriptpubkey: a9149b402803555511d15d81207d3e2cb3e6bc365e0e87
+zk_carrier_part_scriptsig[0]: <hex to paste into TX_R>
+```
+
+The P2SH carrier outputs are spent by TX_R; the printed scriptSig hexes are the values that go into each TX_R input.
+
+#### Reassemble the payload from a TX_R for round-trip verification:
+
+```
+./such -c zk_extract_carrier -x <tx_r_hex>
+```
+
+Output:
+
+```
+zk_payload: 5a4b503100000000000100000014…
+zk_payload_len: 840
+zk_mode: 0
+zk_circuit_id: 0x00000001
+zk_public_inputs_len: 20
+zk_proof_len: 804
+```
+
+#### Validate ZK reveals during SPV scan:
+
+```
+./spvnode -d -p -b scan
+```
+
+This reassembles every `ZKP1` reveal that matches a previously seen `OP_RETURN DZKC` commitment and emits deterministic `[zk-commit]` log lines (`Pending` → `Valid` → `Reveal validated`). Cryptographic proof checks use the verification key embedded in the reveal payload when an in-process verifier is available; otherwise the proof check is delegated to external tooling such as `snarkjs`.
+
+### End-to-end mainnet runs
+
+End-to-end PASSED runs of the demo drivers (`contrib/zk_carrier/scripts/run_full_zk_carrier_demo.sh` for single pairs, `contrib/zk_carrier/scripts/broadcast_set.sh` for multi-pair sets) are committed under [`test-logs/`](../test-logs/) (`mainnet_zk_carrier_e2e_*PASSED*.txt`, `mainnet_zk_carrier_spvnode_PASSED_*.txt`).  They cover both Groth16 (in-process via mcl) and PLONK (external `snarkjs plonk verify`).  See the [BIP](spec/bip-zk-carrier-commitments.mediawiki) *Mainnet Examples* section for the corresponding TX_C / TX_R explorer links and reveal-decoded log excerpts.

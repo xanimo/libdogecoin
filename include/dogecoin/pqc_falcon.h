@@ -83,18 +83,6 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoi
 
 #endif
 
-/*
- * Convenience wrapper returning a 32-byte transaction sighash for an input.
- * The returned bytes are the exact digest buffer used by tx signing paths.
- *
- * Defined in pqc_falcon.c (when USE_LIBOQS) or pqc_raccoon.c (otherwise);
- * declaration is unconditional so callers don't need feature-flag guards.
- */
-LIBDOGECOIN_API dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
-                                                    const cstring* fromPubKey,
-                                                    size_t in_num, int hashtype,
-                                                    uint8_t out32[32]);
-
 LIBDOGECOIN_END_DECL
 
 #endif /* __LIBDOGECOIN_PQC_FALCON_H__ */

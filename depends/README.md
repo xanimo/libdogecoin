@@ -46,6 +46,9 @@ The following can be set when running make: make FOO=bar
                implementation (--enable-raccoon-g). MPFR is the C analogue of
                Python's mpmath and is required to make the Raccoon-G Gaussian
                sampler byte-exact against the upstream Python reference.
+    ZK_CARRIER: set to '1' to vendor herumi/mcl for native Groth16
+                verification in the ZK carrier module.  When unset,
+                Groth16 verification is delegated to off-box snarkjs.
     DEBUG: disable some optimizations and enable more runtime checking
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids

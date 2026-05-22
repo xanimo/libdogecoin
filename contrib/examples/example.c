@@ -8,6 +8,8 @@
 // (or in the case of this project's directory structure, and if you want to build statically):
 // (after build, from the /libdogecoin project root directory)
 // gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -o example
+// To include the ZK carrier section (requires --enable-zk-carrier at configure time):
+// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -DUSE_ZK_CARRIER -o example
 // then run 'example'.
 
 //  for windows, from the command line: (after build, from the /libdogecoin project root directory) run:
@@ -424,6 +426,171 @@ int main() {
         remove_eckey(key2);
         dogecoin_free(sig2);
     }
+
+#if defined(USE_LIBOQS)
+	// PQC EXAMPLE (Falcon-512, Dilithium2)
+	printf("\n\nBEGIN PQC EXAMPLE:\n\n");
+
+	// Falcon-512: keypair + sign + verify + 32-byte carrier commitment.
+	uint8_t *falcon_pk = NULL, *falcon_sk = NULL, *falcon_sig = NULL;
+	size_t falcon_pk_len = 0, falcon_sk_len = 0, falcon_sig_len = 0;
+	uint8_t pqc_msg[32];
+	for (int i = 0; i < 32; ++i) pqc_msg[i] = (uint8_t)i;
+
+	if (dogecoin_falcon512_keypair(&falcon_pk, &falcon_pk_len, &falcon_sk, &falcon_sk_len)
+	    && dogecoin_falcon512_sign(falcon_sk, falcon_sk_len, pqc_msg, sizeof pqc_msg, &falcon_sig, &falcon_sig_len)
+	    && dogecoin_falcon512_verify(falcon_pk, falcon_pk_len, pqc_msg, sizeof pqc_msg, falcon_sig, falcon_sig_len)) {
+		uint8_t falcon_commit[DOGECOIN_PQC_FALCON_COMMIT_LEN];
+		if (dogecoin_falcon512_commit_bytes(falcon_pk, falcon_pk_len, falcon_sig, falcon_sig_len, falcon_commit)) {
+			printf("Falcon-512 keypair/sign/verify/commit OK.\n");
+		} else {
+			printf("Falcon-512 commit_bytes failed.\n");
+			return -1;
+		}
+	} else {
+		printf("Falcon-512 keypair/sign/verify failed.\n");
+		return -1;
+	}
+	dogecoin_free(falcon_pk);
+	dogecoin_free(falcon_sk);
+	dogecoin_free(falcon_sig);
+
+	// Dilithium2: keypair + sign + verify + 32-byte carrier commitment.
+	uint8_t *dil_pk = NULL, *dil_sk = NULL, *dil_sig = NULL;
+	size_t dil_pk_len = 0, dil_sk_len = 0, dil_sig_len = 0;
+
+	if (dogecoin_dilithium2_keypair(&dil_pk, &dil_pk_len, &dil_sk, &dil_sk_len)
+	    && dogecoin_dilithium2_sign(dil_sk, dil_sk_len, pqc_msg, sizeof pqc_msg, &dil_sig, &dil_sig_len)
+	    && dogecoin_dilithium2_verify(dil_pk, dil_pk_len, pqc_msg, sizeof pqc_msg, dil_sig, dil_sig_len)) {
+		uint8_t dil_commit[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN];
+		if (dogecoin_dilithium2_commit_bytes(dil_pk, dil_pk_len, dil_sig, dil_sig_len, dil_commit)) {
+			printf("Dilithium2 keypair/sign/verify/commit OK.\n");
+		} else {
+			printf("Dilithium2 commit_bytes failed.\n");
+			return -1;
+		}
+	} else {
+		printf("Dilithium2 keypair/sign/verify failed.\n");
+		return -1;
+	}
+	dogecoin_free(dil_pk);
+	dogecoin_free(dil_sk);
+	dogecoin_free(dil_sig);
+#endif
+
+#if defined(USE_RACCOON_G)
+	// RACCOON-G-44 EXAMPLE (sign/verify + HD derivation)
+	printf("\n\nBEGIN RACCOON-G-44 EXAMPLE:\n\n");
+
+	uint8_t *rac_pk = NULL, *rac_sk = NULL, *rac_sig = NULL;
+	size_t rac_pk_len = 0, rac_sk_len = 0, rac_sig_len = 0;
+	uint8_t rac_msg[32];
+	for (int i = 0; i < 32; ++i) rac_msg[i] = (uint8_t)(0xa0 + i);
+
+	if (dogecoin_raccoong44_keypair(&rac_pk, &rac_pk_len, &rac_sk, &rac_sk_len)
+	    && dogecoin_raccoong44_sign(rac_sk, rac_sk_len, rac_msg, sizeof rac_msg, &rac_sig, &rac_sig_len)
+	    && dogecoin_raccoong44_verify(rac_pk, rac_pk_len, rac_msg, sizeof rac_msg, rac_sig, rac_sig_len)) {
+		printf("Raccoon-G-44 keypair/sign/verify OK.\n");
+	} else {
+		printf("Raccoon-G-44 keypair/sign/verify failed.\n");
+		return -1;
+	}
+
+	// BIP32-style HD derivation (non-hardened): pub-only derive_pub must
+	// match pk from derive_priv, and the child sk must sign+verify.
+	uint8_t rac_chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+	memset(rac_chaincode, 0x42, sizeof rac_chaincode);
+	uint8_t *rac_child_sk = NULL, *rac_child_pk = NULL, *rac_child_pubonly = NULL;
+	size_t rac_child_sk_len = 0, rac_child_pk_len = 0, rac_child_pubonly_len = 0;
+	if (dogecoin_raccoong44_hd_derive_priv(rac_sk, rac_sk_len, rac_pk, rac_pk_len,
+	                                       rac_chaincode, 7, /*hardened=*/false,
+	                                       &rac_child_sk, &rac_child_sk_len,
+	                                       &rac_child_pk, &rac_child_pk_len)
+	    && dogecoin_raccoong44_hd_derive_pub(rac_pk, rac_pk_len, rac_chaincode, 7,
+	                                         &rac_child_pubonly, &rac_child_pubonly_len)
+	    && rac_child_pk_len == rac_child_pubonly_len
+	    && memcmp(rac_child_pk, rac_child_pubonly, rac_child_pk_len) == 0) {
+		printf("Raccoon-G-44 non-hardened pub-only derivation matches derive_priv.\n");
+
+		uint8_t *rac_child_sig = NULL;
+		size_t rac_child_sig_len = 0;
+		if (dogecoin_raccoong44_sign(rac_child_sk, rac_child_sk_len, rac_msg, sizeof rac_msg,
+		                             &rac_child_sig, &rac_child_sig_len)
+		    && dogecoin_raccoong44_verify(rac_child_pk, rac_child_pk_len, rac_msg, sizeof rac_msg,
+		                                  rac_child_sig, rac_child_sig_len)) {
+			printf("Raccoon-G-44 HD child sign/verify OK.\n");
+		} else {
+			printf("Raccoon-G-44 HD child sign/verify failed.\n");
+			return -1;
+		}
+		dogecoin_free(rac_child_sig);
+	} else {
+		printf("Raccoon-G-44 HD derivation failed.\n");
+		return -1;
+	}
+	dogecoin_free(rac_child_sk);
+	dogecoin_free(rac_child_pk);
+	dogecoin_free(rac_child_pubonly);
+	dogecoin_free(rac_pk);
+	dogecoin_free(rac_sk);
+	dogecoin_free(rac_sig);
+#endif
+
+#if defined(USE_ZK_CARRIER)
+	// ZK CARRIER EXAMPLE (Groth16 payload encode/decode + commitment)
+	printf("\n\nBEGIN ZK CARRIER EXAMPLE:\n\n");
+
+	// Synthetic public inputs / proof bytes (real input comes from snarkjs).
+	const uint8_t zk_pub[]   = {0x01, 0x02, 0x03, 0x04, 0x05};
+	const uint8_t zk_proof[] = "{\"pi_a\":[\"1\",\"2\"],\"pi_b\":[],\"pi_c\":[]}";
+
+	uint8_t* zk_payload = NULL;
+	size_t zk_payload_len = 0;
+	dogecoin_zk_err_t zk_err = dogecoin_zk_encode_payload(
+	    DOGECOIN_ZK_MODE_GROTH16, 0xDEADBEEF,
+	    zk_pub, sizeof zk_pub,
+	    zk_proof, sizeof zk_proof,
+	    NULL, 0,
+	    &zk_payload, &zk_payload_len);
+	if (zk_err != DOGECOIN_ZK_OK) {
+		printf("dogecoin_zk_encode_payload failed: %s\n", dogecoin_zk_strerror(zk_err));
+		return -1;
+	}
+
+	dogecoin_zk_mode_t zk_mode_out;
+	uint32_t zk_cid_out;
+	const uint8_t *zk_pub_out, *zk_proof_out, *zk_vk_out = NULL;
+	size_t zk_pub_out_len = 0, zk_proof_out_len = 0, zk_vk_out_len = 0;
+	zk_err = dogecoin_zk_decode_payload(zk_payload, zk_payload_len,
+	                                    &zk_mode_out, &zk_cid_out,
+	                                    &zk_pub_out, &zk_pub_out_len,
+	                                    &zk_proof_out, &zk_proof_out_len,
+	                                    &zk_vk_out, &zk_vk_out_len);
+	if (zk_err == DOGECOIN_ZK_OK
+	    && zk_mode_out == DOGECOIN_ZK_MODE_GROTH16
+	    && zk_cid_out == 0xDEADBEEF
+	    && zk_pub_out_len == sizeof zk_pub
+	    && memcmp(zk_pub_out, zk_pub, sizeof zk_pub) == 0
+	    && zk_proof_out_len == sizeof zk_proof
+	    && memcmp(zk_proof_out, zk_proof, sizeof zk_proof) == 0) {
+		printf("ZK Groth16 payload encode/decode round-trip OK.\n");
+	} else {
+		printf("ZK Groth16 payload decode mismatch: %s\n", dogecoin_zk_strerror(zk_err));
+		return -1;
+	}
+
+	// SHA256d commitment over the canonical payload bytes.
+	uint8_t zk_commit[32];
+	zk_err = dogecoin_zk_get_commitment_hash(zk_payload, zk_payload_len, zk_commit);
+	if (zk_err == DOGECOIN_ZK_OK) {
+		printf("ZK commitment hash computed (32 bytes).\n");
+	} else {
+		printf("dogecoin_zk_get_commitment_hash failed: %s\n", dogecoin_zk_strerror(zk_err));
+		return -1;
+	}
+
+	dogecoin_free(zk_payload);
+#endif
 
 #if defined(USE_TPM2)
 	// TPM2 TESTS

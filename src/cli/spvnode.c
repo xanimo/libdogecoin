@@ -63,6 +63,7 @@
 #include <dogecoin/bip37.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/ecc.h>
+#include <dogecoin/mem.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
@@ -485,7 +486,6 @@ int main(int argc, char* argv[]) {
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
     int selected_checkpoint_index = -1;
-
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
         print_usage();

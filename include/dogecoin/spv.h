@@ -120,6 +120,14 @@ typedef struct dogecoin_spv_client_
        backends are compiled in. Owned by the client and freed on
        dogecoin_spv_client_free so multiple clients do not share state. */
     void* pqc_pending_commits;
+
+    /* Per-client pending ZK OP_RETURN commitments awaiting carrier TX_R match.
+       Opaque pointer (spv_zk_pending_commit_t* internally); NULL when the ZK
+       carrier module is not compiled in. Owned by the client and freed on
+       dogecoin_spv_client_free so multiple clients do not share state and so
+       a long-running node cannot accumulate unbounded entries from cheap
+       OP_RETURN spam (capped + LRU-evicted by spv_zk_add_pending). */
+    void* zk_pending_commits;
 } dogecoin_spv_client;
 
 LIBDOGECOIN_API dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params, dogecoin_bool debug, dogecoin_bool headers_memonly, dogecoin_bool use_checkpoints, dogecoin_bool full_sync, int maxnodes, const char *http_server);

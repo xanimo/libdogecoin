@@ -922,6 +922,34 @@ out:
     return ret;
 }
 
+/**
+ * @brief This function computes a transaction sighash and
+ * writes the raw 32-byte digest to out32.
+ *
+ * @param tx_to The pointer to the transaction.
+ * @param fromPubKey The scriptPubKey of the input being signed.
+ * @param in_num The index of the input being signed.
+ * @param hashtype The sighash type (e.g. SIGHASH_ALL).
+ * @param out32 The output buffer for the 32-byte hash.
+ *
+ * @return true if the sighash was computed, false on error.
+ */
+dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
+                                    const cstring* fromPubKey,
+                                    size_t in_num, int hashtype,
+                                    uint8_t out32[32])
+{
+    if (!tx_to || !fromPubKey || !out32) {
+        return false;
+    }
+    uint256_t hash;
+    if (!dogecoin_tx_sighash(tx_to, fromPubKey, in_num, hashtype, hash)) {
+        return false;
+    }
+    memcpy(out32, hash, 32);
+    return true;
+}
+
 
 /**
  * @brief This function adds another transaction output to

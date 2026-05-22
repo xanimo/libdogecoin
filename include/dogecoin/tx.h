@@ -105,6 +105,16 @@ LIBDOGECOIN_API void dogecoin_tx_hash(const dogecoin_tx* tx, uint256_t hashout);
 
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromPubKey, size_t in_num, int hashtype, uint256_t hash);
 
+/* Convenience wrapper returning a 32-byte transaction sighash for an input.
+ * The returned bytes are the exact digest buffer used by tx signing paths.
+ * Provided unconditionally so non-PQ callers (the ZK carrier, the such CLI,
+ * etc.) can bind their payloads to the same tx_base sighash that the PQC
+ * carrier signs over. */
+LIBDOGECOIN_API dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
+                                                    const cstring* fromPubKey,
+                                                    size_t in_num, int hashtype,
+                                                    uint8_t out32[32]);
+
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainparams* chain, int64_t amount, const char* address);
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_p2sh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160);
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_p2pkh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160);
