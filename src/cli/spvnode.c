@@ -284,12 +284,6 @@ static dogecoin_bool spv_enable_filtered_blocks = false;
 static dogecoin_bool spv_select_checkpoint = false;
 static int spv_filter_oldest_utxo_height = 0;
 
-/* Global pointers used by handle_sigint for graceful cleanup */
-static dogecoin_spv_client* g_spv_client_shutdown = NULL;
-#if WITH_WALLET
-static dogecoin_wallet* g_wallet_shutdown = NULL;
-#endif
-
 static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt, int max_height)
 {
     const dogecoin_checkpoint* checkpoints = NULL;
@@ -442,20 +436,18 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     }
 }
 
-// Signal handler for SIGINT
-void handle_sigint() {
-    // Reset standard input back to blocking mode
-#ifndef _WIN32
-    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
-    fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
-#endif
-    // Trigger a graceful event-loop exit so cleanup functions run normally.
-    if (g_spv_client_shutdown && g_spv_client_shutdown->nodegroup) {
-        dogecoin_node_group_shutdown(g_spv_client_shutdown->nodegroup);
-        if (g_spv_client_shutdown->nodegroup->event_base)
-            event_base_loopbreak(g_spv_client_shutdown->nodegroup->event_base);
-    } else {
-        exit(0);
+// Signal callback for shutdown requests
+void handle_shutdown_signal(evutil_socket_t sig, short events, void* user_data) {
+    (void)sig;
+    (void)events;
+    dogecoin_spv_client* client = (dogecoin_spv_client*)user_data;
+
+    printf("Disconnecting...\n");
+    if (client && client->nodegroup) {
+        dogecoin_node_group_shutdown(client->nodegroup);
+        if (client->nodegroup->event_base) {
+            event_base_loopbreak(client->nodegroup->event_base);
+        }
     }
 }
 
@@ -595,9 +587,6 @@ int main(int argc, char* argv[]) {
         }
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
-        signal(SIGINT, handle_sigint);
-        signal(SIGTERM, handle_sigint);
-
 #if WITH_WALLET
         dogecoin_wallet_opts wopts = {
             .mnemonic_in = mnemonic_in,
@@ -826,15 +815,27 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_client_discover_peers(client, ips);
 
             printf("Connecting to the p2p network...\n");
-            g_spv_client_shutdown = client;
+            printf("Press CTRL+C or send SIGINT/SIGTERM to disconnect.\n");
+            struct event* sigint_event = evsignal_new(client->nodegroup->event_base, SIGINT, handle_shutdown_signal, client);
+            struct event* sigterm_event = evsignal_new(client->nodegroup->event_base, SIGTERM, handle_shutdown_signal, client);
+            if (!sigint_event || !sigterm_event || event_add(sigint_event, NULL) != 0 || event_add(sigterm_event, NULL) != 0) {
+                fprintf(stderr, "Error: failed to register shutdown signal handlers\n");
+                if (sigint_event) {
+                    event_free(sigint_event);
+                }
+                if (sigterm_event) {
+                    event_free(sigterm_event);
+                }
+                dogecoin_spv_client_free(client);
 #if WITH_WALLET
-            g_wallet_shutdown = wallet;
+                dogecoin_wallet_free(wallet);
 #endif
+                dogecoin_ecc_stop();
+                return EXIT_FAILURE;
+            }
             dogecoin_spv_client_runloop(client);
-            g_spv_client_shutdown = NULL;
-#if WITH_WALLET
-            g_wallet_shutdown = NULL;
-#endif
+            event_free(sigint_event);
+            event_free(sigterm_event);
             dogecoin_spv_client_free(client);
             printf("done\n");
             ret = EXIT_SUCCESS;
