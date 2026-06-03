@@ -104,6 +104,12 @@ AC_ARG_WITH([armv82-crypto],
   [armv82_crypto=$withval],
   [armv82_crypto=no])
 
+AC_ARG_ENABLE([dit],
+  [AS_HELP_STRING([--enable-dit],
+  [Build with Data Independent Timing support on supported architectures (default is no)])],
+  [use_dit=$enableval],
+  [use_dit=no])
+
 AC_ARG_ENABLE([intel-avx2],
   [AS_HELP_STRING([--enable-intel-avx2],
   [Build with Intel AVX2 implementation (default is no)])],
@@ -272,6 +278,10 @@ if test x$armv82_crypto = xyes; then
                    AC_DEFINE(USE_ARMV8, 1, [Define this symbol if armv8 crypto works])
                    CFLAGS=${CFLAGS/"-march=armv8.2-a+crypto+shqa3"/}
                    CFLAGS+="-march=armv8-a+crypto"])
+fi
+
+if test x$use_dit = xyes; then
+  AC_DEFINE(USE_DIT, 1, [Define this symbol if DIT support is enabled])
 fi
 
 if test "x$with_bench" = xyes; then
@@ -464,6 +474,7 @@ echo "  Intel SSE       = $use_intel_sse"
 echo "  SSE2 Scrypt     = $use_scrypt_sse2"
 echo "  ARMv8 crypto    = $armv8_crypto"
 echo "  ARMv8.2 crypto  = $armv82_crypto"
+echo "  DIT             = $use_dit"
 echo
 if test "x$use_tests" = xyes; then
 echo "  test password   = $PASSWD_STR"

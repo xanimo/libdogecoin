@@ -231,6 +231,15 @@ dogecoin_btree_tsearch (const void * __restrict vkey,		/* key to be located */
   return q;
 }
 
+/* Checks if DIT is supported */
+dogecoin_bool is_DIT_supported(void);
+
+/* Enables DIT */
+dogecoin_bool enable_DIT(void);
+
+/* Disables DIT */
+void disable_DIT(void);
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_UTILS_H__
