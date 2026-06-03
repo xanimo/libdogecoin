@@ -1,5 +1,11 @@
 ### YubiKey Storage of Encrypted Keys
 
+> **Scope.** This document covers libdogecoin's **PIV-based** YubiKey integration, used by the `seal` module for encrypted seed/key storage.
+>
+> - **Enabled by:** `./configure --enable-yubikey`
+> - **Links against:** system `libykpiv` + `libpcsclite`
+> - **YubiKey application used:** PIV (Personal Identity Verification)
+
 The YubiKey is a hardware security key that provides strong two-factor authentication and secure cryptographic operations. By integrating the YubiKey with libdogecoin, users can enhance the security of their wallets and transactions. While the integration is tested with YubiKey 5 NFC, it also works with other YubiKey models that support PIV (Personal Identity Verification).
 
 YubiKey supports numerous cryptographic operations; for libdogecoin, we are primarily interested in the PIV application. The PIV application provides a secure way to store private keys. The YubiKey acts as secure key storage, protecting the private keys from unauthorized access.

@@ -325,7 +325,7 @@ if test "x$use_optee" = xyes; then
 fi
 
 if test "x$use_yubikey" = xyes; then
-  AC_CHECK_LIB([ykpiv],[main],LIBYKPIV=-lykpiv,AC_MSG_ERROR(libpkpiv missing))
+  AC_CHECK_LIB([ykpiv],[ykpiv_init],LIBYKPIV=-lykpiv,AC_MSG_ERROR(libykpiv missing))
   LIBS="$LIBS $LIBYKPIV"
   AC_DEFINE(USE_YUBIKEY, 1, [Define this symbol if Yubikey works])
 fi
