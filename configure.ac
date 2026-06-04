@@ -432,6 +432,17 @@ AC_SUBST(EVENT_EXTRA_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(LIBYKPIV)
 AC_SUBST(NASMFLAGS)
+
+# Resolve nasm to an absolute path at configure time so make does not depend on
+# nasm being on $PATH. When building against ./depends, config.site prepends
+# depends/${host}/native/bin to PATH, so this picks up the depends-built nasm.
+if test x$use_intel_avx2 = xyes || test x$use_intel_sse = xyes; then
+  AC_PATH_PROG([NASM], [nasm], [nasm])
+  if test "x$NASM" = "xnasm"; then
+    AC_MSG_ERROR([nasm assembler is required for --enable-intel-avx2/--enable-intel-sse but was not found; build it via depends with NASM=1 or install it (for example: apt-get install nasm, or brew install nasm)])
+  fi
+fi
+AC_SUBST([NASM])
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_BENCH], [test "x$with_bench" = "xyes"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])

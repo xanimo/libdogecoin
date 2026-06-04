@@ -53,6 +53,7 @@ The following can be set when running make: make FOO=bar
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids
     YUBIKEY: set to 'y' to include yubikey packages for the enclave hosts
+    NASM: set to 1 to build native_nasm (for --enable-intel-avx2/--enable-intel-sse or -DUSE_AVX2=ON/-DUSE_SSE=ON). Default: off.
 
 If some packages are not built, the appropriate
 options will be passed to libdogecoin's configure. In this case, `--disable-net`.

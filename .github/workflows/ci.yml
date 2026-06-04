@@ -33,6 +33,8 @@ jobs:
           - x86_64-nixos
           - x86_64-linux-dbg
           - x86_64-linux-yubikey
+          - x86_64-linux-avx2
+          - x86_64-linux-sse
           - x86_64-linux-openenclave
           - x86_64-linux-raccoon-g
           - x86_64-linux-zk-carrier
@@ -104,6 +106,21 @@ jobs:
             packages: libykpiv-dev libpcsclite-dev
             dep-opts: "SPEED=slow V=1"
             config-opts: "--enable-static --disable-shared --enable-yubikey"
+          - name: x86_64-linux-avx2
+            host: x86_64-pc-linux-gnu
+            os: ubuntu-22.04
+            run-tests: true
+            packages: python3-dev python3-dbg
+            dep-opts: "DEBUG=1 SPEED=slow V=1 NASM=1"
+            config-opts: "--enable-debug --enable-intel-avx2"
+            goal: install
+          - name: x86_64-linux-sse
+            host: x86_64-pc-linux-gnu
+            os: ubuntu-22.04
+            run-tests: true
+            packages: python3-dev python3-dbg
+            dep-opts: "DEBUG=1 SPEED=slow V=1 NASM=1"
+            config-opts: "--enable-debug --enable-intel-sse"
             goal: install
           - name: x86_64-linux-openenclave
             host: x86_64-pc-linux-gnu
