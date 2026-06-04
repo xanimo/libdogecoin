@@ -9,6 +9,7 @@
     - [GET /getAddresses](#get-getaddresses)
     - [GET /getTransactions](#get-gettransactions)
     - [GET /getUTXOs](#get-getutxos)
+    - [GET /getSpends](#get-getspends)
     - [GET /getWallet](#get-getwallet)
     - [GET /getHeaders](#get-getheaders)
     - [GET /getChaintip](#get-getchaintip)
@@ -100,7 +101,10 @@ address: DQe1QeG4FxhEgvfuvGfC7oL5G2G87huuxU
 
 ### GET **/getTransactions**
 
-Retrieves all spent (non-spendable) transactions associated with the wallet.
+Spent external receipts: non-spendable UTXOs received from external senders.
+Change from the wallet's own outgoing txs (`is_from_me`) is skipped to avoid
+double-counting along the change chain. Complements `/getUTXOs` (still held)
+and `/getSpends` (outgoing).
 
 #### **Request**
 
@@ -120,13 +124,15 @@ Retrieves all spent (non-spendable) transactions associated with the wallet.
   script_pubkey:  <script_pubkey>
   amount:         <amount>
   confirmations:  <confirmations>
+  height:         <height>
   spendable:      <spendable>
   solvable:       <solvable>
   ...
   Spent Balance: <total_spent_balance>
   ```
 
-  Information about each spent transaction (UTXO) and the total spent balance.
+  Information about each previously-received (now spent) UTXO and the total
+  spent balance, summed over external receipts only.
 
 #### **Example**
 
@@ -144,6 +150,7 @@ address:        DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L
 script_pubkey:  76a9144621d6a7f3b4ebbaee4e2d8c10eafbf1ccbc9c0a88ac
 amount:         50.00000000
 confirmations:  100
+height:         5123450
 spendable:      0
 solvable:       1
 Spent Balance: 50.00000000
@@ -174,6 +181,7 @@ Retrieves all unspent transaction outputs (UTXOs) associated with the wallet.
   script_pubkey:  <script_pubkey>
   amount:         <amount>
   confirmations:  <confirmations>
+  height:         <height>
   spendable:      <spendable>
   solvable:       <solvable>
   ...
@@ -199,9 +207,87 @@ address:        DQe1QeG4FxhEgvfuvGfC7oL5G2G87huuxU
 script_pubkey:  76a9145d6a7f3b4ebbaee4e2d8c10eafbf1ccbc9c0a88ac
 amount:         75.00000000
 confirmations:  100
+height:         5123456
 spendable:      1
 solvable:       1
 Total Unspent: 75.00000000
+```
+
+---
+
+### GET **/getSpends**
+
+Retrieves the wallet's outgoing transaction history with per-output recipient
+breakdown. Iterates `wallet->vec_wtxes` (the wallet's transactions vector,
+populated during SPV rescan from a WIF + watch-addresses), filters to wtx's
+that the wallet funded (`is_from_me`), and for each one decodes every vout's
+destination address. Does not use any spends index/vector.
+
+For each output the response flags `is_mine` so external recipients are
+distinguishable from change. Per-tx totals (`total_in`, `total_out`, `sent`,
+`change`, `fee`) are computed from the wtx vins/vouts.
+
+#### **Request**
+
+- **Method:** `GET`
+- **URL:** `/getSpends`
+
+#### **Response**
+
+- **Content-Type:** `text/plain`
+- **Body:** for each outgoing wtx:
+
+  ```
+  ----------------------
+  txid:           <txid>
+  height:         <block_height>
+  total_in:       <amount>
+  total_out:      <amount>
+  sent:           <amount>   # to external recipients
+  change:         <amount>   # back to our addresses
+  fee:            <amount>
+    output:
+      vout:           <index>
+      address:        <address|(non-p2pkh)>
+      amount:         <amount>
+      is_mine:        <0|1>
+    ...
+  ...
+  ----------------------
+  Outgoing transactions: <count>
+  Total Sent (excl. change): <total>
+  ```
+
+#### **Example**
+
+```bash
+curl http://localhost:<port>/getSpends
+```
+
+#### **Sample Response**
+
+```
+----------------------
+txid:           a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90
+height:         5123456
+total_in:       100.00000000
+total_out:      99.99000000
+sent:           60.00000000
+change:         39.99000000
+fee:            0.01000000
+  output:
+    vout:           0
+    address:        DQe1QeG4FxhEgvfuvGfC7oL5G2G87huuxU
+    amount:         60.00000000
+    is_mine:        0
+  output:
+    vout:           1
+    address:        DH1ApGRY3p2Q6S9HpkjJjqg1JpyZ9HMyaR
+    amount:         39.99000000
+    is_mine:        1
+----------------------
+Outgoing transactions: 1
+Total Sent (excl. change): 60.00000000
 ```
 
 ---
