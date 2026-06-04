@@ -109,6 +109,7 @@ The `/doc` folder has many helpful resources regarding setup and usage of Libdog
 - [`project_roadmap.md`](doc/project_roadmap.md) Our plan for the future of Libdogecoin (with pictures!).
 - [`tools.md`](doc/tools.md) Guidance on how to use provided helper scripts and tools like `such` and `sendtx`.
 - [`transaction.md`](doc/transaction.md) Full description of dogecoin transactions and the Libdogecoin Essential Transaction API.
+- [`wallet.md`](doc/wallet.md) Wallet query API for address-scoped UTXO and balance access.
 
 ## Quick Start
 
