@@ -575,7 +575,11 @@ dogecoin_bool dogecoin_script_build_multisig(cstring* script_in, const unsigned 
 {
     cstr_resize(script_in, 0); //clear script
 
-    if (required_signatures > 16 || pubkeys_chars->len > 16)
+    if (!pubkeys_chars || pubkeys_chars->len == 0)
+        return false;
+    if (required_signatures == 0 || required_signatures > 16)
+        return false;
+    if (pubkeys_chars->len > 16 || required_signatures > pubkeys_chars->len)
         return false;
     enum opcodetype op_req_sig = dogecoin_encode_op_n(required_signatures);
     cstr_append_buf(script_in, &op_req_sig, 1);

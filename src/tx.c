@@ -1223,8 +1223,10 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         if (memcmp(hash160_in_script, hash160, sizeof(hash160)) != 0) {
             res = DOGECOIN_SIGN_NO_KEY_MATCH; //sign anyways
         }
-    } else {
-        // unknown script, however, still try to create a signature (don't apply though)
+    } else if (type != DOGECOIN_TX_MULTISIG) {
+        // unknown script, however, still try to create a signature (don't apply though).
+        // P2SH multisig (DOGECOIN_TX_MULTISIG) is handled by the dedicated branch below,
+        // so do not flag it as unknown here.
         res = DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE;
     }
     vector_free(script_pushes, true);
@@ -1268,6 +1270,69 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         // apply pubkey
         ser_varlen(tx_in->script_sig, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
         ser_bytes(tx_in->script_sig, pubkey.pubkey, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
+    } else if (type == DOGECOIN_TX_MULTISIG) {
+        /* P2SH multisig: scriptSig = OP_0 <sig1> ... <sigN> <serialized_redeem_script>
+         *
+         * We parse any existing signature pushes out of the current scriptSig
+         * (stripping the leading OP_0 marker and the trailing redeem-script push
+         * if present), append the new DER signature, and rebuild the full
+         * scriptSig including the redeem script. Sig pushes are identified
+         * structurally — not by length — so this correctly handles small
+         * redeem scripts (e.g. a 71-byte 2-of-2 redeem) that collide with the
+         * usual DER signature length window.
+         */
+        vector_t* existing_ops = vector_new(4, dogecoin_script_op_free_cb);
+        dogecoin_script_get_ops(tx_in->script_sig, existing_ops);
+
+        size_t start = 0;
+        size_t end = existing_ops->len;
+        if (end > 0) {
+            /* Strip the leading OP_0 marker that BIP16 requires in front of
+             * the signatures (this also covers the OP_CHECKMULTISIG off-by-one). */
+            dogecoin_script_op* first = vector_idx(existing_ops, 0);
+            if (first->op == OP_0 && first->datalen == 0) {
+                start = 1;
+            }
+            /* Strip the trailing redeem-script push (verified to match the
+             * caller-supplied `script` arg byte-for-byte). */
+            dogecoin_script_op* last = vector_idx(existing_ops, end - 1);
+            if (end > start && last->data && last->datalen == script->len &&
+                memcmp(last->data, script->str, script->len) == 0) {
+                end--;
+            }
+        }
+
+        cstring* new_sig = cstr_new_sz(512);
+
+        /* OP_0 (required by BIP16 / OP_CHECKMULTISIG off-by-one) */
+        uint8_t op0 = OP_0;
+        ser_bytes(new_sig, &op0, 1);
+
+        /* re-emit existing signature pushes (everything between OP_0 and the
+         * redeem-script push). */
+        for (size_t k = start; k < end; ++k) {
+            dogecoin_script_op* op = vector_idx(existing_ops, k);
+            if (op->data && op->datalen > 0) {
+                ser_varlen(new_sig, op->datalen);
+                ser_bytes(new_sig, op->data, op->datalen);
+            }
+        }
+        vector_free(existing_ops, true);
+
+        /* new DER signature + hashtype */
+        ser_varlen(new_sig, sigderlen);
+        ser_bytes(new_sig, sigder_plus_hashtype, sigderlen);
+
+        /* serialized redeem script push */
+        ser_varlen(new_sig, script->len);
+        ser_bytes(new_sig, (const unsigned char*)script->str, script->len);
+
+        /* replace the input's scriptSig */
+        cstr_resize(tx_in->script_sig, 0);
+        cstr_append_buf(tx_in->script_sig, new_sig->str, new_sig->len);
+        cstr_free(new_sig, true);
+
+        res = DOGECOIN_SIGN_OK;
     } else {
         // append nothing
         res = DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE;

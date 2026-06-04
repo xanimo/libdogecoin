@@ -979,11 +979,19 @@ void test_script_parse()
     }
 
     cstring* new_script = cstr_new_sz(1024);
-    dogecoin_script_build_multisig(new_script, 2, pubkeys);
+    u_assert_int_eq(dogecoin_script_build_multisig(new_script, 2, pubkeys), true);
 
     u_assert_int_eq(new_script->str[0], 0x52);                   //2
     u_assert_int_eq(new_script->str[new_script->len - 2], 0x53); //3
     u_assert_int_eq(((char)new_script->str[new_script->len - 1] == (char)OP_CHECKMULTISIG), 1);
+
+    u_assert_int_eq(dogecoin_script_build_multisig(new_script, 0, pubkeys), false);
+    u_assert_int_eq(dogecoin_script_build_multisig(new_script, 4, pubkeys), false);
+    u_assert_int_eq(dogecoin_script_build_multisig(new_script, 2, NULL), false);
+
+    vector_t* empty_pubkeys = vector_new(3, free);
+    u_assert_int_eq(dogecoin_script_build_multisig(new_script, 1, empty_pubkeys), false);
+    vector_free(empty_pubkeys, true);
     cstr_free(new_script, true);
 
     dogecoin_pubkey* pubkey = pubkeys->data[0];
@@ -1269,12 +1277,127 @@ void test_tx_sign_p2pkh_i2(dogecoin_tx* tx)
     cstr_free(script_wrong, true);
 }
 
+void test_tx_sign_multisig_2of2_incremental()
+{
+    /* Regression test for the length-heuristic bug in dogecoin_tx_sign_input's
+     * DOGECOIN_TX_MULTISIG branch: a 2-of-2 redeem script is exactly 71 bytes
+     * (1 + 2*(1+33) + 1 + 1), which used to be mis-classified as a DER signature
+     * push during incremental signing — duplicating it into the output scriptSig.
+     *
+     * This test exercises two consecutive sign passes against the same input
+     * and asserts that the final scriptSig parses as exactly
+     * [OP_0, sig0, sig1, redeem] (4 ops), with the trailing push bit-identical
+     * to the redeem script. */
+
+    /* Two distinct cosigner keypairs (generated). */
+    dogecoin_key k0, k1;
+    dogecoin_pubkey p0, p1;
+    dogecoin_privkey_init(&k0);
+    dogecoin_privkey_init(&k1);
+    dogecoin_privkey_gen(&k0);
+    dogecoin_privkey_gen(&k1);
+    dogecoin_pubkey_init(&p0);
+    dogecoin_pubkey_init(&p1);
+    dogecoin_pubkey_from_key(&k0, &p0);
+    dogecoin_pubkey_from_key(&k1, &p1);
+    u_assert_int_eq(dogecoin_pubkey_is_valid(&p0), 1);
+    u_assert_int_eq(dogecoin_pubkey_is_valid(&p1), 1);
+
+    /* Build a 2-of-2 redeem script. Compressed pubkeys ⇒ length is exactly
+     * 1 (OP_2) + 1+33 + 1+33 + 1 (OP_2) + 1 (OP_CHECKMULTISIG) = 71 bytes —
+     * the bug's exact collision case. */
+    vector_t* pubs = vector_new(2, free);
+    dogecoin_pubkey* p0_copy = dogecoin_malloc(sizeof(dogecoin_pubkey));
+    dogecoin_pubkey* p1_copy = dogecoin_malloc(sizeof(dogecoin_pubkey));
+    *p0_copy = p0;
+    *p1_copy = p1;
+    vector_add(pubs, p0_copy);
+    vector_add(pubs, p1_copy);
+    cstring* redeem = cstr_new_sz(128);
+    u_assert_int_eq(dogecoin_script_build_multisig(redeem, 2, pubs), true);
+    u_assert_uint32_eq((uint32_t)redeem->len, 71); /* 2-of-2 compressed ⇒ 71 B */
+    vector_free(pubs, true);
+
+    /* Construct a minimal spending transaction with one input (the P2SH-funded
+     * outpoint is a dummy; sighash only needs the structure to be valid). */
+    dogecoin_tx* tx = dogecoin_tx_new();
+    dogecoin_tx_in* in = dogecoin_tx_in_new();
+    /* dummy prev outpoint */
+    memset(&in->prevout.hash, 0xaa, sizeof(in->prevout.hash));
+    in->prevout.n = 0;
+    in->sequence = 0xffffffff;
+    /* tx_in_new does not allocate script_sig; sign_input writes into it. */
+    in->script_sig = cstr_new_sz(0);
+    vector_add(tx->vin, in);
+
+    /* Add a single P2PKH output so the tx is well-formed. */
+    dogecoin_tx_out* out = dogecoin_tx_out_new();
+    out->value = 100000;
+    out->script_pubkey = cstr_new_sz(0);
+    {
+        const uint8_t dummy_p2pkh[25] = {
+            OP_DUP, OP_HASH160, 20,
+            0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+            0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00,
+            0x11, 0x22, 0x33, 0x44,
+            OP_EQUALVERIFY, OP_CHECKSIG
+        };
+        cstr_append_buf(out->script_pubkey, dummy_p2pkh, sizeof(dummy_p2pkh));
+    }
+    vector_add(tx->vout, out);
+
+    /* Sign pass 1 — cosigner 0. */
+    uint8_t sigcomp[64] = {0};
+    uint8_t sigder[76] = {0};
+    size_t sigder_len = 0;
+    enum dogecoin_tx_sign_result r1 = dogecoin_tx_sign_input(
+        tx, redeem, &k0, 0, SIGHASH_ALL, sigcomp, sigder, &sigder_len);
+    u_assert_int_eq(r1, DOGECOIN_SIGN_OK);
+
+    /* After pass 1 the scriptSig must be [OP_0, sig0, redeem] (3 ops). */
+    vector_t* ops1 = vector_new(4, dogecoin_script_op_free_cb);
+    u_assert_int_eq(dogecoin_script_get_ops(in->script_sig, ops1), true);
+    u_assert_uint32_eq((uint32_t)ops1->len, 3);
+    {
+        dogecoin_script_op* op_last1 = vector_idx(ops1, 2);
+        u_assert_uint32_eq((uint32_t)op_last1->datalen, (uint32_t)redeem->len);
+        u_assert_mem_eq(op_last1->data, redeem->str, redeem->len);
+    }
+    vector_free(ops1, true);
+
+    /* Sign pass 2 — cosigner 1, against the same input. */
+    enum dogecoin_tx_sign_result r2 = dogecoin_tx_sign_input(
+        tx, redeem, &k1, 0, SIGHASH_ALL, sigcomp, sigder, &sigder_len);
+    u_assert_int_eq(r2, DOGECOIN_SIGN_OK);
+
+    /* After pass 2 the scriptSig must be [OP_0, sig0, sig1, redeem] (exactly
+     * 4 ops). With the length-heuristic bug it would parse as 5 ops —
+     * the 71-byte redeem from pass 1 leaked through as a "sig". */
+    vector_t* ops2 = vector_new(8, dogecoin_script_op_free_cb);
+    u_assert_int_eq(dogecoin_script_get_ops(in->script_sig, ops2), true);
+    u_assert_uint32_eq((uint32_t)ops2->len, 4);
+    {
+        dogecoin_script_op* op_first = vector_idx(ops2, 0);
+        u_assert_int_eq(op_first->op, OP_0);
+        u_assert_uint32_eq((uint32_t)op_first->datalen, 0);
+
+        dogecoin_script_op* op_last = vector_idx(ops2, 3);
+        u_assert_uint32_eq((uint32_t)op_last->datalen, (uint32_t)redeem->len);
+        u_assert_mem_eq(op_last->data, redeem->str, redeem->len);
+    }
+    vector_free(ops2, true);
+
+    cstr_free(redeem, true);
+    dogecoin_tx_free(tx);
+}
+
 void test_tx_sign()
 {
     dogecoin_tx* tx = dogecoin_tx_new();
     test_tx_sign_p2pkh(tx);
     test_tx_sign_p2pkh_i2(tx);
     dogecoin_tx_free(tx);
+    test_tx_sign_multisig_2of2_incremental();
 }
 
 void test_scripts()

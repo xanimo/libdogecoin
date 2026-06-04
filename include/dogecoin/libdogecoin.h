@@ -520,6 +520,16 @@ int sign_transaction_ex(int txindex, const char* script_pubkey, const char* priv
 /* convenience wrapper: sign a single-key p2pkh tx at (txindex) using (privkey); writes signed hex into (buf) with capacity (buf_cap) */
 int sign_transaction_w_privkey_ex(int txindex, const char* privkey, char* buf, size_t buf_cap);
 
+/* build an M-of-N P2SH multisig address from (n) compressed pubkey hex strings;
+   writes the P2SH address into (p2sh_addr_out) (must hold at least P2PKHLEN bytes,
+   capacity given by (p2sh_addr_cap)) and the redeem script hex into
+   (redeem_script_hex_out) (must hold at least (n*68+6)*2+1 bytes, capacity given
+   by (redeem_script_hex_cap));
+   returns 1 on success, 0 on error (including insufficient buffer capacity) */
+int get_p2sh_multisig_address(const char** pubkeys_hex, int n, int m, int is_testnet,
+                               char* p2sh_addr_out, size_t p2sh_addr_cap,
+                               char* redeem_script_hex_out, size_t redeem_script_hex_cap);
+
 /* QR Code Generation Functions
 ---------------------------------
 */

@@ -29,10 +29,13 @@
 
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/base58.h>
+#include <dogecoin/key.h>
 #include <dogecoin/koinu.h>
+#include <dogecoin/script.h>
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/vector.h>
 
 /**
  * @brief This function instantiates a new working transaction,
@@ -327,7 +330,7 @@ int add_output(int txindex, char* destinationaddress, char* amount) {
         return false;
     }
     // determine intended network by checking address prefix:
-    const dogecoin_chainparams* chain = (destinationaddress[0] == 'D') ? &dogecoin_chainparams_main : &dogecoin_chainparams_test;
+    const dogecoin_chainparams* chain = chain_from_b58_prefix(destinationaddress);
 
     uint64_t koinu = coins_to_koinu_str(amount);
     // calculate total minus fees
@@ -356,7 +359,7 @@ static int make_change(int txindex, char* public_key, uint64_t subtractedfee, ui
     if (tx == NULL) return false;
 
     // determine intended network by checking address prefix:
-    const dogecoin_chainparams* chain = (public_key[0] == 'D') ? &dogecoin_chainparams_main : &dogecoin_chainparams_test;
+    const dogecoin_chainparams* chain = chain_from_b58_prefix(public_key);
 
     // calculate total minus fees
     uint64_t total_change_back = amount - subtractedfee;
@@ -1078,4 +1081,75 @@ int sign_transaction_w_privkey_ex(int  txindex,
     int ok = sign_transaction_ex(txindex, script_pubkey, privkey, buf, buf_cap);
     dogecoin_free(script_pubkey);
     return ok;
+}
+
+/**
+ * @brief Build an M-of-N P2SH multisig address from compressed pubkey hex strings.
+ *
+ * @param pubkeys_hex            Array of (n) compressed pubkey hex strings (33 bytes each = 66 hex chars).
+ * @param n                      Total number of cosigners.
+ * @param m                      Required signatures.
+ * @param is_testnet             Non-zero to use testnet chain params.
+ * @param p2sh_addr_out          Output buffer for the P2SH address (must be at least P2PKHLEN bytes).
+ * @param p2sh_addr_cap          Capacity of @p p2sh_addr_out in bytes.
+ * @param redeem_script_hex_out  Output buffer for the redeem script hex
+ *                               (must be at least (n*68+6)*2+1 bytes; 1200 is safe for up to 15-of-15).
+ * @param redeem_script_hex_cap  Capacity of @p redeem_script_hex_out in bytes.
+ *
+ * @return 1 on success, 0 on error (including insufficient buffer capacity).
+ */
+int get_p2sh_multisig_address(const char** pubkeys_hex, int n, int m, int is_testnet,
+                               char* p2sh_addr_out, size_t p2sh_addr_cap,
+                               char* redeem_script_hex_out, size_t redeem_script_hex_cap)
+{
+    if (!pubkeys_hex || n < 1 || m < 1 || m > n || !p2sh_addr_out || !redeem_script_hex_out)
+        return 0;
+    if (p2sh_addr_cap < P2PKHLEN)
+        return 0;
+
+    /* load pubkeys into a vector */
+    vector_t* pubs = vector_new((size_t)n, dogecoin_free);
+    for (int i = 0; i < n; ++i) {
+        if (!pubkeys_hex[i]) { vector_free(pubs, true); return 0; }
+        dogecoin_pubkey* pk = (dogecoin_pubkey*)dogecoin_malloc(sizeof(dogecoin_pubkey));
+        dogecoin_pubkey_init(pk);
+        pk->compressed = 1;
+        size_t outlen = 0;
+        utils_hex_to_bin(pubkeys_hex[i], pk->pubkey, strlen(pubkeys_hex[i]), &outlen);
+        if (outlen != 33 || !dogecoin_pubkey_is_valid(pk)) {
+            dogecoin_free(pk);
+            vector_free(pubs, true);
+            return 0;
+        }
+        vector_add(pubs, pk);
+    }
+
+    /* build the redeem script */
+    cstring* redeem = cstr_new_sz(550);
+    if (!dogecoin_script_build_multisig(redeem, (unsigned int)m, pubs)) {
+        cstr_free(redeem, true);
+        vector_free(pubs, true);
+        return 0;
+    }
+    vector_free(pubs, true);
+
+    /* redeem script → hex (each byte renders as two hex chars + NUL terminator) */
+    if (redeem_script_hex_cap < (size_t)redeem->len * 2 + 1) {
+        cstr_free(redeem, true);
+        return 0;
+    }
+    utils_bin_to_hex((unsigned char*)redeem->str, redeem->len, redeem_script_hex_out);
+
+    /* redeem script → hash160 → P2SH address */
+    uint160_t script_hash;
+    dogecoin_script_get_scripthash(redeem, script_hash);
+    cstr_free(redeem, true);
+
+    const dogecoin_chainparams* chain = is_testnet
+        ? &dogecoin_chainparams_test
+        : &dogecoin_chainparams_main;
+    if (!dogecoin_p2sh_addr_from_hash160(script_hash, chain, p2sh_addr_out, p2sh_addr_cap))
+        return 0;
+
+    return 1;
 }

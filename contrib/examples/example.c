@@ -1150,6 +1150,56 @@ int main() {
 		}
 	}
 
+	// MULTISIG P2SH EXAMPLE
+	//
+	// Demonstrates the offline P2SH redeem-script + address derivation
+	// (`get_p2sh_multisig_address`). The cosigner pubkeys below are public
+	// information only; no cosigner private keys (WIFs) are bundled with the
+	// example. To actually spend a P2SH-multisig UTXO, call
+	// `sign_indexed_raw_transaction_ex(txindex, 0, redeem_script_hex,
+	//                                  SIGHASH_ALL, cosigner_wif, buf, cap)`
+	// once per cosigner — feeding each returned hex back in as the next call's
+	// transaction. See doc/transaction_extended.md for the full M-of-N
+	// signing recipe.
+	printf("\n\nBEGIN MULTISIG P2SH EXAMPLE:\n\n");
+
+	// Known 2-of-3 cosigner pubkeys (public, reproducible values).
+	const char* ms_pubs[3] = {
+		"03f59f55e1237358524f59ec304d560b384c35101bc0c830fe0f0734b16c1f2f27",
+		"038abd7a75751f046aca1c72fb1eb02af0088ef5832db0c703f9a7d4973958eaa2",
+		"0262bed3c8c9b168a72915da0ef3b4712d0346367575d10b1c6816c78325f31c85",
+	};
+
+	// 1. Derive the 2-of-3 P2SH address and redeem script from the ordered pubkeys.
+	char ms_p2sh_addr[P2PKHLEN];
+	char ms_redeem_hex[1200]; // safe for up to 15-of-15
+	if (!get_p2sh_multisig_address(ms_pubs, 3, 2, 0 /* mainnet */,
+	                                ms_p2sh_addr, sizeof(ms_p2sh_addr),
+	                                ms_redeem_hex, sizeof(ms_redeem_hex))) {
+		printf("Failed to derive multisig P2SH address.\n");
+		return -1;
+	}
+
+	printf("2-of-3 redeem script: %s\n", ms_redeem_hex);
+	printf("2-of-3 P2SH address:  %s\n", ms_p2sh_addr);
+
+	// 2. Sanity check: the derived address must match the address that would be
+	// computed by hash160-then-base58check of the same redeem script (this is
+	// just a self-consistency check — no funds are touched).
+	{
+		const char expected_mainnet_p2sh[] = "A4WG8CySzTzVYNssp2iKf8eXmDzRwPrSWA";
+		if (strcmp(ms_p2sh_addr, expected_mainnet_p2sh) != 0) {
+			printf("P2SH address %s does not match expected derivation %s.\n",
+			        ms_p2sh_addr, expected_mainnet_p2sh);
+			return -1;
+		}
+		printf("P2SH address derivation matches expected value.\n");
+	}
+	printf("Multisig P2SH derivation OK.\n");
+	// END ===========================================
+
+
+
 	printf("\nTESTS COMPLETE!\n");
 	dogecoin_ecc_stop();
 }
