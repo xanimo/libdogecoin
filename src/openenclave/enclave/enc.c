@@ -226,8 +226,8 @@ void enclave_libdogecoin_run_example()
         oe_result_str(OE_FAILURE);
     }
 
-    if (getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout, true)) {
-        printf("Derived HD Addresses:\n%s\n%s\n", extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+    if (getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout)) {
+        printf("Derived P2PKH Address:\n%s\n%s\n", extout, "DCm7oSg95sxwn3sWxYUDHgKKbB2mDmuR3B");
     } else {
         printf("getDerivedHDAddressByPath failed!\n");
         oe_result_str(OE_FAILURE);
@@ -807,7 +807,7 @@ void enclave_libdogecoin_generate_address(const data_t* encrypted_blob, char* cu
     size_t offset = 0;
 
     if (custom_path) {
-        getDerivedHDAddressByPath(master_key, custom_path, address_p2pkh, false);
+        getDerivedHDAddressByPath(master_key, custom_path, address_p2pkh);
     } else {
         for (uint32_t i = 0; i < num_addresses; i++)
         {

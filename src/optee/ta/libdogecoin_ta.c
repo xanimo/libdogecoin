@@ -666,7 +666,7 @@ static TEE_Result generate_address(uint32_t param_types, TEE_Param params[4]) {
     char master_key[HDKEYLEN];
     getHDRootKeyFromSeed(seed, sizeof(seed), false, master_key);
 
-    getDerivedHDAddressByPath(master_key, key_path, address, false);
+    getDerivedHDAddressByPath(master_key, key_path, address);
 
 
     dogecoin_ecc_stop();

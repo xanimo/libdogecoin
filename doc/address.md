@@ -395,10 +395,11 @@ int main() {
 
 ### **getDerivedHDAddressByPath**
 
-`int getDerivedHDAddressByPath(const char* masterkey, const char* derived_path, char* outaddress, bool outprivkey)`
+`int getDerivedHDAddressByPath(const char* masterkey, const char* derived_path, char* outaddress)`
 
-This function derives an extended HD address by custom path in string format (derived_path).
-It returns 1 if the address is valid and 0 if it is not.
+This function derives a P2PKH address from the given master key using a custom BIP-44 derivation path in string format (`derived_path`, e.g. `m/44'/3'/0'/0/0`).
+The output written to `outaddress` is a base58-encoded P2PKH address (use a buffer of at least `P2PKHLEN` bytes).
+It returns 1 on success and 0 on failure.
 
 _C usage:_
 
@@ -408,15 +409,13 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  size_t extoutsize = 112;
-  char* extout = dogecoin_char_vla(extoutsize);
+  char extout[P2PKHLEN];
   char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
   dogecoin_ecc_start();
-  res = getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout, true);
+  int res = getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout);
   u_assert_int_eq(res, true);
-  u_assert_str_eq(extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+  u_assert_str_eq(extout, "DCm7oSg95sxwn3sWxYUDHgKKbB2mDmuR3B");
   dogecoin_ecc_stop();
-  free(extout);
 }
 ```
 
