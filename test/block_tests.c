@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include <dogecoin/arith_uint256.h>
+#include <dogecoin/auxpow.h>
 #include <dogecoin/block.h>
 
 #include <dogecoin/cstr.h>
@@ -44,6 +45,34 @@ static const struct blockheadertest block_header_tests[] =
                 // end mainnet blocks
                 {"020162002770a8b89647bbb542f044754a07dc6e56545793f5dcecdf43826ae0cb7192a12466d048e51b0f8a3cbaaf8a624b9aa1212ce4c2a4feba0750f7ad14feb75f54c69de053837b091e00000000", "8afc65a42c47b5ed5862194fb846171ba4afb999a1b4cce149f56c328d8a90e4", 6422786, 1407229382, 503937923, 0, &dogecoin_chainparams_test, ""} // 158391
         };
+
+static void test_check_merkle_branch()
+{
+    size_t outlen = 0;
+    uint256_t hash = {0};
+    uint256_t expected = {0};
+    vector_t* merkle_branch = vector_new(3, dogecoin_free);
+
+    /* Fixed branch/index vector generated independently to verify deterministic hashing order. */
+    utils_hex_to_bin("1111111111111111111111111111111111111111111111111111111111111111", hash, DOGECOIN_HASH_LENGTH * 2, &outlen);
+
+    uint256_t* branch0 = dogecoin_uint256_vla(1);
+    uint256_t* branch1 = dogecoin_uint256_vla(1);
+    uint256_t* branch2 = dogecoin_uint256_vla(1);
+    utils_hex_to_bin("2222222222222222222222222222222222222222222222222222222222222222", *branch0, DOGECOIN_HASH_LENGTH * 2, &outlen);
+    utils_hex_to_bin("3333333333333333333333333333333333333333333333333333333333333333", *branch1, DOGECOIN_HASH_LENGTH * 2, &outlen);
+    utils_hex_to_bin("4444444444444444444444444444444444444444444444444444444444444444", *branch2, DOGECOIN_HASH_LENGTH * 2, &outlen);
+    vector_add(merkle_branch, branch0);
+    vector_add(merkle_branch, branch1);
+    vector_add(merkle_branch, branch2);
+
+    uint256_t* result = check_merkle_branch(&hash, merkle_branch, 5);
+    utils_hex_to_bin("80165eb2e22322b7570785b120ecf4b07df5ba7b4a458413a4b15b3d246506b6", expected, DOGECOIN_HASH_LENGTH * 2, &outlen);
+    u_assert_mem_eq(result, expected, DOGECOIN_HASH_LENGTH);
+
+    dogecoin_free(result);
+    vector_free(merkle_branch, true);
+}
 
 void test_block_header()
 {
@@ -184,4 +213,6 @@ void test_block_header()
     cstr_free(blockheader_ser, true);
     dogecoin_block_header_hash(&bheaderprev, (uint8_t *)&checkhash);
     u_assert_str_eq(utils_uint8_to_hex(bheader.prev_block, sizeof(bheader.prev_block)), utils_uint8_to_hex(checkhash, sizeof(checkhash)));
+
+    test_check_merkle_branch();
 }

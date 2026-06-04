@@ -122,6 +122,12 @@ AC_ARG_ENABLE([intel-sse],
   [use_intel_sse=$enableval],
   [use_intel_sse=no])
 
+AC_ARG_ENABLE([intel-sse4],
+  [AS_HELP_STRING([--enable-intel-sse4],
+  [Build with Intel SSE4 implementation (default is no)])],
+  [use_intel_sse4=$enableval],
+  [use_intel_sse4=no])
+
 AC_ARG_ENABLE([scrypt-sse2],
   [AS_HELP_STRING([--enable-scrypt-sse2],
   [Build with scrypt sse2 implementation (default is no)])],
@@ -259,13 +265,17 @@ fi
 # Configure Intel AVX2
 if test x$use_intel_avx2 = xyes; then
   AC_DEFINE(USE_AVX2, 1, [Define this symbol if AVX2 works])
-  CFLAGS="$CFLAGS -mavx2"
 fi
 
 # Configure Intel SSE
 if test x$use_intel_sse = xyes; then
   AC_DEFINE(USE_SSE, 1, [Define this symbol if SSE works])
   CFLAGS="$CFLAGS -msse4.2"
+fi
+
+# Configure Intel SSE4
+if test x$use_intel_sse4 = xyes; then
+  AC_DEFINE(USE_SSE4, 1, [Define this symbol if SSE4 works])
 fi
 
 # Configure Scrypt SSE2
@@ -487,6 +497,7 @@ AM_CONDITIONAL([WITH_LOGDB], [test "x$with_logdb" = "xyes"])
 AM_CONDITIONAL([WITH_WALLET], [test "x$with_wallet" = "xyes"])
 AM_CONDITIONAL([USE_AVX2], [test "x$use_intel_avx2" = "xyes"])
 AM_CONDITIONAL([USE_SSE], [test "x$use_intel_sse" = "xyes"])
+AM_CONDITIONAL([USE_SSE4], [test "x$use_intel_sse4" = "xyes"])
 AM_CONDITIONAL([USE_SSE2], [test "x$use_scrypt_sse2" = "xyes"])
 AM_CONDITIONAL([USE_OPENENCLAVE], [test "x$use_openenclave" = "xyes"])
 AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
@@ -519,6 +530,7 @@ echo "  with TSS2       = $with_tss2"
 echo
 echo "  Intel AVX2      = $use_intel_avx2"
 echo "  Intel SSE       = $use_intel_sse"
+echo "  Intel SSE4      = $use_intel_sse4"
 echo "  SSE2 Scrypt     = $use_scrypt_sse2"
 echo "  ARMv8 crypto    = $armv8_crypto"
 echo "  ARMv8.2 crypto  = $armv82_crypto"

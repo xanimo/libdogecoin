@@ -346,6 +346,7 @@ jobs:
 
       - name: configure libdogecoin
         run: |
+          export PATH="$(pwd)/depends/${{ matrix.host }}/native/bin:$PATH"
           depends/${{ matrix.host }}/native/bin/ccache --max-size=$CCACHE_SIZE
           ./autogen.sh
           ./configure --prefix=`pwd`/depends/${{ matrix.host }} ${{ matrix.config-opts }} HOST=${{ matrix.host }} || ( cat config.log && false)
@@ -354,6 +355,7 @@ jobs:
       - name: build libdogecoin
         run: |
           build_dir="$(pwd)/build/libdogecoin-${{ github.sha }}-${{ matrix.name }}"
+          export PATH="$(pwd)/depends/${{ matrix.host }}/native/bin:$PATH"
           mkdir -p $build_dir/bin $build_dir/docs $build_dir/examples $build_dir/include $build_dir/lib $build_dir/test/ $build_dir/test/wordlist
           if ([ "${{ matrix.name }}" == "x86_64-win-native" ]); then
             cmake -B $build_dir -DBUILD_SHARED_LIBS=1 -DTEST_TPM_AUTO=ON

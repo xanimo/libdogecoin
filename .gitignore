@@ -126,6 +126,7 @@ dummy
 
 # CMake files
 build/*
+/build-local/
 **/cmake-build-debug
 **/CMakeCache.txt
 **/cmake_install.cmake

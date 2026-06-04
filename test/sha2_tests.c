@@ -446,6 +446,31 @@ void test_sha_256()
         digest_out = utils_hex_to_uint8((const char*)nist_sha256_test_vectors_long[i].digest_hex);
         assert(memcmp(buf, digest_out, SHA256_DIGEST_LENGTH) == 0);
     }
+
+    /*
+     * Multi-block sha256d64: the SIMD multi-way kernels (when compiled in)
+     * process 4 (SSE4.1) or 8 (AVX2) blocks at a time. Verify that hashing
+     * many blocks at once produces identical digests to hashing each block
+     * individually via the scalar path. This exercises the lane fan-out
+     * boundary as well as the final 1..(lanes-1) tail.
+     */
+    {
+        const size_t test_blocks = 17; /* 8+4+4+1 across AVX2/SSE/scalar paths */
+        unsigned char in[17 * SHA256_BLOCK_LENGTH];
+        unsigned char out_simd[17 * SHA256_DIGEST_LENGTH];
+        unsigned char out_ref[17 * SHA256_DIGEST_LENGTH];
+        size_t k;
+        /* Deterministic but lane-distinguishing input pattern. */
+        for (k = 0; k < sizeof(in); k++) {
+            in[k] = (unsigned char)(k * 31u + 7u);
+        }
+        sha256d64(in, test_blocks, out_simd);
+        for (k = 0; k < test_blocks; k++) {
+            sha256d64(in + k * SHA256_BLOCK_LENGTH, 1,
+                      out_ref + k * SHA256_DIGEST_LENGTH);
+        }
+        assert(memcmp(out_simd, out_ref, sizeof(out_ref)) == 0);
+    }
 }
 
 void test_sha_512()
