@@ -36,7 +36,7 @@ LIBDOGECOIN_BEGIN_DECL
 typedef struct dogecoin_transaction_ dogecoin_transaction;
 
 /* SMPV transaction structure */
-typedef struct {
+typedef struct dogecoin_smpv_tx_ {
     char* txid;                    /* Transaction ID (hex string) */
     char* raw_hex;                 /* Raw transaction hex */
     dogecoin_tx* decoded_tx;       /* Decoded transaction */
@@ -61,7 +61,7 @@ typedef struct {
 } dogecoin_smpv_tx;
 
 /* SMPV address watcher structure */
-typedef struct {
+typedef struct dogecoin_smpv_watcher_ {
     char* address;                 /* Dogecoin address being watched */
     uint64_t total_received;       /* Total received in koinu */
     uint64_t total_sent;           /* Total sent in koinu */
@@ -78,7 +78,7 @@ typedef struct smpv_tx_lookup_ {
 } smpv_tx_lookup;
 
 /* SMPV client structure */
-typedef struct {
+typedef struct dogecoin_smpv_client_ {
     const dogecoin_chainparams* chain_params;
     dogecoin_smpv_watcher* watchers;   /* Hash table of watchers */
     dogecoin_smpv_tx* mempool_txs;     /* Hash table of mempool transactions */

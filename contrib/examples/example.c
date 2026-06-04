@@ -3,11 +3,11 @@
 #include <string.h>
 
 // Example of how to use libdogecoin API functions:
-// gcc ./examples/example.c -I./include -L./lib -ldogecoin -o example
+// gcc ./examples/example.c -I./include -L./lib -ldogecoin -levent -o example
 
 // (or in the case of this project's directory structure, and if you want to build statically):
 // (after build, from the /libdogecoin project root directory)
-// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -o example
+// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -levent -o example
 // To include the ZK carrier section (requires --enable-zk-carrier at configure time):
 // gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -DUSE_ZK_CARRIER -o example
 //
@@ -20,7 +20,7 @@
 
 //  for windows, from the command line: (after build, from the /libdogecoin project root directory) run:
 //  "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" first to set up the environment.
-//  then run: cl.exe contrib/examples/example.c /I"include\dogecoin" /link "build\Debug\dogecoin.lib" ncrypt.lib tbs.lib msvcrt.lib advapi32.lib /out:example.exe
+//  then run: cl.exe contrib/examples/example.c /I"include\dogecoin" /link "build\Debug\dogecoin.lib" ncrypt.lib tbs.lib msvcrt.lib advapi32.lib event.lib /out:example.exe
 //  then run: example.exe
 
 int main() {
@@ -212,8 +212,11 @@ int main() {
 	char* change_level = BIP44_CHANGE_EXTERNAL;
 	uint32_t account = BIP44_FIRST_ACCOUNT_NODE;
 
-	// Derive the BIP 44 extended key
-	result = derive_bip44_extended_key(&node, &account, NULL, change_level, NULL, false, keypath, &bip44_key);
+	// Derive the BIP 44 extended key (returns 0 on success, -1 on failure)
+	if (derive_bip44_extended_key(&node, &account, NULL, change_level, NULL, false, keypath, &bip44_key) != 0) {
+		printf("Error occurred.\n");
+		return -1;
+	}
 
 	// Print the BIP 44 extended key
 	char bip44_private_key[HDKEYLEN];
@@ -233,8 +236,11 @@ int main() {
 		wiflen = PRIVKEYWIFLEN;
 
 	for (uint32_t index = BIP44_FIRST_ADDRESS_INDEX; index < BIP44_ADDRESS_GAP_LIMIT; index++) {
-		// Derive the addresses
-		result = derive_bip44_extended_key(&node, &account, &index, change_level, NULL, false, keypath, &bip44_key);
+		// Derive the addresses (returns 0 on success, -1 on failure)
+		if (derive_bip44_extended_key(&node, &account, &index, change_level, NULL, false, keypath, &bip44_key) != 0) {
+			printf("Error occurred.\n");
+			return -1;
+		}
 
 		// Print the private key
 		dogecoin_hdnode_serialize_private(&bip44_key, &dogecoin_chainparams_main, bip44_private_key, sizeof(bip44_private_key));
@@ -295,7 +301,7 @@ int main() {
 	char *external_p2pkh_addr = 	"nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde";
 	char *hash_2_doge = 			"b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074";
 	char *hash_10_doge = 			"42113bdc65fc2943cf0359ea1a24ced0b6b0b5290db4c63a3329c6601c4616e2";
-	char myscriptpubkey [PUBKEYHASHLEN];
+	char myscriptpubkey [SCRIPTPUBKEYLEN];
 	dogecoin_p2pkh_address_to_pubkey_hash (str, myscriptpubkey);
 
 	// build transaction
@@ -663,6 +669,486 @@ int main() {
 	}
 
 #endif
+
+	// CHAIN PREFIX HELPERS
+	printf("\n\nBEGIN CHAIN PREFIX HELPERS:\n\n");
+	{
+		const char* mainnet_addr = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
+		const char* testnet_addr = "nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde";
+		printf("isMainnet(%s) = %d\n", mainnet_addr, isMainnetFromB58Prefix(mainnet_addr));
+		printf("isTestnet(%s) = %d\n", testnet_addr, isTestnetFromB58Prefix(testnet_addr));
+		const dogecoin_chainparams* cp = chain_from_b58_prefix((char*)mainnet_addr);
+		printf("chain_from_b58_prefix: %s\n", cp ? cp->chainname : "(null)");
+		printf("chain_from_b58_prefix_bool: %d\n", chain_from_b58_prefix_bool((char*)testnet_addr));
+	}
+
+	// TOOL WRAPPERS
+	printf("\n\nBEGIN TOOL WRAPPERS:\n\n");
+	{
+		char wif[PRIVKEYWIFLEN];
+		char hex[PRIVKEYHEXLEN];
+		size_t wsz = PRIVKEYWIFLEN;
+		if (genPrivkey(false, wif, wsz, hex)) {
+			printf("genPrivkey wif=%s hex=%s\n", wif, hex);
+		}
+		char pub_hex[PUBKEYHEXLEN];
+		size_t psz = PUBKEYHEXLEN;
+		if (getPubkeyFromPrivkey(wif, false, pub_hex, &psz)) {
+			printf("getPubkeyFromPrivkey: %s\n", pub_hex);
+		}
+		char p2pkh_from_pub[P2PKHLEN];
+		if (getAddressFromPubkey(pub_hex, false, p2pkh_from_pub)) {
+			printf("getAddressFromPubkey: %s\n", p2pkh_from_pub);
+		}
+		char script_hex[SCRIPTPUBKEYLEN];
+		if (dogecoin_p2pkh_address_to_pubkey_hash(p2pkh_from_pub, script_hex)) {
+			printf("p2pkh_address_to_pubkey_hash (script): %s\n", script_hex);
+		}
+		/* dogecoin_address_to_pubkey_hash returns a pointer into a static
+		 * internal buffer; it must NOT be freed by the caller. */
+		char* pkh_from_addr = dogecoin_address_to_pubkey_hash(p2pkh_from_pub);
+		if (pkh_from_addr) {
+			printf("dogecoin_address_to_pubkey_hash: %s\n", pkh_from_addr);
+			char roundtrip[P2PKHLEN];
+			if (getAddrFromPubkeyHash(pkh_from_addr, false, roundtrip)) {
+				printf("getAddrFromPubkeyHash: %s\n", roundtrip);
+			}
+			char p2pkh_from_hash[P2PKHLEN];
+			if (dogecoin_pubkey_hash_to_p2pkh_address(pkh_from_addr, strlen(pkh_from_addr), p2pkh_from_hash, &dogecoin_chainparams_main)) {
+				printf("pubkey_hash_to_p2pkh_address: %s\n", p2pkh_from_hash);
+			}
+		}
+		/* dogecoin_private_key_wif_to_pubkey_hash allocates with
+		 * dogecoin_malloc; caller owns the buffer and must free it. */
+		char* pkh_from_wif = dogecoin_private_key_wif_to_pubkey_hash(wif);
+		if (pkh_from_wif) {
+			printf("dogecoin_private_key_wif_to_pubkey_hash: %s\n", pkh_from_wif);
+			dogecoin_free(pkh_from_wif);
+		}
+	}
+
+	// PRIVKEY/PUBKEY STRUCTURE APIs
+	printf("\n\nBEGIN PRIVKEY/PUBKEY STRUCTURE APIs:\n\n");
+	{
+		dogecoin_key priv;
+		dogecoin_privkey_init(&priv);
+		if (!dogecoin_privkey_gen(&priv)) { printf("privkey_gen failed\n"); return -1; }
+		printf("privkey is_valid: %d\n", dogecoin_privkey_is_valid(&priv));
+
+		char privwif[PRIVKEYWIFLEN];
+		size_t plen = PRIVKEYWIFLEN;
+		dogecoin_privkey_encode_wif(&priv, &dogecoin_chainparams_main, privwif, &plen);
+		printf("privkey wif: %s\n", privwif);
+
+		dogecoin_key priv2;
+		dogecoin_privkey_init(&priv2);
+		if (!dogecoin_privkey_decode_wif(privwif, &dogecoin_chainparams_main, &priv2)) {
+			printf("privkey_decode_wif failed\n"); return -1;
+		}
+		printf("decoded privkey is_valid: %d\n", dogecoin_privkey_is_valid(&priv2));
+
+		// wrappers
+		// getDecodedPrivKeyWif writes the raw 32-byte private key (binary, not hex)
+		uint8_t priv_bin[DOGECOIN_ECKEY_PKEY_LENGTH];
+		if (!getDecodedPrivKeyWif(privwif, false, (char*)priv_bin)) {
+			printf("getDecodedPrivKeyWif returned 0\n");
+		}
+		char wif_encoded[PRIVKEYWIFLEN];
+		size_t wlen2 = PRIVKEYWIFLEN;
+		getWifEncodedPrivKey((const char*)priv.privkey, false, wif_encoded, &wlen2);
+		printf("getWifEncodedPrivKey: %s\n", wif_encoded);
+
+		// pubkey API
+		dogecoin_pubkey pub;
+		dogecoin_pubkey_init(&pub);
+		pub.compressed = true;
+		dogecoin_pubkey_from_key(&priv, &pub);
+		printf("pubkey is_valid: %d\n", dogecoin_pubkey_is_valid(&pub));
+		char addrout[P2PKHLEN];
+		dogecoin_pubkey_getaddr_p2pkh(&pub, &dogecoin_chainparams_main, addrout);
+		printf("pubkey_getaddr_p2pkh: %s\n", addrout);
+
+		// sign / recover / verify via compact sig
+		uint8_t msgbuf[] = "hello libdogecoin";
+		uint256_t digest;
+		sha256_raw(msgbuf, sizeof(msgbuf) - 1, digest);
+		unsigned char sigcmp[64];
+		size_t siglen = sizeof(sigcmp);
+		int recid = -1;
+		if (dogecoin_key_sign_hash_compact_recoverable_fcomp(&priv, digest, sigcmp, &siglen, &recid)) {
+			printf("compact sig generated, recid=%d\n", recid);
+			dogecoin_pubkey recovered;
+			dogecoin_pubkey_init(&recovered);
+			recovered.compressed = true;
+			if (dogecoin_key_recover_pubkey(sigcmp, digest, recid, &recovered)) {
+				printf("pubkey recovered, is_valid=%d\n", dogecoin_pubkey_is_valid(&recovered));
+			}
+			printf("verify_sigcmp: %d\n", dogecoin_pubkey_verify_sigcmp(&pub, digest, sigcmp));
+		}
+		dogecoin_privkey_cleanse(&priv);
+		dogecoin_privkey_cleanse(&priv2);
+		dogecoin_pubkey_cleanse(&pub);
+	}
+
+	// ECC API
+	printf("\n\nBEGIN ECC API:\n\n");
+	{
+		uint8_t privbytes[DOGECOIN_ECKEY_PKEY_LENGTH];
+		dogecoin_random_bytes(privbytes, sizeof(privbytes), 0);
+		// ensure it's in range: just use known test vector style by hashing
+		sha256_raw(privbytes, sizeof(privbytes), privbytes);
+
+		uint8_t pubbytes[DOGECOIN_ECKEY_COMPRESSED_LENGTH];
+		size_t pubsize = sizeof(pubbytes);
+		dogecoin_ecc_get_pubkey(privbytes, pubbytes, &pubsize, true);
+		printf("ecc_get_pubkey size=%zu first=%02x\n", pubsize, pubbytes[0]);
+
+		uint256_t hash;
+		uint8_t data[] = "ecc test";
+		sha256_raw(data, sizeof(data) - 1, hash);
+		unsigned char sigder[74];
+		size_t sigderlen = sizeof(sigder);
+		if (dogecoin_ecc_sign(privbytes, hash, sigder, &sigderlen)) {
+			printf("ecc_sign der len=%zu\n", sigderlen);
+			printf("ecc_verify_sig: %d\n", dogecoin_ecc_verify_sig(pubbytes, true, hash, sigder, sigderlen));
+		}
+	}
+
+	// MNEMONIC / SEED
+	printf("\n\nBEGIN MNEMONIC / SEED:\n\n");
+	{
+		MNEMONIC mnemonic = {0};
+		if (generateRandomEnglishMnemonic("128", mnemonic) == 0) {
+			printf("mnemonic (128): %s\n", mnemonic);
+		}
+		if (dogecoin_verify_mnemonic(mnemonic, "eng", " ", NULL) == 0) {
+			printf("mnemonic verified\n");
+		}
+		SEED seed = {0};
+		if (dogecoin_seed_from_mnemonic(mnemonic, NULL, seed) == 0) {
+			printf("seed[0..3]: %02x%02x%02x%02x\n", seed[0], seed[1], seed[2], seed[3]);
+		}
+		char hd_priv[HDKEYLEN];
+		char hd_p2pkh[P2PKHLEN];
+		if (generateHDMasterPubKeypairFromMnemonic(hd_priv, hd_p2pkh, mnemonic, NULL, false) == 0) {
+			printf("HD master from mnemonic addr=%s\n", hd_p2pkh);
+			if (verifyHDMasterPubKeypairFromMnemonic(hd_priv, hd_p2pkh, mnemonic, NULL, false) == 0) {
+				printf("HD master verified against mnemonic\n");
+			}
+		}
+		char addr_from_mn[P2PKHLEN];
+		if (getDerivedHDAddressFromMnemonic(0, 0, BIP44_CHANGE_EXTERNAL, mnemonic, NULL, addr_from_mn, false) == 0) {
+			printf("derived addr from mnemonic: %s\n", addr_from_mn);
+		}
+		// entropy-driven path: HEX_ENTROPY is a fixed char buffer; zero-init
+		// guarantees null termination after the 32 hex chars.
+		MNEMONIC m2 = {0};
+		HEX_ENTROPY zero_entropy = {0};
+		memcpy(zero_entropy, "00000000000000000000000000000000", 32);
+		if (generateEnglishMnemonic(zero_entropy, "128", m2) == 0) {
+			printf("mnemonic (from zero entropy): %s\n", m2);
+		}
+	}
+
+	// HDNODE PRIMITIVES
+	printf("\n\nBEGIN HDNODE PRIMITIVES:\n\n");
+	{
+		dogecoin_hdnode* n = dogecoin_hdnode_new();
+		SEED s;
+		dogecoin_random_bytes(s, sizeof(s), 0);
+		dogecoin_hdnode_from_seed(s, MAX_SEED_SIZE, n);
+		dogecoin_hdnode_fill_public_key(n);
+
+		char pub_hex_out[2 * DOGECOIN_ECKEY_COMPRESSED_LENGTH + 1];
+		size_t ps = sizeof(pub_hex_out);
+		dogecoin_hdnode_get_pub_hex(n, pub_hex_out, &ps);
+		printf("hdnode pub_hex: %s\n", pub_hex_out);
+
+		uint160_t h160;
+		dogecoin_hdnode_get_hash160(n, h160);
+		char h160_hex[41];
+		utils_bin_to_hex((unsigned char*)h160, sizeof(h160), h160_hex);
+		printf("hdnode hash160: %s\n", h160_hex);
+
+		dogecoin_hdnode* copy = dogecoin_hdnode_copy(n);
+		dogecoin_hdnode_private_ckd(copy, 0);
+		dogecoin_hdnode_public_ckd(copy, 0);
+
+		char serialized[HDKEYLEN];
+		dogecoin_hdnode_serialize_private(n, &dogecoin_chainparams_main, serialized, sizeof(serialized));
+		dogecoin_hdnode deserialized;
+		if (dogecoin_hdnode_deserialize(serialized, &dogecoin_chainparams_main, &deserialized)) {
+			printf("hdnode deserialize OK, depth=%u\n", deserialized.depth);
+		}
+
+		// extended key derivation wrappers
+		KEY_PATH kp_acct = "m/44'/3'/0'";
+		KEY_PATH kp_child = "m/0/0";
+		KEY_PATH kp_full = "m/44'/3'/0'/0/0";
+		char ext_out[HDKEYLEN];
+		if (deriveExtKeyFromHDKey(serialized, kp_acct, false, ext_out)) {
+			printf("deriveExtKeyFromHDKey: %s\n", ext_out);
+		}
+		char pub_ext[HDKEYLEN];
+		char pub_from_priv[HDKEYLEN];
+		getHDPubKey(ext_out, false, pub_from_priv);
+		if (deriveExtPubKeyFromHDKey(pub_from_priv, kp_child, false, pub_ext)) {
+			printf("deriveExtPubKeyFromHDKey: %s\n", pub_ext);
+		}
+
+		// bip32 tools
+		char master_tool[HDKEYLEN];
+		if (genHDMaster(false, master_tool, sizeof(master_tool)) == 0) {
+			printf("genHDMaster OK\n");
+			char ext_tool[HDKEYLEN];
+			if (deriveHDExtFromMaster(false, master_tool, kp_full, ext_tool, sizeof(ext_tool)) == 0) {
+				printf("deriveHDExtFromMaster OK\n");
+			}
+		}
+
+		// BIP44 wrappers
+		char bip44_ext[HDKEYLEN];
+		char bip44_ext_pub[HDKEYLEN];
+		KEY_PATH kp_out = {0};
+		uint32_t acct = 0, idxv = 0;
+		if (deriveBIP44ExtendedKey(serialized, &acct, BIP44_CHANGE_EXTERNAL, &idxv, NULL, bip44_ext, kp_out)) {
+			printf("deriveBIP44ExtendedKey path=%s\n", kp_out);
+		}
+		if (deriveBIP44ExtendedPublicKey(serialized, &acct, BIP44_CHANGE_EXTERNAL, &idxv, NULL, bip44_ext_pub, kp_out)) {
+			printf("deriveBIP44ExtendedPublicKey OK\n");
+		}
+
+		// getDerivedHDAddressAsP2PKH / getDerivedHDKeyByPath
+		char p2pkh_out[P2PKHLEN];
+		if (getDerivedHDAddressAsP2PKH(serialized, 0, false, 0, p2pkh_out)) {
+			printf("getDerivedHDAddressAsP2PKH: %s\n", p2pkh_out);
+		}
+		char key_out[HDKEYLEN];
+		if (getDerivedHDKeyByPath(serialized, kp_full, key_out, true)) {
+			printf("getDerivedHDKeyByPath OK\n");
+		}
+
+		dogecoin_hdnode_free(copy);
+		dogecoin_hdnode_free(n);
+	}
+
+	// KOINU CONVERSION
+	printf("\n\nBEGIN KOINU CONVERSION:\n\n");
+	{
+		char coins_str[32];
+		koinu_to_coins_str(1234567890ULL, coins_str);
+		printf("1234567890 koinu = %s DOGE\n", coins_str);
+		uint64_t k = coins_to_koinu_str("42.5");
+		printf("42.5 DOGE = %llu koinu\n", (unsigned long long)k);
+	}
+
+	// MEMORY HELPERS
+	printf("\n\nBEGIN MEMORY HELPERS:\n\n");
+	{
+		char* b = dogecoin_char_vla(64);
+		unsigned char* ub = dogecoin_uchar_vla(64);
+		void* zeros = dogecoin_calloc(4, 16);
+		memset(b, 'A', 63); b[63] = '\0';
+		dogecoin_mem_zero(b, 64);
+		printf("mem_zero first byte: %d\n", b[0]);
+		dogecoin_free(b);
+		dogecoin_free(ub);
+		dogecoin_free(zeros);
+	}
+
+	// VECTOR API
+	printf("\n\nBEGIN VECTOR API:\n\n");
+	{
+		vector_t* v = vector_new(4, NULL);
+		int a = 1, bv = 2, c = 3, d = 4;
+		vector_add(v, &a);
+		vector_add(v, &bv);
+		vector_add(v, &c);
+		vector_add(v, &d);
+		printf("vector len=%zu, find(&c)=%zd\n", v->len, vector_find(v, &c));
+		vector_remove(v, &a);
+		vector_remove_idx(v, 0);
+		vector_remove_range(v, 0, 1);
+		vector_resize(v, 8);
+		printf("after removals len=%zu alloc=%zu\n", v->len, v->alloc);
+		vector_free(v, true);
+	}
+
+	// RANDOM
+	printf("\n\nBEGIN RANDOM:\n\n");
+	{
+		uint8_t rnd[16];
+		if (dogecoin_random_bytes(rnd, sizeof(rnd), 0)) {
+			char hex[33];
+			utils_bin_to_hex(rnd, sizeof(rnd), hex);
+			printf("random: %s\n", hex);
+		}
+	}
+
+	// CRYPTO DIGESTS
+	printf("\n\nBEGIN CRYPTO DIGESTS:\n\n");
+	{
+		const char* m = "abc";
+		size_t ml = strlen(m);
+		uint8_t h1[SHA1_DIGEST_LENGTH];
+		uint8_t h2[SHA256_DIGEST_LENGTH];
+		uint8_t h5[SHA512_DIGEST_LENGTH];
+		uint8_t r160[20];
+		sha1_Raw((const uint8_t*)m, ml, h1);
+		sha256_raw((const uint8_t*)m, ml, h2);
+		sha512_raw((const uint8_t*)m, ml, h5);
+		rmd160((const uint8_t*)m, ml, r160);
+		char buf[129];
+		utils_bin_to_hex(h1, SHA1_DIGEST_LENGTH, buf); printf("sha1: %s\n", buf);
+		utils_bin_to_hex(h2, SHA256_DIGEST_LENGTH, buf); printf("sha256: %s\n", buf);
+		utils_bin_to_hex(h5, SHA512_DIGEST_LENGTH, buf); printf("sha512: %s\n", buf);
+		utils_bin_to_hex(r160, 20, buf); printf("rmd160: %s\n", buf);
+
+		uint8_t key[] = "secret";
+		uint8_t mac[SHA256_DIGEST_LENGTH];
+		hmac_sha1(key, sizeof(key) - 1, (const uint8_t*)m, ml, h1);
+		hmac_sha256(key, sizeof(key) - 1, (const uint8_t*)m, ml, mac);
+		hmac_sha512(key, sizeof(key) - 1, (const uint8_t*)m, ml, h5);
+		utils_bin_to_hex(mac, SHA256_DIGEST_LENGTH, buf); printf("hmac-sha256: %s\n", buf);
+
+		uint8_t derived[32];
+		pbkdf2_hmac_sha256((const uint8_t*)"password", 8, (const uint8_t*)"salt", 4, 1, derived, sizeof(derived));
+		utils_bin_to_hex(derived, 32, buf); printf("pbkdf2-sha256: %s\n", buf);
+		uint8_t derived512[64];
+		pbkdf2_hmac_sha512((const uint8_t*)"password", 8, (const uint8_t*)"salt", 4, 1, derived512);
+		utils_bin_to_hex(derived512, 64, buf); printf("pbkdf2-sha512: %s\n", buf);
+	}
+
+	// BASE58
+	printf("\n\nBEGIN BASE58:\n\n");
+	{
+		const uint8_t payload[] = {0x00, 0x01, 0x02, 0x03, 0x04};
+		char b58[64];
+		size_t b58sz = sizeof(b58);
+		dogecoin_base58_encode(b58, &b58sz, payload, sizeof(payload));
+		printf("base58 encoded: %s\n", b58);
+		uint8_t dec[16];
+		size_t decsz = sizeof(dec);
+		dogecoin_base58_decode(dec, &decsz, b58, strlen(b58));
+		printf("base58 decoded len=%zu\n", decsz);
+
+		char chk[64];
+		size_t chkn = dogecoin_base58_encode_check(payload, sizeof(payload), chk, sizeof(chk));
+		printf("base58check (len=%zu): %s\n", chkn, chk);
+		uint8_t chkdec[16];
+		size_t chkdn = dogecoin_base58_decode_check(chk, chkdec, sizeof(chkdec));
+		printf("base58check decoded len=%zu\n", chkdn);
+	}
+
+	// TRANSACTION OBJECT API
+	printf("\n\nBEGIN TRANSACTION OBJECT API:\n\n");
+	{
+		dogecoin_tx* tx = dogecoin_tx_new();
+		printf("tx is_coinbase (empty): %d\n", dogecoin_tx_is_coinbase(tx));
+		dogecoin_tx_add_address_out(tx, &dogecoin_chainparams_main, 100000000, "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS");
+		uint8_t fake_hash_buf[SHA256_DIGEST_LENGTH];
+		sha256_raw((const uint8_t*)"ph", 2, fake_hash_buf);
+		uint160_t h160;
+		memcpy(h160, fake_hash_buf, sizeof(h160)); // truncate 32->20 bytes for hash160
+		dogecoin_tx_add_p2pkh_hash160_out(tx, 50000000, h160);
+		dogecoin_tx_add_p2sh_hash160_out(tx, 25000000, h160);
+		const uint8_t data_payload[] = {'h','e','l','l','o'};
+		dogecoin_tx_add_data_out(tx, 0, data_payload, sizeof(data_payload));
+
+		uint256_t txh;
+		dogecoin_tx_hash(tx, txh);
+		char buf[65];
+		utils_bin_to_hex(txh, 32, buf);
+		printf("tx hash: %s\n", buf);
+
+		dogecoin_tx* tx2 = dogecoin_tx_new();
+		dogecoin_tx_copy(tx2, tx);
+		dogecoin_tx_free(tx2);
+		dogecoin_tx_free(tx);
+	}
+
+	// ADVANCED TX BUILDER (buffered / _ex variants)
+	printf("\n\nBEGIN ADVANCED TX BUILDER:\n\n");
+	{
+		int tix = start_transaction();
+		add_utxo(tix, "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074", 1);
+		add_output(tix, "nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde", "1.0");
+		char fbuf[TXHEXMAXLEN];
+		int fr = finalize_transaction_ex(tix, "nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde", "0.001", "2", "nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde", fbuf, sizeof(fbuf));
+		printf("finalize_transaction_ex rc=%d len=%zu\n", fr, strlen(fbuf));
+
+		char getbuf[TXHEXMAXLEN];
+		int grc = get_raw_transaction_ex(tix, getbuf, sizeof(getbuf));
+		printf("get_raw_transaction_ex rc=%d\n", grc);
+
+		// store / clear
+		int idx3 = store_raw_transaction(getbuf);
+		printf("store_raw_transaction idx=%d\n", idx3);
+		clear_transaction(idx3);
+
+		remove_all();
+	}
+
+	// QR ENCODE
+	printf("\n\nBEGIN QR ENCODE:\n\n");
+	{
+		const char* qr_addr = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
+		uint8_t qr_bits[4096] = {0};
+		int qsize = qrgen_p2pkh_to_qrbits(qr_addr, qr_bits);
+		printf("qrgen_p2pkh_to_qrbits size=%d\n", qsize);
+		char qr_str[8192];
+		qrgen_p2pkh_to_qr_string(qr_addr, qr_str);
+		printf("qrgen_p2pkh_to_qr_string length=%zu\n", strlen(qr_str));
+	}
+
+	// ECKEY HASH TABLE
+	printf("\n\nBEGIN ECKEY HASH TABLE:\n\n");
+	{
+		eckey* k = new_eckey(false);
+		add_eckey(k);
+		eckey* found = find_eckey(k->idx);
+		printf("eckey idx=%d addr=%s found=%d\n", k->idx, k->address, found != NULL);
+		eckey* k2 = new_eckey_from_privkey(k->private_key_wif);
+		printf("eckey_from_privkey addr=%s\n", k2->address);
+		dogecoin_key_free(k2);
+		/* remove_eckey also frees the eckey via dogecoin_key_free */
+		remove_eckey(k);
+	}
+
+	// SPV CLIENT LIFECYCLE (no network loop)
+	printf("\n\nBEGIN SPV CLIENT LIFECYCLE:\n\n");
+	{
+		dogecoin_spv_client* spv = dogecoin_spv_client_new(&dogecoin_chainparams_test, false, true, true, false, 0, NULL);
+		if (spv) {
+			printf("spv client created\n");
+			dogecoin_spv_enable_smpv(spv, true);
+			dogecoin_spv_client_free(spv);
+			printf("spv client freed\n");
+		}
+	}
+
+	// SMPV CLIENT
+	printf("\n\nBEGIN SMPV CLIENT:\n\n");
+	{
+		dogecoin_smpv_client* sc = dogecoin_smpv_client_new(&dogecoin_chainparams_main);
+		if (sc) {
+			dogecoin_smpv_start(sc);
+			const char* watch_addr = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
+			dogecoin_smpv_add_watcher(sc, watch_addr);
+			dogecoin_smpv_watcher* w = dogecoin_smpv_get_watcher(sc, watch_addr);
+			if (w) {
+				char* wjson = dogecoin_smpv_watcher_to_json(w);
+				if (wjson) { printf("watcher json len=%zu\n", strlen(wjson)); dogecoin_free(wjson); }
+			}
+			uint32_t tt = 0, wa = 0;
+			dogecoin_smpv_get_stats(sc, &tt, &wa);
+			printf("smpv stats total_txs=%u watched=%u\n", tt, wa);
+			dogecoin_smpv_remove_watcher(sc, watch_addr);
+			dogecoin_smpv_stop(sc);
+			dogecoin_smpv_client_free(sc);
+			printf("smpv client freed\n");
+		}
+	}
 
 	printf("\nTESTS COMPLETE!\n");
 	dogecoin_ecc_stop();

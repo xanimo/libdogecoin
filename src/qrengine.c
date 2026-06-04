@@ -69,9 +69,9 @@ int qrgen_p2pkh_to_qr_string(const char* in_p2pkh, char* outString)
 
 // For API: Return byte array of QR code "pixels" (byte map) - returns size (L or W) in pixels of QR.
 int qrgen_p2pkh_to_qrbits(const char* in_p2pkh, uint8_t* outQrByteArray)
-{       
+{
+    stringToQrArray(in_p2pkh, outQrByteArray);
     int size = qrcodegen_getSize(outQrByteArray);
-    stringToQrArray(in_p2pkh,outQrByteArray);
     return size;
 }
 
