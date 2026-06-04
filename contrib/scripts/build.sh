@@ -78,8 +78,8 @@ fi
 if has_param '--depends' "$@"; then
     DEPENDS=1
     export PREFIX=`pwd`/depends/$TARGET_HOST_TRIPLET
-    export CFLAGS+="-I`pwd`/depends/$TARGET_HOST_TRIPLET/include/"
-    export LDFLAGS+="-I`pwd`/depends/$TARGET_HOST_TRIPLET/lib/"
+    export CFLAGS+=" -I`pwd`/depends/$TARGET_HOST_TRIPLET/include/"
+    export LDFLAGS+=" -L`pwd`/depends/$TARGET_HOST_TRIPLET/lib/"
     export LD_LIBRARY_PATH+="`pwd`/depends/$TARGET_HOST_TRIPLET/lib"
     export PKG_CONFIG_PATH+="`pwd`/depends/$TARGET_HOST_TRIPLET/lib/pkgconfig"
 fi
