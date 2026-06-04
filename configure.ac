@@ -216,6 +216,11 @@ AC_ARG_WITH([mcl],
   [use_mcl=$withval],
   [use_mcl=no])
 
+AC_ARG_ENABLE([tss2],
+  [AS_HELP_STRING([--enable-tss2],
+  [enable tss2 functions])],
+  [with_tss2=$enableval],
+  [with_tss2=no])
 
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
@@ -230,6 +235,15 @@ AC_COMPILE_IFELSE([AC_LANG_SOURCE([[void myfunc() {__builtin_expect(0,0);}]])],
 
 # Check for daemon(3)
 AC_CHECK_DECLS([daemon])
+
+# Check for readpassphrase(3) (BSD/macOS); fall back to termios-based getpass otherwise
+AC_CHECK_HEADERS([readpassphrase.h])
+AC_CHECK_DECLS([readpassphrase], [AC_DEFINE([HAVE_READPASSPHRASE], [1], [Define if readpassphrase(3) is available])], [], [[
+#ifdef HAVE_READPASSPHRASE_H
+#include <readpassphrase.h>
+#endif
+#include <unistd.h>
+]])
 
 m4_include(m4/macros/with.m4)
 ARG_WITH_SET([random-device], [/dev/urandom], [set the device to read random data from])
@@ -422,6 +436,27 @@ if test "x$use_mcl" != xno -a "x$use_mcl" != x; then
   AC_LANG_POP([C++])
 fi
 
+if test "x$with_tss2" = xyes; then
+  # Minimum recommended libtss2-esys version: 2.4.0
+  # Prefer pkg-config (handles dependency libs and version), fall back to a
+  # plain library check. Require the public Esys header so a misconfigured
+  # libtss2-dev install fails loudly at configure time rather than at link.
+  m4_ifdef([PKG_CHECK_MODULES], [
+    PKG_CHECK_MODULES([TSS2_ESYS], [tss2-esys >= 2.4.0],
+      [LIBTSS2="$TSS2_ESYS_LIBS"
+       CFLAGS="$CFLAGS $TSS2_ESYS_CFLAGS"],
+      [AC_CHECK_LIB([tss2-esys],[Esys_Initialize],[LIBTSS2=-ltss2-esys],
+        [AC_MSG_ERROR([libtss2-esys missing or too old (need >= 2.4.0); install libtss2-dev])])])
+  ], [
+    AC_CHECK_LIB([tss2-esys],[Esys_Initialize],[LIBTSS2=-ltss2-esys],
+      [AC_MSG_ERROR([libtss2-esys missing; install libtss2-dev])])
+  ])
+  AC_CHECK_HEADER([tss2/tss2_esys.h], [],
+    [AC_MSG_ERROR([tss2/tss2_esys.h missing; install libtss2-dev])])
+  LIBS="$LIBS $LIBTSS2"
+  AC_DEFINE(USE_TSS2, 1, [Define this symbol if libtss2 works])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -430,6 +465,7 @@ AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_CORE_LIBS)
 AC_SUBST(EVENT_EXTRA_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
+AC_SUBST(LIBTSS2)
 AC_SUBST(LIBYKPIV)
 AC_SUBST(NASMFLAGS)
 
@@ -479,6 +515,7 @@ echo "  with tools      = $with_tools"
 echo "  with net        = $with_net"
 echo "  with logdb      = $with_logdb"
 echo "  with wallet     = $with_wallet"
+echo "  with TSS2       = $with_tss2"
 echo
 echo "  Intel AVX2      = $use_intel_avx2"
 echo "  Intel SSE       = $use_intel_sse"

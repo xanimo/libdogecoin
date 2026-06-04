@@ -39,6 +39,10 @@
 #include <assert.h>
 #include <time.h>
 
+#ifdef HAVE_READPASSPHRASE_H
+#include <readpassphrase.h>
+#endif
+
 #include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
@@ -733,7 +737,7 @@ void text_to_hex(char* in, char* out) {
     out[i++] = '\0';
     }
 
-const char* get_build() {
+const char* get_build(void) {
         #if defined(__x86_64__) || defined(_M_X64)
             return "x86_64";
         #elif defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
@@ -790,31 +794,51 @@ char *getpass(const char *prompt) {
     ssize_t nread = strlen(buffer);
     if (nread > 0 && buffer[nread-1] == '\n')
         buffer[nread-1] = '\0';  // Remove newline character
+#elif defined(HAVE_READPASSPHRASE)
+# ifndef RPP_ECHO_OFF
+#  define RPP_ECHO_OFF 0x00
+# endif
+    if (!readpassphrase(prompt, buffer, sizeof(buffer), RPP_ECHO_OFF))
+        return NULL;
 #else
     struct termios old, new;
     ssize_t nread;
+    FILE *tty = fopen("/dev/tty", "r+");
+    int tfd = tty ? fileno(tty) : STDIN_FILENO;
 
-    if (tcgetattr(STDIN_FILENO, &old) != 0)
+    if (tcgetattr(tfd, &old) != 0) {
+        if (tty) fclose(tty);
         return NULL;
+    }
 
     new = old;
     new.c_lflag &= ~ECHO;
 
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &new) != 0)
+    if (tcsetattr(tfd, TCSAFLUSH, &new) != 0) {
+        if (tty) fclose(tty);
         return NULL;
+    }
 
-    printf("%s", prompt);
-    fflush(stdout);
+    fputs(prompt, tty ? tty : stderr);
+    fflush(tty ? tty : stderr);
 
-    if (!fgets(buffer, sizeof(buffer), stdin))
+    if (!fgets(buffer, sizeof(buffer), tty ? tty : stdin)) {
+        tcsetattr(tfd, TCSAFLUSH, &old);
+        if (tty) fclose(tty);
         return NULL;
+    }
 
     nread = strlen(buffer);
     if (nread > 0 && buffer[nread-1] == '\n')
-        buffer[nread-1] = '\0';  // Remove newline character
+        buffer[nread-1] = '\0';
 
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &old) != 0)
+    if (tcsetattr(tfd, TCSAFLUSH, &old) != 0) {
+        if (tty) fclose(tty);
         return NULL;
+    }
+
+    fputs("\n", tty ? tty : stderr);
+    if (tty) fclose(tty);
 
 #endif
     return strdup(buffer);
@@ -850,7 +874,7 @@ void dogecoin_uitoa(int n, char s[])
     dogecoin_str_reverse(s);
 }
 
-bool dogecoin_network_enabled() {
+bool dogecoin_network_enabled(void) {
 #ifndef WITH_NET
     return false;
 #else

@@ -12,7 +12,11 @@
 #include <dogecoin/sha2.h>
 #include <dogecoin/seal.h>
 #include <dogecoin/utils.h>
+#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #if defined (_WIN64) && !defined(__MINGW64__)
 #include <windows.h>
@@ -22,6 +26,11 @@
 
 #ifndef WINVER
 #define WINVER 0x0600
+#endif
+
+#if defined (__linux__) && defined (USE_TSS2)
+#include <tss2/tss2_esys.h>
+#define TPM_RSA_2048_CIPHERTEXT_SIZE 256
 #endif
 
 void test_tpm()
@@ -34,6 +43,141 @@ void test_tpm()
     // Define a random seed and a decrypted seed
     SEED seed = {0};
     SEED decrypted_seed = {0};
+
+#if defined (__linux__) && defined(USE_TSS2)
+
+    ESYS_CONTEXT* context = NULL;
+
+    /* Initialize TPM context. If no TPM (or swtpm) is reachable on this
+     * host, skip the TSS2-specific portion of the test gracefully so the
+     * suite can still run in CI environments that build with --enable-tss2
+     * but have no TPM available. */
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        debug_print("TSS2 Esys_Initialize failed (0x%x): no TPM available, skipping TSS2 tests\n", result);
+    } else {
+        result = Esys_Startup(context, TPM2_SU_CLEAR);
+    }
+    if (result == TSS2_RC_SUCCESS) {
+
+    /* Get random data */
+    TPM2B_DIGEST *random_bytes;
+    result = Esys_GetRandom(context,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            32,
+                            &random_bytes);
+    u_assert_uint32_eq(result, TSS2_RC_SUCCESS);
+
+    char* rand_hex;
+    rand_hex = utils_uint8_to_hex((uint8_t*) random_bytes->buffer, random_bytes->size);
+    debug_print ("Esys_GetRandom: %s\n", rand_hex);
+
+    // Copy random_bytes to seed
+    memcpy(seed, random_bytes->buffer, random_bytes->size);
+
+    /* Probe the TPM for available transient-object capacity. libtpms (the
+     * library backing swtpm in Ubuntu/Debian) is compiled with
+     * MAX_LOADED_OBJECTS=3 and reserves a transient slot per persistent
+     * object, so a stock swtpm cannot hold all three (seed/mnemonic/hdnode)
+     * persistent wrapping keys at once. On such resource-constrained TPMs
+     * we still exercise the full encrypt/decrypt round-trip for one blob
+     * (seed) but skip the multi-persistent portion of the test. Real TPM
+     * hardware comfortably supports enough slots and runs the full suite. */
+    dogecoin_bool tpm_has_room_for_multi = false;
+    {
+        TPMS_CAPABILITY_DATA* cap = NULL;
+        TSS2_RC cap_rc = Esys_GetCapability(context,
+                                            ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
+                                            TPM2_CAP_TPM_PROPERTIES,
+                                            TPM2_PT_HR_TRANSIENT_AVAIL,
+                                            1, NULL, &cap);
+        if (cap_rc == TSS2_RC_SUCCESS && cap != NULL &&
+            cap->data.tpmProperties.count >= 1 &&
+            cap->data.tpmProperties.tpmProperty[0].property == TPM2_PT_HR_TRANSIENT_AVAIL) {
+            uint32_t avail = cap->data.tpmProperties.tpmProperty[0].value;
+            debug_print("TPM2_PT_HR_TRANSIENT_AVAIL=%u\n", avail);
+            /* Need one transient slot per simultaneously-persistent key plus
+             * one for the freshly-created primary; require >= 4 to run the
+             * full multi-key path. */
+            tpm_has_room_for_multi = (avail >= 4);
+        }
+        if (cap) Esys_Free(cap);
+    }
+
+    // Encrypt a random seed with the TPM2
+    u_assert_true (dogecoin_encrypt_seed_with_tpm (seed, sizeof(SEED), TEST_FILE, true));
+    debug_print ("Seed: %s\n", utils_uint8_to_hex (seed, sizeof (SEED)));
+    {
+        char filename[64] = {0};
+        struct stat st = {0};
+        snprintf(filename, sizeof(filename), ".store/encrypted_seed_%d", TEST_FILE);
+        u_assert_true(stat(filename, &st) == 0);
+        u_assert_int_eq((int)st.st_size, TPM_RSA_2048_CIPHERTEXT_SIZE);
+    }
+
+    // Decrypt the seed with the TPM2
+    u_assert_true (dogecoin_decrypt_seed_with_tpm (decrypted_seed, TEST_FILE));
+    debug_print ("Decrypted seed: %s\n", utils_uint8_to_hex (decrypted_seed, sizeof (SEED)));
+    u_assert_mem_eq (seed, decrypted_seed, sizeof (SEED));
+
+    if (tpm_has_room_for_multi) {
+    // Generate and decrypt an HD node with the TPM2
+    dogecoin_hdnode tpm_node, tpm_decrypted_node;
+    u_assert_true (dogecoin_generate_hdnode_encrypt_with_tpm (&tpm_node, TEST_FILE, true));
+    u_assert_true (dogecoin_decrypt_hdnode_with_tpm (&tpm_decrypted_node, TEST_FILE));
+    u_assert_mem_eq (&tpm_node, &tpm_decrypted_node, sizeof (dogecoin_hdnode));
+
+    // Generate and decrypt a mnemonic with the TPM2
+    MNEMONIC tpm_mnemonic = {0};
+    MNEMONIC tpm_decrypted_mnemonic = {0};
+    u_assert_true (dogecoin_generate_mnemonic_encrypt_with_tpm(tpm_mnemonic, TEST_FILE, true, "eng", " ", NULL));
+    u_assert_true (dogecoin_decrypt_mnemonic_with_tpm(tpm_decrypted_mnemonic, TEST_FILE));
+    u_assert_mem_eq (tpm_mnemonic, tpm_decrypted_mnemonic, sizeof (MNEMONIC));
+
+    // list encryption keys in the TPM
+    wchar_t *names[MAX_FILES] = {0};
+    size_t count = 0;
+    u_assert_true (dogecoin_list_encryption_keys_in_tpm(names, &count));
+    u_assert_true (count >= 3);
+    for (size_t i = 0; i < count; i++) {
+        if (names[i]) dogecoin_free(names[i]);
+    }
+
+    // test generateRandomEnglishMnemonicTPM
+    u_assert_true (generateRandomEnglishMnemonicTPM(tpm_mnemonic, TEST_FILE, true));
+
+    // test derived address helpers with encrypted objects
+    char tpm_derived_address[35];
+    u_assert_true (getDerivedHDAddressFromEncryptedSeed(0, 0, BIP44_CHANGE_EXTERNAL, tpm_derived_address, false, TEST_FILE) == 0);
+    u_assert_true (strlen(tpm_derived_address) > 0);
+    u_assert_true (getDerivedHDAddressFromEncryptedMnemonic(0, 0, BIP44_CHANGE_EXTERNAL, NULL, tpm_derived_address, false, TEST_FILE) == 0);
+    u_assert_true (strlen(tpm_derived_address) > 0);
+    u_assert_true (getDerivedHDAddressFromEncryptedHDNode(0, 0, BIP44_CHANGE_EXTERNAL, tpm_derived_address, false, TEST_FILE) == 0);
+    u_assert_true (strlen(tpm_derived_address) > 0);
+    } else {
+        debug_print("TPM has < 4 transient slots available; skipping multi-key TSS2 sub-tests%s\n",
+                    " (swtpm/libtpms is compile-time limited to 3 loaded objects)");
+
+        // Still exercise enumeration of persistent encryption keys; the seed
+        // wrapping key persisted above must show up.
+        wchar_t *names[MAX_FILES] = {0};
+        size_t count = 0;
+        u_assert_true (dogecoin_list_encryption_keys_in_tpm(names, &count));
+        u_assert_true (count >= 1);
+        for (size_t i = 0; i < count; i++) {
+            if (names[i]) dogecoin_free(names[i]);
+        }
+    }
+
+    Esys_Finalize(&context);
+    } else if (context != NULL) {
+        Esys_Finalize(&context);
+    }
+
+#endif
+
     sha512_raw(&random[0], 32, seed);
 
     char* test_password = PASSWD_STR;

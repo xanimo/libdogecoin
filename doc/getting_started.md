@@ -19,7 +19,7 @@ For Ubuntu and Debian Linux, you will need to install the following dependencies
 
 This can be done in the following commands using Linux CLI:
 
-```c
+```sh
 sudo apt-get update
 sudo apt-get install autoconf automake libtool libevent-dev build-essential
 ```
@@ -37,7 +37,7 @@ For Windows, you will need to install the following dependencies before building
 
 If all the necessary dependencies have been installed, you can now proceed in building the library. Using autoconf tools, run the `./autogen.sh` command in terminal:
 
-```c
+```sh
 ./autogen.sh
 ```
 
@@ -45,15 +45,16 @@ Next, you can configure the library to your liking by specifying flags on the `.
 
 At this step there are plenty of flags that can be specified, the two most pertinent ones being `enable-tools/disable-tools` and `enable-net/disable-net`. Both are enabled by default, but if you do not need to use the CLI tools mentioned in [tools.md](tools.md) or are not planning to send transactions using Libdogecoin, you may want to consider disabling these flags for simplicity and speed. Here are some examples of possible configurations you can build:
 
-```c
+```sh
 ./configure
 ./configure --disable-net --disable-tools
 ./configure LD_LIBRARY_PATH='path/to/additional/libraries'
 ./configure CFLAGS='-Ipath/to/additional/include/files'
+./configure --enable-debug --enable-tss2
 ```
 If you're building on Windows, you'll need to use `cmake` instead of `./configure`:
 
-```c
+```sh
 mkdir build
 cd build
 cmake ..
@@ -63,19 +64,29 @@ For a complete list of all different configuration options, you can run the comm
 
 Finally, once you have configured the library to your liking, it is ready to be built. This can be done with the simple `make` command:
 
-```c
+```sh
 make
 ```
 
 Or, if you would like to also run our basic unit tests, you can run the command `make check` which will both build the library and give output showing which files are not passing tests. _Note: when compiling with net enabled, this will appear to hang for a couple of seconds after test_tool(), but rest assured that it is running._
 
-```c
+```sh
 make check
 ```
 
+To test TPM flows on Linux without interactive password prompts, build the test suite (which auto-defines `PASSWD_STR`) and run a TPM emulator before `make check`:
+
+```sh
+mkdir -p /tmp/libdogecoin-tpm
+swtpm socket --tpm2 --tpmstate dir=/tmp/libdogecoin-tpm --ctrl type=tcp,port=2322 --server type=tcp,port=2321 --flags not-need-init &
+export TSS2_TCTI="swtpm:host=127.0.0.1,port=2321"
+```
+
+When finished testing, stop the background emulator with `kill <pid>` (where `<pid>` is `$!` from the `swtpm` command) and remove `/tmp/libdogecoin-tpm` if desired.
+
 _Output:_
 
-```c
+```text
 make[1]: Entering directory '/home/username/libdogecoin'
 make  check-TESTS
 make[2]: Entering directory '/home/username/libdogecoin'
@@ -99,7 +110,7 @@ make[1]: Leaving directory '/home/username/libdogecoin'
 
 On Windows, you will need to run the following commands in the Visual Studio Developer Command Prompt:
 
-```c
+```sh
 mkdir build
 cd build
 cmake ..
@@ -194,7 +205,7 @@ There may be times when you would like to build the library for a different oper
 
 The build steps for cross compilation are very similar to the native build steps listed above. Specify the desired architecture from the list above under by using the `HOST` flag, and include any necessary configuration flags on the `./configure` command:
 
-```c
+```sh
 make -C depends HOST=<target_architecture>
 ./autogen.sh
 ./configure --prefix=`pwd`/depends/<target_architecture>

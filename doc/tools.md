@@ -62,6 +62,8 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - zk_add_commit_and_carrier_tx (requires --enable-zk-carrier)
 - zk_extract_carrier (requires --enable-zk-carrier)
 
+For Linux TPM commands (`list_encryption_keys_in_tpm`, `decrypt_master_key_with_tpm`, `decrypt_mnemonic_with_tpm`), run against a TPM2 device or TPM emulator and build with `--enable-tss2`. For automated/non-interactive tests, build the test suite (which auto-defines `PASSWD_STR`) so prompts are replaced with the compiled-in test password.
+
 So an example run of `such` could be something like this:
 ```
 ./such -c generate_private_key

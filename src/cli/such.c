@@ -41,9 +41,11 @@
 #  include "libdogecoin-config.h"
 #endif
 #include <stdbool.h>
+#include <locale.h>
 #include <stdio.h>   /* printf */
 #include <stdlib.h>  /* atoi, malloc */
 #include <string.h>  /* strcpy */
+#include <wchar.h>   /* wprintf */
 
 #include <dogecoin/uthash.h>
 
@@ -1163,6 +1165,7 @@ static dogecoin_bool such_tx_add_commit_and_carrier_outputs(
 
 int main(int argc, char* argv[])
     {
+    setlocale(LC_CTYPE, "");
     int long_index = 0;
     int opt = 0;
     char* pkey = 0;
@@ -2021,12 +2024,10 @@ int main(int argc, char* argv[])
             return showError("failed to list encryption keys in TPM\n");
             }
 
-#if defined (_WIN64) && !defined(__MINGW64__)
         /* display encryption key names */
         for (size_t i = 0; i < count; i++) {
             wprintf(L"%ls\n", names[i]);
             }
-#endif
         /* free memory */
         for (size_t i = 0; i < count; i++) {
             dogecoin_free(names[i]);

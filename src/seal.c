@@ -59,6 +59,21 @@
 #define WINVER 0x0600
 #endif
 
+#if defined (__linux__) && defined (USE_TSS2)
+#include <fcntl.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <wchar.h>
+#include <tss2/tss2_esys.h>
+// Variadic tpm_cleanup() expects an explicitly pointer-typed NULL terminator.
+#define TPM_CLEANUP_SENTINEL ((void*)NULL)
+#define TPM2_RSA_BUFFER_BYTES (sizeof(((TPM2B_PUBLIC_KEY_RSA){0}).buffer))
+// RSAES-PKCS1-v1_5 encodes EM = 0x00 || 0x02 || PS || 0x00 || M with
+// |PS| >= 8, so the maximum plaintext is k - 11 octets for an RSA modulus k.
+#define TPM2_RSAES_PKCS1_V1_5_OVERHEAD 11u
+#define TPM2_RSAES_PKCS1_V1_5_MAX_PLAINTEXT (TPM2_RSA_BUFFER_BYTES - TPM2_RSAES_PKCS1_V1_5_OVERHEAD)
+#endif
+
 #ifdef USE_YUBIKEY
 #include <ykpiv/ykpiv.h>
 #endif
@@ -124,6 +139,23 @@
 #define MNEMONIC_DATA_TAG(file_num) (0x005F2000 + file_num)
 #define HDNODE_DATA_TAG(file_num) (0x005F3000 + file_num)
 
+// Persistent TPM2 handle ranges for the RSA wrapping keys created by libdogecoin.
+// Each slot's persistent handle is derived from its file number, mirroring the
+// per-name persistence the Windows NCrypt path provides via NCryptCreatePersistedKey.
+// These bases live in the owner-hierarchy persistent range (0x81000000-0x817FFFFF)
+// so EvictControl can install them with ESYS_TR_RH_OWNER authorization. The
+// platform range (0x81800000+) would require platform auth which user-mode
+// processes typically cannot obtain on a real TPM.
+//
+// NOTE: these handle addresses have no IANA / TCG registration.  Other
+// TPM-consuming tools on the same machine should avoid this range to prevent
+// silent collisions with libdogecoin persistent objects.
+#define LINUX_TPM_PERSISTENT_BASE_SEED      0x81710000u
+#define LINUX_TPM_PERSISTENT_BASE_MNEMONIC  0x81720000u
+#define LINUX_TPM_PERSISTENT_BASE_HDNODE    0x81730000u
+#define LINUX_TPM_PERSISTENT_RANGE_MASK     0xFFFF0000u
+#define LINUX_TPM_PERSISTENT_SLOT_MASK      0x0000FFFFu
+
 /**
  * @brief Validates a file number
  *
@@ -144,6 +176,685 @@ dogecoin_bool fileValid (const int file_num)
 
 }
 
+#if defined(__linux__) && defined(USE_TSS2)
+/**
+ * @brief Reads a password from the user for TPM operations.
+ *
+ * Reads a password interactively, optionally prompting for confirmation. In
+ * test mode, uses the compiled-in PASSWD_STR constant.
+ *
+ * @param out Output buffer for the password.
+ * @param out_size Size of the output buffer.
+ * @param prompt Prompt string displayed to the user.
+ * @param confirm Whether to prompt for password confirmation.
+ * @return Returns true if the password was read successfully, false otherwise.
+ */
+static dogecoin_bool linux_tpm_get_password(char* out, size_t out_size, const char* prompt, dogecoin_bool confirm)
+{
+    if (out == NULL || out_size == 0) {
+        return false;
+    }
+    out[0] = '\0';
+#ifdef PASSWD_STR
+    (void)prompt;
+    (void)confirm;
+    size_t password_len = sizeof(PASSWD_STR) - 1;
+    if (password_len >= out_size) {
+        return false;
+    }
+    memcpy(out, PASSWD_STR, password_len + 1);
+    return true;
+#else
+    dogecoin_bool ok = false;
+    char password_copy[128] = {0};
+    char* entered_password = getpass(prompt);
+    if (entered_password == NULL) {
+        goto cleanup;
+    }
+    size_t entered_len = strlen(entered_password);
+    strncpy(password_copy, entered_password, sizeof(password_copy) - 1);
+    password_copy[sizeof(password_copy) - 1] = '\0';
+    dogecoin_mem_zero(entered_password, entered_len + 1);
+    // getpass() (src/utils.c) returns a strdup()'d, heap-allocated buffer, so
+    // it must be free()'d here.  Keep this in sync with the implementation in
+    // src/utils.c if its allocation strategy ever changes.
+    free(entered_password);
+
+    size_t password_len = strnlen(password_copy, sizeof(password_copy));
+    if (password_len == 0) {
+        goto cleanup;
+    }
+
+    if (confirm) {
+        char confirm_buf[128] = {0};
+        char* confirm_password = getpass("Confirm password: ");
+        dogecoin_bool match = false;
+        if (confirm_password) {
+            size_t confirm_len = strlen(confirm_password);
+            strncpy(confirm_buf, confirm_password, sizeof(confirm_buf) - 1);
+            confirm_buf[sizeof(confirm_buf) - 1] = '\0';
+            match = strcmp(password_copy, confirm_buf) == 0;
+            dogecoin_mem_zero(confirm_password, confirm_len + 1);
+            free(confirm_password);
+        }
+        dogecoin_mem_zero(confirm_buf, sizeof(confirm_buf));
+        if (!match) {
+            goto cleanup;
+        }
+    }
+
+    if (password_len >= out_size) {
+        goto cleanup;
+    }
+    memcpy(out, password_copy, password_len + 1);
+    ok = true;
+
+cleanup:
+    dogecoin_mem_zero(password_copy, sizeof(password_copy));
+    return ok;
+#endif
+}
+
+/**
+ * @brief Formats the cross-platform TPM object name for a given object type.
+ *
+ * Formats the same object names used by the Windows NCrypt TPM path. TSS2 does
+ * not provide NCrypt-style string-key lookup, so Linux derives deterministic
+ * owner-hierarchy persistent handles from these names.
+ *
+ * @param filename_prefix Prefix used to identify the encrypted object type.
+ * @param file_num Slot number used in the object name.
+ * @param out Output buffer for the object name.
+ * @param out_size Size of the output buffer.
+ * @return true if the object name was formatted, false otherwise.
+ */
+static dogecoin_bool linux_tpm_object_name(const char* filename_prefix, int file_num, char* out, size_t out_size)
+{
+    const char* fmt = NULL;
+    if (strcmp(filename_prefix, "encrypted_seed") == 0) {
+        fmt = BASE_NAME_SEED FILE_NUM_FORMAT;
+    } else if (strcmp(filename_prefix, "encrypted_mnemonic") == 0) {
+        fmt = BASE_NAME_MNEMONIC FILE_NUM_FORMAT;
+    } else if (strcmp(filename_prefix, "encrypted_hdnode") == 0) {
+        fmt = BASE_NAME_MASTER FILE_NUM_FORMAT;
+    } else {
+        return false;
+    }
+    if (out == NULL || out_size == 0 || file_num < 0) {
+        return false;
+    }
+    int written = snprintf(out, out_size, fmt, file_num);
+    return written > 0 && (size_t)written < out_size;
+}
+
+/**
+ * @brief Computes the persistent TPM2 handle for a cross-platform object name.
+ *
+ * Computes the owner-hierarchy persistent TPM2 handle for the given
+ * libdogecoin TPM object name. Returns 0 if the object name is not a known
+ * libdogecoin object name.
+ *
+ * @param object_name Cross-platform object name.
+ * @return The persistent handle value, or 0 if inputs do not map to a valid handle.
+ */
+static TPM2_HANDLE linux_tpm_persistent_handle_for_object_name(const char* object_name)
+{
+    uint32_t base = 0;
+    const char* slot_str = NULL;
+    if (object_name == NULL) {
+        return 0;
+    }
+    if (strncmp(object_name, BASE_NAME_SEED, strlen(BASE_NAME_SEED)) == 0) {
+        base = LINUX_TPM_PERSISTENT_BASE_SEED;
+        slot_str = object_name + strlen(BASE_NAME_SEED);
+    } else if (strncmp(object_name, BASE_NAME_MNEMONIC, strlen(BASE_NAME_MNEMONIC)) == 0) {
+        base = LINUX_TPM_PERSISTENT_BASE_MNEMONIC;
+        slot_str = object_name + strlen(BASE_NAME_MNEMONIC);
+    } else if (strncmp(object_name, BASE_NAME_MASTER, strlen(BASE_NAME_MASTER)) == 0) {
+        base = LINUX_TPM_PERSISTENT_BASE_HDNODE;
+        slot_str = object_name + strlen(BASE_NAME_MASTER);
+    } else {
+        return 0;
+    }
+    if (slot_str == NULL || *slot_str < '0' || *slot_str > '9') {
+        return 0;
+    }
+    errno = 0;
+    char* end = NULL;
+    unsigned long slot = strtoul(slot_str, &end, 10);
+    if (errno != 0 || end == NULL || *end != '\0') {
+        return 0;
+    }
+    if (slot > LINUX_TPM_PERSISTENT_SLOT_MASK) {
+        return 0;
+    }
+    return (TPM2_HANDLE)(base | (uint32_t)slot);
+}
+
+/**
+ * @brief Computes the persistent TPM2 handle for a given filename prefix and slot.
+ *
+ * Computes the owner-hierarchy persistent TPM2 handle by first formatting the
+ * cross-platform object name and then deriving the deterministic TSS2 handle
+ * from that name.
+ *
+ * @param filename_prefix Prefix used to identify the encrypted object type.
+ * @param file_num Slot number used to derive the persistent handle.
+ * @return The persistent handle value, or 0 if inputs do not map to a valid handle.
+ */
+static TPM2_HANDLE linux_tpm_persistent_handle(const char* filename_prefix, int file_num)
+{
+    char object_name[NAME_MAX_LEN] = {0};
+    if (!linux_tpm_object_name(filename_prefix, file_num, object_name, sizeof(object_name))) {
+        return 0;
+    }
+    return linux_tpm_persistent_handle_for_object_name(object_name);
+}
+
+/**
+ * @brief Frees ESYS allocations and finalizes an ESYS context.
+ *
+ * Frees a NULL-terminated list of Esys-allocated pointers with Esys_Free and
+ * finalizes the ESYS context when provided. Both ctx and any list pointer may
+ * be NULL.
+ *
+ * @param ctx Optional ESYS context pointer to finalize.
+ * @param ... NULL-terminated list of Esys-allocated pointers to free.
+ */
+static void tpm_cleanup(ESYS_CONTEXT** ctx, ...)
+{
+    va_list ap;
+    va_start(ap, ctx);
+    for (;;) {
+        void* p = va_arg(ap, void*);
+        if (p == NULL) {
+            break;
+        }
+        Esys_Free(p);
+    }
+    va_end(ap);
+    if (ctx && *ctx) {
+        Esys_Finalize(ctx);
+    }
+}
+
+/**
+ * @brief Runs TPM startup for Linux TSS2 paths.
+ *
+ * Runs the TPM startup command using ESAPI. Returns true if startup succeeds
+ * or if the TPM is already initialized by another consumer.
+ *
+ * @param context Initialized ESYS context.
+ * @return Returns true when startup succeeds or TPM is already initialized.
+ */
+static dogecoin_bool linux_tpm_startup(ESYS_CONTEXT* context)
+{
+    // Supported Linux access models are swtpm/mssim and kernel TPM resource
+    // managers such as /dev/tpmrm0. Those may already be initialized by another
+    // process; Esys_Startup then reports TPM2_RC_INITIALIZE and is safe to
+    // treat as success.
+    TSS2_RC rc = Esys_Startup(context, TPM2_SU_CLEAR);
+    if (rc == TSS2_RC_SUCCESS) {
+        return true;
+    }
+    // TPM2_RC_INITIALIZE means startup was already completed elsewhere.
+    if (rc == TPM2_RC_INITIALIZE) {
+        return true;
+    }
+    return false;
+}
+
+static void linux_tpm_evict_persistent_handle(ESYS_CONTEXT* context, ESYS_TR handle, TPM2_HANDLE persistent_addr)
+{
+    if (context == NULL || handle == ESYS_TR_NONE) {
+        return;
+    }
+
+    ESYS_TR removed = ESYS_TR_NONE;
+    if (Esys_EvictControl(context, ESYS_TR_RH_OWNER, handle,
+                          ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
+                          persistent_addr, &removed) == TSS2_RC_SUCCESS &&
+        removed != ESYS_TR_NONE) {
+        Esys_TR_Close(context, &removed);
+    }
+}
+
+/**
+ * @brief Encrypts a blob using a TPM-persisted per-slot RSA wrapping key.
+ *
+ * Encrypts input bytes using a per-slot RSA wrapping key persisted in the TPM
+ * under a deterministic handle derived from the cross-platform object name.
+ * The on-disk file stores only the RSA ciphertext, matching the Windows NCrypt
+ * TPM file format.
+ *
+ * @param in Input plaintext bytes.
+ * @param in_size Number of plaintext bytes.
+ * @param file_num Slot index used for persistent object addressing.
+ * @param overwrite Whether to evict and replace an existing persistent key.
+ * @param filename_prefix Prefix used for encrypted file naming.
+ * @param password_prompt Prompt string for user password entry.
+ * @return Returns true on successful encryption and file write, false otherwise.
+ */
+static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, const int file_num, const dogecoin_bool overwrite, const char* filename_prefix, const char* password_prompt)
+{
+    dogecoin_bool ok = false;
+    TPM2_HANDLE persistent_addr = linux_tpm_persistent_handle(filename_prefix, file_num);
+    if (persistent_addr == 0) {
+        return false;
+    }
+    if (in_size > TPM2_RSAES_PKCS1_V1_5_MAX_PLAINTEXT) {
+        fprintf(stderr, "ERROR: Plaintext size exceeds RSAES-PKCS1-v1_5 RSA-2048 encryption capacity\n");
+        return false;
+    }
+
+    char filename[100];
+    // Refuse rather than silently operate on a truncated path: snprintf
+    // returns the length it *would* have written, so a value >= the buffer
+    // size means the slot file name did not fit.
+    int filename_len = snprintf(filename, sizeof(filename), CRYPTO_DIR_PATH "%s_%d", filename_prefix, file_num);
+    if (filename_len < 0 || (size_t)filename_len >= sizeof(filename)) {
+        return false;
+    }
+    if (mkdir(CRYPTO_DIR_PATH, 0700) == -1 && errno != EEXIST) {
+        return false;
+    }
+
+    ESYS_CONTEXT* context = NULL;
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        return false;
+    }
+
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    // If a persistent object already occupies the slot, refuse unless
+    // overwrite is set. When overwrite is set, evict first so EvictControl can
+    // install the new key on the same persistent address.
+    ESYS_TR existing = ESYS_TR_NONE;
+    TSS2_RC tr_rc = Esys_TR_FromTPMPublic(context, persistent_addr,
+                                          ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
+                                          &existing);
+    if (tr_rc == TSS2_RC_SUCCESS) {
+        if (!overwrite) {
+            Esys_TR_Close(context, &existing);
+            tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+            return false;
+        }
+        ESYS_TR removed = ESYS_TR_NONE;
+        tr_rc = Esys_EvictControl(context, ESYS_TR_RH_OWNER, existing,
+                                  ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
+                                  persistent_addr, &removed);
+        if (removed != ESYS_TR_NONE) {
+            Esys_TR_Close(context, &removed);
+        }
+        Esys_TR_Close(context, &existing);
+        if (tr_rc != TSS2_RC_SUCCESS) {
+            tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+            return false;
+        }
+    }
+
+    char password[128] = {0};
+    if (!linux_tpm_get_password(password, sizeof(password), password_prompt, true)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    ESYS_TR keyHandle = ESYS_TR_NONE;
+    ESYS_TR persistentHandle = ESYS_TR_NONE;
+    TPM2B_PUBLIC* outPublic = NULL;
+    TPM2B_CREATION_DATA* creationData = NULL;
+    TPM2B_DIGEST* creationHash = NULL;
+    TPMT_TK_CREATION* creationTicket = NULL;
+    TPM2B_PUBLIC_KEY_RSA* cipher = NULL;
+
+    TPM2B_AUTH authValuePrimary = {0};
+    authValuePrimary.size = strlen(password);
+    if (authValuePrimary.size > sizeof(authValuePrimary.buffer)) {
+        dogecoin_mem_zero(password, sizeof(password));
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    memcpy(authValuePrimary.buffer, password, authValuePrimary.size);
+
+    TPM2B_SENSITIVE_CREATE inSensitivePrimary = {
+        .size = 0,
+        .sensitive = {
+            .userAuth = {.size = 0, .buffer = {0}},
+            .data = {.size = 0, .buffer = {0}},
+        },
+    };
+
+    memcpy(inSensitivePrimary.sensitive.userAuth.buffer, password, authValuePrimary.size);
+    inSensitivePrimary.sensitive.userAuth.size = authValuePrimary.size;
+    dogecoin_mem_zero(password, sizeof(password));
+
+    TPM2B_PUBLIC inPublic = {
+        .size = 0,
+        .publicArea = {
+            .type = TPM2_ALG_RSA,
+            .nameAlg = TPM2_ALG_SHA256,
+            .objectAttributes = (TPMA_OBJECT_USERWITHAUTH |
+                                 TPMA_OBJECT_DECRYPT |
+                                 TPMA_OBJECT_FIXEDTPM |
+                                 TPMA_OBJECT_FIXEDPARENT |
+                                 TPMA_OBJECT_SENSITIVEDATAORIGIN),
+            .authPolicy = {.size = 0},
+            .parameters.rsaDetail = {
+                .symmetric = {.algorithm = TPM2_ALG_NULL},
+                // RSAES-PKCS1-v1_5 (TPM2_ALG_RSAES) is used deliberately, NOT
+                // by oversight.  It is the same padding scheme the Windows
+                // NCrypt backend uses (NCRYPT_PAD_PKCS1_FLAG, see the
+                // NCryptEncrypt/NCryptDecrypt calls in this file).  OAEP
+                // (TPM2_ALG_OAEP) is cryptographically preferable for a brand
+                // new standalone format, but the padding scheme and the
+                // on-disk layout are exactly what determine whether one
+                // platform can read the other's slot files: both backends
+                // write only the raw RSA-2048 ciphertext (no wrapper, no
+                // metadata), so the file format is byte-for-byte identical
+                // across Windows and Linux.  Keeping RSAES here means that,
+                // given the same RSA wrapping key and user password, a slot
+                // file sealed by the Windows backend can in principle be
+                // unsealed by this Linux/TSS2 backend and vice-versa (e.g. a
+                // dual-boot machine that exposes the same RSA key to both
+                // OSes).  Switching this path to OAEP would unilaterally break
+                // that cross-platform decryption property, which is why it is
+                // intentionally left as RSAES.
+                .scheme = {.scheme = TPM2_ALG_RSAES},
+                .keyBits = 2048,
+                .exponent = 0,
+            },
+            .unique.rsa = {.size = 0, .buffer = {0}},
+        },
+    };
+
+    TPM2B_DATA outsideInfo = {.size = 0, .buffer = {0}};
+    TPML_PCR_SELECTION creationPCR = {.count = 0};
+    // Pass empty owner-hierarchy auth: on real hardware the kernel or OS
+    // provisions the owner auth independently, so sending the user password
+    // here would trigger TPM_RC_BAD_AUTH.  The user password lives only in
+    // inSensitivePrimary.sensitive.userAuth (object-level auth).
+    TPM2B_AUTH authValue = {.size = 0, .buffer = {0}};
+
+    result = Esys_TR_SetAuth(context, ESYS_TR_RH_OWNER, &authValue);
+    if (result != TSS2_RC_SUCCESS) {
+        dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
+        dogecoin_mem_zero(&inSensitivePrimary, sizeof(inSensitivePrimary));
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    result = Esys_CreatePrimary(context,
+                                ESYS_TR_RH_OWNER,
+                                ESYS_TR_PASSWORD,
+                                ESYS_TR_NONE,
+                                ESYS_TR_NONE,
+                                &inSensitivePrimary,
+                                &inPublic,
+                                &outsideInfo,
+                                &creationPCR,
+                                &keyHandle,
+                                &outPublic,
+                                &creationData,
+                                &creationHash,
+                                &creationTicket);
+
+    if (result != TSS2_RC_SUCCESS) {
+        dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
+        dogecoin_mem_zero(&inSensitivePrimary, sizeof(inSensitivePrimary));
+        tpm_cleanup(&context, outPublic, creationData, creationHash, creationTicket, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    dogecoin_mem_zero(&inSensitivePrimary, sizeof(inSensitivePrimary));
+    tpm_cleanup(NULL, outPublic, creationData, creationHash, creationTicket, TPM_CLEANUP_SENTINEL);
+
+    // Encrypt plaintext against the transient RSA key before persisting it.
+    // This avoids immediate persistent-slot round-tripping and reduces
+    // TPM_RC_OBJECT_MEMORY risk on constrained TPM implementations.
+    TPM2B_PUBLIC_KEY_RSA plain = {0};
+    plain.size = in_size;
+    memcpy(plain.buffer, in, in_size);
+
+    // RSAES-PKCS1-v1_5 — same scheme as Windows NCrypt (NCRYPT_PAD_PKCS1_FLAG)
+    // for cross-platform ciphertext compatibility (see key template comment).
+    TPMT_RSA_DECRYPT scheme = {.scheme = TPM2_ALG_RSAES};
+    result = Esys_RSA_Encrypt(context,
+                              keyHandle,
+                              ESYS_TR_NONE,
+                              ESYS_TR_NONE,
+                              ESYS_TR_NONE,
+                              &plain,
+                              &scheme,
+                              NULL,
+                              &cipher);
+    if (result != TSS2_RC_SUCCESS) {
+        dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
+        Esys_FlushContext(context, keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    // Persist the wrapping key under the deterministic 0x81xx_xxxx handle.
+    // After this call, keyHandle is consumed and persistentHandle becomes the
+    // live ESYS_TR for the persistent object.
+    result = Esys_EvictControl(context, ESYS_TR_RH_OWNER, keyHandle,
+                               ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
+                               persistent_addr, &persistentHandle);
+    if (result != TSS2_RC_SUCCESS || persistentHandle == ESYS_TR_NONE) {
+        dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
+        tpm_cleanup(NULL, cipher, TPM_CLEANUP_SENTINEL);
+        Esys_FlushContext(context, keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    result = Esys_TR_SetAuth(context, persistentHandle, &authValuePrimary);
+    dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
+    if (result != TSS2_RC_SUCCESS) {
+        tpm_cleanup(NULL, cipher, TPM_CLEANUP_SENTINEL);
+        linux_tpm_evict_persistent_handle(context, persistentHandle, persistent_addr);
+        Esys_TR_Close(context, &persistentHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    int fd = open(filename, O_WRONLY | O_CREAT | (overwrite ? O_TRUNC : O_EXCL), 0600);
+    if (fd == -1) {
+        fprintf(stderr, "ERROR: Failed to open file '%s' for writing: %s\n", filename, strerror(errno));
+        tpm_cleanup(NULL, cipher, TPM_CLEANUP_SENTINEL);
+        linux_tpm_evict_persistent_handle(context, persistentHandle, persistent_addr);
+        Esys_TR_Close(context, &persistentHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    FILE* fp = fdopen(fd, "wb");
+    if (!fp) {
+        close(fd);
+        tpm_cleanup(NULL, cipher, TPM_CLEANUP_SENTINEL);
+        linux_tpm_evict_persistent_handle(context, persistentHandle, persistent_addr);
+        Esys_TR_Close(context, &persistentHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    ok = fwrite(cipher->buffer, 1, cipher->size, fp) == cipher->size;
+
+    fclose(fp);
+    if (!ok) {
+        // Keep the on-disk file and the TPM persistent key in sync: if the
+        // ciphertext could not be fully written, remove the partial file and
+        // evict the just-persisted key so no orphaned persistent slot is left
+        // behind.  This is safe because this path is always a fresh encrypt
+        // (an existing slot was already evicted above when overwrite is set),
+        // so we are never destroying a key that still backs valid data.
+        remove(filename);
+        linux_tpm_evict_persistent_handle(context, persistentHandle, persistent_addr);
+    }
+    tpm_cleanup(NULL, cipher, TPM_CLEANUP_SENTINEL);
+    Esys_TR_Close(context, &persistentHandle);
+    tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+    return ok;
+}
+
+/**
+ * @brief Decrypts a blob using a TPM-persisted per-slot RSA wrapping key.
+ *
+ * Decrypts a blob previously encrypted with a per-slot RSA wrapping key
+ * persisted in the TPM. Resolves the persistent key from the cross-platform
+ * object name and reads the ciphertext from disk.
+ *
+ * @param out Output plaintext buffer.
+ * @param out_size Output buffer size in bytes.
+ * @param file_num Slot index used for persistent object addressing.
+ * @param filename_prefix Prefix used for encrypted file naming.
+ * @param password_prompt Prompt string for user password entry.
+ * @param actual_size Optional decrypted byte count output.
+ * @return Returns true on successful decryption, false otherwise.
+ */
+static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const int file_num, const char* filename_prefix, const char* password_prompt, size_t* actual_size)
+{
+    dogecoin_bool ok = false;
+    ESYS_CONTEXT* context = NULL;
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        return false;
+    }
+
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    char filename[100];
+    int filename_len = snprintf(filename, sizeof(filename), CRYPTO_DIR_PATH "%s_%d", filename_prefix, file_num);
+    if (filename_len < 0 || (size_t)filename_len >= sizeof(filename)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    FILE* fp = fopen(filename, "rb");
+    if (!fp) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    TPM2_HANDLE persistent_addr = linux_tpm_persistent_handle(filename_prefix, file_num);
+    if (persistent_addr == 0) {
+        fclose(fp);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    long file_size = ftell(fp);
+    if (file_size <= 0) {
+        fclose(fp);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    size_t encrypted_size = (size_t)file_size;
+    if (encrypted_size > TPM2_RSA_BUFFER_BYTES) {
+        fclose(fp);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        fclose(fp);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    uint8_t encrypted_blob[TPM2_RSA_BUFFER_BYTES] = {0};
+    if (fread(encrypted_blob, 1, encrypted_size, fp) != encrypted_size) {
+        fclose(fp);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    fclose(fp);
+
+    // Resolve the persistent TPM2 handle into an ESYS_TR for the live object.
+    ESYS_TR keyHandle = ESYS_TR_NONE;
+    result = Esys_TR_FromTPMPublic(context, persistent_addr,
+                                   ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
+                                   &keyHandle);
+    if (result != TSS2_RC_SUCCESS) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    char password[128] = {0};
+    if (!linux_tpm_get_password(password, sizeof(password), password_prompt, false)) {
+        Esys_TR_Close(context, &keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    TPM2B_AUTH authValue = {0};
+    authValue.size = strlen(password);
+    if (authValue.size > sizeof(authValue.buffer)) {
+        dogecoin_mem_zero(password, sizeof(password));
+        Esys_TR_Close(context, &keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    memcpy(authValue.buffer, password, authValue.size);
+    dogecoin_mem_zero(password, sizeof(password));
+    // Empty owner-hierarchy auth: the user password is set as the
+    // persistent object's auth (below), not as owner auth.
+    TPM2B_AUTH authValuePrimary = {.size = 0};
+
+    result = Esys_TR_SetAuth(context, ESYS_TR_RH_OWNER, &authValuePrimary);
+    if (result != TSS2_RC_SUCCESS) {
+        dogecoin_mem_zero(&authValue, sizeof(authValue));
+        Esys_TR_Close(context, &keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+    result = Esys_TR_SetAuth(context, keyHandle, &authValue);
+    dogecoin_mem_zero(&authValue, sizeof(authValue));
+    if (result != TSS2_RC_SUCCESS) {
+        Esys_TR_Close(context, &keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    // RSAES-PKCS1-v1_5 — same scheme as Windows NCrypt (NCRYPT_PAD_PKCS1_FLAG)
+    // for cross-platform ciphertext compatibility (see key template comment
+    // in linux_tpm_encrypt_blob).
+    TPMT_RSA_DECRYPT scheme = {.scheme = TPM2_ALG_RSAES};
+    TPM2B_PUBLIC_KEY_RSA cipher = {.size = encrypted_size, .buffer = {0}};
+    memcpy(cipher.buffer, encrypted_blob, encrypted_size);
+    TPM2B_DATA label = {.size = 0};
+    TPM2B_PUBLIC_KEY_RSA* plain = NULL;
+
+    result = Esys_RSA_Decrypt(context, keyHandle, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, &cipher, &scheme, &label, &plain);
+    if (result != TSS2_RC_SUCCESS || plain == NULL || plain->size > out_size) {
+        tpm_cleanup(NULL, plain, TPM_CLEANUP_SENTINEL);
+        Esys_TR_Close(context, &keyHandle);
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    memcpy(out, plain->buffer, plain->size);
+    if (actual_size) {
+        *actual_size = plain->size;
+    }
+    tpm_cleanup(NULL, plain, TPM_CLEANUP_SENTINEL);
+    Esys_TR_Close(context, &keyHandle);
+    tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+    ok = true;
+    return ok;
+}
+#endif
+
 /**
  * @brief Encrypts a seed using the TPM
  *
@@ -155,9 +866,13 @@ dogecoin_bool fileValid (const int file_num)
  * @param[in] overwrite Whether or not to overwrite an existing seed
  * @return true if the seed was encrypted successfully, false otherwise.
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite)
-{
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite) {
+#if defined(__linux__) && defined(USE_TSS2)
+    if (seed == NULL || !fileValid(file_num)) {
+        return false;
+    }
+    return linux_tpm_encrypt_blob((const uint8_t*)seed, size, file_num, overwrite, "encrypted_seed", "Enter password for seed encryption: ");
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Validate the input parameters
     if (seed == NULL)
@@ -349,9 +1064,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
  * @param file_num The file number for the encrypted seed
  * @return Returns true if the seed is decrypted successfully, false otherwise.
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_tpm(SEED seed, const int file_num)
-{
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_tpm(SEED seed, const int file_num) {
+#if defined(__linux__) && defined(USE_TSS2)
+    if (seed == NULL || !fileValid(file_num)) {
+        return false;
+    }
+    size_t actual_size = 0;
+    return linux_tpm_decrypt_blob((uint8_t*)seed, MAX_SEED_SIZE, file_num, "encrypted_seed", "Enter password for seed decryption: ", &actual_size);
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Validate the input parameters
     if (seed == NULL)
@@ -899,7 +1619,39 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin_hdnode* out, const int file_num, dogecoin_bool overwrite)
 {
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+#if defined(__linux__) && defined(USE_TSS2)
+    if (out == NULL || !fileValid(file_num)) {
+        return false;
+    }
+
+    ESYS_CONTEXT* context = NULL;
+    TPM2B_DIGEST* random_bytes = NULL;
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        return false;
+    }
+
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    result = Esys_GetRandom(context,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            32,
+                            &random_bytes);
+    if (result != TSS2_RC_SUCCESS || random_bytes == NULL || random_bytes->size != 32) {
+        tpm_cleanup(&context, random_bytes, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    dogecoin_hdnode_from_seed((uint8_t*)random_bytes->buffer, 32, out);
+    tpm_cleanup(&context, random_bytes, TPM_CLEANUP_SENTINEL);
+    return linux_tpm_encrypt_blob((const uint8_t*)out, sizeof(dogecoin_hdnode), file_num, overwrite, "encrypted_hdnode", "Enter password for HD node encryption: ");
+
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Validate the input parameters
     if (out == NULL)
@@ -1149,7 +1901,17 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_tpm(dogecoin_hdnode* out, const int file_num)
 {
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+#if defined(__linux__) && defined(USE_TSS2)
+    size_t actual_size = 0;
+    if (out == NULL || !fileValid(file_num)) {
+        return false;
+    }
+    if (!linux_tpm_decrypt_blob((uint8_t*)out, sizeof(dogecoin_hdnode), file_num, "encrypted_hdnode", "Enter password for HD node decryption: ", &actual_size)) {
+        return false;
+    }
+    return actual_size == sizeof(dogecoin_hdnode);
+
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Validate the input parameters
     if (out == NULL)
@@ -1706,7 +2468,45 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words)
 {
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+#if defined(__linux__) && defined(USE_TSS2)
+    if (mnemonic == NULL || !fileValid(file_num)) {
+        return false;
+    }
+
+    ESYS_CONTEXT* context = NULL;
+    TPM2B_DIGEST* random_bytes = NULL;
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        return false;
+    }
+
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    result = Esys_GetRandom(context,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            32,
+                            &random_bytes);
+    if (result != TSS2_RC_SUCCESS || random_bytes == NULL || random_bytes->size != 32) {
+        tpm_cleanup(&context, random_bytes, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    char* rand_hex = utils_uint8_to_hex((uint8_t*)random_bytes->buffer, random_bytes->size);
+    size_t mnemonicSize = 0;
+    int mnemonicResult = dogecoin_generate_mnemonic("256", lang, space, (const char*)rand_hex, words, NULL, &mnemonicSize, mnemonic);
+    utils_clear_buffers();
+    tpm_cleanup(&context, random_bytes, TPM_CLEANUP_SENTINEL);
+    if (mnemonicResult == -1) {
+        return false;
+    }
+    return linux_tpm_encrypt_blob((const uint8_t*)mnemonic, strlen(mnemonic) + 1, file_num, overwrite, "encrypted_mnemonic", "Enter password for mnemonic encryption: ");
+
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Validate the input parameters
     if (mnemonic == NULL)
@@ -1964,7 +2764,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_tpm(MNEMONIC mnemonic, const int file_num)
 {
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+#if defined(__linux__) && defined(USE_TSS2)
+    size_t actual_size = 0;
+    if (mnemonic == NULL || !fileValid(file_num)) {
+        return false;
+    }
+    dogecoin_mem_zero(mnemonic, sizeof(MNEMONIC));
+    if (!linux_tpm_decrypt_blob((uint8_t*)mnemonic, sizeof(MNEMONIC), file_num, "encrypted_mnemonic", "Enter password for mnemonic decryption: ", &actual_size)) {
+        return false;
+    }
+    mnemonic[sizeof(MNEMONIC) - 1] = '\0';
+    return actual_size > 0;
+
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Validate the input parameters
     if (mnemonic == NULL)
@@ -2505,7 +3317,89 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* names[], size_t* count)
 {
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+#if defined(__linux__) && defined(USE_TSS2)
+    if (names == NULL || count == NULL) {
+        return false;
+    }
+    *count = 0;
+
+    ESYS_CONTEXT* context = NULL;
+    if (Esys_Initialize(&context, NULL, NULL) != TSS2_RC_SUCCESS) {
+        return false;
+    }
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+        return false;
+    }
+
+    // Walk the persistent-handle range of the TPM with TPM2_CAP_HANDLES and
+    // emit a libdogecoin-style name for each entry that matches one of the
+    // libdogecoin persistent-handle bases.
+    TPM2_HANDLE start = TPM2_PERSISTENT_FIRST;
+    TPMI_YES_NO more = TPM2_NO;
+    do {
+        TPMS_CAPABILITY_DATA* cap = NULL;
+        TSS2_RC rc = Esys_GetCapability(context,
+                                        ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
+                                        TPM2_CAP_HANDLES, start,
+                                        TPM2_MAX_CAP_HANDLES, &more, &cap);
+        if (rc != TSS2_RC_SUCCESS || cap == NULL) {
+            for (size_t i = 0; i < *count; i++) {
+                dogecoin_free(names[i]);
+                names[i] = NULL;
+            }
+            *count = 0;
+            tpm_cleanup(&context, cap, TPM_CLEANUP_SENTINEL);
+            return false;
+        }
+
+        const TPML_HANDLE* handles = &cap->data.handles;
+        for (UINT32 i = 0; i < handles->count; i++) {
+            if (*count >= MAX_FILES) break;
+            TPM2_HANDLE ph = handles->handle[i];
+            uint32_t base = ph & LINUX_TPM_PERSISTENT_RANGE_MASK;
+            unsigned slot = ph & LINUX_TPM_PERSISTENT_SLOT_MASK;
+            const wchar_t* fmt = NULL;
+            size_t buflen = 0;
+            if (base == LINUX_TPM_PERSISTENT_BASE_SEED) {
+                fmt = L"dogecoin_seed_%03u";
+                buflen = wcslen(L"dogecoin_seed_000") + 1;
+            } else if (base == LINUX_TPM_PERSISTENT_BASE_MNEMONIC) {
+                fmt = L"dogecoin_mnemonic_%03u";
+                buflen = wcslen(L"dogecoin_mnemonic_000") + 1;
+            } else if (base == LINUX_TPM_PERSISTENT_BASE_HDNODE) {
+                fmt = L"dogecoin_master_%03u";
+                buflen = wcslen(L"dogecoin_master_000") + 1;
+            }
+            if (fmt == NULL) {
+                continue;
+            }
+            names[*count] = dogecoin_calloc(buflen, sizeof(wchar_t));
+            if (names[*count] == NULL) {
+                for (size_t j = 0; j < *count; j++) {
+                    dogecoin_free(names[j]);
+                    names[j] = NULL;
+                }
+                *count = 0;
+                tpm_cleanup(&context, cap, TPM_CLEANUP_SENTINEL);
+                return false;
+            }
+            swprintf(names[*count], buflen, fmt, slot);
+            (*count)++;
+        }
+
+        if (handles->count > 0) {
+            start = handles->handle[handles->count - 1] + 1;
+        } else {
+            more = TPM2_NO;
+        }
+        tpm_cleanup(NULL, cap, TPM_CLEANUP_SENTINEL);
+    } while (more == TPM2_YES && start <= TPM2_PERSISTENT_LAST && *count < MAX_FILES);
+
+    tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
+    return true;
+
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Declare ncrypt variables
     SECURITY_STATUS status;
@@ -2549,7 +3443,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         }
 
         // Allocate memory for the name
-        names[*count] = malloc((wcslen(keyList->pszName) + 1) * sizeof(wchar_t));
+        size_t name_len = wcslen(keyList->pszName) + 1;
+        names[*count] = dogecoin_calloc(name_len, sizeof(wchar_t));
 
         if (names[*count] == NULL)
         {
@@ -2568,7 +3463,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         }
 
         // Copy the name
-        swprintf(names[*count], (wcslen(keyList->pszName) + 1) * sizeof(wchar_t), L"%ls", keyList->pszName);
+        swprintf(names[*count], name_len, L"%ls", keyList->pszName);
 
         // Increment the count of keys
         (*count)++;
