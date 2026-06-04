@@ -39,8 +39,10 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/vector.h>
 
-/* 100 000-byte standard-tx → 200 000 hex chars + NUL */
-#define TO_UINT8_HEX_BUF_LEN 200001
+/* Dogecoin standard TX ceiling: MAX_STANDARD_TX_WEIGHT / 4 = 100 000 bytes
+   → hex encoding: 100 000 * 2 + 1 (NUL) = 200 001 */
+#define DOGECOIN_MAX_TX_HEX_LEN 200001
+#define TO_UINT8_HEX_BUF_LEN DOGECOIN_MAX_TX_HEX_LEN  /* back-compat alias */
 #define VARINT_LEN 20
 #define MAX_LEN 128
 

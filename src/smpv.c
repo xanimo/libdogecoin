@@ -29,6 +29,8 @@
 #include <dogecoin/smpv.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/tx.h>
+#include <dogecoin/protocol.h>
+#include <dogecoin/utils.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/hash.h>
 #include <dogecoin/cstr.h>
@@ -267,9 +269,15 @@ dogecoin_bool dogecoin_smpv_add_watcher(
 
     /* Initialize new watcher */
     dogecoin_smpv_watcher* watcher = &client->watchers[client->watcher_count];
-    watcher->address = dogecoin_calloc(1, strlen(address) + 1);
+    size_t addr_len = strspn(address, VALID_BASE58_CHARS);
+    /* P2PKHLEN (35) is the buffer size including NUL terminator.
+       A valid P2PKH address is 34 chars, so addr_len of 34 passes
+       the >= 35 check. This also validates that the string contains
+       only Base58 characters and is properly NUL-terminated. */
+    if (addr_len == 0 || addr_len >= P2PKHLEN || address[addr_len] != '\0') return false;
+    watcher->address = dogecoin_calloc(1, P2PKHLEN);
     if (!watcher->address) return false;
-    strcpy(watcher->address, address);
+    memcpy_safe(watcher->address, address, addr_len);
     watcher->total_received = 0;
     watcher->total_sent = 0;
     watcher->balance = 0;
@@ -379,10 +387,13 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     if (!smpv_tx) return false;
 
     /* keep the hex string */
-    const size_t raw_len = strlen(raw_tx_hex);
+    const size_t raw_len = strspn(raw_tx_hex, VALID_HEX_CHARS);
+    if (raw_len < 2 || (raw_len % 2) != 0 || raw_tx_hex[raw_len] != '\0' || raw_len > DOGECOIN_MAX_TX_HEX_LEN - 1) {
+        dogecoin_smpv_tx_free(smpv_tx); return false;
+    }
     smpv_tx->raw_hex = (char*)dogecoin_calloc(1, raw_len + 1);
     if (!smpv_tx->raw_hex) { dogecoin_smpv_tx_free(smpv_tx); return false; }
-    strcpy(smpv_tx->raw_hex, raw_tx_hex);
+    memcpy_safe(smpv_tx->raw_hex, raw_tx_hex, raw_len);
 
     /* hex -> bytes */
     const size_t alloc_bytes = raw_len / 2;
@@ -395,12 +406,15 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     /* txid = dbl-SHA256(bytes) (display LE) */
     uint256_t h;
     dogecoin_dblhash(bin, out_len, h);
-    smpv_tx->txid = (char*)dogecoin_calloc(1, 65);
+    smpv_tx->txid = (char*)dogecoin_calloc(1, DOGECOIN_HASH_HEX_LENGTH);
     if (!smpv_tx->txid) { dogecoin_free(bin); dogecoin_smpv_tx_free(smpv_tx); return false; }
-    char* hex = utils_uint8_to_hex((const uint8_t*)h, 32);
+    char* hex = utils_uint8_to_hex((const uint8_t*)h, DOGECOIN_HASH_LENGTH);
     if (!hex) { dogecoin_free(bin); dogecoin_smpv_tx_free(smpv_tx); return false; }
-    strcpy(smpv_tx->txid, hex);
-    utils_reverse_hex(smpv_tx->txid, 64);
+    /* Copy exactly DOGECOIN_HASH_LENGTH*2 (64) hex chars into txid.
+       The NUL terminator at position 64 is guaranteed because txid was
+       allocated with dogecoin_calloc(1, DOGECOIN_HASH_HEX_LENGTH) above. */
+    memcpy_safe(smpv_tx->txid, hex, DOGECOIN_HASH_LENGTH * 2);
+    utils_reverse_hex(smpv_tx->txid, DOGECOIN_HASH_LENGTH * 2);
 
     /* base metadata */
     smpv_tx->size          = (uint64_t)out_len;
@@ -511,8 +525,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     {
         smpv_tx_lookup* lk = (smpv_tx_lookup*)dogecoin_calloc(1, sizeof(smpv_tx_lookup));
         if (lk) {
-            strncpy(lk->txid, client->mempool_txs[client->mempool_tx_count].txid, 64);
-            lk->txid[64] = '\0';
+            strncpy(lk->txid, client->mempool_txs[client->mempool_tx_count].txid, DOGECOIN_HASH_LENGTH * 2);
+            lk->txid[DOGECOIN_HASH_LENGTH * 2] = '\0';
             lk->index = client->mempool_tx_count;
             HASH_ADD_STR(client->tx_lookup, txid, lk);
         }
@@ -674,10 +688,12 @@ dogecoin_bool dogecoin_smpv_is_tx_relevant(
 
     const char* address = smpv_tx_find_relevant_watcher_address(client, tx);
     if (address) {
-        size_t alen = strlen(address);
+        /* Validate address contains only Base58 characters before copying */
+        size_t alen = strspn(address, VALID_BASE58_CHARS);
+        if (alen == 0 || alen >= P2PKHLEN || address[alen] != '\0') return false;
         *relevant_address = (char*)dogecoin_calloc(1, alen + 1);
         if (!*relevant_address) return false;
-        strcpy(*relevant_address, address);
+        memcpy_safe(*relevant_address, address, alen);
         return true;
     }
 
@@ -687,8 +703,8 @@ dogecoin_bool dogecoin_smpv_is_tx_relevant(
 /* Decode raw transaction hex */
 LIBDOGECOIN_API dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex) {
     if (!raw_tx_hex) return NULL;
-    size_t hex_len = strlen(raw_tx_hex);
-    if (hex_len < 2 || (hex_len % 2) != 0) return NULL;
+    size_t hex_len = strspn(raw_tx_hex, VALID_HEX_CHARS);
+    if (hex_len < 2 || (hex_len % 2) != 0 || raw_tx_hex[hex_len] != '\0' || hex_len > DOGECOIN_MAX_TX_HEX_LEN - 1) return NULL;
 
     size_t bin_len = hex_len / 2;
     unsigned char* bin = (unsigned char*)dogecoin_calloc(1, bin_len);
@@ -781,7 +797,7 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
         if (block_hash) {
             size_t blen = strlen(block_hash);
             tx->block_hash = (char*)dogecoin_calloc(1, blen + 1);
-            if (tx->block_hash) strcpy(tx->block_hash, block_hash);
+            if (tx->block_hash) memcpy_safe(tx->block_hash, block_hash, blen);
         }
 
         client->last_update_time = time(NULL);

@@ -115,7 +115,7 @@ void dogecoin_ecc_stop(void);
 #define HDKEYLEN 112 // Function expects 128 but needs to be fixed to take 111.
 
 //#define P2PKHLEN 34 //our mainnet addresses are 34 chars if p2pkh and start with D.  Internally this is cited as 35 for strings that represent it because +stringterm.
-#define P2PKHLEN 35 // Function expects 35, but needs to be fixed to take 34.
+#define P2PKHLEN 35 // Function expects 35, 34-char address + NUL terminator.
 
 //#define PUBKEYHEXLEN 67 //should be 66 for hex pubkey.  Internally this is cited as 67 for strings that represent it because +stringterm.
 #define PUBKEYHEXLEN 67
