@@ -428,6 +428,9 @@ libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 
 if USE_TESTS
 tests_SOURCES += \
+    test/compact_block_tests.c \
+    test/compact_filter_tests.c \
+    test/golomb_tests.c \
     test/net_tests.c \
     test/protocol_tests.c \
     test/spv_tests.c

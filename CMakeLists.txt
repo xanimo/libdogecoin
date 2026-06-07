@@ -666,6 +666,9 @@ IF(WITH_NET)
     ENDIF()
     IF(USE_TESTS)
         TARGET_SOURCES(tests ${visibility}
+            test/compact_block_tests.c
+            test/compact_filter_tests.c
+            test/golomb_tests.c
             test/net_tests.c
             test/protocol_tests.c
             test/spv_tests.c

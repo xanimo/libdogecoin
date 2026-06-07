@@ -143,6 +143,9 @@ extern void test_tool();
 #endif
 
 #ifdef WITH_NET
+extern void test_compact_block();
+extern void test_compact_filter();
+extern void test_golomb();
 extern void test_net_basics_plus_download_block();
 extern void test_protocol();
 extern void test_net_flag_defined();
@@ -277,6 +280,9 @@ int main()
 #endif
 
 #ifdef WITH_NET
+    u_run_test(test_compact_block);
+    u_run_test(test_compact_filter);
+    u_run_test(test_golomb);
     u_run_test(test_net_flag_defined);
     u_run_test(test_net_basics_plus_download_block);
     u_run_test(test_protocol);
