@@ -646,6 +646,10 @@ IF(WITH_NET)
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
         src/bip37.c
+        src/bloom.c
+        src/compact_block.c
+        src/compact_filter.c
+        src/golomb.c
         src/headersdb_file.c
         src/net.c
         src/protocol.c

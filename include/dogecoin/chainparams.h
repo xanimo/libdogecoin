@@ -71,6 +71,24 @@ extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[33];
 extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[24];
 
+/**
+ * @brief BIP 157 compact filter header checkpoint.
+ *
+ * Filter header checkpoints at every CFCHECKPT_INTERVAL (1000) blocks.
+ */
+typedef struct dogecoin_cf_checkpoint_ {
+    uint32_t height;           /**< Block height (multiple of CFCHECKPT_INTERVAL) */
+    const char* filter_header; /**< Filter header hash as 64-char hex string */
+} dogecoin_cf_checkpoint;
+
+/* BIP157 compact filter header checkpoints per network. */
+extern const dogecoin_cf_checkpoint dogecoin_mainnet_cf_checkpoint_array[];
+extern const size_t dogecoin_mainnet_cf_checkpoint_count;
+extern const dogecoin_cf_checkpoint dogecoin_testnet_cf_checkpoint_array[];
+extern const size_t dogecoin_testnet_cf_checkpoint_count;
+extern const dogecoin_cf_checkpoint dogecoin_regtest_cf_checkpoint_array[];
+extern const size_t dogecoin_regtest_cf_checkpoint_count;
+
 LIBDOGECOIN_API const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
 LIBDOGECOIN_API int chain_from_b58_prefix_bool(char* address);
 

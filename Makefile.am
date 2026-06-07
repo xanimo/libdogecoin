@@ -403,6 +403,10 @@ noinst_HEADERS += \
     include/dogecoin/headersdb.h \
     include/dogecoin/headersdb_file.h \
     include/dogecoin/protocol.h \
+    include/dogecoin/bloom.h \
+    include/dogecoin/compact_block.h \
+    include/dogecoin/compact_filter.h \
+    include/dogecoin/golomb.h \
     include/dogecoin/net.h \
     include/dogecoin/rest.h \
     include/dogecoin/spv.h
@@ -410,6 +414,10 @@ noinst_HEADERS += \
 libdogecoin_la_SOURCES += \
     src/headersdb_file.c \
     src/bip37.c \
+    src/bloom.c \
+    src/compact_block.c \
+    src/compact_filter.c \
+    src/golomb.c \
     src/net.c \
     src/protocol.c \
     src/rest.c \

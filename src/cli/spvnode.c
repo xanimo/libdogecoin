@@ -200,6 +200,8 @@ static struct option long_options[] = {
         {"filtered_blocks", no_argument, NULL, 'g'},
         {"select_checkpoint", no_argument, NULL, 'q'},
         {"daemon", no_argument, NULL, 'z'},
+        {"no_cfilters", no_argument, NULL, 'e'},
+        {"export_cfcheckpts", no_argument, NULL, 'o'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -478,6 +480,8 @@ int main(int argc, char* argv[]) {
     char* http_server = NULL;
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
+    dogecoin_bool no_cfilters = false;
+    dogecoin_bool export_cfcheckpts = false;
     int selected_checkpoint_index = -1;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -487,7 +491,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgq", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeo", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -568,6 +572,12 @@ int main(int argc, char* argv[]) {
                     spv_select_checkpoint = true;
                     use_checkpoint = true;
                     break;
+                case 'e':
+                    no_cfilters = true;
+                    break;
+                case 'o':
+                    export_cfcheckpts = true;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -586,6 +596,25 @@ int main(int argc, char* argv[]) {
         if (smpv_cli_enable) {
             dogecoin_spv_enable_smpv(client, true);
             printf("[smpv] enabled via CLI flag\n");
+        }
+        if (no_cfilters || full_sync) {
+            /* Disable BIP157 compact filter sync when:
+             *  - user explicitly passed --no_cfilters (-e)
+             *  - full_sync (-b) is requested: we need full blocks anyway,
+             *    and Dogecoin peers don't advertise NODE_COMPACT_FILTERS yet,
+             *    so BIP157 sync would stall indefinitely. */
+            dogecoin_spv_enable_compact_filters(client, false);
+            if (no_cfilters) {
+                printf("[bip157] compact filters disabled via CLI flag (--no_cfilters)\n");
+            } else {
+                printf("[bip157] compact filters disabled (full_sync mode uses direct block download)\n");
+            }
+        } else {
+            printf("[bip157] compact block filters enabled (default)\n");
+        }
+        if (export_cfcheckpts) {
+            client->cf_export_enabled = true;
+            printf("[bip157] filter header checkpoint export enabled; lines prefixed '[cfcheckpt-export]' will appear as headers sync\n");
         }
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
