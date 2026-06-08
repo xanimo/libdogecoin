@@ -203,6 +203,8 @@ static struct option long_options[] = {
         {"daemon", no_argument, NULL, 'z'},
         {"no_cfilters", no_argument, NULL, 'e'},
         {"export_cfcheckpts", no_argument, NULL, 'o'},
+        {"filter_hash_db", required_argument, NULL, 'F'},
+        {"cf_from_genesis", no_argument, NULL, 'G'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -483,6 +485,8 @@ int main(int argc, char* argv[]) {
     dogecoin_bool smpv_cli_enable = false;
     dogecoin_bool no_cfilters = false;
     dogecoin_bool export_cfcheckpts = false;
+    char* filter_hash_db = NULL;
+    dogecoin_bool cf_from_genesis = false;
     int selected_checkpoint_index = -1;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -492,7 +496,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeo", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:G", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -578,6 +582,12 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'o':
                     export_cfcheckpts = true;
+                    break;
+                case 'F':
+                    filter_hash_db = optarg;
+                    break;
+                case 'G':
+                    cf_from_genesis = true;
                     break;
                 default:
                     print_usage();
@@ -804,6 +814,30 @@ int main(int argc, char* argv[]) {
         }
 
         dogecoin_free(headersfile);
+
+        /* Load auxiliary hash-lookup DB for filter IBD from genesis when using
+         * checkpoint-based headers.  This DB is opened read-only after the
+         * primary DB so its block-hash records cover early heights. */
+        if (filter_hash_db && client->compact_filters_enabled) {
+            client->aux_hash_db = &dogecoin_headers_db_interface_file;
+            client->aux_hash_db_ctx = client->aux_hash_db->init(chain, false);
+            if (!client->aux_hash_db_ctx ||
+                !client->aux_hash_db->load(client->aux_hash_db_ctx, filter_hash_db, false)) {
+                printf("[bip157] warning: could not load filter hash DB '%s'; early-height lookups may fail\n", filter_hash_db);
+                if (client->aux_hash_db_ctx) {
+                    client->aux_hash_db->free(client->aux_hash_db_ctx);
+                    client->aux_hash_db_ctx = NULL;
+                }
+                client->aux_hash_db = NULL;
+            } else {
+                printf("[bip157] loaded filter hash DB '%s' for genesis filter download\n", filter_hash_db);
+            }
+        }
+        if (cf_from_genesis) {
+            client->cf_start_height = 1;
+            printf("[bip157] filter download will start from genesis (height 1)\n");
+        }
+
         if (!response) {
             printf("Could not load or create headers database...aborting\n");
 #if WITH_WALLET

@@ -115,6 +115,16 @@ typedef struct dogecoin_spv_client_
      * client stays connected to the explicitly-named hosts only. */
     char *peer_ips;
 
+    /* BIP157 genesis-filter support: optional read-only secondary headers DB
+     * used only for block-hash lookup at early heights when the primary DB is
+     * checkpoint-based.  Populated via --filter-hash-db CLI option. */
+    void                                *aux_hash_db_ctx; /**< Context for aux block-hash lookup DB */
+    const dogecoin_headers_db_interface *aux_hash_db;     /**< Interface for aux block-hash lookup DB */
+
+    /* When non-zero, overrides the cfheaders start height (auto default:
+     * chainbottom for checkpoint-based sync, 1 for genesis sync). */
+    uint32_t cf_start_height;
+
     /* BIP157: compact filter sync state */
     dogecoin_bool compact_filters_enabled; /**< Whether compact filter sync is active */
     dogecoin_compact_filter_state *cfilter_state; /**< BIP157 per-client compact filter state */

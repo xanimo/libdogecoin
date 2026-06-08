@@ -124,6 +124,10 @@ static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
     return true;
 }
 
+static uint32_t spv_elapsed(const dogecoin_spv_client *client) {
+    return (uint32_t)((uint64_t)time(NULL) - client->start_ts);
+}
+
 static dogecoin_bool spv_lookup_headersdb_height_by_hash(dogecoin_spv_client* client,
                                                          const uint8_t hash[32],
                                                          uint32_t* out_height)
@@ -608,6 +612,9 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
 
     client->peer_ips = NULL;
 
+    client->aux_hash_db_ctx = NULL;
+    client->aux_hash_db = NULL;
+    client->cf_start_height = 0;
 
     return client;
 }
@@ -708,6 +715,11 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         client->peer_ips = NULL;
     }
 
+    if (client->aux_hash_db && client->aux_hash_db_ctx) {
+        client->aux_hash_db->free(client->aux_hash_db_ctx);
+        client->aux_hash_db_ctx = NULL;
+        client->aux_hash_db = NULL;
+    }
 
     if (client->headers_db)
     {
@@ -1748,7 +1760,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         uint32_t amount_of_headers;
         if (!deser_varlen(&amount_of_headers, buf)) return;
         uint64_t now = time(NULL);
-        client->nodegroup->log_write_cb("Got %d headers (took %d s) from node %d\n", amount_of_headers, now - client->last_headersrequest_time, node->nodeid);
+        client->nodegroup->log_write_cb("Got %d headers (took %d s) from node %d [%us elapsed]\n", amount_of_headers, now - client->last_headersrequest_time, node->nodeid, spv_elapsed(client));
 
         // flag off the request stall check
         client->last_headersrequest_time = 0;
@@ -1791,7 +1803,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
 
         client->nodegroup->log_write_cb("Connected %d headers\n", connected_headers);
-        client->nodegroup->log_write_cb("Chaintip at height %d\n", chaintip->height);
+        client->nodegroup->log_write_cb("Chaintip at height %d [%us elapsed]\n", chaintip->height, spv_elapsed(client));
 
         if (client->header_message_processed && client->header_message_processed(client, node, chaintip) == false)
             return;
@@ -2305,8 +2317,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_blockindex *cf_tip = client->headers_db->getchaintip(client->headers_db_ctx);
                 if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height) {
                     if (client->nodegroup && client->nodegroup->log_write_cb)
-                        client->nodegroup->log_write_cb("[bip157] all filters processed: %u matched blocks\n",
-                            (unsigned int)cfstate->matched_block_hashes->len);
+                        client->nodegroup->log_write_cb("[bip157] all filters processed: %u matched blocks [%us elapsed]\n",
+                            (unsigned int)cfstate->matched_block_hashes->len, spv_elapsed(client));
                     cfstate->awaiting_response = false;
                     client->stateflags &= ~SPV_CFILTER_SYNC_FLAG;
                     if (!client->called_sync_completed && client->sync_completed) {
@@ -2509,15 +2521,24 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_mem_zero(cfstate->cfheaders_tip_hash, sizeof(uint256_t));
                 dogecoin_mem_zero(cfstate->genesis_filter_header, sizeof(uint256_t));
 
-                /* Start cfheaders from the chainbottom height (oldest block we have headers for).
-                 * With checkpoint-based header sync we only have hashes from the checkpoint
-                 * onwards; requesting stop hashes before that height would fail the file scan. */
-                uint32_t cfh_start = 1;
-                {
+                /* Determine where cfheaders download starts.
+                 * cf_start_height overrides everything (set via --cf-from-genesis or API).
+                 * Otherwise: start at chainbottom (checkpoint-based sync) unless an aux
+                 * hash-lookup DB is available, in which case we can go back to genesis. */
+                uint32_t cfh_start;
+                if (client->cf_start_height > 0) {
+                    cfh_start = client->cf_start_height;
+                } else if (client->aux_hash_db && client->aux_hash_db_ctx) {
+                    /* aux DB covers early heights — download filters from genesis. */
+                    cfh_start = 1;
+                } else {
                     dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
-                    if (hdb && hdb->chainbottom && hdb->chainbottom->height > 0)
-                        cfh_start = hdb->chainbottom->height;
+                    cfh_start = (hdb && hdb->chainbottom && hdb->chainbottom->height > 0)
+                                ? hdb->chainbottom->height : 1;
                 }
+                if (client->nodegroup && client->nodegroup->log_write_cb)
+                    client->nodegroup->log_write_cb("[bip157] cfheaders download will start at height %u [%us elapsed]\n",
+                        cfh_start, spv_elapsed(client));
                 cfstate->cfheaders_tip_height = (cfh_start > 1) ? cfh_start - 1 : 0;
                 cfstate->cfheaders_base_height = cfh_start;
 
@@ -3078,11 +3099,18 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfheaders(dogecoin_spv_client
          * Try the in-memory prev chain first; fall back to a file scan. */
         dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
         if (!dogecoin_headers_db_get_block_hash_at_height(hdb, batch_stop_height, batch_stop_hash)) {
-            /* Cannot locate the stop block — fall back to tip (server may reject). */
-            if (client->nodegroup && client->nodegroup->log_write_cb)
-                client->nodegroup->log_write_cb("[bip157] getcfheaders: cannot find hash at height %u, using tip\n", batch_stop_height);
-            memcpy(batch_stop_hash, tip->hash, sizeof(uint256_t));
-            batch_stop_height = tip_height;
+            /* Primary DB miss — try aux hash-lookup DB (genesis headers for filter IBD). */
+            dogecoin_bool aux_found = false;
+            if (client->aux_hash_db && client->aux_hash_db_ctx) {
+                dogecoin_headers_db *aux = (dogecoin_headers_db *)client->aux_hash_db_ctx;
+                aux_found = dogecoin_headers_db_get_block_hash_at_height(aux, batch_stop_height, batch_stop_hash);
+            }
+            if (!aux_found) {
+                if (client->nodegroup && client->nodegroup->log_write_cb)
+                    client->nodegroup->log_write_cb("[bip157] getcfheaders: cannot find hash at height %u, using tip\n", batch_stop_height);
+                memcpy(batch_stop_hash, tip->hash, sizeof(uint256_t));
+                batch_stop_height = tip_height;
+            }
         }
     }
 
@@ -3108,8 +3136,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfheaders(dogecoin_spv_client
     memcpy(client->cfilter_state->pending_stop_hash, batch_stop_hash, sizeof(uint256_t));
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[bip157] sent getcfheaders (start=%u stop_height=%u) to node %d\n",
-            start_height, batch_stop_height, node->nodeid);
+        client->nodegroup->log_write_cb("[bip157] sent getcfheaders (start=%u stop_height=%u) to node %d [%us elapsed]\n",
+            start_height, batch_stop_height, node->nodeid, spv_elapsed(client));
     return true;
 }
 
@@ -3134,11 +3162,18 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfilters(dogecoin_spv_client 
     } else {
         dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
         if (!dogecoin_headers_db_get_block_hash_at_height(hdb, batch_end, batch_stop_hash)) {
-            /* Fallback: use the caller's stop_hash (tip); server may reject for long ranges */
-            if (client->nodegroup && client->nodegroup->log_write_cb)
-                client->nodegroup->log_write_cb("[bip157] getcfilters: cannot find hash at height %u, using tip\n", batch_end);
-            memcpy(batch_stop_hash, stop_hash, sizeof(uint256_t));
-            if (tip) batch_end = (uint32_t)tip->height;
+            /* Primary DB miss — try aux hash-lookup DB (genesis headers for filter IBD). */
+            dogecoin_bool aux_found = false;
+            if (client->aux_hash_db && client->aux_hash_db_ctx) {
+                dogecoin_headers_db *aux = (dogecoin_headers_db *)client->aux_hash_db_ctx;
+                aux_found = dogecoin_headers_db_get_block_hash_at_height(aux, batch_end, batch_stop_hash);
+            }
+            if (!aux_found) {
+                if (client->nodegroup && client->nodegroup->log_write_cb)
+                    client->nodegroup->log_write_cb("[bip157] getcfilters: cannot find hash at height %u, using tip\n", batch_end);
+                memcpy(batch_stop_hash, stop_hash, sizeof(uint256_t));
+                if (tip) batch_end = (uint32_t)tip->height;
+            }
         }
     }
 
@@ -3165,7 +3200,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfilters(dogecoin_spv_client 
     memcpy(cfstate->pending_stop_hash, batch_stop_hash, sizeof(uint256_t));
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[bip157] sent getcfilters (start=%u..%u) to node %d\n",
-            start_height, batch_end, node->nodeid);
+        client->nodegroup->log_write_cb("[bip157] sent getcfilters (start=%u..%u) to node %d [%us elapsed]\n",
+            start_height, batch_end, node->nodeid, spv_elapsed(client));
     return true;
 }
