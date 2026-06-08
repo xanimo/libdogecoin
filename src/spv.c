@@ -3336,6 +3336,12 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
         local_filter.n_flags = client->bloom_flags;
         dogecoin_bip37_filter_add(&local_filter, data, data_len);
     }
+    if (client->compact_filters_enabled && client->cfilter_state &&
+        client->cfilter_state->watched_scripts) {
+        cstring *script = cstr_new_buf(data, data_len);
+        if (script)
+            vector_add(client->cfilter_state->watched_scripts, script);
+    }
     if (!client->nodegroup || !client->nodegroup->nodes) return true;
 
     cstring* payload = cstr_new_sz((size_t)data_len + SPV_VARINT_MAX_LEN);

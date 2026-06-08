@@ -767,10 +767,9 @@ int main(int argc, char* argv[]) {
         }
 
         /* BIP157 compact-filter address watching: add each wallet address's
-         * P2PKH scriptPubKey to cfstate->watched_scripts so that cfilters are
-         * checked against real wallet outputs. */
-        if (client->compact_filters_enabled && client->cfilter_state &&
-            client->cfilter_state->watched_scripts) {
+         * P2PKH scriptPubKey via filteradd so cfilters are matched against
+         * real wallet outputs. */
+        if (client->compact_filters_enabled) {
             unsigned int wi;
             for (wi = 0; wi < wallet->waddr_vector->len; wi++) {
                 dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, wi);
@@ -783,13 +782,10 @@ int main(int argc, char* argv[]) {
                 memcpy(spk + 3, waddr->pubkeyhash, sizeof(uint160_t));
                 spk[23] = 0x88; /* OP_EQUALVERIFY  */
                 spk[24] = 0xac; /* OP_CHECKSIG     */
-                cstring *script = cstr_new_buf(spk, sizeof(spk));
-                if (script) {
-                    vector_add(client->cfilter_state->watched_scripts, script);
-                    char addr_str[P2PKHLEN];
-                    if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr_str, sizeof(addr_str))) {
-                        printf("[bip157] watching address: %s\n", addr_str);
-                    }
+                dogecoin_spv_client_filteradd(client, spk, sizeof(spk));
+                char addr_str[P2PKHLEN];
+                if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr_str, sizeof(addr_str))) {
+                    printf("[bip157] watching address: %s\n", addr_str);
                 }
             }
         }
