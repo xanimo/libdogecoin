@@ -815,22 +815,24 @@ int main(int argc, char* argv[]) {
 
         dogecoin_free(headersfile);
 
-        /* Load auxiliary hash-lookup DB for filter IBD from genesis when using
-         * checkpoint-based headers.  This DB is opened read-only after the
-         * primary DB so its block-hash records cover early heights. */
+        /* Load auxiliary hash-lookup DB for filter IBD from genesis.
+         * Use open_for_scan instead of load() to avoid reading 1M+ records
+         * into the in-memory tree — only the file handle is needed for the
+         * sequential block-hash scan done by get_block_hash_at_height(). */
         if (filter_hash_db && client->compact_filters_enabled) {
             client->aux_hash_db = &dogecoin_headers_db_interface_file;
             client->aux_hash_db_ctx = client->aux_hash_db->init(chain, false);
             if (!client->aux_hash_db_ctx ||
-                !client->aux_hash_db->load(client->aux_hash_db_ctx, filter_hash_db, false)) {
-                printf("[bip157] warning: could not load filter hash DB '%s'; early-height lookups may fail\n", filter_hash_db);
+                !dogecoin_headers_db_open_for_scan(
+                    (dogecoin_headers_db *)client->aux_hash_db_ctx, filter_hash_db)) {
+                printf("[bip157] warning: could not open filter hash DB '%s'; early-height lookups may fail\n", filter_hash_db);
                 if (client->aux_hash_db_ctx) {
                     client->aux_hash_db->free(client->aux_hash_db_ctx);
                     client->aux_hash_db_ctx = NULL;
                 }
                 client->aux_hash_db = NULL;
             } else {
-                printf("[bip157] loaded filter hash DB '%s' for genesis filter download\n", filter_hash_db);
+                printf("[bip157] opened filter hash DB '%s' for genesis filter download (scan-only)\n", filter_hash_db);
             }
         }
         if (cf_from_genesis) {

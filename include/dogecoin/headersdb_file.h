@@ -85,6 +85,7 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t 
  * @param hash_out    Receives the 32-byte block hash on success.
  * @return true if found and @p hash_out is populated.
  */
+dogecoin_bool dogecoin_headers_db_open_for_scan(dogecoin_headers_db *db, const char *filename);
 dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *db, uint32_t target_height, uint256_t hash_out);
 
 /* Defined in headersdb_file.c using typed trampolines (avoids the

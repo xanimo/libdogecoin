@@ -271,6 +271,42 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
 }
 
 /**
+ * Open an existing headers DB file for sequential hash lookup only.
+ *
+ * Unlike dogecoin_headers_db_load(), this function does NOT read any block
+ * records or build the in-memory tree.  It simply opens the file, verifies
+ * the 8-byte magic+version header, and leaves the file handle ready for
+ * dogecoin_headers_db_get_block_hash_at_height().  Use this for the aux
+ * hash-lookup DB in BIP157 genesis filter IBD — no tree needed.
+ */
+dogecoin_bool dogecoin_headers_db_open_for_scan(dogecoin_headers_db *db, const char *filename)
+{
+    if (!db || !filename) return false;
+
+    db->headers_tree_file = fopen(filename, "rb");
+    if (!db->headers_tree_file) {
+        fprintf(stderr, "headers_db: cannot open '%s' for scan: %s\n", filename, strerror(errno));
+        return false;
+    }
+
+    uint8_t buf[sizeof(file_hdr_magic) + sizeof(current_version)];
+    if (fread(buf, sizeof(buf), 1, db->headers_tree_file) != 1 ||
+        memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)) != 0) {
+        fprintf(stderr, "headers_db: bad magic in '%s'\n", filename);
+        fclose(db->headers_tree_file);
+        db->headers_tree_file = NULL;
+        return false;
+    }
+    if (le32toh(*(uint32_t *)(buf + sizeof(file_hdr_magic))) > current_version) {
+        fprintf(stderr, "headers_db: unsupported version in '%s'\n", filename);
+        fclose(db->headers_tree_file);
+        db->headers_tree_file = NULL;
+        return false;
+    }
+    return true;
+}
+
+/**
  * The function takes a block index and writes it to the headers database
  *
  * @param db the headers database
