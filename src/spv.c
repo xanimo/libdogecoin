@@ -996,6 +996,40 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
     if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG)
     {
         dogecoin_net_spv_request_headers(client);
+
+        /* Recovery: if our chaintip is far below the global-best peer and no
+         * BLOCKSYNC node has a block request in-flight, we're deadlocked —
+         * the inv handler won't request blocks because we're too far behind,
+         * and dogecoin_net_spv_request_headers early-returns because BLOCKSYNC
+         * nodes exist.  Force all nodes back to header sync. */
+        dogecoin_blockindex *sc_tip = client->headers_db->getchaintip(client->headers_db_ctx);
+        uint32_t sc_best = 0;
+        size_t sc_i;
+        for (sc_i = 0; sc_i < client->nodegroup->nodes->len; sc_i++) {
+            dogecoin_node *sc_n = vector_idx(client->nodegroup->nodes, sc_i);
+            if ((sc_n->state & NODE_CONNECTED) && sc_n->bestknownheight > sc_best)
+                sc_best = sc_n->bestknownheight;
+        }
+        if (sc_tip && sc_best > (uint32_t)sc_tip->height + 1440) {
+            dogecoin_bool any_pending = false;
+            for (sc_i = 0; sc_i < client->nodegroup->nodes->len; sc_i++) {
+                dogecoin_node *sc_n = vector_idx(client->nodegroup->nodes, sc_i);
+                if ((sc_n->state & NODE_BLOCKSYNC) && (sc_n->state & NODE_CONNECTED) && sc_n->time_last_request > 0)
+                    any_pending = true;
+            }
+            if (!any_pending) {
+                for (sc_i = 0; sc_i < client->nodegroup->nodes->len; sc_i++) {
+                    dogecoin_node *sc_n = vector_idx(client->nodegroup->nodes, sc_i);
+                    if (sc_n->state & NODE_BLOCKSYNC) sc_n->state &= ~NODE_BLOCKSYNC;
+                }
+                client->stateflags &= ~SPV_FULLBLOCK_SYNC_FLAG;
+                client->stateflags |= SPV_HEADER_SYNC_FLAG;
+                client->nodegroup->log_write_cb(
+                    "[spv] stale BLOCKSYNC (height=%d global_best=%d) — forcing header sync\n",
+                    sc_tip->height, sc_best);
+                dogecoin_net_spv_request_headers(client);
+            }
+        }
     }
 
     /* BIP157: recover from stalled awaiting_response when a peer disconnected
@@ -1979,6 +2013,18 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         // flag off the request stall check
         client->last_headersrequest_time = 0;
 
+        /* Use global-best height so we don't switch to BLOCKSYNC prematurely when
+         * the peer we're syncing from has a low tip but other peers are further ahead. */
+        uint32_t global_best_height = node->bestknownheight;
+        {
+            unsigned int gni;
+            for (gni = 0; gni < (unsigned int)client->nodegroup->nodes->len; gni++) {
+                dogecoin_node *gn = (dogecoin_node*)vector_idx(client->nodegroup->nodes, gni);
+                if ((gn->state & NODE_CONNECTED) && gn->bestknownheight > global_best_height)
+                    global_best_height = gn->bestknownheight;
+            }
+        }
+
         unsigned int connected_headers = 0;
         unsigned int i;
         for (i = 0; i < amount_of_headers; i++)
@@ -2003,7 +2049,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             } else {
                 if (client->header_connected) { client->header_connected(client); }
                 connected_headers++;
-                if (pindex->height >= node->bestknownheight - 5) {
+                if (pindex->height >= global_best_height - 5) {
                     client->stateflags &= ~SPV_HEADER_SYNC_FLAG;
                     client->stateflags |= SPV_FULLBLOCK_SYNC_FLAG;
                     node->state &= ~NODE_HEADERSYNC;
