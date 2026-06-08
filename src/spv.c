@@ -49,6 +49,7 @@
 
 #include <dogecoin/block.h>
 #include <dogecoin/bip37.h>
+#include <dogecoin/portable_endian.h>
 #include <dogecoin/blockchain.h>
 #include <dogecoin/compact_filter.h>
 #include <dogecoin/golomb.h>
@@ -3680,6 +3681,43 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
     return flushed;
 }
 
+/* Advance @buf past the AUXPoW chain data that follows the 80-byte standard
+ * header in a P2P headers message for AUXPoW blocks (version & 0x100).
+ * Mirrors deserialize_dogecoin_auxpow_block's buffer consumption but skips
+ * check_auxpow — PoW is guaranteed by checkpoint anchors at segment boundaries. */
+static dogecoin_bool par_hdr_skip_auxpow(struct const_buffer *buf) {
+    /* parent coinbase tx (variable length) */
+    size_t cb_len = 0;
+    dogecoin_tx *dummy = dogecoin_tx_new();
+    dogecoin_bool ok = (dogecoin_bool)dogecoin_tx_deserialize(buf->p, buf->len, dummy, &cb_len);
+    dogecoin_tx_free(dummy);
+    if (!ok || cb_len == 0 || !deser_skip(buf, cb_len)) return false;
+
+    /* parent_hash (32 bytes) */
+    if (!deser_skip(buf, 32)) return false;
+
+    /* parent merkle branch: count (varint) + count×32 bytes */
+    uint32_t merkle_count = 0;
+    if (!deser_varlen(&merkle_count, buf)) return false;
+    if (merkle_count > 0 && !deser_skip(buf, (size_t)merkle_count * 32)) return false;
+
+    /* parent_merkle_index (uint32) */
+    if (!deser_skip(buf, 4)) return false;
+
+    /* aux merkle branch: count (varint) + count×32 bytes */
+    uint32_t aux_count = 0;
+    if (!deser_varlen(&aux_count, buf)) return false;
+    if (aux_count > 0 && !deser_skip(buf, (size_t)aux_count * 32)) return false;
+
+    /* aux_merkle_index (uint32) */
+    if (!deser_skip(buf, 4)) return false;
+
+    /* parent block header: version(4) + prev_block(32) + merkle_root(32) + time(4) + bits(4) + nonce(4) */
+    if (!deser_skip(buf, 80)) return false;
+
+    return true;
+}
+
 /* Called from the DOGECOIN_MSG_HEADERS handler when par_hdr is active.
  * @buf points just past the varint that gave @count. */
 static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
@@ -3703,34 +3741,44 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         return;
     }
 
-    /* Buffer each raw 80-byte header.
+    /* Buffer each raw 80-byte standard header.
      *
      * AUXPoW blocks (version & 0x100) carry variable-length AUXPoW chain data
      * between the standard 80-byte header and the 1-byte tx_count varint in the
-     * P2P headers message.  We must deserialise on the live P2P buffer so that
-     * buf->p advances past the AUXPoW data; only the standard 80 bytes are kept
-     * in seg->buf for later flush via connect_hdr. */
+     * P2P headers message.  We copy the standard 80 bytes, advance buf by 80,
+     * then call par_hdr_skip_auxpow to consume the AUXPoW data without running
+     * check_auxpow (checkpoint anchors at segment boundaries guarantee validity). */
     for (uint32_t i = 0; i < count; i++) {
         if (buf->len < PAR_HDR_RAW_LEN) break;
 
-        const uint8_t *hdr_start = (const uint8_t *)buf->p;
+        /* Peek at version to detect AUXPoW (wire format: little-endian int32) */
+        uint32_t wire_ver;
+        memcpy(&wire_ver, buf->p, 4);
+        const dogecoin_bool is_aux = (le32toh(wire_ver) & 0x100) != 0;
 
-        /* Deserialise on the live P2P buffer — advances past AUXPoW if present */
-        dogecoin_block_header hdr;
-        if (!dogecoin_block_header_deserialize(&hdr, buf, client->chainparams, NULL)) break;
-
-        /* Grow buffer if needed */
+        /* Grow segment buffer if needed */
         if (seg->count >= seg->cap) {
             seg->cap *= 2;
             seg->buf  = dogecoin_realloc(seg->buf, (size_t)seg->cap * PAR_HDR_RAW_LEN);
         }
 
-        /* Store only the standard 80-byte header (no AUXPoW) */
-        memcpy(seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN, hdr_start, PAR_HDR_RAW_LEN);
-        seg->count++;
+        /* Copy the standard 80-byte header and advance past it */
+        memcpy(seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN, buf->p, PAR_HDR_RAW_LEN);
+        buf->p   = (const uint8_t *)buf->p + PAR_HDR_RAW_LEN;
+        buf->len -= PAR_HDR_RAW_LEN;
 
-        dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
-        seg->tip_height++;
+        /* For AUXPoW blocks, skip the variable-length chain data */
+        if (is_aux && !par_hdr_skip_auxpow(buf)) break;
+
+        /* Compute header hash from the buffered 80 bytes */
+        dogecoin_block_header hdr;
+        struct const_buffer hbuf = { seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN,
+                                     PAR_HDR_RAW_LEN };
+        if (dogecoin_block_header_deserialize(&hdr, &hbuf, client->chainparams, NULL)) {
+            dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
+            seg->tip_height++;
+        }
+        seg->count++;
 
         /* skip tx_count varint (always 0x00 in headers messages) */
         if (buf->len > 0) { buf->p = (const uint8_t *)buf->p + 1; buf->len--; }
