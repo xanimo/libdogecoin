@@ -55,6 +55,11 @@ typedef struct dogecoin_headers_db_
     dogecoin_blockindex genesis;
     dogecoin_blockindex *chaintip;
     dogecoin_blockindex *chainbottom;
+    /* Sequential scan state for dogecoin_headers_db_get_block_hash_at_height.
+     * cfheaders batches request increasing heights; resuming from the last
+     * found record avoids O(N²) re-reads over a 6.2M-block file. */
+    long     scan_resume_pos;    /**< File offset after last successful scan record */
+    uint32_t scan_resume_height; /**< Block height at scan_resume_pos */
 } dogecoin_headers_db;
 
 dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);

@@ -577,12 +577,22 @@ dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *
     }
 
     /* Slow path: scan the on-disk file.
-     * Records are written in the order they were received (roughly height order).
-     * Record layout: hash(32) + height(4 LE) + chainwork(32) + header(80) = 148 bytes. */
+     * Records are written in ascending height order (one getheaders batch at a time).
+     * Record layout: hash(32) + height(4 LE) + chainwork(32) + header(80) = 148 bytes.
+     *
+     * cfheaders batches request heights in ascending order (2000, 4000, ...).
+     * Scanning from offset 0 each time would be O(N²) over a 6M-block file.
+     * Instead, resume from the last scan position when target_height is beyond
+     * what was found before; reset to the beginning only when scanning backwards. */
     if (!db->headers_tree_file) return false;
 
     long saved_pos = ftell(db->headers_tree_file);
-    fseek(db->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET);
+
+    long start_pos = SPV_HEADERS_FILE_HDR_LEN;
+    if (db->scan_resume_height > 0 && target_height >= db->scan_resume_height)
+        start_pos = db->scan_resume_pos; /* continue forward from last find */
+
+    fseek(db->headers_tree_file, start_pos, SEEK_SET);
 
     uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
     dogecoin_bool found = false;
@@ -592,6 +602,9 @@ dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *
         h = le32toh(h);
         if (h == target_height) {
             memcpy_safe(hash_out, rec, sizeof(uint256_t));
+            /* Remember this position so the next forward lookup can skip ahead. */
+            db->scan_resume_pos    = ftell(db->headers_tree_file);
+            db->scan_resume_height = h;
             found = true;
             break;
         }
