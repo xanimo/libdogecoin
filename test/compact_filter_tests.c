@@ -53,11 +53,16 @@ static void test_compact_filter_state_lifecycle(void)
     u_assert_not_null(state->watched_scripts);
     u_assert_not_null(state->matched_block_hashes);
 
+    /* cfheaders_base_height must start at 1 (default) */
+    u_assert_uint32_eq(state->cfheaders_base_height, 1);
+
     /* reset clears tip height and awaiting flag, preserves watched_scripts */
     state->cfheaders_tip_height = 42;
+    state->cfheaders_base_height = 6238060;
     state->awaiting_response = true;
     dogecoin_compact_filter_state_reset(state);
     u_assert_uint32_eq(state->cfheaders_tip_height, 0);
+    u_assert_uint32_eq(state->cfheaders_base_height, 1);
     u_assert_true(state->awaiting_response == false);
     u_assert_not_null(state->watched_scripts);
 
@@ -357,6 +362,98 @@ static void test_cf_checkpoints_validate(void)
 }
 
 /* ================================================================ */
+/*  cfheaders_base_height cfilter indexing                         */
+/* ================================================================ */
+
+/* Verify cfilter validation indexing when cfheaders start at a height > 1.
+ * With checkpoint-based header sync, cfheaders_base_height is set to chainbottom
+ * (e.g. 6,238,060), not 1.  filter_headers[i] = filter header for block at
+ * (cfheaders_base_height + i), so the vector index is (filter_height - base). */
+static void test_cfilter_indexing_with_base_height(void)
+{
+    dogecoin_compact_filter_state *state = dogecoin_compact_filter_state_new();
+    u_assert_not_null(state);
+
+    const uint32_t base = 6238060; /* simulated chainbottom */
+    state->cfheaders_base_height = base;
+    state->cfheaders_tip_height  = base - 1;
+    state->filters_tip_height    = base - 1;
+
+    /* Synthetic genesis_filter_header: the filter header at height (base-1). */
+    uint256_t genesis_fh;
+    memset(genesis_fh, 0xAB, 32);
+    memcpy(state->genesis_filter_header, genesis_fh, 32);
+
+    /* Build 3 consecutive filter data strings (empty GCS filters). */
+    cstring *fd[3];
+    fd[0] = cstr_new_sz(0); /* height base   */
+    fd[1] = cstr_new_sz(0); /* height base+1 */
+    fd[2] = cstr_new_sz(0); /* height base+2 */
+
+    /* Compute chained filter headers. */
+    uint256_t fh[3];
+    dogecoin_compact_filter_compute_header(fd[0], genesis_fh,  fh[0]);
+    dogecoin_compact_filter_compute_header(fd[1], fh[0],       fh[1]);
+    dogecoin_compact_filter_compute_header(fd[2], fh[1],       fh[2]);
+
+    /* Populate filter_headers as if cfheaders download completed. */
+    uint32_t k;
+    for (k = 0; k < 3; k++) {
+        uint256_t *h = dogecoin_calloc(1, sizeof(uint256_t));
+        memcpy(*h, fh[k], 32);
+        vector_add(state->filter_headers, h);
+    }
+    state->cfheaders_tip_height = base + 2;
+
+    /* ------ cfilter at height (base) ------
+     * vec_idx = filter_height - base = 0
+     * prev_fh = genesis_filter_header  (filter_height <= base) */
+    {
+        uint32_t filter_height = base;
+        uint32_t vec_idx = filter_height - base;
+        u_assert_uint32_eq(vec_idx, 0);
+        u_assert_true(vec_idx < state->filter_headers->len);
+
+        uint256_t prev_fh;
+        memcpy(prev_fh, state->genesis_filter_header, 32);
+        u_assert_mem_eq(prev_fh, genesis_fh, 32);
+
+        uint256_t *expected = (uint256_t *)vector_idx(state->filter_headers, vec_idx);
+        u_assert_mem_eq(*expected, fh[0], 32);
+        u_assert_true(dogecoin_compact_filter_validate(fd[0], prev_fh, *expected));
+    }
+
+    /* ------ cfilter at height (base+1) ------
+     * vec_idx = 1, prev_fh = filter_headers[0] */
+    {
+        uint32_t filter_height = base + 1;
+        uint32_t vec_idx = filter_height - base;
+        u_assert_uint32_eq(vec_idx, 1);
+        u_assert_true(vec_idx < state->filter_headers->len);
+
+        uint32_t prev_idx = filter_height - base - 1; /* = 0 */
+        uint256_t prev_fh;
+        memcpy(prev_fh, vector_idx(state->filter_headers, prev_idx), 32);
+        u_assert_mem_eq(prev_fh, fh[0], 32);
+
+        uint256_t *expected = (uint256_t *)vector_idx(state->filter_headers, vec_idx);
+        u_assert_mem_eq(*expected, fh[1], 32);
+        u_assert_true(dogecoin_compact_filter_validate(fd[1], prev_fh, *expected));
+    }
+
+    /* ------ wrong prev_fh must fail ------
+     * Using genesis_fh as prev for height base+1 is incorrect. */
+    {
+        uint256_t *expected = (uint256_t *)vector_idx(state->filter_headers, 1);
+        u_assert_true(!dogecoin_compact_filter_validate(fd[1], genesis_fh, *expected));
+    }
+
+    uint32_t j;
+    for (j = 0; j < 3; j++) cstr_free(fd[j], true);
+    dogecoin_compact_filter_state_free(state);
+}
+
+/* ================================================================ */
 /*  Public test entry point                                         */
 /* ================================================================ */
 
@@ -374,4 +471,5 @@ void test_compact_filter(void)
     test_cf_checkpoints_get();
     test_cf_checkpoints_load();
     test_cf_checkpoints_validate();
+    test_cfilter_indexing_with_base_height();
 }

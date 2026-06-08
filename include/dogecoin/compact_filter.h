@@ -168,6 +168,7 @@ typedef struct dogecoin_compact_filter_state_ {
     uint256_t     cfheaders_tip_hash;     /**< Filter header at cfheaders_tip_height */
     vector_t     *filter_headers;         /**< Vector of verified filter headers (uint256_t*) */
     vector_t     *checkpoints;            /**< Vector of checkpoint filter headers (uint256_t*) */
+    uint32_t      cfheaders_base_height;   /**< Block height of filter_headers[0]; usually 1 or chainbottom_height */
     uint32_t      filters_tip_height;     /**< Height of last received filter */
     uint32_t      cfilter_batch_end;      /**< Last height expected in current getcfilters batch (re-request when filters_tip_height reaches this) */
     uint32_t      pending_start_height;   /**< Start of current outstanding request */

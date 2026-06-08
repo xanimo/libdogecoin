@@ -232,6 +232,7 @@ dogecoin_compact_filter_state* dogecoin_compact_filter_state_new(void) {
     dogecoin_mem_zero(state->genesis_filter_header, sizeof(uint256_t));
     state->filter_headers = vector_new(4096, dogecoin_free);
     state->checkpoints = vector_new(64, dogecoin_free);
+    state->cfheaders_base_height = 1;
     state->filters_tip_height = 0;
     state->cfilter_batch_end = 0;
     state->pending_start_height = 0;
@@ -278,6 +279,7 @@ void dogecoin_compact_filter_state_reset(dogecoin_compact_filter_state *state) {
         vector_free(state->checkpoints, true);
         state->checkpoints = vector_new(64, dogecoin_free);
     }
+    state->cfheaders_base_height = 1;
     state->filters_tip_height = 0;
     state->pending_start_height = 0;
     dogecoin_mem_zero(state->pending_stop_hash, sizeof(uint256_t));

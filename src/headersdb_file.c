@@ -559,6 +559,49 @@ dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db) {
 }
 
 /**
+ * Find a block hash by height, first in the in-memory prev chain and then by
+ * scanning the on-disk header file.  Used by the BIP157 cfheaders batcher to
+ * compute a valid stop_hash without needing a height-indexed block index.
+ */
+dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *db, uint32_t target_height, uint256_t hash_out)
+{
+    if (!db) return false;
+
+    /* Fast path: walk the in-memory prev chain (works for the last max_hdr_in_mem entries) */
+    dogecoin_blockindex *bi = db->chaintip;
+    while (bi && (uint32_t)bi->height > target_height)
+        bi = bi->prev;
+    if (bi && (uint32_t)bi->height == target_height) {
+        memcpy_safe(hash_out, bi->hash, sizeof(uint256_t));
+        return true;
+    }
+
+    /* Slow path: scan the on-disk file.
+     * Records are written in the order they were received (roughly height order).
+     * Record layout: hash(32) + height(4 LE) + chainwork(32) + header(80) = 148 bytes. */
+    if (!db->headers_tree_file) return false;
+
+    long saved_pos = ftell(db->headers_tree_file);
+    fseek(db->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET);
+
+    uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+    dogecoin_bool found = false;
+    while (fread(rec, SPV_HEADERS_FILE_REC_LEN, 1, db->headers_tree_file) == 1) {
+        uint32_t h;
+        memcpy(&h, rec + 32, 4); /* height field is at offset 32 (after the hash) */
+        h = le32toh(h);
+        if (h == target_height) {
+            memcpy_safe(hash_out, rec, sizeof(uint256_t));
+            found = true;
+            break;
+        }
+    }
+
+    fseek(db->headers_tree_file, saved_pos, SEEK_SET);
+    return found;
+}
+
+/**
  * Set the checkpoint block to the given hash and height
  *
  * @param db The headers database.

@@ -68,6 +68,20 @@ dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db);
 void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, arith_uint256 chainwork);
 
+/**
+ * @brief Find the block hash stored at a specific height in the on-disk header file.
+ *
+ * Scans the headers.db file from its beginning, reading fixed-size records until
+ * the one with @p target_height is found.  Falls back to walking the in-memory
+ * prev-chain first for blocks near the chain tip (no file I/O needed there).
+ *
+ * @param db          The headers database (file handle must be open).
+ * @param target_height  Block height to look up.
+ * @param hash_out    Receives the 32-byte block hash on success.
+ * @return true if found and @p hash_out is populated.
+ */
+dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *db, uint32_t target_height, uint256_t hash_out);
+
 /* Defined in headersdb_file.c using typed trampolines (avoids the
  * function-pointer-cast UB that -fsanitize=function flags). */
 extern const dogecoin_headers_db_interface dogecoin_headers_db_interface_file;
