@@ -3636,11 +3636,25 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
             dogecoin_blockindex *pindex =
                 client->headers_db->connect_hdr(client->headers_db_ctx, &cbuf, false, &connected);
             if (!connected) {
-                if (bad == 0 && client->nodegroup && client->nodegroup->log_write_cb)
+                if (bad == 0 && client->nodegroup && client->nodegroup->log_write_cb) {
+                    /* Decode prev_block from the raw header for diagnostics */
+                    const uint8_t *raw = seg->buf + (size_t)j * PAR_HDR_RAW_LEN;
+                    /* Standard header layout: version(4) + prev_block(32) */
+                    char prev_hex[65] = {0};
+                    for (int _k = 0; _k < 32; _k++)
+                        snprintf(prev_hex + _k*2, 3, "%02x", raw[4 + (31-_k)]);
+                    char tip_hex[65] = {0};
+                    if (hdb && hdb->chaintip)
+                        for (int _k = 0; _k < 32; _k++)
+                            snprintf(tip_hex + _k*2, 3, "%02x", ((uint8_t*)hdb->chaintip->hash)[_k]);
                     client->nodegroup->log_write_cb(
-                        "[par-hdr] segment %u: first connect failure at j=%u (chaintip=%d)\n",
+                        "[par-hdr] segment %u: first connect failure at j=%u\n"
+                        "  chaintip  height=%d hash=%s\n"
+                        "  prev_block in hdr=%s\n",
                         s->flush_idx, j,
-                        hdb && hdb->chaintip ? (int)hdb->chaintip->height : -1);
+                        hdb && hdb->chaintip ? (int)hdb->chaintip->height : -1, tip_hex,
+                        prev_hex);
+                }
                 bad++;
                 dogecoin_free(pindex); /* orphan — not in DB */
             } else {
