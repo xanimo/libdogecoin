@@ -809,18 +809,22 @@ int main(int argc, char* argv[]) {
             dogecoin_free(header_type_prefix);
             if (headers_name) {
                 // Load headers file name with headers name:
+                if (genesis_headers && !in_memory_headers) remove(dbfile ? dbfile : headers_name);
                 response = dogecoin_spv_client_load(client, (dbfile ? dbfile : headers_name), prompt);
             } else {
                 // Otherwise, use default headers file name:
+                if (genesis_headers && !in_memory_headers) remove(dbfile ? dbfile : headersfile);
                 response = dogecoin_spv_client_load(client, (dbfile ? dbfile : headersfile), prompt);
             }
         }
         else if (headers_name) {
             // Load headers file name with headers name:
+            if (genesis_headers && !in_memory_headers) remove(dbfile ? dbfile : headers_name);
             response = dogecoin_spv_client_load(client, (dbfile ? dbfile : headers_name), prompt);
         } else {
             // Otherwise, use default headers file name:
             headersfile = concat(header_prefix, header_suffix);
+            if (genesis_headers && !in_memory_headers) remove(dbfile ? dbfile : headersfile);
             response = dogecoin_spv_client_load(client, (dbfile ? dbfile : headersfile), prompt);
         }
 

@@ -3457,25 +3457,33 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
     }
     if (!cnt) return NULL;
 
+    /* arr[0] is the genesis entry (height=0) — it is the start anchor for the
+     * first segment, not an endpoint to download toward.  Skip it so segment 0
+     * covers the range genesis..arr[1] instead of the degenerate 0..0 range. */
+    size_t start_i = (cnt > 0 && arr[0].height == 0) ? 1 : 0;
+    size_t num_segs = cnt - start_i;
+    if (!num_segs) return NULL;
+
     par_hdr_state *s = dogecoin_calloc(1, sizeof(par_hdr_state));
-    s->segs = dogecoin_calloc(cnt, sizeof(par_hdr_seg));
-    s->num_segs = (uint32_t)cnt;
+    s->segs = dogecoin_calloc(num_segs, sizeof(par_hdr_seg));
+    s->num_segs = (uint32_t)num_segs;
     s->active = true;
 
-    for (uint32_t i = 0; i < (uint32_t)cnt; i++) {
+    for (uint32_t i = 0; i < (uint32_t)num_segs; i++) {
+        uint32_t arr_i = (uint32_t)(start_i + i);
         par_hdr_seg *seg = &s->segs[i];
 
-        /* stop = checkpoint[i] */
-        seg->stop_height = arr[i].height;
-        utils_uint256_sethex((char *)arr[i].hash, seg->stop_hash);
+        /* stop = checkpoint[arr_i] */
+        seg->stop_height = arr[arr_i].height;
+        utils_uint256_sethex((char *)arr[arr_i].hash, seg->stop_hash);
 
-        /* start = checkpoint[i-1] (or genesis for first segment) */
+        /* start = genesis when i==0, else checkpoint[arr_i-1] */
         if (i == 0) {
             seg->start_height = 0;
             memcpy(seg->start_hash, params->genesisblockhash, sizeof(uint256_t));
         } else {
-            seg->start_height = arr[i - 1].height;
-            utils_uint256_sethex((char *)arr[i - 1].hash, seg->start_hash);
+            seg->start_height = arr[arr_i - 1].height;
+            utils_uint256_sethex((char *)arr[arr_i - 1].hash, seg->start_hash);
         }
 
         seg->node_id    = -1;
@@ -3564,10 +3572,6 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
             dogecoin_blockindex *pindex =
                 client->headers_db->connect_hdr(client->headers_db_ctx, &cbuf, false, &connected);
             if (!connected) {
-                if (client->nodegroup && client->nodegroup->log_write_cb)
-                    client->nodegroup->log_write_cb(
-                        "[par-hdr] flush: header %u in segment %u failed to connect\n",
-                        j, s->flush_idx);
                 bad++;
                 dogecoin_free(pindex); /* orphan — not in DB */
             } else {
