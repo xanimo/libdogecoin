@@ -3372,6 +3372,16 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
     uint32_t data_len)
 {
     if (!client || !data || data_len == 0) return false;
+
+    /* BIP157: populate watched_scripts for compact filter matching */
+    if (client->compact_filters_enabled && client->cfilter_state &&
+        client->cfilter_state->watched_scripts) {
+        cstring *script = cstr_new_buf(data, data_len);
+        if (script)
+            vector_add(client->cfilter_state->watched_scripts, script);
+        return true;  /* skip BIP37 bloom filter and P2P FILTERADD when using compact filters */
+    }
+
     if (client->bloom_filter && client->bloom_filter_len > 0) {
         dogecoin_bip37_filter local_filter;
         memset(&local_filter, 0, sizeof(local_filter));
@@ -3381,12 +3391,6 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
         local_filter.n_tweak = client->bloom_ntweak;
         local_filter.n_flags = client->bloom_flags;
         dogecoin_bip37_filter_add(&local_filter, data, data_len);
-    }
-    if (client->compact_filters_enabled && client->cfilter_state &&
-        client->cfilter_state->watched_scripts) {
-        cstring *script = cstr_new_buf(data, data_len);
-        if (script)
-            vector_add(client->cfilter_state->watched_scripts, script);
     }
     if (!client->nodegroup || !client->nodegroup->nodes) return true;
 
@@ -3604,6 +3608,14 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
     par_hdr_state *s = client->par_hdr;
     uint32_t flushed = 0;
 
+    /* Batch-optimise writes: suppress per-record fdatasync and skip scrypt
+     * PoW verification.  Segments are checkpoint-anchored so the chain is
+     * implicitly validated.  A single fsync at the end suffices. */
+    dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
+    dogecoin_bool prev_batch = hdb ? hdb->batch_write : false;
+    dogecoin_bool prev_skip  = hdb ? hdb->skip_pow    : false;
+    if (hdb) { hdb->batch_write = true; hdb->skip_pow = true; }
+
     while (s->flush_idx < s->num_segs && s->segs[s->flush_idx].complete &&
            !s->segs[s->flush_idx].flushed) {
         par_hdr_seg *seg = &s->segs[s->flush_idx];
@@ -3624,6 +3636,11 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
             dogecoin_blockindex *pindex =
                 client->headers_db->connect_hdr(client->headers_db_ctx, &cbuf, false, &connected);
             if (!connected) {
+                if (bad == 0 && client->nodegroup && client->nodegroup->log_write_cb)
+                    client->nodegroup->log_write_cb(
+                        "[par-hdr] segment %u: first connect failure at j=%u (chaintip=%d)\n",
+                        s->flush_idx, j,
+                        hdb && hdb->chaintip ? (int)hdb->chaintip->height : -1);
                 bad++;
                 dogecoin_free(pindex); /* orphan — not in DB */
             } else {
@@ -3638,6 +3655,13 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         flushed++;
 
         if (bad) break; /* stop flushing if chain broke; caller handles */
+    }
+
+    if (hdb) {
+        hdb->batch_write = prev_batch;
+        hdb->skip_pow    = prev_skip;
+        if (flushed > 0 && hdb->headers_tree_file)
+            dogecoin_file_commit(hdb->headers_tree_file);
     }
     return flushed;
 }

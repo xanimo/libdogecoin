@@ -60,6 +60,8 @@ typedef struct dogecoin_headers_db_
      * found record avoids O(N²) re-reads over a 6.2M-block file. */
     long     scan_resume_pos;    /**< File offset after last successful scan record */
     uint32_t scan_resume_height; /**< Block height at scan_resume_pos */
+    dogecoin_bool batch_write;   /**< Suppress per-record fdatasync; caller must commit after */
+    dogecoin_bool skip_pow;      /**< Skip scrypt PoW verify (for checkpoint-anchored bulk loads) */
 } dogecoin_headers_db;
 
 dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);
