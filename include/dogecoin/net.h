@@ -102,6 +102,12 @@ typedef struct dogecoin_node_ {
     unsigned int bestknownheight;
 
     uint32_t hints; /* can be use for user defined state */
+
+    /* BIP157 parallel cfilter worker state.
+     * cf_batch_end == 0 means no batch is assigned yet. */
+    uint32_t cf_batch_start;   /* first height in current getcfilters batch */
+    uint32_t cf_batch_end;     /* last height in current getcfilters batch */
+    uint32_t cf_cur_height;    /* next expected cfilter height from this node */
 } dogecoin_node;
 
 /* =================================== */

@@ -242,6 +242,10 @@ dogecoin_compact_filter_state* dogecoin_compact_filter_state_new(void) {
     state->watched_scripts = vector_new(16, cstr_free_void);
     state->matched_block_hashes = vector_new(64, dogecoin_free);
     state->matched_blocks_fetched = 0;
+    state->par_num_workers = 0;
+    state->par_next_height = 0;
+    state->par_flush_height = 0;
+    state->par_bufs = NULL;
     return state;
 }
 
@@ -262,6 +266,24 @@ void dogecoin_compact_filter_state_free(dogecoin_compact_filter_state *state) {
     if (state->matched_block_hashes) {
         vector_free(state->matched_block_hashes, true);
         state->matched_block_hashes = NULL;
+    }
+    if (state->par_bufs) {
+        uint8_t pi;
+        for (pi = 0; pi < state->par_num_workers; pi++) {
+            cf_par_buf *b = &state->par_bufs[pi];
+            if (b->records) {
+                uint32_t cnt = (b->batch_end >= b->batch_start) ? (b->batch_end - b->batch_start + 1) : 0;
+                uint32_t ri;
+                for (ri = 0; ri < cnt; ri++) {
+                    if (b->records[ri].filter_data)
+                        cstr_free(b->records[ri].filter_data, true);
+                }
+                dogecoin_free(b->records);
+                b->records = NULL;
+            }
+        }
+        dogecoin_free(state->par_bufs);
+        state->par_bufs = NULL;
     }
     dogecoin_free(state);
 }
@@ -291,6 +313,28 @@ void dogecoin_compact_filter_state_reset(dogecoin_compact_filter_state *state) {
         state->matched_block_hashes = vector_new(64, dogecoin_free);
     }
     state->matched_blocks_fetched = 0;
+    /* Reset parallel state but keep par_num_workers and par_bufs allocation */
+    state->par_next_height = 0;
+    state->par_flush_height = 0;
+    if (state->par_bufs) {
+        uint8_t pi;
+        for (pi = 0; pi < state->par_num_workers; pi++) {
+            cf_par_buf *b = &state->par_bufs[pi];
+            if (b->records) {
+                uint32_t cnt = (b->batch_end >= b->batch_start) ? (b->batch_end - b->batch_start + 1) : 0;
+                uint32_t ri;
+                for (ri = 0; ri < cnt; ri++) {
+                    if (b->records[ri].filter_data)
+                        cstr_free(b->records[ri].filter_data, true);
+                }
+                dogecoin_free(b->records);
+                b->records = NULL;
+            }
+            b->node_id = -1;
+            b->received = 0;
+            b->complete = false;
+        }
+    }
 }
 
 /* ================================================================ */

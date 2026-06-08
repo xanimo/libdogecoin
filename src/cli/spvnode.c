@@ -205,6 +205,7 @@ static struct option long_options[] = {
         {"export_cfcheckpts", no_argument, NULL, 'o'},
         {"filter_hash_db", required_argument, NULL, 'F'},
         {"cf_from_genesis", no_argument, NULL, 'G'},
+        {"cf_workers", required_argument, NULL, 'W'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -487,6 +488,7 @@ int main(int argc, char* argv[]) {
     dogecoin_bool export_cfcheckpts = false;
     char* filter_hash_db = NULL;
     dogecoin_bool cf_from_genesis = false;
+    int cf_workers = 0;
     int selected_checkpoint_index = -1;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -496,7 +498,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:G", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:GW:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -588,6 +590,9 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'G':
                     cf_from_genesis = true;
+                    break;
+                case 'W':
+                    cf_workers = atoi(optarg);
                     break;
                 default:
                     print_usage();
@@ -840,6 +845,11 @@ int main(int argc, char* argv[]) {
             printf("[bip157] filter download will start from genesis (height 1)\n");
         }
 
+        if (cf_workers > 1) {
+            client->cf_num_workers = (uint8_t)(cf_workers > 8 ? 8 : cf_workers);
+            printf("[bip157-par] parallel cfilter workers: %u\n", (unsigned int)client->cf_num_workers);
+        }
+
         if (!response) {
             printf("Could not load or create headers database...aborting\n");
 #if WITH_WALLET
@@ -913,7 +923,27 @@ int main(int argc, char* argv[]) {
             }
             printf("done\n");
             printf("Discover peers...\n");
-            dogecoin_spv_client_discover_peers(client, ips);
+
+            /* For parallel cfilter download: build N connections to the same host.
+             * Each independent TCP connection becomes one parallel worker. */
+            char *par_ips = NULL;
+            if (client->cf_num_workers > 1 && ips) {
+                size_t host_len = strlen(ips);
+                size_t n = client->cf_num_workers;
+                /* "host,host,host..." = n*(host_len+1) - 1 chars + NUL */
+                par_ips = (char *)dogecoin_calloc(n * (host_len + 1) + 1, 1);
+                if (par_ips) {
+                    size_t wi;
+                    for (wi = 0; wi < n; wi++) {
+                        if (wi > 0) strcat(par_ips, ",");
+                        strcat(par_ips, ips);
+                    }
+                    client->nodegroup->desired_amount_connected_nodes = (int)n;
+                    printf("[bip157-par] connecting %u workers to %s\n", (unsigned int)n, ips);
+                }
+            }
+            dogecoin_spv_client_discover_peers(client, par_ips ? par_ips : ips);
+            dogecoin_free(par_ips);
 
             printf("Connecting to the p2p network...\n");
             printf("Press CTRL+C or send SIGINT/SIGTERM to disconnect.\n");

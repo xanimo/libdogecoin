@@ -128,6 +128,148 @@ static uint32_t spv_elapsed(const dogecoin_spv_client *client) {
     return (uint32_t)((uint64_t)time(NULL) - client->start_ts);
 }
 
+/* ------------------------------------------------------------------ */
+/* Assign the next getcfilters batch to a parallel worker node.        */
+/* Returns true if a batch was assigned and getcfilters was sent.      */
+/* ------------------------------------------------------------------ */
+static dogecoin_bool spv_cf_par_assign(dogecoin_spv_client *client, dogecoin_node *node)
+{
+    dogecoin_compact_filter_state *cfstate = client->cfilter_state;
+    uint32_t start = cfstate->par_next_height;
+    uint32_t tip   = cfstate->cfheaders_tip_height;
+
+    if (start > tip) return false;
+
+    /* Find a free slot */
+    int slot = -1;
+    uint8_t pi;
+    for (pi = 0; pi < cfstate->par_num_workers; pi++) {
+        if (cfstate->par_bufs[pi].node_id == -1) { slot = (int)pi; break; }
+    }
+    if (slot < 0) return false;
+
+    uint32_t end = start + MAX_GETCFILTERS_SIZE - 1;
+    if (end > tip) end = tip;
+
+    uint32_t count = end - start + 1;
+    cf_par_buf *buf = &cfstate->par_bufs[slot];
+    buf->node_id    = node->nodeid;
+    buf->batch_start = start;
+    buf->batch_end   = end;
+    buf->received    = 0;
+    buf->complete    = false;
+    buf->records     = (cf_par_record *)dogecoin_calloc(count, sizeof(cf_par_record));
+    if (!buf->records) { buf->node_id = -1; return false; }
+
+    node->cf_batch_start = start;
+    node->cf_batch_end   = end;
+    node->cf_cur_height  = start;
+    cfstate->par_next_height = end + 1;
+
+    /* Resolve stop hash */
+    uint256_t stop_hash;
+    dogecoin_blockindex *tip_bi = client->headers_db->getchaintip(client->headers_db_ctx);
+    if (tip_bi && end == (uint32_t)tip_bi->height) {
+        memcpy(stop_hash, tip_bi->hash, 32);
+    } else {
+        dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
+        if (!dogecoin_headers_db_get_block_hash_at_height(hdb, end, stop_hash)) {
+            dogecoin_bool aux_found = false;
+            if (client->aux_hash_db && client->aux_hash_db_ctx) {
+                dogecoin_headers_db *aux = (dogecoin_headers_db *)client->aux_hash_db_ctx;
+                aux_found = dogecoin_headers_db_get_block_hash_at_height(aux, end, stop_hash);
+            }
+            if (!aux_found && tip_bi) memcpy(stop_hash, tip_bi->hash, 32);
+        }
+    }
+
+    dogecoin_getcfilters_msg gcf_msg;
+    gcf_msg.filter_type  = GCS_BASIC_FILTER_TYPE;
+    gcf_msg.start_height = start;
+    memcpy(gcf_msg.stop_hash, stop_hash, 32);
+
+    cstring *payload = cstr_new_sz(64);
+    dogecoin_p2p_msg_getcfilters_ser(&gcf_msg, payload);
+    cstring *p2pmsg = dogecoin_p2p_message_new(
+        node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETCFILTERS,
+        payload->str, payload->len);
+    cstr_free(payload, true);
+    dogecoin_node_send(node, p2pmsg);
+    cstr_free(p2pmsg, true);
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[bip157-par] node %d: getcfilters [%u..%u] [%us elapsed]\n",
+            node->nodeid, start, end, spv_elapsed(client));
+    return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* Flush contiguous complete batches to disk in height order.          */
+/* ------------------------------------------------------------------ */
+static void spv_cf_par_try_flush(dogecoin_spv_client *client)
+{
+    dogecoin_compact_filter_state *cfstate = client->cfilter_state;
+    uint8_t n = cfstate->par_num_workers;
+    dogecoin_bool flushed;
+
+    do {
+        flushed = false;
+        uint8_t pi;
+        for (pi = 0; pi < n; pi++) {
+            cf_par_buf *buf = &cfstate->par_bufs[pi];
+            if (buf->node_id == -1 || !buf->complete) continue;
+            if (buf->batch_start != cfstate->par_flush_height) continue;
+
+            /* Flush this batch sequentially */
+            uint32_t count = buf->batch_end - buf->batch_start + 1;
+            uint32_t ri;
+            for (ri = 0; ri < count; ri++) {
+                uint32_t h = buf->batch_start + ri;
+                cf_par_record *rec = &buf->records[ri];
+                if (rec->filter_data) {
+                    if (client->cfilters_db)
+                        dogecoin_cfilters_db_write(client->cfilters_db, h,
+                                                   rec->block_hash, rec->filter_data);
+                    cstr_free(rec->filter_data, true);
+                    rec->filter_data = NULL;
+                }
+            }
+
+            cfstate->filters_tip_height = buf->batch_end;
+            cfstate->par_flush_height   = buf->batch_end + 1;
+
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[bip157-par] flushed [%u..%u], progress %u/%u [%us elapsed]\n",
+                    buf->batch_start, buf->batch_end,
+                    buf->batch_end, cfstate->cfheaders_tip_height,
+                    spv_elapsed(client));
+
+            dogecoin_free(buf->records);
+            buf->records  = NULL;
+            buf->node_id  = -1;
+            buf->complete = false;
+            flushed = true;
+            break;
+        }
+    } while (flushed);
+
+    if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[bip157] all filters processed: %u matched blocks [%us elapsed]\n",
+                (unsigned int)cfstate->matched_block_hashes->len, spv_elapsed(client));
+        cfstate->awaiting_response = false;
+        client->stateflags &= ~SPV_CFILTER_SYNC_FLAG;
+        if (!client->called_sync_completed && client->sync_completed) {
+            if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
+            client->sync_completed(client);
+            client->called_sync_completed = true;
+        }
+    }
+}
+
 static dogecoin_bool spv_lookup_headersdb_height_by_hash(dogecoin_spv_client* client,
                                                          const uint8_t hash[32],
                                                          uint32_t* out_height)
@@ -615,6 +757,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->aux_hash_db_ctx = NULL;
     client->aux_hash_db = NULL;
     client->cf_start_height = 0;
+    client->cf_num_workers = 0;
 
     return client;
 }
@@ -2246,9 +2389,37 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         cfilter_msg.filter_type,
                         (unsigned int)(cfilter_msg.filter_data ? cfilter_msg.filter_data->len : 0));
 
-                if (cfstate->filters_tip_height < cfstate->cfheaders_tip_height &&
-                    cfilter_msg.filter_data) {
-                    uint32_t filter_height = cfstate->filters_tip_height + 1;
+                if (cfilter_msg.filter_data) {
+                    dogecoin_bool parallel = (cfstate->par_num_workers > 1);
+
+                    /* Determine the height this cfilter corresponds to. */
+                    uint32_t filter_height;
+                    cf_par_buf *par_buf = NULL;
+
+                    if (parallel) {
+                        /* Per-node height tracking: validate node has an active batch */
+                        if (node->cf_batch_end == 0 ||
+                            node->cf_cur_height > node->cf_batch_end) {
+                            /* Stale or unassigned — drop */
+                            goto cfilter_handler_done;
+                        }
+                        filter_height = node->cf_cur_height;
+                        node->cf_cur_height++;
+
+                        /* Find the buffer for this node */
+                        uint8_t pi;
+                        for (pi = 0; pi < cfstate->par_num_workers; pi++) {
+                            if (cfstate->par_bufs[pi].node_id == node->nodeid) {
+                                par_buf = &cfstate->par_bufs[pi];
+                                break;
+                            }
+                        }
+                        if (!par_buf) goto cfilter_handler_done;
+                    } else {
+                        if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height)
+                            goto cfilter_handler_done;
+                        filter_height = cfstate->filters_tip_height + 1;
+                    }
 
                     /*
                      * filter_headers[i] = filter header for block at height (cfheaders_base_height + i).
@@ -2275,62 +2446,100 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         uint256_t *expected_fh = (uint256_t *)vector_idx(cfstate->filter_headers, vec_idx);
 
                         if (dogecoin_compact_filter_validate(cfilter_msg.filter_data, prev_fh, *expected_fh)) {
-                            cfstate->filters_tip_height = filter_height;
+                            if (parallel) {
+                                /* Buffer the validated record; disk flush happens in-order via spv_cf_par_try_flush */
+                                uint32_t offset = filter_height - par_buf->batch_start;
+                                cf_par_record *rec = &par_buf->records[offset];
+                                rec->filter_data = cstr_new_buf(cfilter_msg.filter_data->str,
+                                                                cfilter_msg.filter_data->len);
+                                memcpy(rec->block_hash, cfilter_msg.block_hash, 32);
 
-                            /* Print filter hash for visibility */
-                            uint256_t filter_hash_vis;
-                            dogecoin_hash((const unsigned char *)cfilter_msg.filter_data->str,
-                                          cfilter_msg.filter_data->len, filter_hash_vis);
-                            char *fh_hex  = utils_uint8_to_hex(filter_hash_vis, 32);
-                            char *hdr_hex = utils_uint8_to_hex(*expected_fh, 32);
-                            printf("[bip157] height=%u  filter_hash=%s  filter_header=%s  data_len=%u\n",
-                                filter_height, fh_hex, hdr_hex,
-                                (unsigned int)cfilter_msg.filter_data->len);
-                            fflush(stdout);
-
-                            /* Match watched scripts against this filter */
-                            if (cfstate->watched_scripts && cfstate->watched_scripts->len > 0) {
-                                gcs_filter *gcs = gcs_filter_new();
-                                struct const_buffer fbuf = { cfilter_msg.filter_data->str, cfilter_msg.filter_data->len };
-                                if (gcs_filter_deserialize(gcs, cfilter_msg.filter_type, cfilter_msg.block_hash, &fbuf)) {
-                                    if (gcs_filter_match_any(gcs, cfstate->watched_scripts)) {
-                                        if (client->nodegroup && client->nodegroup->log_write_cb)
-                                            client->nodegroup->log_write_cb("[bip157] MATCH at height %u\n", filter_height);
-                                        uint256_t *matched_hash = dogecoin_calloc(1, sizeof(uint256_t));
-                                        memcpy(matched_hash, cfilter_msg.block_hash, sizeof(uint256_t));
-                                        vector_add(cfstate->matched_block_hashes, matched_hash);
+                                /* Match watched scripts now (before buffering loses the data reference) */
+                                if (cfstate->watched_scripts && cfstate->watched_scripts->len > 0) {
+                                    gcs_filter *gcs = gcs_filter_new();
+                                    struct const_buffer fbuf = { cfilter_msg.filter_data->str,
+                                                                  cfilter_msg.filter_data->len };
+                                    if (gcs_filter_deserialize(gcs, cfilter_msg.filter_type,
+                                                                cfilter_msg.block_hash, &fbuf)) {
+                                        if (gcs_filter_match_any(gcs, cfstate->watched_scripts)) {
+                                            if (client->nodegroup && client->nodegroup->log_write_cb)
+                                                client->nodegroup->log_write_cb(
+                                                    "[bip157] MATCH at height %u\n", filter_height);
+                                            uint256_t *matched_hash = dogecoin_calloc(1, sizeof(uint256_t));
+                                            memcpy(matched_hash, cfilter_msg.block_hash, sizeof(uint256_t));
+                                            vector_add(cfstate->matched_block_hashes, matched_hash);
+                                        }
                                     }
+                                    gcs_filter_free(gcs);
                                 }
-                                gcs_filter_free(gcs);
+
+                                par_buf->received++;
+                                if (par_buf->received == par_buf->batch_end - par_buf->batch_start + 1) {
+                                    par_buf->complete = true;
+                                    spv_cf_par_try_flush(client);
+                                    /* Get next batch for this worker (no-op if all work assigned) */
+                                    spv_cf_par_assign(client, node);
+                                }
+                            } else {
+                                /* Sequential mode: write immediately */
+                                cfstate->filters_tip_height = filter_height;
+
+                                if (client->cfilters_db)
+                                    dogecoin_cfilters_db_write(client->cfilters_db,
+                                                               filter_height,
+                                                               cfilter_msg.block_hash,
+                                                               cfilter_msg.filter_data);
+
+                                /* Match watched scripts */
+                                if (cfstate->watched_scripts && cfstate->watched_scripts->len > 0) {
+                                    gcs_filter *gcs = gcs_filter_new();
+                                    struct const_buffer fbuf = { cfilter_msg.filter_data->str,
+                                                                  cfilter_msg.filter_data->len };
+                                    if (gcs_filter_deserialize(gcs, cfilter_msg.filter_type,
+                                                                cfilter_msg.block_hash, &fbuf)) {
+                                        if (gcs_filter_match_any(gcs, cfstate->watched_scripts)) {
+                                            if (client->nodegroup && client->nodegroup->log_write_cb)
+                                                client->nodegroup->log_write_cb(
+                                                    "[bip157] MATCH at height %u\n", filter_height);
+                                            uint256_t *matched_hash = dogecoin_calloc(1, sizeof(uint256_t));
+                                            memcpy(matched_hash, cfilter_msg.block_hash, sizeof(uint256_t));
+                                            vector_add(cfstate->matched_block_hashes, matched_hash);
+                                        }
+                                    }
+                                    gcs_filter_free(gcs);
+                                }
+
+                                /* Request next batch when current is consumed */
+                                dogecoin_blockindex *cf_tip =
+                                    client->headers_db->getchaintip(client->headers_db_ctx);
+                                if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height) {
+                                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                                        client->nodegroup->log_write_cb(
+                                            "[bip157] all filters processed: %u matched blocks [%us elapsed]\n",
+                                            (unsigned int)cfstate->matched_block_hashes->len,
+                                            spv_elapsed(client));
+                                    cfstate->awaiting_response = false;
+                                    client->stateflags &= ~SPV_CFILTER_SYNC_FLAG;
+                                    if (!client->called_sync_completed && client->sync_completed) {
+                                        if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
+                                        client->sync_completed(client);
+                                        client->called_sync_completed = true;
+                                    }
+                                } else if (cfstate->filters_tip_height >= cfstate->cfilter_batch_end) {
+                                    cfstate->awaiting_response = false;
+                                    dogecoin_spv_request_cfilters(client, node,
+                                        cfstate->filters_tip_height + 1, cf_tip->hash);
+                                }
                             }
                         } else {
                             if (client->nodegroup && client->nodegroup->log_write_cb)
-                                client->nodegroup->log_write_cb("[bip157] filter at height %u FAILED validation\n", filter_height);
+                                client->nodegroup->log_write_cb(
+                                    "[bip157] filter at height %u FAILED validation\n", filter_height);
                             dogecoin_node_misbehave(node);
                         }
                     }
                 }
-
-                /* Only request the next batch once the current batch is consumed.
-                 * A single getcfilters sends at most MAX_GETCFILTERS_SIZE cfilters; re-requesting
-                 * after every individual cfilter would create a storm of redundant requests. */
-                dogecoin_blockindex *cf_tip = client->headers_db->getchaintip(client->headers_db_ctx);
-                if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height) {
-                    if (client->nodegroup && client->nodegroup->log_write_cb)
-                        client->nodegroup->log_write_cb("[bip157] all filters processed: %u matched blocks [%us elapsed]\n",
-                            (unsigned int)cfstate->matched_block_hashes->len, spv_elapsed(client));
-                    cfstate->awaiting_response = false;
-                    client->stateflags &= ~SPV_CFILTER_SYNC_FLAG;
-                    if (!client->called_sync_completed && client->sync_completed) {
-                        if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
-                        client->sync_completed(client);
-                        client->called_sync_completed = true;
-                    }
-                } else if (cfstate->filters_tip_height >= cfstate->cfilter_batch_end) {
-                    cfstate->awaiting_response = false;
-                    dogecoin_spv_request_cfilters(client, node, cfstate->filters_tip_height + 1, cf_tip->hash);
-                }
-                /* else: mid-batch — more cfilters are coming, do not re-request yet */
+                cfilter_handler_done:;
             } else {
                 if (client->nodegroup && client->nodegroup->log_write_cb)
                     client->nodegroup->log_write_cb("[bip157] failed to deserialize cfilter from node %d\n", node->nodeid);
@@ -2427,13 +2636,41 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     } else {
                         if (client->nodegroup && client->nodegroup->log_write_cb)
                             client->nodegroup->log_write_cb("[bip157] all cfheaders received, starting cfilter download\n");
-                        /* Start cfilter scan from the same height cfheaders started from —
-                         * which is chainbottom_height when checkpoint-based header sync is used. */
-                        {
-                            dogecoin_headers_db *hdb_cf = (dogecoin_headers_db *)client->headers_db_ctx;
-                            uint32_t cf_scan_start = 1;
-                            if (hdb_cf && hdb_cf->chainbottom && hdb_cf->chainbottom->height > 0)
-                                cf_scan_start = hdb_cf->chainbottom->height;
+
+                        dogecoin_headers_db *hdb_cf = (dogecoin_headers_db *)client->headers_db_ctx;
+                        uint32_t cf_scan_start = 1;
+                        if (hdb_cf && hdb_cf->chainbottom && hdb_cf->chainbottom->height > 0)
+                            cf_scan_start = hdb_cf->chainbottom->height;
+
+                        if (client->cf_num_workers > 1) {
+                            /* Parallel mode: assign batches to all connected nodes */
+                            cfstate->par_num_workers = client->cf_num_workers;
+                            cfstate->par_next_height  = cf_scan_start;
+                            cfstate->par_flush_height = cf_scan_start;
+                            cfstate->filters_tip_height = (cf_scan_start > 1) ? cf_scan_start - 1 : 0;
+
+                            if (!cfstate->par_bufs) {
+                                cfstate->par_bufs = (cf_par_buf *)dogecoin_calloc(
+                                    cfstate->par_num_workers, sizeof(cf_par_buf));
+                                uint8_t pi;
+                                for (pi = 0; pi < cfstate->par_num_workers; pi++)
+                                    cfstate->par_bufs[pi].node_id = -1;
+                            }
+
+                            if (client->nodegroup && client->nodegroup->log_write_cb)
+                                client->nodegroup->log_write_cb(
+                                    "[bip157-par] assigning %u parallel workers from height %u\n",
+                                    (unsigned int)cfstate->par_num_workers, cf_scan_start);
+
+                            unsigned int ni;
+                            for (ni = 0; ni < client->nodegroup->nodes->len; ni++) {
+                                dogecoin_node *wn = (dogecoin_node *)vector_idx(client->nodegroup->nodes, ni);
+                                if (!wn || !(wn->state & NODE_CONNECTED) || !wn->version_handshake)
+                                    continue;
+                                spv_cf_par_assign(client, wn);
+                            }
+                        } else {
+                            /* Sequential mode: single node, existing path */
                             cfstate->filters_tip_height = (cf_scan_start > 1) ? cf_scan_start - 1 : 0;
                             dogecoin_spv_request_cfilters(client, node, cf_scan_start, tip->hash);
                         }

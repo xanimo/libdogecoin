@@ -152,6 +152,26 @@ typedef struct dogecoin_cfcheckpt_msg_ {
 } dogecoin_cfcheckpt_msg;
 
 /* ================================================================ */
+/*  Parallel cfilter download support structures                    */
+/* ================================================================ */
+
+/** One buffered cfilter record held before in-order disk flush. */
+typedef struct cf_par_record_ {
+    uint256_t  block_hash;
+    cstring   *filter_data;   /**< NULL = slot not yet received */
+} cf_par_record;
+
+/** In-flight getcfilters batch for one parallel worker node. */
+typedef struct cf_par_buf_ {
+    int            node_id;     /**< dogecoin_node.nodeid owning this slot; -1 = free */
+    uint32_t       batch_start;
+    uint32_t       batch_end;
+    cf_par_record *records;     /**< array[batch_end - batch_start + 1] */
+    uint32_t       received;    /**< number of records received so far */
+    dogecoin_bool  complete;    /**< true when received == batch size */
+} cf_par_buf;
+
+/* ================================================================ */
 /*  BIP 157 Per-Peer Compact Filter State                           */
 /* ================================================================ */
 
@@ -179,6 +199,12 @@ typedef struct dogecoin_compact_filter_state_ {
     vector_t     *watched_scripts;        /**< ScriptPubKeys to match against filters (cstring*) */
     vector_t     *matched_block_hashes;   /**< Block hashes where filter matched (uint256_t*) */
     uint32_t      matched_blocks_fetched; /**< Number of matched blocks already received */
+
+    /* Parallel cfilter download (par_num_workers > 1 activates parallel mode). */
+    uint8_t       par_num_workers;   /**< 0/1 = sequential; >1 = parallel worker count */
+    uint32_t      par_next_height;   /**< Next height not yet assigned to any worker */
+    uint32_t      par_flush_height;  /**< Next height that must be flushed to disk next */
+    cf_par_buf   *par_bufs;          /**< Worker buffer array [par_num_workers], NULL in sequential mode */
 } dogecoin_compact_filter_state;
 
 /* ================================================================ */
