@@ -109,6 +109,12 @@ typedef struct dogecoin_spv_client_
     uint256_t filtered_history_last_rerequest_txid; /* dedupe repeated tail re-requests for the same matched tx */
     int32_t  filtered_history_last_rerequest_height;
 
+    /* Comma-separated "host:port" strings supplied by the caller via
+     * dogecoin_spv_client_discover_peers().  When non-NULL, the reconnect
+     * callback reuses these peers instead of querying DNS seeds, so the
+     * client stays connected to the explicitly-named hosts only. */
+    char *peer_ips;
+
     /* BIP157: compact filter sync state */
     dogecoin_bool compact_filters_enabled; /**< Whether compact filter sync is active */
     dogecoin_compact_filter_state *cfilter_state; /**< BIP157 per-client compact filter state */

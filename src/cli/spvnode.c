@@ -179,7 +179,8 @@ become_daemon(int flags)
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
-        {"ips", no_argument, NULL, 'i'},
+        {"ips", required_argument, NULL, 'i'},
+        {"host", required_argument, NULL, 'i'},
         {"debug", no_argument, NULL, 'd'},
         {"maxnodes", no_argument, NULL, 'm'},
         {"mnemonic", no_argument, NULL, 'n'},
@@ -216,7 +217,7 @@ static void print_version() {
  */
 static void print_usage() {
     print_version();
-    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
+    printf("Usage: spvnode (-c|continuous) (-i|--ips|-H|--host <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
 (-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-q|--select_checkpoint) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");

@@ -433,7 +433,9 @@ void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
 void dogecoin_node_connection_state_changed_cb(dogecoin_node *node) {
     if (node->nodegroup->should_connect_to_more_nodes_cb) {
         if (node->nodegroup->should_connect_to_more_nodes_cb(node)) {
-            dogecoin_spv_client_discover_peers((dogecoin_spv_client*)node->nodegroup->ctx, NULL);
+            dogecoin_spv_client *client = (dogecoin_spv_client*)node->nodegroup->ctx;
+            /* Use explicit peer IPs when provided; fall back to DNS seeds otherwise. */
+            dogecoin_spv_client_discover_peers(client, client->peer_ips);
             dogecoin_node_group_connect_next_nodes(node->nodegroup);
         }
     }
@@ -600,6 +602,13 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->cf_computed_height = 0;
     client->cf_export_enabled = false;
 
+    /* BIP157 persistent filter storage (opened in dogecoin_spv_client_load) */
+    client->cfheaders_db = NULL;
+    client->cfilters_db  = NULL;
+
+    client->peer_ips = NULL;
+
+
     return client;
 }
 
@@ -611,6 +620,19 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
  */
 void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char *ips)
 {
+#ifndef _WIN32
+    // set stdin to non-blocking for quit command
+    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
+    fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
+#endif
+
+    /* Remember explicit peer IPs so reconnects reuse them instead of DNS seeds. */
+    if (ips) {
+        if (client->peer_ips) dogecoin_free(client->peer_ips);
+        client->peer_ips = strdup(ips);
+    }
+
+
     dogecoin_node_group_add_peers_by_ip_or_seed(client->nodegroup, ips);
 }
 
@@ -671,6 +693,21 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         client->cfilter_state = NULL;
     }
     client->compact_filters_enabled = false;
+
+    if (client->cfheaders_db) {
+        dogecoin_cfheaders_db_free(client->cfheaders_db);
+        client->cfheaders_db = NULL;
+    }
+    if (client->cfilters_db) {
+        dogecoin_cfilters_db_free(client->cfilters_db);
+        client->cfilters_db = NULL;
+    }
+
+    if (client->peer_ips) {
+        dogecoin_free(client->peer_ips);
+        client->peer_ips = NULL;
+    }
+
 
     if (client->headers_db)
     {
