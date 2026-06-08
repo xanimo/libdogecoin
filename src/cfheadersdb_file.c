@@ -176,11 +176,13 @@ dogecoin_bool dogecoin_cfheaders_db_load(
         path = path_obj->str;
     }
 
-    /* Determine whether we are creating or opening an existing file */
+    /* Determine whether we are creating or opening an existing file.
+     * A file that exists but is smaller than the 8-byte header (e.g. 0 bytes
+     * left by a previous crashed run) is treated as new and re-initialised. */
     struct stat sb;
-    dogecoin_bool create = (stat(path, &sb) != 0);
+    dogecoin_bool create = (stat(path, &sb) != 0) || (sb.st_size < 8);
 
-    db->file = fopen(path, create ? "a+b" : "r+b");
+    db->file = fopen(path, create ? "w+b" : "r+b");
     if (path_obj) cstr_free(path_obj, true);
 
     if (!db->file) {
@@ -311,9 +313,9 @@ dogecoin_bool dogecoin_cfilters_db_load(
     }
 
     struct stat sb;
-    dogecoin_bool create = (stat(path, &sb) != 0);
+    dogecoin_bool create = (stat(path, &sb) != 0) || (sb.st_size < 8);
 
-    db->file = fopen(path, create ? "a+b" : "r+b");
+    db->file = fopen(path, create ? "w+b" : "r+b");
     if (path_obj) cstr_free(path_obj, true);
 
     if (!db->file) {
