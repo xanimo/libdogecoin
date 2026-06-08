@@ -938,22 +938,25 @@ int main(int argc, char* argv[]) {
             printf("done\n");
             printf("Discover peers...\n");
 
-            /* For parallel cfilter download: build N connections to the same host.
-             * Each independent TCP connection becomes one parallel worker. */
+            /* For parallel downloads (cfilter workers or genesis headers): build N
+             * connections to the same host; each TCP connection is one worker. */
             char *par_ips = NULL;
-            if (client->cf_num_workers > 1 && ips) {
+            size_t par_n = 0;
+            if (client->cf_num_workers > 1 && ips)
+                par_n = client->cf_num_workers;
+            else if (genesis_headers && ips && maxnodes > 1)
+                par_n = (size_t)maxnodes;
+            if (par_n > 1) {
                 size_t host_len = strlen(ips);
-                size_t n = client->cf_num_workers;
-                /* "host,host,host..." = n*(host_len+1) - 1 chars + NUL */
-                par_ips = (char *)dogecoin_calloc(n * (host_len + 1) + 1, 1);
+                par_ips = (char *)dogecoin_calloc(par_n * (host_len + 1) + 1, 1);
                 if (par_ips) {
                     size_t wi;
-                    for (wi = 0; wi < n; wi++) {
+                    for (wi = 0; wi < par_n; wi++) {
                         if (wi > 0) strcat(par_ips, ",");
                         strcat(par_ips, ips);
                     }
-                    client->nodegroup->desired_amount_connected_nodes = (int)n;
-                    printf("[bip157-par] connecting %u workers to %s\n", (unsigned int)n, ips);
+                    client->nodegroup->desired_amount_connected_nodes = (int)par_n;
+                    printf("[par] connecting %u workers to %s\n", (unsigned int)par_n, ips);
                 }
             }
             dogecoin_spv_client_discover_peers(client, par_ips ? par_ips : ips);
