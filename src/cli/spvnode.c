@@ -206,6 +206,7 @@ static struct option long_options[] = {
         {"filter_hash_db", required_argument, NULL, 'F'},
         {"cf_from_genesis", no_argument, NULL, 'G'},
         {"cf_workers", required_argument, NULL, 'W'},
+        {"genesis_headers", no_argument, NULL, 'H'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -489,6 +490,7 @@ int main(int argc, char* argv[]) {
     char* filter_hash_db = NULL;
     dogecoin_bool cf_from_genesis = false;
     int cf_workers = 0;
+    dogecoin_bool genesis_headers = false;
     int selected_checkpoint_index = -1;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -498,7 +500,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:GW:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:GW:H", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -593,6 +595,10 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'W':
                     cf_workers = atoi(optarg);
+                    break;
+                case 'H':
+                    genesis_headers = true;
+                    use_checkpoint = false;
                     break;
                 default:
                     print_usage();
@@ -843,6 +849,14 @@ int main(int argc, char* argv[]) {
         if (cf_from_genesis) {
             client->cf_start_height = 1;
             printf("[bip157] filter download will start from genesis (height 1)\n");
+        }
+
+        if (genesis_headers) {
+            if (!dogecoin_spv_client_enable_genesis_headers(client))
+                printf("[par-hdr] warning: no checkpoints for this chain; genesis header sync unavailable\n");
+            else
+                printf("[par-hdr] parallel genesis header download enabled (%u segments)\n",
+                       (unsigned int)client->par_hdr->num_segs);
         }
 
         if (cf_workers > 1) {

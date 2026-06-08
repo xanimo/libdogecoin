@@ -56,6 +56,40 @@ typedef struct spv_block_sample_
     uint64_t fees;      // total fees
 } spv_block_sample;
 
+/* Raw block header size in the P2P wire format (no tx count byte). */
+#define PAR_HDR_RAW_LEN 80
+
+/* One parallel header-download segment.  Each segment spans the open-closed
+ * height interval (start_height, stop_height] and is assigned to one node. */
+typedef struct par_hdr_seg_ {
+    uint32_t  start_height;   /* height of start_hash (exclusive lower bound) */
+    uint256_t start_hash;     /* block hash at start_height — getheaders locator */
+    uint32_t  stop_height;    /* height of stop_hash  (inclusive upper bound)  */
+    uint256_t stop_hash;      /* block hash at stop_height — getheaders hash_stop */
+
+    /* download progress */
+    int       node_id;        /* assigned node (-1 = unassigned)               */
+    uint32_t  tip_height;     /* highest header received so far in this segment */
+    uint256_t tip_hash;       /* hash of that header (next-batch locator)       */
+
+    /* buffered raw 80-byte block headers in ascending height order */
+    uint8_t  *buf;
+    uint32_t  count;          /* headers buffered */
+    uint32_t  cap;            /* buffer capacity  */
+
+    dogecoin_bool complete;   /* all stop_height - start_height headers received */
+    dogecoin_bool flushed;    /* segment has been flushed into the primary DB    */
+} par_hdr_seg;
+
+/* Top-level state for a parallel genesis header download. */
+typedef struct par_hdr_state_ {
+    par_hdr_seg  *segs;         /* ordered array of segments                    */
+    uint32_t      num_segs;     /* total segment count                          */
+    uint32_t      next_assign;  /* index of the next unassigned segment         */
+    uint32_t      flush_idx;    /* index of the next segment pending flush      */
+    dogecoin_bool active;       /* download in progress                         */
+} par_hdr_state;
+
 typedef struct dogecoin_spv_client_
 {
     dogecoin_node_group *nodegroup;
@@ -129,6 +163,11 @@ typedef struct dogecoin_spv_client_
      * 0 or 1 means sequential (default); >1 activates parallel mode. */
     uint8_t cf_num_workers;
 
+    /* Parallel genesis header sync (uses chainparams block checkpoints as
+     * segment boundaries so N nodes download disjoint height ranges at once).
+     * NULL when not active. */
+    struct par_hdr_state_ *par_hdr;
+
     /* BIP157: compact filter sync state */
     dogecoin_bool compact_filters_enabled; /**< Whether compact filter sync is active */
     dogecoin_compact_filter_state *cfilter_state; /**< BIP157 per-client compact filter state */
@@ -195,6 +234,11 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_clien
 
 /* BIP157: enable or disable compact filter sync for this client */
 LIBDOGECOIN_API void dogecoin_spv_enable_compact_filters(dogecoin_spv_client *client, dogecoin_bool enable);
+
+/* Parallel genesis header sync: initialise from chainparams checkpoints.
+ * Also resets cf_start_height = 1 and clears any existing CF DB state.
+ * Returns false if the chain has no checkpoint array (e.g. regtest). */
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_enable_genesis_headers(dogecoin_spv_client *client);
 
 /* BIP157: send getcfcheckpt, getcfheaders, getcfilters to a peer */
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfcheckpt(dogecoin_spv_client *client, dogecoin_node *node);
