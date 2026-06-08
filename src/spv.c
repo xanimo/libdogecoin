@@ -3703,9 +3703,21 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         return;
     }
 
-    /* Buffer each raw 80-byte header */
+    /* Buffer each raw 80-byte header.
+     *
+     * AUXPoW blocks (version & 0x100) carry variable-length AUXPoW chain data
+     * between the standard 80-byte header and the 1-byte tx_count varint in the
+     * P2P headers message.  We must deserialise on the live P2P buffer so that
+     * buf->p advances past the AUXPoW data; only the standard 80 bytes are kept
+     * in seg->buf for later flush via connect_hdr. */
     for (uint32_t i = 0; i < count; i++) {
         if (buf->len < PAR_HDR_RAW_LEN) break;
+
+        const uint8_t *hdr_start = (const uint8_t *)buf->p;
+
+        /* Deserialise on the live P2P buffer — advances past AUXPoW if present */
+        dogecoin_block_header hdr;
+        if (!dogecoin_block_header_deserialize(&hdr, buf, client->chainparams, NULL)) break;
 
         /* Grow buffer if needed */
         if (seg->count >= seg->cap) {
@@ -3713,20 +3725,13 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
             seg->buf  = dogecoin_realloc(seg->buf, (size_t)seg->cap * PAR_HDR_RAW_LEN);
         }
 
-        memcpy(seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN, buf->p, PAR_HDR_RAW_LEN);
+        /* Store only the standard 80-byte header (no AUXPoW) */
+        memcpy(seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN, hdr_start, PAR_HDR_RAW_LEN);
         seg->count++;
 
-        /* Compute header hash to track tip */
-        dogecoin_block_header hdr;
-        struct const_buffer hbuf = { seg->buf + (size_t)(seg->count - 1) * PAR_HDR_RAW_LEN,
-                                     PAR_HDR_RAW_LEN };
-        if (dogecoin_block_header_deserialize(&hdr, &hbuf, client->chainparams, NULL)) {
-            dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
-            seg->tip_height++;
-        }
+        dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
+        seg->tip_height++;
 
-        buf->p   = (const uint8_t *)buf->p + PAR_HDR_RAW_LEN;
-        buf->len -= PAR_HDR_RAW_LEN;
         /* skip tx_count varint (always 0x00 in headers messages) */
         if (buf->len > 0) { buf->p = (const uint8_t *)buf->p + 1; buf->len--; }
     }
