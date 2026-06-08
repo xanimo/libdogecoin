@@ -28,9 +28,15 @@
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
+#include <io.h>
 #define MKDIR_ONE(p) _mkdir(p)
+#define CF_FTRUNCATE(fd, sz) _chsize((fd), (long)(sz))
+#define CF_FILENO(f) _fileno(f)
 #else
+#include <unistd.h>
 #define MKDIR_ONE(p) mkdir(p, 0755)
+#define CF_FTRUNCATE(fd, sz) ftruncate((fd), (off_t)(sz))
+#define CF_FILENO(f) fileno(f)
 #endif
 
 #include <errno.h>
@@ -42,10 +48,12 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
 
-/* Magic bytes and current file format version */
+/* Magic bytes and current file format version.
+ * v2 format: magic(4) + version(4) + genesis_filter_header(32) + records(N*36)
+ * v1 format: magic(4) + version(4) + records(N*36)  [obsolete, triggers rebuild] */
 static const uint8_t cfhdr_magic[4]   = {0xCF, 0x68, 0x44, 0x52}; /* "CfhDR" */
 static const uint8_t cfdata_magic[4]  = {0xCF, 0xDA, 0x54, 0x41}; /* "CfDATA" */
-static const uint32_t cf_file_version = 1;
+static const uint32_t cf_file_version = 2;
 
 /* ================================================================ */
 /*  Internal helpers                                                */
@@ -104,27 +112,31 @@ static void default_filter_path(cstring **path_out, const char *filename)
 }
 
 /**
- * Write magic + version file header to an open file positioned at offset 0.
+ * Write the v2 file header: magic(4) + version(4) + genesis_filter_header(32).
+ * genesis bytes are initialised to zero; call dogecoin_cfheaders_db_write_genesis
+ * to fill them in once the first cfheaders batch arrives.
  */
 static dogecoin_bool write_file_header(FILE *f, const uint8_t *magic)
 {
     if (fwrite(magic, 4, 1, f) != 1) return false;
     uint32_t v = htole32(cf_file_version);
-    return (fwrite(&v, 4, 1, f) == 1);
+    if (fwrite(&v, 4, 1, f) != 1) return false;
+    uint8_t zeros[32];
+    memset(zeros, 0, 32);
+    return (fwrite(zeros, 32, 1, f) == 1);
 }
 
 /**
- * Verify the magic + version header of an already-open file.
- * Returns false on mismatch or version too new.
+ * Read the file header and return the version number.
+ * Returns 0 on bad magic or read error; callers treat anything < 2 as stale.
  */
-static dogecoin_bool check_file_header(FILE *f, const uint8_t *expected_magic)
+static uint32_t read_file_version(FILE *f, const uint8_t *expected_magic)
 {
     uint8_t buf[8];
     rewind(f);
-    if (fread(buf, 8, 1, f) != 1) return false;
-    if (memcmp(buf, expected_magic, 4) != 0) return false;
-    uint32_t ver = le32toh(*(uint32_t *)(buf + 4));
-    return (ver <= cf_file_version);
+    if (fread(buf, 8, 1, f) != 1) return 0;
+    if (memcmp(buf, expected_magic, 4) != 0) return 0;
+    return le32toh(*(uint32_t *)(buf + 4));
 }
 
 /* ================================================================ */
@@ -163,7 +175,6 @@ dogecoin_bool dogecoin_cfheaders_db_load(
     cstring *path_obj = NULL;
     const char *path = file_path;
     if (!path) {
-        /* Ensure the filter/basic/ directory exists first */
         cstring *datadir = cstr_new_sz(512);
         dogecoin_get_default_datadir(datadir);
         while (datadir->len > 0 && datadir->str[datadir->len - 1] == '\0')
@@ -176,71 +187,71 @@ dogecoin_bool dogecoin_cfheaders_db_load(
         path = path_obj->str;
     }
 
-    /* Determine whether we are creating or opening an existing file.
-     * A file that exists but is smaller than the 8-byte header (e.g. 0 bytes
-     * left by a previous crashed run) is treated as new and re-initialised. */
     struct stat sb;
-    dogecoin_bool create = (stat(path, &sb) != 0) || (sb.st_size < 8);
+    dogecoin_bool create = (stat(path, &sb) != 0) || (sb.st_size < (long)CF_HEADERS_FILE_HDR_LEN);
 
-    db->file = fopen(path, create ? "w+b" : "r+b");
+    if (!create) {
+        db->file = fopen(path, "r+b");
+        if (db->file) {
+            uint32_t ver = read_file_version(db->file, cfhdr_magic);
+            if (ver >= 2) {
+                /* v2 file: read genesis_filter_header then records */
+                if (fread(state->genesis_filter_header, 32, 1, db->file) == 1) {
+                    size_t loaded = 0;
+                    uint32_t first_height = 0;
+                    uint8_t rec[CF_HEADERS_FILE_REC_LEN];
+                    printf("Loading compact filter headers from disk...\n");
+                    while (fread(rec, CF_HEADERS_FILE_REC_LEN, 1, db->file) == 1) {
+                        uint32_t height;
+                        memcpy(&height, rec, 4);
+                        height = le32toh(height);
+                        if (loaded == 0) first_height = height;
+                        uint256_t *fh = dogecoin_calloc(1, 32);
+                        memcpy(fh, rec + 4, 32);
+                        vector_add(state->filter_headers, fh);
+                        db->tip_height = height;
+                        memcpy(db->tip_header, fh, 32);
+                        loaded++;
+                        if (loaded % 100000 == 0) {
+                            printf("\r  %zu filter headers loaded (height %u)", loaded, height);
+                            fflush(stdout);
+                        }
+                    }
+                    if (loaded > 0) {
+                        printf("\r  %zu filter headers loaded, heights %u..%u\n",
+                               loaded, first_height, db->tip_height);
+                        state->cfheaders_tip_height  = db->tip_height;
+                        state->cfheaders_base_height = first_height;
+                        memcpy(state->cfheaders_tip_hash, db->tip_header, 32);
+                    }
+                    fseek(db->file, 0, SEEK_END);
+                    if (path_obj) cstr_free(path_obj, true);
+                    return true;
+                }
+            }
+            /* v1 or unreadable: close and delete, will recreate below */
+            if (ver < 2)
+                fprintf(stderr, "cfheadersdb: v%u file detected; rebuilding as v2 "
+                        "(cfheaders will re-download)\n", ver);
+            fclose(db->file);
+            db->file = NULL;
+        }
+        remove(path);
+    }
+
+    /* Create fresh v2 file */
+    db->file = fopen(path, "w+b");
     if (path_obj) cstr_free(path_obj, true);
-
     if (!db->file) {
         fprintf(stderr, "cfheadersdb: cannot open %s: %s\n", path, strerror(errno));
         return false;
     }
-
-    if (create) {
-        if (!write_file_header(db->file, cfhdr_magic)) {
-            fprintf(stderr, "cfheadersdb: failed to write file header\n");
-            fclose(db->file);
-            db->file = NULL;
-            return false;
-        }
-        return true;
-    }
-
-    /* Existing file — verify header */
-    if (!check_file_header(db->file, cfhdr_magic)) {
-        fprintf(stderr, "cfheadersdb: bad magic or unsupported version\n");
+    if (!write_file_header(db->file, cfhdr_magic)) {
+        fprintf(stderr, "cfheadersdb: failed to write file header\n");
         fclose(db->file);
         db->file = NULL;
         return false;
     }
-
-    /* Read all records and populate state->filter_headers */
-    size_t loaded = 0;
-    uint8_t rec[CF_HEADERS_FILE_REC_LEN]; /* height(4) + filter_header(32) */
-
-    printf("Loading compact filter headers from disk...\n");
-
-    while (fread(rec, CF_HEADERS_FILE_REC_LEN, 1, db->file) == 1) {
-        uint32_t height;
-        memcpy(&height, rec, 4);
-        height = le32toh(height);
-
-        uint256_t *fh = dogecoin_calloc(1, 32);
-        memcpy(fh, rec + 4, 32);
-        vector_add(state->filter_headers, fh);
-
-        db->tip_height = height;
-        memcpy(db->tip_header, fh, 32);
-        loaded++;
-
-        if (loaded % 100000 == 0) {
-            printf("\r  %zu filter headers loaded (height %u)", loaded, height);
-            fflush(stdout);
-        }
-    }
-
-    if (loaded > 0) {
-        printf("\r  %zu filter headers loaded, tip at height %u\n", loaded, db->tip_height);
-        state->cfheaders_tip_height = db->tip_height;
-        memcpy(state->cfheaders_tip_hash, db->tip_header, 32);
-    }
-
-    /* Position file pointer at end for subsequent appends */
-    fseek(db->file, 0, SEEK_END);
     return true;
 }
 
@@ -264,6 +275,35 @@ dogecoin_bool dogecoin_cfheaders_db_write(
 
     db->tip_height = height;
     memcpy(db->tip_header, filter_header, 32);
+    return true;
+}
+
+dogecoin_bool dogecoin_cfheaders_db_write_genesis(
+    dogecoin_cfheaders_db *db,
+    const uint256_t genesis_filter_header)
+{
+    if (!db || !db->read_write || !db->file) return true;
+
+    long saved = ftell(db->file);
+    if (fseek(db->file, 8, SEEK_SET) != 0) return false;
+    dogecoin_bool ok = (fwrite(genesis_filter_header, 32, 1, db->file) == 1);
+    dogecoin_file_commit(db->file);
+    fseek(db->file, saved, SEEK_SET);
+    return ok;
+}
+
+dogecoin_bool dogecoin_cfheaders_db_reset(dogecoin_cfheaders_db *db)
+{
+    if (!db || !db->read_write || !db->file) return true;
+
+    fflush(db->file);
+    if (CF_FTRUNCATE(CF_FILENO(db->file), (long)CF_HEADERS_FILE_HDR_LEN) != 0) {
+        fprintf(stderr, "cfheadersdb: truncate failed: %s\n", strerror(errno));
+        return false;
+    }
+    fseek(db->file, 0, SEEK_END);
+    db->tip_height = 0;
+    memset(db->tip_header, 0, 32);
     return true;
 }
 
@@ -334,7 +374,7 @@ dogecoin_bool dogecoin_cfilters_db_load(
     }
 
     /* Existing file — verify header and seek to end for appends */
-    if (!check_file_header(db->file, cfdata_magic)) {
+    if (read_file_version(db->file, cfdata_magic) == 0) {
         fprintf(stderr, "cfiltersdb: bad magic or unsupported version\n");
         fclose(db->file);
         db->file = NULL;

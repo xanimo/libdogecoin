@@ -2576,9 +2576,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 uint32_t height = cfstate->cfheaders_tip_height;
 
                 /* On the first cfheaders batch, prev_filter_header is the filter header
-                 * immediately before our starting height — store it for cfilter validation. */
+                 * immediately before our starting height — store it for cfilter validation
+                 * and persist it so restarts don't need to re-download cfheaders. */
                 if (cfstate->filter_headers->len == 0) {
                     memcpy(cfstate->genesis_filter_header, cfh_msg.prev_filter_header, 32);
+                    if (client->cfheaders_db)
+                        dogecoin_cfheaders_db_write_genesis(client->cfheaders_db,
+                                                           cfh_msg.prev_filter_header);
                 }
 
                 unsigned int i;
@@ -2754,9 +2758,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 }
 
                 dogecoin_blockindex *tip = client->headers_db->getchaintip(client->headers_db_ctx);
-                cfstate->cfheaders_tip_height = 0;
-                dogecoin_mem_zero(cfstate->cfheaders_tip_hash, sizeof(uint256_t));
-                dogecoin_mem_zero(cfstate->genesis_filter_header, sizeof(uint256_t));
 
                 /* Determine where cfheaders download starts.
                  * cf_start_height overrides everything (set via --cf-from-genesis or API).
@@ -2773,14 +2774,92 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     cfh_start = (hdb && hdb->chainbottom && hdb->chainbottom->height > 0)
                                 ? hdb->chainbottom->height : 1;
                 }
-                if (client->nodegroup && client->nodegroup->log_write_cb)
-                    client->nodegroup->log_write_cb("[bip157] cfheaders download will start at height %u [%us elapsed]\n",
-                        cfh_start, spv_elapsed(client));
-                cfstate->cfheaders_tip_height = (cfh_start > 1) ? cfh_start - 1 : 0;
-                cfstate->cfheaders_base_height = cfh_start;
 
-                cfstate->awaiting_response = false;
-                dogecoin_spv_request_cfheaders(client, node, cfh_start, tip->hash);
+                /* Use cfheaders already loaded from disk if they are valid and cover
+                 * the needed range.  The v2 DB stores genesis_filter_header so we can
+                 * validate cfilters without re-downloading all cfheaders. */
+                uint8_t gfh_zeros[32];
+                memset(gfh_zeros, 0, 32);
+                dogecoin_bool genesis_valid =
+                    (memcmp(cfstate->genesis_filter_header, gfh_zeros, 32) != 0);
+                dogecoin_bool have_loaded =
+                    (cfstate->filter_headers->len > 0 &&
+                     cfstate->cfheaders_base_height > 0 &&
+                     cfstate->cfheaders_base_height <= cfh_start &&
+                     cfstate->cfheaders_tip_height >= (cfh_start > 0 ? cfh_start - 1 : 0));
+
+                if (have_loaded && genesis_valid) {
+                    uint32_t cfh_resume = cfstate->cfheaders_tip_height + 1;
+                    if (cfh_resume > (uint32_t)tip->height) {
+                        /* cfheaders already at chain tip: skip directly to cfilters */
+                        if (client->nodegroup && client->nodegroup->log_write_cb)
+                            client->nodegroup->log_write_cb(
+                                "[bip157] cfheaders at tip (base=%u tip=%u), starting cfilters [%us elapsed]\n",
+                                cfstate->cfheaders_base_height,
+                                cfstate->cfheaders_tip_height, spv_elapsed(client));
+                        dogecoin_headers_db *hdb_cf = (dogecoin_headers_db *)client->headers_db_ctx;
+                        uint32_t cf_scan_start = 1;
+                        if (hdb_cf && hdb_cf->chainbottom && hdb_cf->chainbottom->height > 0)
+                            cf_scan_start = hdb_cf->chainbottom->height;
+                        cfstate->awaiting_response = false;
+                        if (client->cf_num_workers > 1) {
+                            cfstate->par_num_workers   = client->cf_num_workers;
+                            cfstate->par_next_height   = cf_scan_start;
+                            cfstate->par_flush_height  = cf_scan_start;
+                            cfstate->filters_tip_height = (cf_scan_start > 1) ? cf_scan_start - 1 : 0;
+                            if (!cfstate->par_bufs) {
+                                cfstate->par_bufs = (cf_par_buf *)dogecoin_calloc(
+                                    cfstate->par_num_workers, sizeof(cf_par_buf));
+                                uint8_t pi;
+                                for (pi = 0; pi < cfstate->par_num_workers; pi++)
+                                    cfstate->par_bufs[pi].node_id = -1;
+                            }
+                            if (client->nodegroup && client->nodegroup->log_write_cb)
+                                client->nodegroup->log_write_cb(
+                                    "[bip157-par] assigning %u parallel workers from height %u\n",
+                                    (unsigned int)cfstate->par_num_workers, cf_scan_start);
+                            unsigned int ni;
+                            for (ni = 0; ni < client->nodegroup->nodes->len; ni++) {
+                                dogecoin_node *wn = (dogecoin_node *)vector_idx(
+                                    client->nodegroup->nodes, ni);
+                                if (!wn || !(wn->state & NODE_CONNECTED) ||
+                                    !wn->version_handshake)
+                                    continue;
+                                spv_cf_par_assign(client, wn);
+                            }
+                        } else {
+                            cfstate->filters_tip_height = (cf_scan_start > 1) ? cf_scan_start - 1 : 0;
+                            dogecoin_spv_request_cfilters(client, node, cf_scan_start, tip->hash);
+                        }
+                    } else {
+                        /* Resume cfheaders download from where the DB left off */
+                        if (client->nodegroup && client->nodegroup->log_write_cb)
+                            client->nodegroup->log_write_cb(
+                                "[bip157] resuming cfheaders from %u (base=%u disk_tip=%u) [%us elapsed]\n",
+                                cfh_resume, cfstate->cfheaders_base_height,
+                                cfstate->cfheaders_tip_height, spv_elapsed(client));
+                        cfstate->awaiting_response = false;
+                        dogecoin_spv_request_cfheaders(client, node, cfh_resume, tip->hash);
+                    }
+                } else {
+                    /* Fresh start: clear any stale loaded data and re-download */
+                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                        client->nodegroup->log_write_cb(
+                            "[bip157] cfheaders fresh start at height %u [%us elapsed]\n",
+                            cfh_start, spv_elapsed(client));
+                    if (cfstate->filter_headers->len > 0) {
+                        vector_free(cfstate->filter_headers, true);
+                        cfstate->filter_headers = vector_new(4096, dogecoin_free);
+                    }
+                    dogecoin_mem_zero(cfstate->cfheaders_tip_hash, sizeof(uint256_t));
+                    dogecoin_mem_zero(cfstate->genesis_filter_header, sizeof(uint256_t));
+                    cfstate->cfheaders_tip_height  = (cfh_start > 1) ? cfh_start - 1 : 0;
+                    cfstate->cfheaders_base_height = cfh_start;
+                    if (client->cfheaders_db)
+                        dogecoin_cfheaders_db_reset(client->cfheaders_db);
+                    cfstate->awaiting_response = false;
+                    dogecoin_spv_request_cfheaders(client, node, cfh_start, tip->hash);
+                }
             } else {
                 if (client->nodegroup && client->nodegroup->log_write_cb)
                     client->nodegroup->log_write_cb("[bip157] failed to deserialize cfcheckpt\n");
