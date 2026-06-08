@@ -1003,25 +1003,43 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
         /* Only retry here when not already in a live parallel cfilter download. */
         dogecoin_bool par_active = (cfstate->par_num_workers > 0 &&
             cfstate->filters_tip_height < cfstate->cfheaders_tip_height);
-        if (cf_incomplete && !par_active &&
-            cfstate->awaiting_response &&
-            cfstate->last_request_time > 0 &&
-            *now > cfstate->last_request_time + CF_RESPONSE_TIMEOUT) {
-            client->nodegroup->log_write_cb(
-                "[bip157] CF response timeout after %us — retrying\n",
-                (unsigned int)(*now - cfstate->last_request_time));
-            cfstate->awaiting_response = false;
-            dogecoin_node *cf_node = NULL;
+        if (cf_incomplete && !par_active && cfstate->awaiting_response) {
+            /* Fast-path: if no CF-capable peer is connected right now, the peer
+             * we sent the request to has disconnected.  Clear awaiting_response
+             * immediately so the postcmd trigger can fire as soon as any CF peer
+             * reconnects — no need to wait the full CF_RESPONSE_TIMEOUT. */
+            dogecoin_bool any_cf_connected = false;
             for (unsigned int ni = 0; ni < client->nodegroup->nodes->len; ni++) {
                 dogecoin_node *n = (dogecoin_node *)vector_idx(client->nodegroup->nodes, ni);
                 if ((n->state & NODE_CONNECTED) &&
                     (n->services & DOGECOIN_NODE_COMPACT_FILTERS)) {
-                    cf_node = n;
+                    any_cf_connected = true;
                     break;
                 }
             }
-            if (cf_node)
-                dogecoin_spv_request_cfcheckpt(client, cf_node);
+            if (!any_cf_connected) {
+                client->nodegroup->log_write_cb(
+                    "[bip157] CF peer gone — clearing awaiting_response to retry on reconnect\n");
+                cfstate->awaiting_response = false;
+            } else if (cfstate->last_request_time > 0 &&
+                       *now > cfstate->last_request_time + CF_RESPONSE_TIMEOUT) {
+                /* Full timeout: CF peer is connected but not responding. */
+                client->nodegroup->log_write_cb(
+                    "[bip157] CF response timeout after %us — retrying\n",
+                    (unsigned int)(*now - cfstate->last_request_time));
+                cfstate->awaiting_response = false;
+                dogecoin_node *cf_node = NULL;
+                for (unsigned int ni = 0; ni < client->nodegroup->nodes->len; ni++) {
+                    dogecoin_node *n = (dogecoin_node *)vector_idx(client->nodegroup->nodes, ni);
+                    if ((n->state & NODE_CONNECTED) &&
+                        (n->services & DOGECOIN_NODE_COMPACT_FILTERS)) {
+                        cf_node = n;
+                        break;
+                    }
+                }
+                if (cf_node)
+                    dogecoin_spv_request_cfcheckpt(client, cf_node);
+            }
         }
     }
 
@@ -3400,6 +3418,33 @@ LIBDOGECOIN_API void dogecoin_spv_enable_compact_filters(dogecoin_spv_client *cl
 /* ================================================================ */
 /* BIP157: request helper functions                                  */
 /* ================================================================ */
+
+/* Find the first block-header checkpoint at height >= target_height and write
+ * its hash in P2P (internal LE) byte order to hash_out.
+ * Returns the checkpoint height, or 0 if no suitable checkpoint exists. */
+static uint32_t cf_find_checkpoint_stop(const dogecoin_chainparams *params,
+    uint32_t target_height, uint256_t hash_out)
+{
+    const dogecoin_checkpoint *arr = NULL;
+    size_t cnt = 0;
+    if (!params) return 0;
+    if (strcmp(params->chainname, "main") == 0) {
+        arr = dogecoin_mainnet_checkpoint_array;
+        cnt = sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
+    } else if (strcmp(params->chainname, "test") == 0) {
+        arr = dogecoin_testnet_checkpoint_array;
+        cnt = sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);
+    }
+    for (size_t i = 0; i < cnt; i++) {
+        if (arr[i].height >= target_height) {
+            /* chainparams hashes are display-order hex; utils_uint256_sethex reverses to LE */
+            utils_uint256_sethex((char *)arr[i].hash, hash_out);
+            return arr[i].height;
+        }
+    }
+    return 0;
+}
+
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfcheckpt(dogecoin_spv_client *client, dogecoin_node *node)
 {
     if (!client || !node || !client->cfilter_state) return false;
@@ -3461,10 +3506,22 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfheaders(dogecoin_spv_client
                 aux_found = dogecoin_headers_db_get_block_hash_at_height(aux, batch_stop_height, batch_stop_hash);
             }
             if (!aux_found) {
-                if (client->nodegroup && client->nodegroup->log_write_cb)
-                    client->nodegroup->log_write_cb("[bip157] getcfheaders: cannot find hash at height %u, using tip\n", batch_stop_height);
-                memcpy(batch_stop_hash, tip->hash, sizeof(uint256_t));
-                batch_stop_height = tip_height;
+                uint32_t cp_h = cf_find_checkpoint_stop(client->chainparams,
+                    batch_stop_height, batch_stop_hash);
+                if (cp_h > 0) {
+                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                        client->nodegroup->log_write_cb(
+                            "[bip157] getcfheaders: no hash at %u, using checkpoint %u\n",
+                            batch_stop_height, cp_h);
+                    batch_stop_height = cp_h;
+                } else {
+                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                        client->nodegroup->log_write_cb(
+                            "[bip157] getcfheaders: cannot find hash at height %u, using tip\n",
+                            batch_stop_height);
+                    memcpy(batch_stop_hash, tip->hash, sizeof(uint256_t));
+                    batch_stop_height = tip_height;
+                }
             }
         }
     }
@@ -3524,10 +3581,22 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfilters(dogecoin_spv_client 
                 aux_found = dogecoin_headers_db_get_block_hash_at_height(aux, batch_end, batch_stop_hash);
             }
             if (!aux_found) {
-                if (client->nodegroup && client->nodegroup->log_write_cb)
-                    client->nodegroup->log_write_cb("[bip157] getcfilters: cannot find hash at height %u, using tip\n", batch_end);
-                memcpy(batch_stop_hash, stop_hash, sizeof(uint256_t));
-                if (tip) batch_end = (uint32_t)tip->height;
+                uint32_t cp_h = cf_find_checkpoint_stop(client->chainparams,
+                    batch_end, batch_stop_hash);
+                if (cp_h > 0) {
+                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                        client->nodegroup->log_write_cb(
+                            "[bip157] getcfilters: no hash at %u, using checkpoint %u\n",
+                            batch_end, cp_h);
+                    batch_end = cp_h;
+                } else {
+                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                        client->nodegroup->log_write_cb(
+                            "[bip157] getcfilters: cannot find hash at height %u, using tip\n",
+                            batch_end);
+                    memcpy(batch_stop_hash, stop_hash, sizeof(uint256_t));
+                    if (tip) batch_end = (uint32_t)tip->height;
+                }
             }
         }
     }
