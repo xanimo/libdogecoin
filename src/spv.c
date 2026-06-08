@@ -3569,10 +3569,12 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
                         "[par-hdr] flush: header %u in segment %u failed to connect\n",
                         j, s->flush_idx);
                 bad++;
+                dogecoin_free(pindex); /* orphan — not in DB */
+            } else {
+                if (pindex && client->header_connected)
+                    client->header_connected(client);
+                /* pindex is now db->chaintip — owned by the DB, do NOT free */
             }
-            if (pindex && client->header_connected)
-                client->header_connected(client);
-            dogecoin_free(pindex);
         }
 
         seg->flushed = true;
