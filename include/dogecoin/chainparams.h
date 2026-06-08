@@ -68,7 +68,7 @@ extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 
 // the mainnet checkpoints, needs a fix size
-extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[33];
+extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[87];
 extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[24];
 
 /**
