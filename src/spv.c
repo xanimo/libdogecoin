@@ -337,6 +337,7 @@ static dogecoin_bool spv_log_merkle_match(const uint8_t txid[32], uint32_t pos, 
 
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
+static const unsigned int CF_RESPONSE_TIMEOUT = 30;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
@@ -989,6 +990,39 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
     if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG)
     {
         dogecoin_net_spv_request_headers(client);
+    }
+
+    /* BIP157: recover from stalled awaiting_response when a peer disconnected
+     * mid-download without clearing the flag. */
+    if (client->compact_filters_enabled && client->cfilter_state) {
+        dogecoin_compact_filter_state *cfstate = client->cfilter_state;
+        dogecoin_bool cf_incomplete =
+            ((uint32_t)pindex->height > 0) &&
+            (cfstate->cfheaders_tip_height < (uint32_t)pindex->height ||
+             cfstate->filters_tip_height  < cfstate->cfheaders_tip_height);
+        /* Only retry here when not already in a live parallel cfilter download. */
+        dogecoin_bool par_active = (cfstate->par_num_workers > 0 &&
+            cfstate->filters_tip_height < cfstate->cfheaders_tip_height);
+        if (cf_incomplete && !par_active &&
+            cfstate->awaiting_response &&
+            cfstate->last_request_time > 0 &&
+            *now > cfstate->last_request_time + CF_RESPONSE_TIMEOUT) {
+            client->nodegroup->log_write_cb(
+                "[bip157] CF response timeout after %us — retrying\n",
+                (unsigned int)(*now - cfstate->last_request_time));
+            cfstate->awaiting_response = false;
+            dogecoin_node *cf_node = NULL;
+            for (unsigned int ni = 0; ni < client->nodegroup->nodes->len; ni++) {
+                dogecoin_node *n = (dogecoin_node *)vector_idx(client->nodegroup->nodes, ni);
+                if ((n->state & NODE_CONNECTED) &&
+                    (n->services & DOGECOIN_NODE_COMPACT_FILTERS)) {
+                    cf_node = n;
+                    break;
+                }
+            }
+            if (cf_node)
+                dogecoin_spv_request_cfcheckpt(client, cf_node);
+        }
     }
 
     client->last_statecheck_time = *now;
@@ -1959,7 +1993,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         }
         else if (client->compact_filters_enabled && client->cfilter_state &&
                  !client->cfilter_state->awaiting_response &&
-                 client->cfilter_state->filters_tip_height == 0 &&
+                 /* CF sync not yet complete: cfheaders or cfilters behind chain tip */
+                 (client->cfilter_state->cfheaders_tip_height < (uint32_t)chaintip->height ||
+                  client->cfilter_state->filters_tip_height  < client->cfilter_state->cfheaders_tip_height) &&
+                 /* Not already in a live parallel cfilter download */
+                 !(client->cfilter_state->par_num_workers > 0 &&
+                   client->cfilter_state->filters_tip_height < client->cfilter_state->cfheaders_tip_height) &&
                  chaintip->height > 0 &&
                  chaintip->height >= node->bestknownheight - 5) {
             /* Headers are at tip — find a BIP157-capable peer (NODE_COMPACT_FILTERS) */
