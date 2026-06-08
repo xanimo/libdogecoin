@@ -371,8 +371,8 @@ if test "x$use_liboqs" = xyes; then
 fi
 
 if test "x$use_raccoon_g" = xyes; then
-  AC_CHECK_HEADER([gmp.h],,[AC_MSG_ERROR([gmp.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=y or install libgmp-dev)])])
-  AC_CHECK_HEADER([mpfr.h],,[AC_MSG_ERROR([mpfr.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=y or install libmpfr-dev)])])
+  AC_CHECK_HEADER([gmp.h],,[AC_MSG_ERROR([gmp.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=1 or install libgmp-dev)])])
+  AC_CHECK_HEADER([mpfr.h],,[AC_MSG_ERROR([mpfr.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=1 or install libmpfr-dev)])])
   AC_CHECK_LIB([gmp],[__gmpz_init],[LIBGMP=-lgmp],AC_MSG_ERROR(libgmp missing))
   AC_CHECK_LIB([mpfr],[mpfr_init],[LIBMPFR=-lmpfr],AC_MSG_ERROR(libmpfr missing),[$LIBGMP])
   AC_CHECK_LIB([m],[sqrt],[LIBM=-lm],AC_MSG_ERROR(libm missing))

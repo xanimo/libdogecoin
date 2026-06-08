@@ -6,8 +6,7 @@ SDK_PATH ?= $(BASEDIR)/SDKs
 NO_QT ?=
 NO_WALLET ?=
 NO_UPNP ?=
-NO_LIBOQS ?=
-LIBOQS_RACCOON ?=
+LIBOQS ?=
 RACCOON_G ?=
 ZK_CARRIER ?=
 YUBIKEY ?=
@@ -120,12 +119,12 @@ qt_packages_$(NO_QT) = $(qt_packages) $(qt_$(host_os)_packages) $(qt_$(host_arch
 wallet_packages_$(NO_WALLET) = $(wallet_packages)
 upnp_packages_$(NO_UPNP) = $(upnp_packages)
 yubikey_packages_$(YUBIKEY) = $(yubikey_packages)
-liboqs_packages_$(NO_LIBOQS) = $(liboqs_packages)
-# raccoon_g_packages (gmp, mpfr) are only built when RACCOON_G=y is passed.
+liboqs_packages_$(LIBOQS) = $(liboqs_packages)
+# raccoon_g_packages (gmp, mpfr) are only built when RACCOON_G=1 is passed.
 # They provide the mpmath-equivalent arbitrary-precision FP arithmetic that the
 # in-tree Raccoon-G Gaussian sampler needs to be byte-exact against the upstream
 # Python reference. They are independent of liboqs.
-ifeq ($(RACCOON_G),y)
+ifeq ($(RACCOON_G),1)
 raccoon_g_packages_ = $(raccoon_g_packages)
 endif
 
@@ -133,7 +132,7 @@ ifeq ($(ZK_CARRIER),1)
 packages += $(zk_carrier_packages)
 endif
 
-packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_) $(yubikey_packages_y) $(liboqs_packages_) $(raccoon_g_packages_) $(qrencode_packages_)
+packages += $($(host_arch)_$(host_os)_packages) $($(host_os)_packages) $(qt_packages_) $(wallet_packages_) $(upnp_packages_) $(yubikey_packages_1) $(liboqs_packages_1) $(raccoon_g_packages_) $(qrencode_packages_)
 native_packages += $($(host_arch)_$(host_os)_native_packages) $($(host_os)_native_packages)
 
 ifneq ($(qt_packages_),)
