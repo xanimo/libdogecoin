@@ -207,6 +207,7 @@ static struct option long_options[] = {
         {"cf_from_genesis", no_argument, NULL, 'G'},
         {"cf_workers", required_argument, NULL, 'W'},
         {"genesis_headers", no_argument, NULL, 'H'},
+        {"logfile", required_argument, NULL, 'L'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -288,6 +289,34 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
     }
 
 static dogecoin_bool quit_when_synced = true;
+static FILE *g_logfile = NULL;
+
+static int spvnode_log_file(const char* format, ...) {
+    if (!g_logfile) return 0;
+    va_list args;
+    va_start(args, format);
+    fprintf(g_logfile, "DEBUG: ");
+    vfprintf(g_logfile, format, args);
+    va_end(args);
+    fflush(g_logfile);
+    return 1;
+}
+
+static int spvnode_log_both(const char* format, ...) {
+    va_list args, args2;
+    va_start(args, format);
+    va_copy(args2, args);
+    printf("DEBUG: ");
+    vprintf(format, args);
+    va_end(args);
+    if (g_logfile) {
+        fprintf(g_logfile, "DEBUG: ");
+        vfprintf(g_logfile, format, args2);
+        fflush(g_logfile);
+    }
+    va_end(args2);
+    return 1;
+}
 static dogecoin_bool spv_enable_filtered_blocks = false;
 static dogecoin_bool spv_select_checkpoint = false;
 static int spv_filter_oldest_utxo_height = 0;
@@ -492,6 +521,7 @@ int main(int argc, char* argv[]) {
     int cf_workers = 0;
     dogecoin_bool genesis_headers = false;
     int selected_checkpoint_index = -1;
+    char* logfile = NULL;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
         print_usage();
@@ -500,7 +530,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:GW:H", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgqeoF:GW:HL:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -600,6 +630,9 @@ int main(int argc, char* argv[]) {
                     genesis_headers = true;
                     use_checkpoint = false;
                     break;
+                case 'L':
+                    logfile = optarg;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -611,6 +644,15 @@ int main(int argc, char* argv[]) {
         dogecoin_ctx* ts_ctx = cli_ts_context_start("spvnode", chain == &dogecoin_chainparams_test);
         in_memory_headers = (dbfile && ((strcmp(dbfile, "0") == 0) || (strcmp(dbfile, "no") == 0)));
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, in_memory_headers, use_checkpoint, full_sync, maxnodes, http_server);
+
+        if (logfile) {
+            g_logfile = fopen(logfile, "a");
+            if (!g_logfile) {
+                fprintf(stderr, "Cannot open logfile '%s': %s\n", logfile, strerror(errno));
+            } else {
+                client->nodegroup->log_write_cb = debug ? spvnode_log_both : spvnode_log_file;
+            }
+        }
 
         if (http_server) {
             evhttp_set_gencb(client->nodegroup->http_server, dogecoin_http_request_cb, client);

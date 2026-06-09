@@ -211,21 +211,21 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
     size_t connected_headers_count = 0;
     if (db->headers_tree_file && !create)
     {
-        printf("Loading headers from disk, this may take several minutes...\n");
+        printf("Loading headers from disk...\n");
+        /* Skip PoW re-verification on load: blocks were already verified when
+         * written.  Stored hash and chainwork are used directly. */
+        db->skip_pow = true;
         while (!feof(db->headers_tree_file))
         {
-            // print progress
-            if (connected_headers_count % 1000 == 0)
+            if (connected_headers_count % 100000 == 0 && connected_headers_count > 0)
             {
-                printf("\r%ld headers loaded", connected_headers_count);
+                printf("\r%zu headers loaded", connected_headers_count);
                 fflush(stdout);
             }
 
             uint8_t buf_all[SPV_HEADERS_FILE_REC_LEN];
             if (fread(buf_all, sizeof(buf_all), 1, db->headers_tree_file) == 1) {
                 struct const_buffer cbuf_all = {buf_all, sizeof(buf_all)};
-
-                //load all
 
                 uint256_t hash;
                 uint32_t height;
@@ -242,9 +242,12 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                         dogecoin_block_header_free(&chainheader->header);
                         dogecoin_free(chainheader);
                         fprintf(stderr, "\nError: Invalid data found.\n");
+                        db->skip_pow = false;
                         return -1;
                     }
-                    dogecoin_block_header_hash(&chainheader->header, (uint8_t *)&chainheader->hash);
+                    /* Use stored hash directly — no SHA256d recompute needed */
+                    memcpy(chainheader->hash, hash, sizeof(uint256_t));
+                    chainheader->chainwork = chainwork;
                     chainheader->prev = NULL;
                     db->chaintip = chainheader;
                     if (db->use_binary_tree) {
@@ -265,8 +268,9 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                 db->chaintip->chainwork = chainwork;
             }
         }
+        db->skip_pow = false;
     }
-    printf("\nConnected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
+    printf("\nConnected %zu headers, now at height: %d\n", connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
 
