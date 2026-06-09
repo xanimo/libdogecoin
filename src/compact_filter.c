@@ -242,10 +242,20 @@ dogecoin_compact_filter_state* dogecoin_compact_filter_state_new(void) {
     state->watched_scripts = vector_new(16, cstr_free_void);
     state->matched_block_hashes = vector_new(64, dogecoin_free);
     state->matched_blocks_fetched = 0;
+    state->cf_block_fetch_active = false;
     state->par_num_workers = 0;
     state->par_next_height = 0;
     state->par_flush_height = 0;
     state->par_bufs = NULL;
+    state->cfh_par_n = 0;
+    state->cfh_par_done = 0;
+    state->cfh_par_data = NULL;
+    state->cfh_par_base = 1;
+    state->cfh_par_total = 0;
+    state->cfh_par_chunks = NULL;
+    state->filter_headers_flat = NULL;
+    state->filter_headers_flat_base = 1;
+    state->filter_headers_flat_len = 0;
     return state;
 }
 
@@ -285,6 +295,18 @@ void dogecoin_compact_filter_state_free(dogecoin_compact_filter_state *state) {
         dogecoin_free(state->par_bufs);
         state->par_bufs = NULL;
     }
+    if (state->cfh_par_data) {
+        dogecoin_free(state->cfh_par_data);
+        state->cfh_par_data = NULL;
+    }
+    if (state->cfh_par_chunks) {
+        dogecoin_free(state->cfh_par_chunks);
+        state->cfh_par_chunks = NULL;
+    }
+    if (state->filter_headers_flat) {
+        dogecoin_free(state->filter_headers_flat);
+        state->filter_headers_flat = NULL;
+    }
     dogecoin_free(state);
 }
 
@@ -313,7 +335,26 @@ void dogecoin_compact_filter_state_reset(dogecoin_compact_filter_state *state) {
         state->matched_block_hashes = vector_new(64, dogecoin_free);
     }
     state->matched_blocks_fetched = 0;
-    /* Reset parallel state but keep par_num_workers and par_bufs allocation */
+    state->cf_block_fetch_active = false;
+    /* Free parallel cfheaders download state */
+    if (state->cfh_par_data) {
+        dogecoin_free(state->cfh_par_data);
+        state->cfh_par_data = NULL;
+    }
+    if (state->cfh_par_chunks) {
+        dogecoin_free(state->cfh_par_chunks);
+        state->cfh_par_chunks = NULL;
+    }
+    state->cfh_par_n = 0;
+    state->cfh_par_done = 0;
+    state->cfh_par_total = 0;
+    if (state->filter_headers_flat) {
+        dogecoin_free(state->filter_headers_flat);
+        state->filter_headers_flat = NULL;
+        state->filter_headers_flat_len = 0;
+    }
+
+    /* Reset parallel cfilter state but keep par_num_workers and par_bufs allocation */
     state->par_next_height = 0;
     state->par_flush_height = 0;
     if (state->par_bufs) {

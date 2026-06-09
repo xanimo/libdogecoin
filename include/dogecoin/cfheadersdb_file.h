@@ -167,6 +167,16 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_cfheaders_db_write_genesis(
     const uint256_t genesis_filter_header);
 
 /**
+ * @brief Flush and fdatasync the cfheaders file.
+ *
+ * Call once after a bulk write loop instead of relying on per-record commits.
+ *
+ * @param db  The database object.
+ * @return true on success.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_cfheaders_db_flush(dogecoin_cfheaders_db *db);
+
+/**
  * @brief Truncate cfheaders.dat to the v2 header only (clears all records).
  *
  * Used by the cfcheckpt handler when a fresh cfheaders download is needed

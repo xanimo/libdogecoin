@@ -271,10 +271,16 @@ dogecoin_bool dogecoin_cfheaders_db_write(
         fprintf(stderr, "cfheadersdb: write failed at height %u\n", height);
         return false;
     }
-    dogecoin_file_commit(db->file);
 
     db->tip_height = height;
     memcpy(db->tip_header, filter_header, 32);
+    return true;
+}
+
+dogecoin_bool dogecoin_cfheaders_db_flush(dogecoin_cfheaders_db *db)
+{
+    if (!db || !db->read_write || !db->file) return true;
+    dogecoin_file_commit(db->file);
     return true;
 }
 

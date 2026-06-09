@@ -810,7 +810,11 @@ int main(int argc, char* argv[]) {
 
         /* BIP157 compact-filter address watching: add each wallet address's
          * P2PKH scriptPubKey via filteradd so cfilters are matched against
-         * real wallet outputs. */
+         * real wallet outputs.  Two sources:
+         *   1. waddr_vector — HD-derived keys controlled by this wallet.
+         *   2. wallet->utxos — previously discovered UTXOs whose script_pubkey
+         *      may cover watch-only or externally-derived addresses not present
+         *      in waddr_vector. */
         if (client->compact_filters_enabled) {
             unsigned int wi;
             for (wi = 0; wi < wallet->waddr_vector->len; wi++) {
@@ -829,6 +833,19 @@ int main(int argc, char* argv[]) {
                 if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr_str, sizeof(addr_str))) {
                     printf("[bip157] watching address: %s\n", addr_str);
                 }
+            }
+            /* Also watch script_pubkeys from previously-tracked UTXOs (hex → raw). */
+            dogecoin_utxo* utxo;
+            dogecoin_utxo* tmp_utxo;
+            HASH_ITER(hh, wallet->utxos, utxo, tmp_utxo) {
+                if (!utxo->script_pubkey[0]) continue;
+                size_t spk_hex_len = strlen(utxo->script_pubkey);
+                size_t spk_raw_len = spk_hex_len / 2;
+                const uint8_t *spk_raw = utils_hex_to_uint8(utxo->script_pubkey);
+                if (!spk_raw) continue;
+                dogecoin_spv_client_filteradd(client, spk_raw, spk_raw_len);
+                printf("[bip157] watching utxo script (%s): %s\n",
+                       utxo->address, utxo->script_pubkey);
             }
         }
 

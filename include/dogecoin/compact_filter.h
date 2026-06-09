@@ -199,13 +199,42 @@ typedef struct dogecoin_compact_filter_state_ {
     vector_t     *watched_scripts;        /**< ScriptPubKeys to match against filters (cstring*) */
     vector_t     *matched_block_hashes;   /**< Block hashes where filter matched (uint256_t*) */
     uint32_t      matched_blocks_fetched; /**< Number of matched blocks already received */
+    dogecoin_bool cf_block_fetch_active;  /**< True while fetching full blocks for BIP157 matches */
 
     /* Parallel cfilter download (par_num_workers > 1 activates parallel mode). */
     uint8_t       par_num_workers;   /**< 0/1 = sequential; >1 = parallel worker count */
     uint32_t      par_next_height;   /**< Next height not yet assigned to any worker */
     uint32_t      par_flush_height;  /**< Next height that must be flushed to disk next */
     cf_par_buf   *par_bufs;          /**< Worker buffer array [par_num_workers], NULL in sequential mode */
+
+    /* Parallel cfheaders download (cfh_par_n > 0 activates parallel mode).
+     * Each worker downloads a disjoint height range; validation uses cfcheckpt
+     * anchors so workers are independent.  When all complete, filter_headers
+     * is populated from cfh_par_data and the normal cfilter scan begins. */
+    uint8_t        cfh_par_n;        /**< Number of parallel cfheader workers (0 = sequential) */
+    uint8_t        cfh_par_done;     /**< Count of completed workers */
+    uint8_t       *cfh_par_data;     /**< Flat 32*N_total byte array of filter headers */
+    uint32_t       cfh_par_base;     /**< Height of first entry in cfh_par_data */
+    uint32_t       cfh_par_total;    /**< Total number of filter headers in cfh_par_data */
+    struct cfh_par_chunk_ *cfh_par_chunks; /**< Per-worker state [cfh_par_n] */
+
+    /* Flat filter-header array owned after parallel cfheader download completes.
+     * When non-NULL, cfilter validation uses this instead of the filter_headers vector. */
+    uint8_t       *filter_headers_flat;      /**< 32*N contiguous filter headers */
+    uint32_t       filter_headers_flat_base; /**< Height of index 0 in filter_headers_flat */
+    uint32_t       filter_headers_flat_len;  /**< Number of entries in filter_headers_flat */
 } dogecoin_compact_filter_state;
+
+/** Per-worker state for parallel cfheaders download. */
+typedef struct cfh_par_chunk_ {
+    int      node_id;     /**< dogecoin_node.nodeid; -1 = unassigned; -2 = no work */
+    uint32_t start;       /**< first height this worker handles */
+    uint32_t end;         /**< last height this worker handles */
+    uint32_t req_next;    /**< next height to request in a GETCFHEADERS batch */
+    uint8_t  prev_fh[32];/**< filter header immediately before start (cfcheckpt anchor) */
+    uint32_t n_received;  /**< filter headers received so far for this chunk */
+    dogecoin_bool complete;
+} cfh_par_chunk;
 
 /* ================================================================ */
 /*  Message Serialization                                           */
