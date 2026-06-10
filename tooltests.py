@@ -60,4 +60,27 @@ for cmd in commands2:
         print("ERROR during "+cmd[0])
         sys.exit(os.EX_DATAERR)
 
+# PSBT (BIP174) commands
+UNSIGNED_TX = "0200000001b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae0760740000000000ffffffff0100ca9a3b000000001976a91415e7469e21938db38e943abd7a2c1073c00e0edd88ac00000000"
+PSBT_HEX    = "70736274ff0100550200000001b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae0760740000000000ffffffff0100ca9a3b000000001976a91415e7469e21938db38e943abd7a2c1073c00e0edd88ac00000000000000"
+
+commands_psbt = []
+commands_psbt.append(["-c psbt_create -x " + UNSIGNED_TX,                    0])  # valid unsigned tx
+commands_psbt.append(["-c psbt_create",                                       1])  # missing -x
+commands_psbt.append(["-c psbt_create -x deadbeef",                           1])  # invalid hex
+commands_psbt.append(["-c psbt_decode -x " + PSBT_HEX,                       0])  # valid PSBT
+commands_psbt.append(["-c psbt_decode",                                       1])  # missing -x
+commands_psbt.append(["-c psbt_decode -x deadbeef",                           1])  # invalid PSBT
+commands_psbt.append(["-c psbt_sign -x " + PSBT_HEX,                         1])  # missing -p
+commands_psbt.append(["-c psbt_finalize -x " + PSBT_HEX,                     1])  # no sigs → fails
+commands_psbt.append(["-c psbt_finalize",                                     1])  # missing -x
+commands_psbt.append(["-c psbt_extract -x " + PSBT_HEX,                      1])  # not finalized
+commands_psbt.append(["-c psbt_extract",                                      1])  # missing -x
+
+for cmd in commands_psbt:
+    retcode = call(baseCommand+" "+cmd[0], shell=True)
+    if retcode != cmd[1]:
+        print("ERROR during "+cmd[0])
+        sys.exit(os.EX_DATAERR)
+
 sys.exit(os.EX_OK)
