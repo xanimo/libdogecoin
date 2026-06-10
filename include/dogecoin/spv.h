@@ -235,6 +235,11 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_clien
 /* BIP157: enable or disable compact filter sync for this client */
 LIBDOGECOIN_API void dogecoin_spv_enable_compact_filters(dogecoin_spv_client *client, dogecoin_bool enable);
 
+/* BIP157: rescan all cached cfilters in cfilters.dat against watched scripts.
+ * Call after dogecoin_spv_client_filteradd and before dogecoin_spv_client_runloop
+ * to check locally-stored filters immediately without waiting for cfheaders sync. */
+LIBDOGECOIN_API void dogecoin_spv_client_rescan_cached_filters(dogecoin_spv_client *client);
+
 /* Parallel genesis header sync: initialise from chainparams checkpoints.
  * Also resets cf_start_height = 1 and clears any existing CF DB state.
  * Returns false if the chain has no checkpoint array (e.g. regtest). */

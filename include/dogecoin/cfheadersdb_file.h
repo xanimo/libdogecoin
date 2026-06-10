@@ -237,6 +237,26 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_cfilters_db_write(
     const uint256_t block_hash,
     const cstring *filter_data);
 
+/**
+ * @brief Iterate over all records in the cfilters file.
+ *
+ * Rewinds the file to the first record and calls @p cb for each one.
+ * Iteration stops early if @p cb returns false.
+ *
+ * @param db          The database object (must be loaded).
+ * @param cb          Callback: (height, block_hash, filter_data, data_len, ctx).
+ *                    Return false to stop iteration.
+ * @param ctx         Caller context passed through to @p cb.
+ * @return true if the full file was iterated (or cb stopped it early),
+ *         false on I/O error.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_cfilters_db_iterate(
+    dogecoin_cfilters_db *db,
+    dogecoin_bool (*cb)(uint32_t height, const uint256_t block_hash,
+                        const uint8_t *filter_data, uint32_t data_len,
+                        void *ctx),
+    void *ctx);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* __LIBDOGECOIN_CFHEADERSDB_FILE_H__ */

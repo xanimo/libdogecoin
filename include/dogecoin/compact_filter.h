@@ -223,6 +223,7 @@ typedef struct dogecoin_compact_filter_state_ {
     uint8_t       *filter_headers_flat;      /**< 32*N contiguous filter headers */
     uint32_t       filter_headers_flat_base; /**< Height of index 0 in filter_headers_flat */
     uint32_t       filter_headers_flat_len;  /**< Number of entries in filter_headers_flat */
+    dogecoin_bool  rescan_done;              /**< True after a full cached-filter rescan; suppresses duplicate rescan in cfh_par_finish */
 } dogecoin_compact_filter_state;
 
 /** Per-worker state for parallel cfheaders download. */

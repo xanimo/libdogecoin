@@ -387,6 +387,14 @@ dogecoin_bool dogecoin_cfilters_db_load(
         return false;
     }
 
+    /* Skip the remaining 32 bytes of the file header (magic+version already
+     * consumed by read_file_version; seek to the first record). */
+    if (fseek(db->file, CF_HEADERS_FILE_HDR_LEN, SEEK_SET) != 0) {
+        fclose(db->file);
+        db->file = NULL;
+        return false;
+    }
+
     /* Scan records to find the tip height (variable-length; must iterate) */
     while (true) {
         uint8_t hdr[CF_FILTERS_FILE_REC_HDR_LEN];
@@ -427,5 +435,47 @@ dogecoin_bool dogecoin_cfilters_db_write(
 
     dogecoin_file_commit(db->file);
     db->tip_height = height;
+    return true;
+}
+
+dogecoin_bool dogecoin_cfilters_db_iterate(
+    dogecoin_cfilters_db *db,
+    dogecoin_bool (*cb)(uint32_t height, const uint256_t block_hash,
+                        const uint8_t *filter_data, uint32_t data_len,
+                        void *ctx),
+    void *ctx)
+{
+    if (!db || !db->file || !cb) return false;
+
+    /* Rewind past the file header to the first record. */
+    if (fseek(db->file, CF_HEADERS_FILE_HDR_LEN, SEEK_SET) != 0)
+        return false;
+
+    uint8_t hdr[CF_FILTERS_FILE_REC_HDR_LEN];
+    while (fread(hdr, CF_FILTERS_FILE_REC_HDR_LEN, 1, db->file) == 1) {
+        uint32_t height, data_len;
+        uint256_t block_hash;
+        memcpy(&height,     hdr,      4); height   = le32toh(height);
+        memcpy(block_hash,  hdr + 4,  32);
+        memcpy(&data_len,   hdr + 36, 4); data_len = le32toh(data_len);
+
+        if (data_len == 0) {
+            if (!cb(height, block_hash, NULL, 0, ctx)) break;
+            continue;
+        }
+
+        uint8_t *buf = dogecoin_malloc(data_len);
+        if (!buf) return false;
+        if (fread(buf, data_len, 1, db->file) != 1) {
+            dogecoin_free(buf);
+            return false;
+        }
+        dogecoin_bool cont = cb(height, block_hash, buf, data_len, ctx);
+        dogecoin_free(buf);
+        if (!cont) break;
+    }
+
+    /* Restore write position at end of file. */
+    fseek(db->file, 0, SEEK_END);
     return true;
 }

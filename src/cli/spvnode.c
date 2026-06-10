@@ -995,6 +995,13 @@ int main(int argc, char* argv[]) {
 #endif
             }
             printf("done\n");
+
+            /* Rescan any cfilters cached from a prior run before entering the
+             * network runloop — finds matches immediately without waiting for
+             * the cfheaders sync to complete. */
+            if (client->compact_filters_enabled)
+                dogecoin_spv_client_rescan_cached_filters(client);
+
             printf("Discover peers...\n");
 
             /* For parallel downloads (cfilter workers or genesis headers): build N

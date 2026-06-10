@@ -289,6 +289,97 @@ static void cfh_par_init(dogecoin_spv_client *client,
     cfstate->awaiting_response = false;
 }
 
+/* Callback context for spv_rescan_cached_cfilters. */
+typedef struct {
+    dogecoin_spv_client *client;
+    uint32_t             up_to_height; /* only rescan heights < this */
+    uint32_t             scanned;
+    uint32_t             matched;
+} rescan_ctx;
+
+/* Iterator callback: match one cached cfilter against watched_scripts. */
+static dogecoin_bool spv_rescan_cb(uint32_t height, const uint256_t block_hash,
+                                    const uint8_t *filter_data, uint32_t data_len,
+                                    void *ctx_)
+{
+    rescan_ctx *ctx = (rescan_ctx *)ctx_;
+    if (height >= ctx->up_to_height) return false; /* stop; network takes over here */
+
+    dogecoin_compact_filter_state *cfstate = ctx->client->cfilter_state;
+    if (!cfstate->watched_scripts || cfstate->watched_scripts->len == 0) return true;
+
+    ctx->scanned++;
+
+    gcs_filter *gcs = gcs_filter_new();
+    struct const_buffer fbuf = { filter_data, data_len };
+    if (gcs_filter_deserialize(gcs, GCS_BASIC_FILTER_TYPE, block_hash, &fbuf)) {
+        if (gcs_filter_match_any(gcs, cfstate->watched_scripts)) {
+            if (ctx->client->nodegroup && ctx->client->nodegroup->log_write_cb)
+                ctx->client->nodegroup->log_write_cb(
+                    "[bip157] MATCH (rescan) at height %u\n", height);
+            uint256_t *matched_hash = dogecoin_calloc(1, sizeof(uint256_t));
+            memcpy(matched_hash, block_hash, sizeof(uint256_t));
+            vector_add(cfstate->matched_block_hashes, matched_hash);
+            ctx->matched++;
+        }
+    }
+    gcs_filter_free(gcs);
+    return true;
+}
+
+/* Rescan cached cfilters (heights 1..cf_scan_start-1) against watched_scripts.
+ * Called before starting the network download so that already-stored filters
+ * are not skipped when scripts were registered after the previous sync. */
+static void spv_rescan_cached_cfilters(dogecoin_spv_client *client, uint32_t cf_scan_start)
+{
+    if (!client->cfilters_db) return;
+    dogecoin_compact_filter_state *cfstate = client->cfilter_state;
+    if (!cfstate || !cfstate->watched_scripts || cfstate->watched_scripts->len == 0) return;
+
+    /* Skip partial rescan if a full startup rescan already covered everything. */
+    if (cfstate->rescan_done) return;
+
+    if (cf_scan_start <= 1) return;
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[bip157] rescanning cached filters heights 1..%u against %u watched scripts\n",
+            cf_scan_start - 1, (unsigned int)cfstate->watched_scripts->len);
+
+    rescan_ctx ctx = { client, cf_scan_start, 0, 0 };
+    dogecoin_cfilters_db_iterate(client->cfilters_db, spv_rescan_cb, &ctx);
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[bip157] rescan complete: %u filters checked, %u matched\n",
+            ctx.scanned, ctx.matched);
+}
+
+void dogecoin_spv_client_rescan_cached_filters(dogecoin_spv_client *client)
+{
+    if (!client || !client->cfilters_db) return;
+    dogecoin_compact_filter_state *cfstate = client->cfilter_state;
+    if (!cfstate || !cfstate->watched_scripts || cfstate->watched_scripts->len == 0) return;
+
+    uint32_t tip = client->cfilters_db->tip_height;
+    if (tip == 0) return;
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[bip157] startup rescan: checking all %u cached filters against %u watched scripts\n",
+            tip, (unsigned int)cfstate->watched_scripts->len);
+
+    rescan_ctx ctx = { client, UINT32_MAX, 0, 0 };
+    dogecoin_cfilters_db_iterate(client->cfilters_db, spv_rescan_cb, &ctx);
+
+    cfstate->rescan_done = true;
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[bip157] startup rescan complete: %u filters checked, %u matched\n",
+            ctx.scanned, ctx.matched);
+}
+
 /* Called when all cfheaders chunks are complete: populate filter_headers
  * from the flat array and transition to cfilter download. */
 static void cfh_par_finish(dogecoin_spv_client *client, dogecoin_node *node)
@@ -338,6 +429,10 @@ static void cfh_par_finish(dogecoin_spv_client *client, dogecoin_node *node)
     uint32_t cf_scan_start = 1;
     if (hdb_cf && hdb_cf->chainbottom && hdb_cf->chainbottom->height > 0)
         cf_scan_start = hdb_cf->chainbottom->height;
+
+    /* Rescan any cached filters (heights 1..cf_scan_start-1) that were stored
+     * in a prior run before these watched scripts were registered. */
+    spv_rescan_cached_cfilters(client, cf_scan_start);
 
     if (client->cf_num_workers > 1) {
         cfstate->par_num_workers  = client->cf_num_workers;
@@ -3265,6 +3360,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         uint32_t cf_scan_start = 1;
                         if (hdb_cf && hdb_cf->chainbottom && hdb_cf->chainbottom->height > 0)
                             cf_scan_start = hdb_cf->chainbottom->height;
+
+                        /* Rescan any cached filters stored before these scripts were registered. */
+                        spv_rescan_cached_cfilters(client, cf_scan_start);
 
                         if (client->nodegroup && client->nodegroup->log_write_cb)
                             client->nodegroup->log_write_cb(
