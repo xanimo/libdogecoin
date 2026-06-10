@@ -73,6 +73,7 @@ noinst_HEADERS = \
     include/dogecoin/sha2.h \
     include/dogecoin/smpv.h \
     include/dogecoin/tool.h \
+    include/dogecoin/psbt.h \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \
     include/dogecoin/utf8proc.h \
@@ -109,6 +110,7 @@ libdogecoin_la_SOURCES = \
     src/mem.c \
     src/moon.c \
     src/pow.c \
+    src/psbt.c \
     src/png.c \
     src/jpeg.c \
     src/qrengine.c \
@@ -286,6 +288,7 @@ tests_SOURCES = \
     test/signmsg_tests.c \
     test/smpv_tests.c \
     test/tpm_tests.c \
+    test/psbt_tests.c \
     test/transaction_tests.c \
     test/validation_tests.c \
     test/tx_tests.c \
