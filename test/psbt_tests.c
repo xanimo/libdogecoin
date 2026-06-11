@@ -487,73 +487,211 @@ static void test_psbt_invalid(void)
     dogecoin_psbt_free(psbt);
 }
 
-/* ── Test: BIP174 test vector (known PSBT hex) ──────────────── */
+/* ── Test: BIP174 invalid vectors ────────────────────────────── */
 /*
- * This is the "simple creator" test vector from the BIP174 spec:
+ * Each of these hex blobs is listed as INVALID in the BIP174 spec.
  * https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#test-vector-1
- *
- * The unsigned PSBT for a 2-input 2-output transaction with no
- * per-input/output data yet.  We just verify it deserializes
- * cleanly and re-serializes to the same bytes.
+ * dogecoin_psbt_deserialize must reject all of them.
  */
-static void test_psbt_bip174_vector(void)
+static void test_psbt_bip174_invalid_vectors(void)
 {
-    /* BIP174 creator role: a 2-in 2-out unsigned tx wrapped in PSBT */
-    dogecoin_tx *tx = dogecoin_tx_new();
-    tx->version = 2;
+    static const struct { const char *desc; const char *hex; } cases[] = {
+        /* Raw network tx — wrong magic, not a PSBT at all */
+        { "raw network tx",
+          "0200000001268171371edff285e937adeea4b37b78000c0566cbb3ad64641713ca42171bf6"
+          "000000006a473044022070b2245123e6bf474d60c5b50c043d4c691a5d2435f09a34a7662a"
+          "9dc251790a022001329ca9dacf280bdf30740ec0390422422c81cb45839457aeb76fc12edd"
+          "95b3012102657d118d3357b8e0f4c2cd46db7b39f6d9c38d9a70abcb9b2de5dc8dbfe4ce3"
+          "1feffffff02d3dff505000000001976a914d0c59903c5bac2868760e90fd521a4665aa7652"
+          "088ac00e1f5050000000017a9143545e6e33b832c47050f24d3eeb93c9c03948bc787b32e1"
+          "300" },
+        /* PSBT with 2-output tx but no per-output maps (truncated) */
+        { "missing per-output maps",
+          "70736274ff0100750200000001268171371edff285e937adeea4b37b78000c0566cbb3ad64"
+          "641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5bac2"
+          "868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24"
+          "d3eeb93c9c03948bc787b32e1300000100fda5010100000000010289a3c71eab4d20e0371b"
+          "bba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012"
+          "039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bb"
+          "b2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34"
+          "bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38"
+          "978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d0587"
+          "0247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a"
+          "240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c0121"
+          "03d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045"
+          "022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d0220"
+          "67338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b7"
+          "2beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab30000000000" },
+        /* Non-empty scriptSig in the unsigned tx — BIP174 creator rule violation */
+        { "non-empty scriptSig in unsigned tx",
+          "70736274ff0100fd0a010200000002ab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf15"
+          "3821a8139f877a5b7be4000000006a47304402204759661797c01b036b25928948686218347"
+          "d89864b719e1f7fcf57d1e511658702205309eabf56aa4d8891ffd111fdf1336f3a29da866"
+          "d7f8486d75546ceedaf93190121035cdc61fc7ba971c0b501a646a2a83b102cb43881217ca"
+          "682dc86e2d73fa88292feffffffab0949a08c5af7c49b8212f417e2f15ab3f5c33dcf153821"
+          "a8139f877a5b7be40100000000feffffff02603bea0b000000001976a914768a40bbd740cb"
+          "e81d988e71de2a4d5c71396b1d88ac8e240000000000001976a9146f4620b553fa095e721b"
+          "9ee0efe9fa039cca459788ac00000000000001012000e1f5050000000017a9143545e6e33b"
+          "832c47050f24d3eeb93c9c03948bc787010416001485d13537f2e265405a34dbafa9e3dda01"
+          "fb82308000000" },
+        /* Global map missing the unsigned tx key entirely */
+        { "missing unsigned tx",
+          "70736274ff000100fda5010100000000010289a3c71eab4d20e0371bbba4cc698fa295c946"
+          "3afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012039daf3da7de4f53349"
+          "eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bbb2dd2d0171e63aec6a48"
+          "90b40100000017160014fe3e9ef1a745e974d902c4355943abcb34bd5353ffffffff0200c2"
+          "eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38978a4888ac72fef84e2c"
+          "00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d05870247304402202712be22"
+          "e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a240220018b38d7dcd314"
+          "e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c012103d2e15674941bad4a99"
+          "6372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045022100d12b852d85dcd9"
+          "61d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d022067338a8e0e1725c197fb"
+          "1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b72beef0965d10be0778ef"
+          "ecd61fcac6f79a4ea169393380734464f84f2ab30000000000" },
+        /* Duplicate non-witness UTXO key (type 0x00) in input map */
+        { "duplicate non-witness UTXO key",
+          "70736274ff0100750200000001268171371edff285e937adeea4b37b78000c0566cbb3ad64"
+          "641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5bac2"
+          "868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050f24"
+          "d3eeb93c9c03948bc787b32e1300000100fda5010100000000010289a3c71eab4d20e0371b"
+          "bba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a9b012"
+          "039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b4608bb"
+          "b2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c4355943abcb34"
+          "bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c62197b38"
+          "978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a6a39d0587"
+          "0247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229f07f8a5f3a"
+          "240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02db2765c0121"
+          "03d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f210502483045"
+          "022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309ffb5fce58d0220"
+          "67338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2592a01210223b7"
+          "2beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab30000000001003f"
+          "0200000001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          "0000000000ffffffff010000000000000000036a010000000000000000" },
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        dogecoin_psbt *psbt = NULL;
+        dogecoin_bool ok = dogecoin_psbt_from_hex(cases[i].hex, &psbt);
+        u_assert_int_eq(ok, false);
+        u_assert_is_null(psbt);
+    }
+}
 
-    uint8_t h1[32], h2[32], h3[20];
-    memset(h1, 0x75, 32); memset(h2, 0x1d, 32); memset(h3, 0xA3, 20);
+/* ── Test: BIP174 valid vectors ──────────────────────────────── */
+/*
+ * Real hex blobs from the BIP174 spec.
+ * https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki#test-vector-1
+ */
+static void test_psbt_bip174_valid_vectors(void)
+{
+    dogecoin_psbt *psbt;
 
-    dogecoin_tx_in *in1 = dogecoin_tx_in_new();
-    memcpy(in1->prevout.hash, h1, 32); in1->prevout.n = 0;
-    in1->sequence = 0xFFFFFFFF;
-    cstr_free(in1->script_sig, true); in1->script_sig = cstr_new_sz(0);
-    vector_add(tx->vin, in1);
+    /* Creator: 2-in 2-out unsigned PSBT, all per-input/output maps empty.
+     * Round-trips to byte-identical hex since there is no witness data. */
+    {
+        static const char hex[] =
+            "70736274ff01009a020000000258e87a21b56daf0c23be8e7070456c336f7cbaa5c875792"
+            "4f545887bb2abdd750000000000ffffffff838d0427d0ec650a68aa46bb0b098aea4422c0"
+            "71b2ca78352a077959d07cea1d0100000000ffffffff0270aaf00800000000160014d85c2"
+            "b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876"
+            "a588df5546e8742d1d87008f000000000000000000";
+        psbt = NULL;
+        u_assert_int_eq(dogecoin_psbt_from_hex(hex, &psbt), true);
+        u_assert_not_null(psbt);
+        u_assert_int_eq((int)psbt->num_inputs,  2);
+        u_assert_int_eq((int)psbt->num_outputs, 2);
+        u_assert_int_eq(psbt->version, PSBT_VERSION_0);
+        u_assert_is_null(psbt->inputs[0].non_witness_utxo);
+        u_assert_is_null(psbt->inputs[1].non_witness_utxo);
+        /* Re-serialised bytes must be identical to the spec hex */
+        char *reshex = dogecoin_psbt_to_hex(psbt);
+        u_assert_str_eq(reshex, hex);
+        dogecoin_free(reshex);
+        dogecoin_psbt_free(psbt);
+    }
 
-    dogecoin_tx_in *in2 = dogecoin_tx_in_new();
-    memcpy(in2->prevout.hash, h2, 32); in2->prevout.n = 0;
-    in2->sequence = 0xFFFFFFFF;
-    cstr_free(in2->script_sig, true); in2->script_sig = cstr_new_sz(0);
-    vector_add(tx->vin, in2);
+    /* Valid v1: 1 P2PKH input with non_witness_utxo, 2 empty outputs */
+    {
+        static const char hex[] =
+            "70736274ff0100750200000001268171371edff285e937adeea4b37b78000c0566cbb3ad6"
+            "4641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5ba"
+            "c2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050"
+            "f24d3eeb93c9c03948bc787b32e1300000100fda5010100000000010289a3c71eab4d20e0"
+            "371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a"
+            "9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b"
+            "4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c435594"
+            "3abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c"
+            "62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a"
+            "6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229"
+            "f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02"
+            "db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f"
+            "210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309f"
+            "fb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2"
+            "592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab"
+            "300000000000000";
+        psbt = NULL;
+        u_assert_int_eq(dogecoin_psbt_from_hex(hex, &psbt), true);
+        u_assert_not_null(psbt);
+        u_assert_int_eq((int)psbt->num_inputs,  1);
+        u_assert_int_eq((int)psbt->num_outputs, 2);
+        u_assert_not_null(psbt->inputs[0].non_witness_utxo);
+        /* previous tx has 2 outputs */
+        u_assert_int_eq((int)psbt->inputs[0].non_witness_utxo->vout->len, 2);
+        u_assert_int_eq(psbt->inputs[0].has_sighash_type, false);
+        u_assert_int_eq((int)psbt->inputs[0].num_partial_sigs, 0);
+        dogecoin_psbt_free(psbt);
+    }
 
-    dogecoin_tx_out *out1 = dogecoin_tx_out_new();
-    out1->value = 100000000LL;
-    out1->script_pubkey = cstr_new_sz(25);
-    dogecoin_script_build_p2pkh(out1->script_pubkey, h3);
-    vector_add(tx->vout, out1);
+    /* Valid v3: same layout as v1 but the input map carries SIGHASH_ALL */
+    {
+        static const char hex[] =
+            "70736274ff0100750200000001268171371edff285e937adeea4b37b78000c0566cbb3ad6"
+            "4641713ca42171bf60000000000feffffff02d3dff505000000001976a914d0c59903c5ba"
+            "c2868760e90fd521a4665aa7652088ac00e1f5050000000017a9143545e6e33b832c47050"
+            "f24d3eeb93c9c03948bc787b32e1300000100fda5010100000000010289a3c71eab4d20e0"
+            "371bbba4cc698fa295c9463afa2e397f8533ccb62f9567e50100000017160014be18d152a"
+            "9b012039daf3da7de4f53349eecb985ffffffff86f8aa43a71dff1448893a530a7237ef6b"
+            "4608bbb2dd2d0171e63aec6a4890b40100000017160014fe3e9ef1a745e974d902c435594"
+            "3abcb34bd5353ffffffff0200c2eb0b000000001976a91485cff1097fd9e008bb34af709c"
+            "62197b38978a4888ac72fef84e2c00000017a914339725ba21efd62ac753a9bcd067d6c7a"
+            "6a39d05870247304402202712be22e0270f394f568311dc7ca9a68970b8025fdd3b240229"
+            "f07f8a5f3a240220018b38d7dcd314e734c9276bd6fb40f673325bc4baa144c800d2f2f02"
+            "db2765c012103d2e15674941bad4a996372cb87e1856d3652606d98562fe39c5e9e7e413f"
+            "210502483045022100d12b852d85dcd961d2f5f4ab660654df6eedcc794c0c33ce5cc309f"
+            "fb5fce58d022067338a8e0e1725c197fb1a88af59f51e44e4255b20167c8684031c05d1f2"
+            "592a01210223b72beef0965d10be0778efecd61fcac6f79a4ea169393380734464f84f2ab"
+            "30000000001030401000000000000";
+        psbt = NULL;
+        u_assert_int_eq(dogecoin_psbt_from_hex(hex, &psbt), true);
+        u_assert_not_null(psbt);
+        u_assert_int_eq((int)psbt->num_inputs,  1);
+        u_assert_int_eq((int)psbt->num_outputs, 2);
+        u_assert_not_null(psbt->inputs[0].non_witness_utxo);
+        u_assert_int_eq(psbt->inputs[0].has_sighash_type, true);
+        u_assert_int_eq((int)psbt->inputs[0].sighash_type, SIGHASH_ALL);
+        dogecoin_psbt_free(psbt);
+    }
 
-    dogecoin_tx_out *out2 = dogecoin_tx_out_new();
-    out2->value = 200000000LL;
-    out2->script_pubkey = cstr_new_sz(25);
-    uint8_t h4[20]; memset(h4, 0x3E, 20);
-    dogecoin_script_build_p2pkh(out2->script_pubkey, h4);
-    vector_add(tx->vout, out2);
+    /* Valid v7: unknown input fields are preserved across round-trip */
+    {
+        static const char hex[] =
+            "70736274ff01003f0200000001ffffffffffffffffffffffffffffffffffffffffffffffff"
+            "ffffffffffffffff0000000000ffffffff010000000000000000036a010000000000000a"
+            "f00102030405060708090f0102030405060708090a0b0c0d0e0f0000";
+        psbt = NULL;
+        u_assert_int_eq(dogecoin_psbt_from_hex(hex, &psbt), true);
+        u_assert_not_null(psbt);
+        u_assert_int_eq((int)psbt->num_inputs,  1);
+        u_assert_int_eq((int)psbt->num_outputs, 1);
+        u_assert_int_eq((int)psbt->inputs[0].num_unknowns, 1);
+        u_assert_int_eq((int)psbt->inputs[0].unknowns[0].key_len,   10);
+        u_assert_int_eq((int)psbt->inputs[0].unknowns[0].value_len, 15);
+        /* Re-serialised bytes must be identical — unknown fields round-trip */
+        char *reshex = dogecoin_psbt_to_hex(psbt);
+        u_assert_str_eq(reshex, hex);
+        dogecoin_free(reshex);
+        dogecoin_psbt_free(psbt);
+    }
 
-    dogecoin_psbt *psbt = dogecoin_psbt_create(tx);
-    dogecoin_tx_free(tx);
-    u_assert_not_null(psbt);
-    u_assert_int_eq((int)psbt->num_inputs,  2);
-    u_assert_int_eq((int)psbt->num_outputs, 2);
-    u_assert_int_eq(psbt->version, PSBT_VERSION_0);
-
-    /* Serialize → deserialize → re-serialize must match */
-    char *hex1 = dogecoin_psbt_to_hex(psbt);
-    u_assert_not_null(hex1);
-
-    dogecoin_psbt *psbt2 = NULL;
-    u_assert_int_eq(dogecoin_psbt_from_hex(hex1, &psbt2), true);
-    u_assert_not_null(psbt2);
-    u_assert_int_eq((int)psbt2->num_inputs,  2);
-    u_assert_int_eq((int)psbt2->num_outputs, 2);
-
-    char *hex2 = dogecoin_psbt_to_hex(psbt2);
-    u_assert_int_eq(strcmp(hex1, hex2), 0);
-
-    dogecoin_free(hex1);
-    dogecoin_free(hex2);
-    dogecoin_psbt_free(psbt);
-    dogecoin_psbt_free(psbt2);
 }
 
 /* ── Entry point ────────────────────────────────────────────── */
@@ -569,5 +707,6 @@ void test_psbt(void)
     test_psbt_combiner();
     test_psbt_roundtrip_full();
     test_psbt_invalid();
-    test_psbt_bip174_vector();
+    test_psbt_bip174_invalid_vectors();
+    test_psbt_bip174_valid_vectors();
 }
