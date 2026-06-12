@@ -76,12 +76,12 @@ void dogecoin_p2p_msg_getcfcheckpt_ser(const dogecoin_getcfcheckpt_msg *msg, cst
 dogecoin_bool dogecoin_p2p_msg_cfilter_deser(dogecoin_cfilter_msg *msg, struct const_buffer *buf) {
     if (!msg || !buf) return false;
 
-    /* block_hash (32 bytes) -- Dogecoin Core wire format puts hash first */
-    if (!deser_u256(msg->block_hash, buf)) return false;
-
-    /* filter_type (1 byte) */
+    /* filter_type (1 byte) -- BIP157: FilterType | BlockHash | NumFilterBytes | FilterBytes */
     if (buf->len < 1) return false;
     deser_bytes(&msg->filter_type, buf, 1);
+
+    /* block_hash (32 bytes) */
+    if (!deser_u256(msg->block_hash, buf)) return false;
 
     /* filter_data (var_bytes: compact_size + data) */
     uint32_t filter_len;

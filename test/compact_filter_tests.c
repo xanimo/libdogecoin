@@ -142,16 +142,16 @@ static void test_getcfcheckpt_ser(void)
 
 static void test_cfilter_deser(void)
 {
-    /* Dogecoin Core wire format: block_hash(32) | filter_type(1) | varint(len) | data */
+    /* BIP157 wire format: filter_type(1) | block_hash(32) | varint(len) | data */
     uint8_t block_hash[32];
     uint32_t i;
     for (i = 0; i < 32; i++) block_hash[i] = (uint8_t)i;
     const uint8_t filter_bytes[] = {0xDE, 0xAD, 0xBE, 0xEF};
 
     cstring *wire = cstr_new_sz(64);
-    ser_bytes(wire, block_hash, 32);
     uint8_t ft = GCS_BASIC_FILTER_TYPE;
     ser_bytes(wire, &ft, 1);
+    ser_bytes(wire, block_hash, 32);
     ser_varlen(wire, sizeof(filter_bytes));
     ser_bytes(wire, filter_bytes, sizeof(filter_bytes));
 
@@ -179,7 +179,7 @@ static void test_cfilter_deser_truncated(void)
     struct const_buffer buf = {short_buf, sizeof(short_buf)};
     dogecoin_cfilter_msg msg;
     dogecoin_cfilter_msg_init(&msg);
-    /* Only 10 bytes — not enough for 32-byte block_hash */
+    /* Only 10 bytes — not enough for filter_type(1) + block_hash(32) */
     u_assert_true(!dogecoin_p2p_msg_cfilter_deser(&msg, &buf));
     dogecoin_cfilter_msg_free(&msg);
 }
