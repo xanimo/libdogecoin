@@ -287,8 +287,12 @@ static void test_psbt_sign_finalize_extract(void)
     u_assert_not_null(psbt);
     dogecoin_tx_free(tx);
 
-    /* Build the UTXO (previous tx at the outpoint) */
+    /* Build the UTXO; fix prevout hash to match its actual txid (required by signer) */
     dogecoin_tx *utxo = make_prev_tx(hash160);
+    uint8_t utxo_txid[32];
+    dogecoin_tx_hash(utxo, utxo_txid);
+    dogecoin_tx_in *vin0 = vector_idx(psbt->tx->vin, 0);
+    memcpy(vin0->prevout.hash, utxo_txid, 32);
     u_assert_int_eq(dogecoin_psbt_input_set_utxo(psbt, 0, utxo), true);
     dogecoin_tx_free(utxo);
 
@@ -359,10 +363,15 @@ static void test_psbt_combiner(void)
     dogecoin_psbt *psbt2 = dogecoin_psbt_create(tx);
     dogecoin_tx_free(tx);
 
-    /* Each signer sets the UTXO (using key1's hash160, though not strictly
-     * verified here — we're testing combine, not signing correctness) */
+    /* Each signer sets the UTXO; prevout hash must match actual txid */
     uint8_t h1[20]; dogecoin_pubkey_get_hash160(&pub1, h1);
     dogecoin_tx *utxo = make_prev_tx(h1);
+    uint8_t utxo_txid[32];
+    dogecoin_tx_hash(utxo, utxo_txid);
+    dogecoin_tx_in *vin1 = vector_idx(psbt1->tx->vin, 0);
+    dogecoin_tx_in *vin2 = vector_idx(psbt2->tx->vin, 0);
+    memcpy(vin1->prevout.hash, utxo_txid, 32);
+    memcpy(vin2->prevout.hash, utxo_txid, 32);
     dogecoin_psbt_input_set_utxo(psbt1, 0, utxo);
     dogecoin_psbt_input_set_utxo(psbt2, 0, utxo);
     dogecoin_tx_free(utxo);
@@ -416,8 +425,12 @@ static void test_psbt_roundtrip_full(void)
     dogecoin_psbt *psbt = dogecoin_psbt_create(tx);
     dogecoin_tx_free(tx);
 
-    /* Set UTXO */
+    /* Set UTXO; prevout hash must match actual txid */
     dogecoin_tx *utxo = make_prev_tx(hash160);
+    uint8_t utxo_txid[32];
+    dogecoin_tx_hash(utxo, utxo_txid);
+    dogecoin_tx_in *vin0 = vector_idx(psbt->tx->vin, 0);
+    memcpy(vin0->prevout.hash, utxo_txid, 32);
     dogecoin_psbt_input_set_utxo(psbt, 0, utxo);
     dogecoin_tx_free(utxo);
 

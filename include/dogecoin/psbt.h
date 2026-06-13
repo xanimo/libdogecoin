@@ -44,7 +44,7 @@ LIBDOGECOIN_BEGIN_DECL
 /* ── Global key types ─────────────────────────────────────────── */
 #define PSBT_GLOBAL_UNSIGNED_TX  0x00u
 #define PSBT_GLOBAL_XPUB         0x01u
-#define PSBT_GLOBAL_VERSION      0xFBu  /* BIP370 */
+#define PSBT_GLOBAL_VERSION      0xFBu  /* BIP370 version field — preserved on round-trip; only v0 semantics implemented */
 
 /* ── Input key types ──────────────────────────────────────────── */
 #define PSBT_IN_NON_WITNESS_UTXO  0x00u
@@ -58,9 +58,9 @@ LIBDOGECOIN_BEGIN_DECL
 #define PSBT_OUT_REDEEM_SCRIPT    0x00u
 #define PSBT_OUT_BIP32_DERIVATION 0x02u
 
-/* PSBT version numbers (BIP370) */
+/* PSBT version constants — only BIP174 v0 semantics are implemented */
 #define PSBT_VERSION_0  0x00000000u
-#define PSBT_VERSION_2  0x00000002u
+#define PSBT_VERSION_2  0x00000002u  /* recognized in PSBT_GLOBAL_VERSION field; not fully implemented */
 
 /* Max per-field sizes */
 #define PSBT_MAX_PUBKEY_LEN  33u   /* compressed secp256k1 public key */
@@ -133,7 +133,7 @@ typedef struct dogecoin_psbt_output {
 /* ── Top-level PSBT (BIP174 §3.1) ────────────────────────────── */
 typedef struct dogecoin_psbt {
     dogecoin_tx          *tx;           /* global: unsigned transaction */
-    uint32_t              version;      /* global: PSBT version (BIP370) */
+    uint32_t              version;      /* global: version field (BIP370 §2.1.4); v0 semantics only */
 
     dogecoin_psbt_xpub   *xpubs;
     size_t                num_xpubs;

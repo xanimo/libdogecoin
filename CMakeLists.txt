@@ -388,6 +388,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pow.c
     src/png.c
     src/jpeg.c
+    src/psbt.c
     src/random.c
     src/rmd160.c
     src/script.c
@@ -542,6 +543,7 @@ IF(USE_TESTS)
         test/mem_tests.c
         test/moon_tests.c
         test/opreturn_tests.c
+        test/psbt_tests.c
         test/qr_tests.c
         test/random_tests.c
         test/rmd160_tests.c

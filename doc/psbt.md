@@ -57,7 +57,7 @@
 
 ## Introduction
 
-Partially Signed Dogecoin Transactions (PSBT) implement [BIP174](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki) (PSBTv0) and [BIP370](https://github.com/bitcoin/bips/blob/master/bip-0370.mediawiki) (PSBTv2). PSBT is a wire format that wraps an unsigned transaction together with per-input metadata — previous outputs, redeem scripts, partial signatures, BIP32 derivation paths — so that multiple independent parties (hardware wallets, air-gapped signers, co-signers in a multisig quorum) can each contribute signatures without ever sharing private keys or needing a live network connection.
+Partially Signed Dogecoin Transactions (PSBT) implement [BIP174](https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki) (PSBTv0). PSBT is a wire format that wraps an unsigned transaction together with per-input metadata — previous outputs, redeem scripts, partial signatures, BIP32 derivation paths — so that multiple independent parties (hardware wallets, air-gapped signers, co-signers in a multisig quorum) can each contribute signatures without ever sharing private keys or needing a live network connection. The [BIP370](https://github.com/bitcoin/bips/blob/master/bip-0370.mediawiki) global version field (`0xFB`) is preserved across serialize/deserialize round-trips but BIP370 v2 semantics are not implemented.
 
 A PSBT travels through up to six well-defined roles before the final signed transaction is produced:
 
@@ -131,7 +131,7 @@ Each key-value entry is:
 |----------|----------|-------|
 | `0x00` | (empty) | Serialized unsigned transaction |
 | `0x01` | 78-byte BIP32 xpub | Master fingerprint + derivation path |
-| `0xFB` | (empty) | PSBT version (BIP370; `0x02000000` for v2) |
+| `0xFB` | (empty) | PSBT version field (BIP370 §2.1.4); preserved on round-trip; only v0 semantics implemented |
 
 ### Per-Input Map
 

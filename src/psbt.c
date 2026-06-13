@@ -37,12 +37,105 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/portable_endian.h>
 #include <dogecoin/psbt.h>
+#include <dogecoin/rmd160.h>
 #include <dogecoin/script.h>
 #include <dogecoin/serialize.h>
+#include <dogecoin/sha2.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 
 /* ── Internal helpers ─────────────────────────────────────────── */
+
+/* Script-aware data push: emits the correct opcode(s) for length. */
+static void ser_script_push(cstring *s, const uint8_t *data, size_t len)
+{
+    if (len <= 75) {
+        uint8_t b = (uint8_t)len;
+        ser_bytes(s, &b, 1);
+    } else if (len <= 255) {
+        uint8_t hdr[2] = { 0x4c /* OP_PUSHDATA1 */, (uint8_t)len };
+        ser_bytes(s, hdr, 2);
+    } else {
+        uint8_t op = 0x4d; /* OP_PUSHDATA2 */
+        uint16_t n = htole16((uint16_t)len);
+        ser_bytes(s, &op, 1);
+        ser_bytes(s, (const uint8_t *)&n, 2);
+    }
+    ser_bytes(s, data, len);
+}
+
+/* HASH160 = RIPEMD160(SHA256(data)).  out must be 20 bytes. */
+static void hash160_buf(const uint8_t *data, size_t len, uint8_t out[20])
+{
+    uint8_t sha[SHA256_DIGEST_LENGTH];
+    sha256_raw(data, len, sha);
+    rmd160(sha, SHA256_DIGEST_LENGTH, out);
+}
+
+/*
+ * Parse a bare-multisig redeem script:
+ *   OP_m <pub_0> ... <pub_{n-1}> OP_n OP_CHECKMULTISIG
+ * Returns true and fills m_out, n_out, pubkeys[0..n-1], pubkey_lens[0..n-1].
+ * pubkeys[] point into script->str — do NOT free them.
+ */
+static dogecoin_bool psbt_parse_multisig(const cstring *script,
+                                          uint8_t *m_out, uint8_t *n_out,
+                                          const uint8_t *pubkeys[16],
+                                          uint8_t pubkey_lens[16])
+{
+    if (!script || script->len < 3) return false;
+    const uint8_t *p   = (const uint8_t *)script->str;
+    const uint8_t *end = p + script->len;
+
+    if (*p < 0x51 || *p > 0x60) return false;   /* OP_1..OP_16 */
+    uint8_t m = *p - 0x50;
+    p++;
+
+    uint8_t n = 0;
+    while (p < end && (*p == 0x21 || *p == 0x41)) {
+        uint8_t pklen = *p++;
+        if (p + pklen > end || n >= 16) return false;
+        pubkeys[n]     = p;
+        pubkey_lens[n] = pklen;
+        n++;
+        p += pklen;
+    }
+    if (n == 0) return false;
+
+    if (p >= end || *p < 0x51 || *p > 0x60) return false;  /* OP_n */
+    if (*p - 0x50 != n) return false;
+    p++;
+
+    if (p >= end || *p != 0xae /* OP_CHECKMULTISIG */) return false;
+    p++;
+
+    if (p != end || m > n) return false;
+
+    *m_out = m;
+    *n_out = n;
+    return true;
+}
+
+/* Clear per-input signing fields after finalization (BIP174 §Finalizer). */
+static void psbt_input_finalized_clear(dogecoin_psbt_input *in)
+{
+    dogecoin_free(in->partial_sigs);
+    in->partial_sigs     = NULL;
+    in->num_partial_sigs = 0;
+
+    in->has_sighash_type = false;
+    in->sighash_type     = 0;
+
+    if (in->redeem_script) {
+        cstr_free(in->redeem_script, true);
+        in->redeem_script = NULL;
+    }
+    for (size_t i = 0; i < in->num_keypaths; i++)
+        dogecoin_free(in->keypaths[i].path);
+    dogecoin_free(in->keypaths);
+    in->keypaths     = NULL;
+    in->num_keypaths = 0;
+}
 
 static void ser_psbt_kv(cstring *s,
                         const uint8_t *key, size_t klen,
@@ -389,7 +482,13 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 x->path[i] = le32toh(c);
             }
         } else {
-            /* Store as unknown */
+            /* Duplicate unknown key is invalid (BIP174 §Encoding) */
+            for (size_t k = 0; k < psbt->num_unknowns; k++) {
+                if (psbt->unknowns[k].key_len == klen &&
+                    memcmp(psbt->unknowns[k].key, key, klen) == 0) {
+                    dogecoin_free(key); dogecoin_free(val); goto fail;
+                }
+            }
             psbt->unknowns = dogecoin_realloc(psbt->unknowns,
                                  (psbt->num_unknowns + 1) * sizeof(*psbt->unknowns));
             dogecoin_psbt_unknown *u = &psbt->unknowns[psbt->num_unknowns++];
@@ -423,15 +522,17 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 }
             } else if (type == PSBT_IN_PARTIAL_SIG && klen >= 34 && klen <= 66) {
                 /* key: 0x02 + pubkey (33 or 65 bytes) */
+                if (vlen == 0 || vlen > PSBT_MAX_SIG_LEN) {
+                    dogecoin_free(key); dogecoin_free(val); goto fail;
+                }
                 size_t pklen = klen - 1;
                 in->partial_sigs = dogecoin_realloc(in->partial_sigs,
                     (in->num_partial_sigs + 1) * sizeof(*in->partial_sigs));
                 dogecoin_psbt_partialsig *ps = &in->partial_sigs[in->num_partial_sigs++];
                 memcpy(ps->pubkey, key + 1, pklen);
                 ps->pubkey_len = pklen;
-                size_t slen = vlen < PSBT_MAX_SIG_LEN ? vlen : PSBT_MAX_SIG_LEN;
-                memcpy(ps->sig, val, slen);
-                ps->sig_len = slen;
+                memcpy(ps->sig, val, vlen);
+                ps->sig_len = vlen;
             } else if (type == PSBT_IN_SIGHASH_TYPE && klen == 1) {
                 if (vlen != 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 uint32_t sh; memcpy(&sh, val, 4); in->sighash_type = le32toh(sh);
@@ -458,6 +559,12 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 if (in->final_script_sig) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 in->final_script_sig = cstr_new_buf((const char *)val, vlen);
             } else {
+                for (size_t k = 0; k < in->num_unknowns; k++) {
+                    if (in->unknowns[k].key_len == klen &&
+                        memcmp(in->unknowns[k].key, key, klen) == 0) {
+                        dogecoin_free(key); dogecoin_free(val); goto fail;
+                    }
+                }
                 in->unknowns = dogecoin_realloc(in->unknowns,
                     (in->num_unknowns + 1) * sizeof(*in->unknowns));
                 dogecoin_psbt_unknown *u = &in->unknowns[in->num_unknowns++];
@@ -499,6 +606,12 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                     uint32_t c; memcpy(&c, val + 4 + k * 4, 4); kp->path[k] = le32toh(c);
                 }
             } else {
+                for (size_t k = 0; k < out->num_unknowns; k++) {
+                    if (out->unknowns[k].key_len == klen &&
+                        memcmp(out->unknowns[k].key, key, klen) == 0) {
+                        dogecoin_free(key); dogecoin_free(val); goto fail;
+                    }
+                }
                 out->unknowns = dogecoin_realloc(out->unknowns,
                     (out->num_unknowns + 1) * sizeof(*out->unknowns));
                 dogecoin_psbt_unknown *u = &out->unknowns[out->num_unknowns++];
@@ -659,26 +772,50 @@ dogecoin_bool dogecoin_psbt_output_add_keypath(dogecoin_psbt *psbt, size_t idx,
 
 /* ── Signer ───────────────────────────────────────────────────── */
 
-/* Return the scriptPubKey for the prevout of input i.
- * For non-witness UTXO: look up the output at the vout index. */
+/*
+ * Return the scriptCode for signing input i, performing mandatory BIP174
+ * signer checks:
+ *  (a) non_witness_utxo.txid must match the input's prevout hash
+ *  (b) for P2SH: HASH160(redeem_script) must match the scriptPubKey hash
+ *
+ * Returns NULL if any check fails or no UTXO is present.
+ * Note: signing without a UTXO is intentionally rejected — the "redeem
+ * script only" path was an unsafe fallback that let unverified scripts be
+ * signed.
+ */
 static cstring *psbt_get_script_for_input(const dogecoin_psbt *psbt, size_t i)
 {
     const dogecoin_psbt_input *in = &psbt->inputs[i];
+    if (!in->non_witness_utxo) return NULL;   /* require UTXO for signing */
+
     dogecoin_tx_in *txin = vector_idx(psbt->tx->vin, i);
 
-    if (in->non_witness_utxo) {
-        uint32_t vout = txin->prevout.n;
-        if (!in->non_witness_utxo->vout ||
-            vout >= in->non_witness_utxo->vout->len) return NULL;
-        dogecoin_tx_out *txout = vector_idx(in->non_witness_utxo->vout, vout);
-        if (!txout->script_pubkey) return NULL;
-        /* If a redeem script is present (P2SH), the scriptCode is the redeem script. */
-        if (in->redeem_script) return in->redeem_script;
-        return txout->script_pubkey;
+    /* (a) txid of provided UTXO must match prevout hash */
+    uint256_t utxo_txid;
+    dogecoin_tx_hash(in->non_witness_utxo, utxo_txid);
+    if (memcmp(utxo_txid, txin->prevout.hash, 32) != 0) return NULL;
+
+    uint32_t vout = txin->prevout.n;
+    if (!in->non_witness_utxo->vout || vout >= in->non_witness_utxo->vout->len)
+        return NULL;
+    dogecoin_tx_out *txout = vector_idx(in->non_witness_utxo->vout, vout);
+    if (!txout->script_pubkey) return NULL;
+
+    if (in->redeem_script) {
+        /* (b) P2SH: verify HASH160(redeem_script) == scriptPubKey[2..21] */
+        const cstring *spk = txout->script_pubkey;
+        if (spk->len != 23 ||
+            (uint8_t)spk->str[0] != 0xa9 ||
+            (uint8_t)spk->str[1] != 0x14 ||
+            (uint8_t)spk->str[22] != 0x87) return NULL;  /* not P2SH */
+        uint8_t h160[20];
+        hash160_buf((const uint8_t *)in->redeem_script->str,
+                    in->redeem_script->len, h160);
+        if (memcmp(h160, (const uint8_t *)spk->str + 2, 20) != 0) return NULL;
+        return in->redeem_script;
     }
-    /* Redeem script without UTXO: use it directly */
-    if (in->redeem_script) return in->redeem_script;
-    return NULL;
+
+    return txout->script_pubkey;
 }
 
 dogecoin_bool dogecoin_psbt_sign_input(dogecoin_psbt *psbt, size_t idx,
@@ -828,6 +965,29 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
                 if (sk->path_len) memcpy(nk->path, sk->path, sk->path_len * 4);
             }
         }
+
+        /* Merge per-input unknowns */
+        for (size_t j = 0; j < si->num_unknowns; j++) {
+            const dogecoin_psbt_unknown *su = &si->unknowns[j];
+            dogecoin_bool found = false;
+            for (size_t k = 0; k < di->num_unknowns; k++) {
+                if (di->unknowns[k].key_len == su->key_len &&
+                    memcmp(di->unknowns[k].key, su->key, su->key_len) == 0) {
+                    found = true; break;
+                }
+            }
+            if (!found) {
+                di->unknowns = dogecoin_realloc(di->unknowns,
+                    (di->num_unknowns + 1) * sizeof(*di->unknowns));
+                dogecoin_psbt_unknown *nu = &di->unknowns[di->num_unknowns++];
+                nu->key_len = su->key_len;
+                nu->key = dogecoin_malloc(su->key_len);
+                memcpy(nu->key, su->key, su->key_len);
+                nu->value_len = su->value_len;
+                nu->value = su->value_len ? dogecoin_malloc(su->value_len) : NULL;
+                if (su->value_len) memcpy(nu->value, su->value, su->value_len);
+            }
+        }
     }
 
     for (size_t i = 0; i < dst->num_outputs; i++) {
@@ -853,7 +1013,75 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
                 if (sk->path_len) memcpy(nk->path, sk->path, sk->path_len * 4);
             }
         }
+
+        /* Merge per-output unknowns */
+        for (size_t j = 0; j < sout->num_unknowns; j++) {
+            const dogecoin_psbt_unknown *su = &sout->unknowns[j];
+            dogecoin_bool found = false;
+            for (size_t k = 0; k < dout->num_unknowns; k++) {
+                if (dout->unknowns[k].key_len == su->key_len &&
+                    memcmp(dout->unknowns[k].key, su->key, su->key_len) == 0) {
+                    found = true; break;
+                }
+            }
+            if (!found) {
+                dout->unknowns = dogecoin_realloc(dout->unknowns,
+                    (dout->num_unknowns + 1) * sizeof(*dout->unknowns));
+                dogecoin_psbt_unknown *nu = &dout->unknowns[dout->num_unknowns++];
+                nu->key_len = su->key_len;
+                nu->key = dogecoin_malloc(su->key_len);
+                memcpy(nu->key, su->key, su->key_len);
+                nu->value_len = su->value_len;
+                nu->value = su->value_len ? dogecoin_malloc(su->value_len) : NULL;
+                if (su->value_len) memcpy(nu->value, su->value, su->value_len);
+            }
+        }
     }
+
+    /* Merge global xpubs */
+    for (size_t i = 0; i < src->num_xpubs; i++) {
+        const dogecoin_psbt_xpub *sx = &src->xpubs[i];
+        dogecoin_bool found = false;
+        for (size_t k = 0; k < dst->num_xpubs; k++) {
+            if (memcmp(dst->xpubs[k].xpub, sx->xpub, 78) == 0) {
+                found = true; break;
+            }
+        }
+        if (!found) {
+            dst->xpubs = dogecoin_realloc(dst->xpubs,
+                (dst->num_xpubs + 1) * sizeof(*dst->xpubs));
+            dogecoin_psbt_xpub *nx = &dst->xpubs[dst->num_xpubs++];
+            memcpy(nx->xpub, sx->xpub, 78);
+            nx->fingerprint = sx->fingerprint;
+            nx->path_len = sx->path_len;
+            nx->path = sx->path_len ? dogecoin_malloc(sx->path_len * 4) : NULL;
+            if (sx->path_len) memcpy(nx->path, sx->path, sx->path_len * 4);
+        }
+    }
+
+    /* Merge global unknowns */
+    for (size_t i = 0; i < src->num_unknowns; i++) {
+        const dogecoin_psbt_unknown *su = &src->unknowns[i];
+        dogecoin_bool found = false;
+        for (size_t k = 0; k < dst->num_unknowns; k++) {
+            if (dst->unknowns[k].key_len == su->key_len &&
+                memcmp(dst->unknowns[k].key, su->key, su->key_len) == 0) {
+                found = true; break;
+            }
+        }
+        if (!found) {
+            dst->unknowns = dogecoin_realloc(dst->unknowns,
+                (dst->num_unknowns + 1) * sizeof(*dst->unknowns));
+            dogecoin_psbt_unknown *nu = &dst->unknowns[dst->num_unknowns++];
+            nu->key_len = su->key_len;
+            nu->key = dogecoin_malloc(su->key_len);
+            memcpy(nu->key, su->key, su->key_len);
+            nu->value_len = su->value_len;
+            nu->value = su->value_len ? dogecoin_malloc(su->value_len) : NULL;
+            if (su->value_len) memcpy(nu->value, su->value, su->value_len);
+        }
+    }
+
     return true;
 }
 
@@ -871,26 +1099,34 @@ dogecoin_bool dogecoin_psbt_finalize_input(dogecoin_psbt *psbt, size_t idx)
 
     if (in->final_script_sig) return true; /* already finalized */
 
-    cstring *script = psbt_get_script_for_input(psbt, idx);
-    if (!script) return false;
+    /* Resolve the scriptPubKey / scriptCode for this input.
+     * For finalization we look directly at the stored UTXO — we need the
+     * outer scriptPubKey to classify the spending path. */
+    if (!in->non_witness_utxo) return false;
+    dogecoin_tx_in *txin = vector_idx(psbt->tx->vin, idx);
+    uint32_t vout_idx = txin->prevout.n;
+    if (!in->non_witness_utxo->vout ||
+        vout_idx >= in->non_witness_utxo->vout->len) return false;
+    dogecoin_tx_out *txout = vector_idx(in->non_witness_utxo->vout, vout_idx);
+    if (!txout->script_pubkey) return false;
 
-    enum dogecoin_tx_out_type type = dogecoin_script_classify(script, NULL);
+    enum dogecoin_tx_out_type type =
+        dogecoin_script_classify(txout->script_pubkey, NULL);
 
     if (type == DOGECOIN_TX_PUBKEYHASH) {
         /* Standard P2PKH: exactly one partial sig required */
         if (in->num_partial_sigs != 1) return false;
         dogecoin_psbt_partialsig *ps = &in->partial_sigs[0];
         cstring *ss = cstr_new_sz(150);
-        ser_varlen(ss, (uint32_t)ps->sig_len);
-        ser_bytes(ss, ps->sig, ps->sig_len);
-        ser_varlen(ss, (uint32_t)ps->pubkey_len);
-        ser_bytes(ss, ps->pubkey, ps->pubkey_len);
+        ser_script_push(ss, ps->sig, ps->sig_len);
+        ser_script_push(ss, ps->pubkey, ps->pubkey_len);
         in->final_script_sig = ss;
+        psbt_input_finalized_clear(in);
         return true;
     }
 
     if (type == DOGECOIN_TX_SCRIPTHASH && in->redeem_script) {
-        /* P2SH: classify redeem script to decide how to finalize */
+        /* P2SH: classify the redeem script to determine the inner spend path */
         enum dogecoin_tx_out_type inner =
             dogecoin_script_classify(in->redeem_script, NULL);
 
@@ -898,30 +1134,46 @@ dogecoin_bool dogecoin_psbt_finalize_input(dogecoin_psbt *psbt, size_t idx)
             if (in->num_partial_sigs != 1) return false;
             dogecoin_psbt_partialsig *ps = &in->partial_sigs[0];
             cstring *ss = cstr_new_sz(200);
-            ser_varlen(ss, (uint32_t)ps->sig_len);
-            ser_bytes(ss, ps->sig, ps->sig_len);
-            ser_varlen(ss, (uint32_t)ps->pubkey_len);
-            ser_bytes(ss, ps->pubkey, ps->pubkey_len);
-            /* push redeem script */
-            ser_varlen(ss, (uint32_t)in->redeem_script->len);
-            ser_bytes(ss, (const uint8_t *)in->redeem_script->str, in->redeem_script->len);
+            ser_script_push(ss, ps->sig, ps->sig_len);
+            ser_script_push(ss, ps->pubkey, ps->pubkey_len);
+            ser_script_push(ss, (const uint8_t *)in->redeem_script->str,
+                            in->redeem_script->len);
             in->final_script_sig = ss;
+            psbt_input_finalized_clear(in);
             return true;
         }
 
         if (inner == DOGECOIN_TX_MULTISIG) {
-            /* OP_0 <sig1> [<sig2>...] <redeem_script> */
+            uint8_t m, n;
+            const uint8_t *pubkeys[16];
+            uint8_t pubkey_lens[16];
+            if (!psbt_parse_multisig(in->redeem_script, &m, &n,
+                                     pubkeys, pubkey_lens)) return false;
+            if (in->num_partial_sigs < (size_t)m) return false;
+
+            /* OP_0 <sigs in pubkey order, exactly m> <redeem_script> */
             cstring *ss = cstr_new_sz(300);
             uint8_t op0 = 0x00;
-            ser_bytes(ss, &op0, 1); /* OP_0 */
-            for (size_t j = 0; j < in->num_partial_sigs; j++) {
-                dogecoin_psbt_partialsig *ps = &in->partial_sigs[j];
-                ser_varlen(ss, (uint32_t)ps->sig_len);
-                ser_bytes(ss, ps->sig, ps->sig_len);
+            ser_bytes(ss, &op0, 1); /* OP_0 (CHECKMULTISIG bug dummy) */
+
+            uint8_t pushed = 0;
+            for (size_t ki = 0; ki < n && pushed < m; ki++) {
+                for (size_t j = 0; j < in->num_partial_sigs; j++) {
+                    dogecoin_psbt_partialsig *ps = &in->partial_sigs[j];
+                    if (ps->pubkey_len == pubkey_lens[ki] &&
+                        memcmp(ps->pubkey, pubkeys[ki], pubkey_lens[ki]) == 0) {
+                        ser_script_push(ss, ps->sig, ps->sig_len);
+                        pushed++;
+                        break;
+                    }
+                }
             }
-            ser_varlen(ss, (uint32_t)in->redeem_script->len);
-            ser_bytes(ss, (const uint8_t *)in->redeem_script->str, in->redeem_script->len);
+            if (pushed < m) { cstr_free(ss, true); return false; }
+
+            ser_script_push(ss, (const uint8_t *)in->redeem_script->str,
+                            in->redeem_script->len);
             in->final_script_sig = ss;
+            psbt_input_finalized_clear(in);
             return true;
         }
     }
