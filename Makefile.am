@@ -18,6 +18,8 @@ libdogecoin: src/secp256k1
 includedir = $(prefix)/include/dogecoin
 
 lib_LTLIBRARIES = libdogecoin.la
+noinst_LTLIBRARIES =
+libdogecoin_la_DEPENDENCIES =
 include_HEADERS = \
     include/dogecoin/constants.h \
     include/dogecoin/dogecoin.h \
@@ -184,7 +186,7 @@ ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
 ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
 ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
 
-libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
+libdogecoin_la_DEPENDENCIES += $(ASM_LIB_FILES)
 
 CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
 endif
@@ -203,10 +205,24 @@ ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
 ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
 ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
 
-libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
+libdogecoin_la_DEPENDENCIES += $(ASM_LIB_FILES)
 
 CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
 endif
+endif
+
+if USE_AVX2
+noinst_LTLIBRARIES += libdogecoin_sha256_avx2.la
+libdogecoin_sha256_avx2_la_SOURCES = src/crypto/sha256_avx2.c
+libdogecoin_sha256_avx2_la_CFLAGS = $(libdogecoin_la_CFLAGS) -mavx2
+endif
+
+if USE_SSE4
+noinst_LTLIBRARIES += libdogecoin_sha256_sse4.la
+libdogecoin_sha256_sse4_la_SOURCES = \
+    src/crypto/sha256_sse41.c \
+    src/crypto/sha256_sse4.c
+libdogecoin_sha256_sse4_la_CFLAGS = $(libdogecoin_la_CFLAGS) -msse4.1
 endif
 
 if USE_SSE2
@@ -220,6 +236,14 @@ libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/includ
 # USE_AVX2 / USE_SSE asm blocks above is active at a time (the SSE block
 # is gated by !USE_AVX2), so $(ASM_LIB_FILES) is unambiguous.
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
+if USE_AVX2
+libdogecoin_la_LIBADD += libdogecoin_sha256_avx2.la
+libdogecoin_la_DEPENDENCIES += libdogecoin_sha256_avx2.la
+endif
+if USE_SSE4
+libdogecoin_la_LIBADD += libdogecoin_sha256_sse4.la
+libdogecoin_la_DEPENDENCIES += libdogecoin_sha256_sse4.la
+endif
 
 if HAVE_MCL
 # mcl BN254 flags.

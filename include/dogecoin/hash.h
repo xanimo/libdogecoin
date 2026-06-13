@@ -74,6 +74,11 @@ LIBDOGECOIN_API static inline dogecoin_bool dogecoin_dblhash(const unsigned char
     return true;
 }
 
+LIBDOGECOIN_API static inline void dogecoin_hash_2_inputs(const uint8_t* left, const uint8_t* right, uint256_t hashout)
+{
+    sha256d_2_input(left, right, hashout);
+}
+
 LIBDOGECOIN_API static inline void dogecoin_hash_sngl_sha256(const unsigned char* datain, size_t length, uint256_t hashout)
 {
     sha256_raw(datain, length, hashout); // single sha256 hash

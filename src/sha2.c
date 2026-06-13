@@ -206,8 +206,28 @@ extern void sha1_block_avx(const void *, void *);
 extern void sha256_block_sse(const void *, void *);
 extern void sha256_block_avx(const void *, void *);
 
+#if defined(USE_SSE4) && (defined(__x86_64__) || defined(__amd64__))
+extern void libdogecoin_sha256_sse4_transform(uint32_t* s, const unsigned char* chunk, size_t blocks);
+#define LIBDOGECOIN_HAVE_SHA256_SSE4 1
+#endif
+
 extern void sha512_block_sse(const void *, void *);
 extern void sha512_block_avx(const void *, void *);
+
+/*
+ * Multi-way SHA-256 double-hash kernels (Bitcoin Core style).
+ * Each routine consumes N blocks of 64 input bytes and produces N blocks of 32
+ * output bytes, where N = 4 for SSE4.1 and N = 8 for AVX2. They are only
+ * defined on x86 builds with the corresponding ISA enabled.
+ */
+#if defined(USE_AVX2) && (defined(__x86_64__) || defined(__amd64__) || defined(__i386__))
+extern void libdogecoin_sha256d64_avx2(unsigned char* out, const unsigned char* in);
+#define LIBDOGECOIN_HAVE_SHA256D64_AVX2 1
+#endif
+#if defined(USE_SSE4) && (defined(__x86_64__) || defined(__amd64__) || defined(__i386__))
+extern void libdogecoin_sha256d64_sse41(unsigned char* out, const unsigned char* in);
+#define LIBDOGECOIN_HAVE_SHA256D64_SSE41 1
+#endif
 
 /*** SHA-XYZ INITIAL HASH VALUES AND CONSTANTS ************************/
 
@@ -269,7 +289,7 @@ static const uint32_t K[] =
 #endif
 
 /* Hash constant words K for SHA-256: */
-#if !(defined(USE_AVX2) || defined(USE_SSE) || defined(USE_ARMV8) || defined(USE_ARMV82))
+#if !(defined(USE_AVX2) || defined(USE_SSE) || defined(USE_SSE4) || defined(USE_ARMV8) || defined(USE_ARMV82))
 static const sha2_word32 K256[64] = {
     0x428a2f98UL,
     0x71374491UL,
@@ -946,6 +966,8 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
     sha256_block_avx(data, context->state);
 #elif defined(USE_SSE) /* Use SSE-optimized SHA-256 transform */
     sha256_block_sse(data, context->state);
+#elif defined(LIBDOGECOIN_HAVE_SHA256_SSE4) /* Use SSE4-optimized SHA-256 transform */
+    libdogecoin_sha256_sse4_transform(context->state, (const unsigned char *)data, 1);
 #elif defined(USE_ARMV8) || defined(USE_ARMV82) /* Use ARMv8-optimized SHA-256 transform */
     sha256_transform_armv8(context->state, (const unsigned char *)data);
 #else
@@ -1289,6 +1311,100 @@ void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_
     sha256_init(&context);
     sha256_write(&context, data, len);
     sha256_finalize(&context, digest);
+}
+
+void sha256d64(const uint8_t* input, size_t blocks, uint8_t* digest)
+{
+    sha2_word64* length_ptr;
+    sha2_word64 bitcount;
+    sha256_context context;
+    uint8_t block[SHA256_BLOCK_LENGTH];
+    uint8_t mid[SHA256_DIGEST_LENGTH];
+
+    /*
+     * SIMD multi-way kernels: process 8 (AVX2) or 4 (SSE4.1) 64-byte blocks at
+     * a time, doing both SHA-256 rounds in parallel across lanes. This matches
+     * the SHA256D64 fast-path used by Bitcoin/Dogecoin Core for merkle leaf
+     * hashing.
+     */
+#ifdef LIBDOGECOIN_HAVE_SHA256D64_AVX2
+    while (blocks >= 8) {
+        libdogecoin_sha256d64_avx2(digest, input);
+        input += 8 * SHA256_BLOCK_LENGTH;
+        digest += 8 * SHA256_DIGEST_LENGTH;
+        blocks -= 8;
+    }
+#endif
+#ifdef LIBDOGECOIN_HAVE_SHA256D64_SSE41
+    while (blocks >= 4) {
+        libdogecoin_sha256d64_sse41(digest, input);
+        input += 4 * SHA256_BLOCK_LENGTH;
+        digest += 4 * SHA256_DIGEST_LENGTH;
+        blocks -= 4;
+    }
+#endif
+
+    while (blocks--) {
+        sha256_init(&context);
+        sha256_transform(&context, (const sha2_word32*)input);
+
+        MEMSET_BZERO(block, sizeof(block));
+        block[0] = 0x80;
+        bitcount = SHA256_BLOCK_LENGTH << 3;
+#if BYTE_ORDER == LITTLE_ENDIAN
+        REVERSE64(bitcount, bitcount);
+#endif
+        length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
+        *length_ptr = bitcount;
+        sha256_transform(&context, (const sha2_word32*)block);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+        for (int j = 0; j < 8; j++) {
+            sha2_word32 word = context.state[j];
+            REVERSE32(word, word);
+            memcpy_safe(mid + (j * sizeof(word)), &word, sizeof(word));
+        }
+#else
+        MEMCPY_BCOPY(mid, context.state, SHA256_DIGEST_LENGTH);
+#endif
+
+        sha256_init(&context);
+        MEMSET_BZERO(block, sizeof(block));
+        MEMCPY_BCOPY(block, mid, SHA256_DIGEST_LENGTH);
+        block[SHA256_DIGEST_LENGTH] = 0x80;
+        bitcount = SHA256_DIGEST_LENGTH << 3;
+#if BYTE_ORDER == LITTLE_ENDIAN
+        REVERSE64(bitcount, bitcount);
+#endif
+        length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
+        *length_ptr = bitcount;
+        sha256_transform(&context, (const sha2_word32*)block);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+        for (int j = 0; j < 8; j++) {
+            sha2_word32 word = context.state[j];
+            REVERSE32(word, word);
+            memcpy_safe(digest + (j * sizeof(word)), &word, sizeof(word));
+        }
+#else
+        MEMCPY_BCOPY(digest, context.state, SHA256_DIGEST_LENGTH);
+#endif
+        input += SHA256_BLOCK_LENGTH;
+        digest += SHA256_DIGEST_LENGTH;
+    }
+
+    MEMSET_BZERO(mid, sizeof(mid));
+    MEMSET_BZERO(block, sizeof(block));
+    MEMSET_BZERO(&context, sizeof(context));
+}
+
+void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t right[SHA256_DIGEST_LENGTH], uint8_t digest[SHA256_DIGEST_LENGTH])
+{
+    uint8_t block[SHA256_BLOCK_LENGTH];
+    MEMCPY_BCOPY(block, left, SHA256_DIGEST_LENGTH);
+    MEMCPY_BCOPY(block + SHA256_DIGEST_LENGTH, right, SHA256_DIGEST_LENGTH);
+    sha256d64(block, 1, digest);
+    MEMSET_BZERO(block, sizeof(block));
 }
 
 void sha256_reset(sha256_context* ctx) {
