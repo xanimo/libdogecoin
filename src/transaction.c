@@ -882,7 +882,7 @@ int sign_raw_transaction_ex(int    inputindex,
     // sign
     uint8_t sigcompact[64] = {0};
     size_t sigderlen = 75;
-    uint8_t sigder_plus_hashtype[75];
+    uint8_t sigder_plus_hashtype[75] = {0};
     enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(
         txtmp, script, &key,
         inputindex, sighashtype,
