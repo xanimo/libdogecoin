@@ -208,6 +208,8 @@ static struct option long_options[] = {
         {"cf_workers", required_argument, NULL, 'W'},
         {"genesis_headers", no_argument, NULL, 'H'},
         {"logfile", required_argument, NULL, 'L'},
+        {"cfheaders_path", required_argument, NULL, 257},
+        {"cfilters_path",  required_argument, NULL, 258},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -522,6 +524,8 @@ int main(int argc, char* argv[]) {
     dogecoin_bool genesis_headers = false;
     int selected_checkpoint_index = -1;
     char* logfile = NULL;
+    char* cfheaders_path = NULL;
+    char* cfilters_path  = NULL;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
         print_usage();
@@ -633,6 +637,12 @@ int main(int argc, char* argv[]) {
                 case 'L':
                     logfile = optarg;
                     break;
+                case 257:
+                    cfheaders_path = optarg;
+                    break;
+                case 258:
+                    cfilters_path = optarg;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -661,6 +671,11 @@ int main(int argc, char* argv[]) {
             dogecoin_spv_enable_smpv(client, true);
             printf("[smpv] enabled via CLI flag\n");
         }
+        if (cfheaders_path)
+            client->cfheaders_path = strdup(cfheaders_path);
+        if (cfilters_path)
+            client->cfilters_path = strdup(cfilters_path);
+
         if (no_cfilters || full_sync) {
             /* Disable BIP157 compact filter sync when:
              *  - user explicitly passed --no_cfilters (-e)

@@ -171,6 +171,10 @@ typedef struct dogecoin_spv_client_
     /* BIP157: compact filter sync state */
     dogecoin_bool compact_filters_enabled; /**< Whether compact filter sync is active */
     dogecoin_compact_filter_state *cfilter_state; /**< BIP157 per-client compact filter state */
+    struct dogecoin_cfheaders_db_ *cfheaders_db;  /**< Persistent storage for BIP157 filter headers */
+    struct dogecoin_cfilters_db_  *cfilters_db;   /**< Persistent storage for BIP157 filter data */
+    char *cfheaders_path;  /**< Override path for cfheaders.dat (NULL = default datadir) */
+    char *cfilters_path;   /**< Override path for cfilters.dat (NULL = default datadir) */
 
     /* BIP158 filter header computation during full block sync */
     uint256_t cf_prev_filter_header;   /**< Running filter header chain for BIP158 */

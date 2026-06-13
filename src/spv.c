@@ -1261,8 +1261,10 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->cf_export_enabled = false;
 
     /* BIP157 persistent filter storage (opened in dogecoin_spv_client_load) */
-    client->cfheaders_db = NULL;
-    client->cfilters_db  = NULL;
+    client->cfheaders_db  = NULL;
+    client->cfilters_db   = NULL;
+    client->cfheaders_path = NULL;
+    client->cfilters_path  = NULL;
 
     client->peer_ips = NULL;
 
@@ -1364,6 +1366,14 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         dogecoin_cfilters_db_free(client->cfilters_db);
         client->cfilters_db = NULL;
     }
+    if (client->cfheaders_path) {
+        dogecoin_free(client->cfheaders_path);
+        client->cfheaders_path = NULL;
+    }
+    if (client->cfilters_path) {
+        dogecoin_free(client->cfilters_path);
+        client->cfilters_path = NULL;
+    }
 
     if (client->peer_ips) {
         dogecoin_free(client->peer_ips);
@@ -1447,8 +1457,29 @@ dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client *client, const char *
     if (!client->headers_db)
         return false;
 
-    return client->headers_db->load(client->headers_db_ctx, file_path, prompt);
+    if (!client->headers_db->load(client->headers_db_ctx, file_path, prompt))
+        return false;
 
+    /* Open BIP157 persistent filter databases when compact filter sync is enabled */
+    if (client->compact_filters_enabled && client->cfilter_state) {
+        dogecoin_bool inmem = (file_path && strcmp(file_path, ":memory:") == 0);
+
+        client->cfheaders_db = dogecoin_cfheaders_db_new(inmem);
+        if (!dogecoin_cfheaders_db_load(client->cfheaders_db, client->cfheaders_path, client->cfilter_state)) {
+            fprintf(stderr, "spv: failed to open cfheaders.dat; continuing without persistence\n");
+            dogecoin_cfheaders_db_free(client->cfheaders_db);
+            client->cfheaders_db = NULL;
+        }
+
+        client->cfilters_db = dogecoin_cfilters_db_new(inmem);
+        if (!dogecoin_cfilters_db_load(client->cfilters_db, client->cfilters_path)) {
+            fprintf(stderr, "spv: failed to open cfilters.dat; continuing without persistence\n");
+            dogecoin_cfilters_db_free(client->cfilters_db);
+            client->cfilters_db = NULL;
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -1775,7 +1806,8 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         }
     }
 
-    if (nodes_at_same_height >= COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT && !client->called_sync_completed && client->sync_completed)
+    if (nodes_at_same_height >= COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT && !client->called_sync_completed && client->sync_completed
+        && !client->compact_filters_enabled)
     {
         client->sync_completed(client);
         client->called_sync_completed = true;
@@ -2562,7 +2594,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             // we check if the height is greater than or equal to the node's bestknown height minus 5 minutes
             if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
                 // last requested block reached, consider stop syncing
-                if (!client->called_sync_completed && client->sync_completed) {
+                if (!client->called_sync_completed && client->sync_completed
+                    && !client->compact_filters_enabled) { /* BIP157: defer to cfilter completion */
                     // enable mempool requests if smpv is enabled
                     if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
                     client->sync_completed(client);
@@ -2932,7 +2965,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         if (dogecoin_hash_equal((uint8_t *)node->last_requested_inv, (uint8_t *)pindex->hash)) {
             if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
-                if (!client->called_sync_completed && client->sync_completed) {
+                if (!client->called_sync_completed && client->sync_completed
+                    && !client->compact_filters_enabled) { /* BIP157: defer to cfilter completion */
                     if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
                     client->sync_completed(client);
                     client->called_sync_completed = true;
@@ -4481,7 +4515,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_enable_genesis_headers(
     if (client->cfilters_db) {
         dogecoin_cfilters_db_free(client->cfilters_db);
         client->cfilters_db = dogecoin_cfilters_db_new(false);
-        dogecoin_cfilters_db_load(client->cfilters_db, NULL);
+        dogecoin_cfilters_db_load(client->cfilters_db, client->cfilters_path);
     }
     if (client->cfilter_state) {
         vector_free(client->cfilter_state->filter_headers, true);
