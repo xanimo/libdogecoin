@@ -145,14 +145,16 @@ int main(int argc, char* argv[]) {
             }
         }
 
-    /* The above code is checking if the data is NULL, empty or larger than the maximum
-    size of a p2p message. */
-    if (data == NULL || strlen(data) == 0 || strlen(data) > DOGECOIN_MAX_P2P_MSG_SIZE) {
-        return showError("Transaction in invalid or to large.\n");
+    if (data == NULL) {
+        return showError("Transaction is invalid or too large.\n");
         }
-    uint8_t* data_bin = dogecoin_malloc(strlen(data) / 2 + 1);
+    size_t data_hex_len = strspn(data, VALID_HEX_CHARS);
+    if (data_hex_len == 0 || (data_hex_len % 2) != 0 || data[data_hex_len] != '\0' || data_hex_len > DOGECOIN_MAX_TX_HEX_LEN - 1) {
+        return showError("Transaction is invalid or too large.\n");
+        }
+    uint8_t* data_bin = dogecoin_malloc(data_hex_len / 2 + 1);
     size_t outlen = 0;
-    utils_hex_to_bin(data, data_bin, strlen(data), &outlen);
+    utils_hex_to_bin(data, data_bin, data_hex_len, &outlen);
 
     dogecoin_tx* tx = dogecoin_tx_new();
     /* Deserializing the transaction and broadcasting it to the network. */

@@ -247,17 +247,22 @@ int start_transaction() {
  */
 int save_raw_transaction(int txindex, const char* hexadecimal_transaction) {
     debug_print("raw_hexadecimal_transaction: %s\n", hexadecimal_transaction);
-    if (strlen(hexadecimal_transaction) > TXHEXMAXLEN) { //don't accept tx larger then 100kb
-        printf("tx too large (max 100kb)\n");
+    if (!hexadecimal_transaction) {
+        printf("invalid tx hex\n");
+        return false;
+    }
+    size_t hex_len = strspn(hexadecimal_transaction, VALID_HEX_CHARS);
+    if (hex_len == 0 || (hex_len % 2) != 0 || hexadecimal_transaction[hex_len] != '\0' || hex_len > TXHEXMAXLEN) {
+        printf("tx hex is invalid or too large (max 100kb)\n");
         return false;
     }
 
     // deserialize transaction
     dogecoin_tx* txtmp = dogecoin_tx_new();
-    uint8_t* data_bin = dogecoin_malloc(strlen(hexadecimal_transaction));
+    uint8_t* data_bin = dogecoin_malloc(hex_len / 2 + 1);
     size_t outlength = 0;
     // convert incomingrawtx to byte array to dogecoin_tx and if it fails free from memory
-    utils_hex_to_bin(hexadecimal_transaction, data_bin, strlen(hexadecimal_transaction), &outlength);
+    utils_hex_to_bin(hexadecimal_transaction, data_bin, hex_len, &outlength);
     if (!dogecoin_tx_deserialize(data_bin, outlength, txtmp, NULL)) {
         // free byte array
         dogecoin_free(data_bin);
@@ -290,6 +295,11 @@ int add_utxo(int txindex, char* hex_utxo_txid, int vout) {
 
     // guard against null pointer exceptions
     if (tx == NULL) return false;
+
+    // validate hex txid: must be exactly 64 hex characters
+    if (!hex_utxo_txid) return false;
+    size_t hex_len = strspn(hex_utxo_txid, VALID_HEX_CHARS);
+    if (hex_len != DOGECOIN_HASH_LENGTH * 2 || hex_utxo_txid[hex_len] != '\0') return false;
 
     size_t flag = tx->transaction->vin->len;
 
@@ -483,8 +493,15 @@ void clear_transaction(int txindex) {
 int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, int sighashtype, char* privkey) {
     if(!incomingrawtx || !scripthex) return false;
 
-    if (strlen(incomingrawtx) > TXHEXMAXLEN) { //don't accept tx larger then 100kb
-        printf("tx too large (max 100kb)\n");
+    size_t tx_hex_len = strspn(incomingrawtx, VALID_HEX_CHARS);
+    if (tx_hex_len == 0 || (tx_hex_len % 2) != 0 || incomingrawtx[tx_hex_len] != '\0' || tx_hex_len > TXHEXMAXLEN) {
+        printf("tx hex is invalid or too large (max 100kb)\n");
+        return false;
+    }
+
+    size_t script_hex_len = strspn(scripthex, VALID_HEX_CHARS);
+    if (script_hex_len == 0 || (script_hex_len % 2) != 0 || scripthex[script_hex_len] != '\0') {
+        printf("invalid script hex\n");
         return false;
     }
 
@@ -492,10 +509,10 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
 
     // deserialize transaction
     dogecoin_tx* txtmp = dogecoin_tx_new();
-    uint8_t* data_bin = dogecoin_malloc(strlen(incomingrawtx) / 2);
+    uint8_t* data_bin = dogecoin_malloc(tx_hex_len / 2 + 1);
     size_t outlength = 0;
     // convert incomingrawtx to byte array to dogecoin_tx and if it fails free from memory
-    utils_hex_to_bin(incomingrawtx, data_bin, strlen(incomingrawtx), &outlength);
+    utils_hex_to_bin(incomingrawtx, data_bin, tx_hex_len, &outlength);
 
     if (!dogecoin_tx_deserialize(data_bin, outlength, txtmp, NULL)) {
         // free byte array
@@ -517,9 +534,9 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
     }
 
     // initialize byte array with length equal to account for byte size
-    uint8_t* script_data = dogecoin_uint8_vla(strlen(scripthex));
+    uint8_t* script_data = dogecoin_uint8_vla(script_hex_len);
     // convert hex string to byte array
-    utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlength);
+    utils_hex_to_bin(scripthex, script_data, script_hex_len, &outlength);
     cstring* script = cstr_new_buf(script_data, outlength);
 
     uint256_t sighash;
@@ -528,8 +545,8 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
 
     dogecoin_tx_sighash(txtmp, script, inputindex, sighashtype, sighash);
 
-    char *hex = utils_uint8_to_hex(sighash, 32);
-    utils_reverse_hex(hex, 64);
+    char *hex = utils_uint8_to_hex(sighash, DOGECOIN_HASH_LENGTH);
+    utils_reverse_hex(hex, DOGECOIN_HASH_LENGTH * 2);
 
     debug_print("script: %s\n", scripthex);
     debug_print("script-type: %s\n", dogecoin_tx_out_type_to_str(dogecoin_script_classify(script, NULL)));

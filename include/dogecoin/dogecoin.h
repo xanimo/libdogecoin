@@ -125,6 +125,11 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 #define DOGECOIN_ECKEY_COMPRESSED_LENGTH 33
 #define DOGECOIN_ECKEY_PKEY_LENGTH 32
 #define DOGECOIN_HASH_LENGTH 32
+#define DOGECOIN_HASH_HEX_LENGTH (DOGECOIN_HASH_LENGTH * 2 + 1)
+
+/* Accepted hex character set for strspn validation */
+#define VALID_HEX_CHARS "0123456789abcdefABCDEF"
+#define VALID_BASE58_CHARS "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 /* Constants for BIP32 */
 #define MAX_SEED_SIZE 64

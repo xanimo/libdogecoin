@@ -149,8 +149,7 @@ int dogecoin_b58check(const void* bin, size_t binsz, const char* base58str)
     return binc[0];
 }
 
-static const char b58digits_ordered[] =
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+static const char b58digits_ordered[] = VALID_BASE58_CHARS;
 
 int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t binsz)
 {

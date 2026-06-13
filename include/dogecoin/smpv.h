@@ -72,7 +72,7 @@ typedef struct dogecoin_smpv_watcher_ {
 
 /* Hash table entry for txid lookup */
 typedef struct smpv_tx_lookup_ {
-    char txid[65];              /* key: hex txid (64 chars + NUL) */
+    char txid[DOGECOIN_HASH_HEX_LENGTH]; /* key: hex txid (64 chars + NUL) */
     uint32_t index;             /* index into mempool_txs array */
     UT_hash_handle hh;
 } smpv_tx_lookup;

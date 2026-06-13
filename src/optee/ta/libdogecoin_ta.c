@@ -69,6 +69,7 @@ void hmac_sha256(const uint8_t* key, const size_t keylen, const uint8_t* msg, co
 char* strcat(char *dest, const char *src);
 char* strncat(char *dest, const char *src, size_t n);
 char* strlcat(char *dst, const char *src, size_t size);
+size_t strspn(const char *s, const char *accept);
 long int strtol (const char* str, char** endptr, int base);
 int fprintf(void *stream, const char *format, ...);
 int fopen(const char *path, const char *mode);
@@ -165,6 +166,23 @@ char* strncat(char *dest, const char *src, size_t n)
     // Call strlcat
     strlcat(dest, src, strlen(dest) + n + 1);
     return dest;
+}
+
+size_t strspn(const char *s, const char *accept)
+{
+    size_t count = 0;
+    const char *p;
+    while (*s) {
+        for (p = accept; *p; p++) {
+            if (*s == *p)
+                break;
+        }
+        if (!*p)
+            break;
+        s++;
+        count++;
+    }
+    return count;
 }
 
 long int strtol (const char* str, char** endptr, int base)

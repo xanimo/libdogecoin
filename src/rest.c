@@ -38,6 +38,7 @@
 
 #include <stdlib.h>   // qsort
 #include <stdint.h>   // uint64_t
+#include <string.h>   // strspn
 
 static int cmp_u64(const void *a, const void *b) {
     uint64_t va = *(const uint64_t*)a, vb = *(const uint64_t*)b;
@@ -183,9 +184,9 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
             int64_t debit_in = dogecoin_wallet_get_debit_tx(wallet, wtx->tx);
             int64_t fee = (debit_in > 0 && debit_in >= total_out) ? (debit_in - total_out) : 0;
 
-            char txid_hex[65] = {0};
+            char txid_hex[DOGECOIN_HASH_HEX_LENGTH] = {0};
             utils_bin_to_hex((unsigned char*)wtx->tx_hash_cache, DOGECOIN_HASH_LENGTH, txid_hex);
-            utils_reverse_hex(txid_hex, 64);
+            utils_reverse_hex(txid_hex, DOGECOIN_HASH_LENGTH * 2);
 
             char debit_str[KOINU_STRINGLEN]  = {0};
             char total_str[KOINU_STRINGLEN]  = {0};
@@ -339,23 +340,24 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         const char* p = strstr(query, "txid=");
         if (!p) { evhttp_send_error(req, HTTP_BADREQUEST, "missing txid param"); evbuffer_free(evb); return; }
         p += 5;
-        char txid_hex[65]; size_t n = 0;
-        while (p[n] && p[n] != '&' && n < 64) { txid_hex[n] = p[n]; n++; }
+        char txid_hex[DOGECOIN_HASH_HEX_LENGTH]; size_t n = 0;
+        while (p[n] && p[n] != '&' && n < DOGECOIN_HASH_LENGTH * 2) { txid_hex[n] = p[n]; n++; }
         txid_hex[n] = '\0';
-        if (n != 64) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid length"); evbuffer_free(evb); return; }
+        if (n != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid length"); evbuffer_free(evb); return; }
+        if (strspn(txid_hex, VALID_HEX_CHARS) != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
 
         //parse big-endian hex -> bytes, then convert to little-endian for cache compare
-        uint8_t txid_be[32]; size_t outlen = 0;
-        utils_hex_to_bin(txid_hex, txid_be, 64, &outlen);
-        if (outlen != 32) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
-        uint8_t txid_le[32];
-        for (int i = 0; i < 32; ++i) txid_le[i] = txid_be[31 - i];
+        uint8_t txid_be[DOGECOIN_HASH_LENGTH]; size_t outlen = 0;
+        utils_hex_to_bin(txid_hex, txid_be, DOGECOIN_HASH_LENGTH * 2, &outlen);
+        if (outlen != DOGECOIN_HASH_LENGTH) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
+        uint8_t txid_le[DOGECOIN_HASH_LENGTH];
+        for (int i = 0; i < (int)DOGECOIN_HASH_LENGTH; ++i) txid_le[i] = txid_be[DOGECOIN_HASH_LENGTH - 1 - i];
 
         int found = 0;
         for (unsigned int i = 0; i < wallet->vec_wtxes->len; i++) {
             dogecoin_wtx* wtx = vector_idx(wallet->vec_wtxes, i);
             if (!wtx || !wtx->tx) continue;
-            if (memcmp(wtx->tx_hash_cache, txid_le, 32) != 0) continue;
+            if (memcmp(wtx->tx_hash_cache, txid_le, DOGECOIN_HASH_LENGTH) != 0) continue;
 
             // serialize & hex-encode the tx
             cstring* ser = cstr_new_sz(1024);
@@ -383,10 +385,11 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         const char* p = strstr(query, "txid=");
         if (!p) { evhttp_send_error(req, HTTP_BADREQUEST, "missing txid param"); evbuffer_free(evb); return; }
         p += 5;
-        char txid_hex[65]; size_t n = 0;
-        while (p[n] && p[n] != '&' && n < 64) { txid_hex[n] = p[n]; n++; }
+        char txid_hex[DOGECOIN_HASH_HEX_LENGTH]; size_t n = 0;
+        while (p[n] && p[n] != '&' && n < DOGECOIN_HASH_LENGTH * 2) { txid_hex[n] = p[n]; n++; }
         txid_hex[n] = '\0';
-        if (n != 64) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid length"); evbuffer_free(evb); return; }
+        if (n != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid length"); evbuffer_free(evb); return; }
+        if (strspn(txid_hex, VALID_HEX_CHARS) != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
 
         // parse optional vout / n
         int have_vout = 0, want_vout = 0;
@@ -402,16 +405,16 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         }
 
         // utxo->txid bytes are big-endian (display order)
-        uint8_t txid_be[32]; size_t outlen = 0;
-        utils_hex_to_bin(txid_hex, txid_be, 64, &outlen);
-        if (outlen != 32) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
+        uint8_t txid_be[DOGECOIN_HASH_LENGTH]; size_t outlen = 0;
+        utils_hex_to_bin(txid_hex, txid_be, DOGECOIN_HASH_LENGTH * 2, &outlen);
+        if (outlen != DOGECOIN_HASH_LENGTH) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
 
         int found = 0;
         if (HASH_COUNT(wallet->utxos) > 0) {
             dogecoin_utxo* utxo;
             dogecoin_utxo* tmp;
             HASH_ITER(hh, wallet->utxos, utxo, tmp) {
-                if (memcmp(utxo->txid, txid_be, 32) != 0) continue;
+                if (memcmp(utxo->txid, txid_be, DOGECOIN_HASH_LENGTH) != 0) continue;
                 if (have_vout && utxo->vout != want_vout) continue;
                 found = 1;
                 evbuffer_add_printf(evb, "%s\n", "----------------------");
