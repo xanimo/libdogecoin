@@ -866,6 +866,7 @@ int main(int argc, char* argv[]) {
                         spk[23] = 0x88; /* OP_EQUALVERIFY  */
                         spk[24] = 0xac; /* OP_CHECKSIG     */
                         dogecoin_spv_client_filteradd(client, spk, sizeof(spk));
+                        dogecoin_wallet_add_watchonly_addr(wallet, tok);
                         printf("[bip157] watching address (cli): %s\n", tok);
                     }
                     tok = strtok_r(NULL, " ", &saveptr);
