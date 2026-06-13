@@ -1391,6 +1391,56 @@ void test_tx_sign_multisig_2of2_incremental()
     dogecoin_tx_free(tx);
 }
 
+/* regression: a caller requesting only DER output (sigcompact_out == NULL) must
+   still receive a populated DER buffer. previously the DER write was gated on
+   sigcompact_out, so DER-only callers (e.g. psbt incremental cosigning) got a
+   zeroed/stale buffer. reuses the verified test_tx_sign_p2pkh fixture. */
+void test_tx_sign_p2pkh_der_only(dogecoin_tx* tx)
+{
+    const char* tx_hex = "02000000027409797c31feecc4e69b51c58b477b72c53355743a6f6124f9d78221672df3700100000000ffffffff6e1709c1e2bdd85aed24dccfd48293993617f249d4d4381296a9c914be3e85e60100000000ffffffff01c07fdc0b0000000017a914ba277fd56b69177464fcb6a27a530f03740345ed8700000000";
+    const char* script_hex = "76a9149b47fd7adc7a671ed059c9dcbf2eee2e882ea56b88ac";
+    const char* pkey_wif = "cRpSdivawavdAPgEYGXusWt64cJG9zLcgDPsEvnhHWtizVtmGk5b";
+    const char* expected_sigder = "304402205d44c682a69da1ca10e1149548bf7e7b53f0ce8f2d2bd2ea74026cba57cd4fe702200e0f9d87aafa1c88697238aaf1059b7718a97ff681efe474097221d456eb7ea201";
+    int sighashtype = SIGHASH_ALL;
+    int inputindex = 0;
+
+    size_t outlen;
+    uint8_t* tx_data = dogecoin_uint8_vla(strlen(tx_hex) / 2);
+    utils_hex_to_bin(tx_hex, tx_data, strlen(tx_hex), &outlen);
+    uint8_t* script_data = dogecoin_uint8_vla(strlen(script_hex) / 2);
+    utils_hex_to_bin(script_hex, script_data, strlen(script_hex), &outlen);
+    cstring* script = cstr_new_buf(script_data, outlen);
+    free(script_data);
+    uint8_t* expected_sigder_data = dogecoin_uint8_vla(strlen(expected_sigder) / 2);
+    utils_hex_to_bin(expected_sigder, expected_sigder_data, strlen(expected_sigder), &outlen);
+    size_t expected_sigder_len = outlen;
+
+    dogecoin_key pkey;
+    dogecoin_privkey_init(&pkey);
+    dogecoin_privkey_decode_wif(pkey_wif, &dogecoin_chainparams_regtest, &pkey);
+
+    dogecoin_tx_deserialize(tx_data, strlen(tx_hex) / 2, tx, NULL);
+    free(tx_data);
+
+    // DER-only: pass NULL for the compact output buffer
+    uint8_t sigder[76] = {0};
+    size_t sigder_len = 0;
+    enum dogecoin_tx_sign_result res =
+        dogecoin_tx_sign_input(tx, script, &pkey, inputindex, sighashtype, NULL, sigder, &sigder_len);
+
+    u_assert_int_eq(res, DOGECOIN_SIGN_OK);
+    // buffer must actually be populated, not left zeroed
+    u_assert_uint32_eq((uint32_t)sigder_len, (uint32_t)expected_sigder_len);
+    u_assert_mem_eq(sigder, expected_sigder_data, sigder_len);
+    // raw DER (<=72) + 1 hashtype byte; no fixed lower window is enforced
+    u_assert_true(sigder_len >= 9 && sigder_len <= 73);
+    u_assert_int_eq(sigder[0], 0x30);
+    u_assert_int_eq(sigder[sigder_len - 1], (uint8_t)sighashtype);
+
+    free(expected_sigder_data);
+    cstr_free(script, true);
+}
+
 void test_tx_sign()
 {
     dogecoin_tx* tx = dogecoin_tx_new();
@@ -1398,6 +1448,9 @@ void test_tx_sign()
     test_tx_sign_p2pkh_i2(tx);
     dogecoin_tx_free(tx);
     test_tx_sign_multisig_2of2_incremental();
+    tx = dogecoin_tx_new();
+    test_tx_sign_p2pkh_der_only(tx);
+    dogecoin_tx_free(tx);
 }
 
 void test_scripts()
