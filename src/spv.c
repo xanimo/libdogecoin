@@ -594,11 +594,12 @@ static dogecoin_bool spv_cf_par_assign(dogecoin_spv_client *client, dogecoin_nod
 
     uint32_t count = end - start + 1;
     cf_par_buf *buf = &cfstate->par_bufs[slot];
-    buf->node_id    = node->nodeid;
+    buf->node_id     = node->nodeid;
     buf->batch_start = start;
     buf->batch_end   = end;
     buf->received    = 0;
     buf->complete    = false;
+    buf->assign_time = time(NULL);
     buf->records     = (cf_par_record *)dogecoin_calloc(count, sizeof(cf_par_record));
     if (!buf->records) { buf->node_id = -1; return false; }
 
@@ -1582,6 +1583,43 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
         dogecoin_bool par_active = (cfstate->cfh_par_n > 0) ||
             (cfstate->par_num_workers > 0 &&
              cfstate->filters_tip_height < cfstate->cfheaders_tip_height);
+        /* Par cfilter stall recovery: if a worker has been assigned longer than
+         * CF_RESPONSE_TIMEOUT and has received nothing, free the slot and
+         * re-assign from the next available node. */
+        if (cfstate->par_num_workers > 0 && cfstate->par_bufs) {
+            int64_t stall_deadline = *now - CF_RESPONSE_TIMEOUT;
+            uint8_t pi;
+            for (pi = 0; pi < cfstate->par_num_workers; pi++) {
+                cf_par_buf *buf = &cfstate->par_bufs[pi];
+                if (buf->node_id == -1 || buf->complete) continue;
+                if (buf->received > 0) continue; /* making progress */
+                if (buf->assign_time == 0 || buf->assign_time > stall_deadline) continue;
+
+                client->nodegroup->log_write_cb(
+                    "[bip157-par] worker slot %u (node %d, [%u..%u]) stalled — reassigning\n",
+                    (unsigned int)pi, buf->node_id, buf->batch_start, buf->batch_end);
+
+                /* Reset slot and re-issue from the stalled start height */
+                uint32_t retry_start = buf->batch_start;
+                dogecoin_free(buf->records);
+                buf->records  = NULL;
+                buf->node_id  = -1;
+                buf->complete = false;
+                buf->received = 0;
+                cfstate->par_next_height = retry_start; /* back up */
+
+                /* Find any connected peer to take over */
+                unsigned int ni;
+                for (ni = 0; ni < client->nodegroup->nodes->len; ni++) {
+                    dogecoin_node *rn = (dogecoin_node *)vector_idx(
+                        client->nodegroup->nodes, ni);
+                    if (!rn || !(rn->state & NODE_CONNECTED) || !rn->version_handshake)
+                        continue;
+                    if (spv_cf_par_assign(client, rn)) break;
+                }
+            }
+        }
+
         if (cf_incomplete && !par_active && cfstate->awaiting_response) {
             /* Fast-path: if no CF-capable peer is connected right now, the peer
              * we sent the request to has disconnected.  Clear awaiting_response

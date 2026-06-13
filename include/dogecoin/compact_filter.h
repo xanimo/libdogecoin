@@ -169,6 +169,7 @@ typedef struct cf_par_buf_ {
     cf_par_record *records;     /**< array[batch_end - batch_start + 1] */
     uint32_t       received;    /**< number of records received so far */
     dogecoin_bool  complete;    /**< true when received == batch size */
+    int64_t        assign_time; /**< unix time when this slot was last assigned */
 } cf_par_buf;
 
 /* ================================================================ */
