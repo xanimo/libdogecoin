@@ -849,6 +849,29 @@ int main(int argc, char* argv[]) {
                     printf("[bip157] watching address: %s\n", addr_str);
                 }
             }
+            /* Also watch addresses supplied via -a/--address on the CLI. */
+            if (address && address[0] != '\0') {
+                char* addr_copy = strdup(address);
+                char* saveptr = NULL;
+                char* tok = strtok_r(addr_copy, " ", &saveptr);
+                while (tok) {
+                    uint8_t dec[64];
+                    size_t dec_len = dogecoin_base58_decode_check(tok, dec, sizeof(dec));
+                    if (dec_len == 21) { /* 1-byte version + 20-byte hash160 */
+                        uint8_t spk[25];
+                        spk[0]  = 0x76; /* OP_DUP          */
+                        spk[1]  = 0xa9; /* OP_HASH160      */
+                        spk[2]  = 0x14; /* push 20 bytes   */
+                        memcpy(spk + 3, dec + 1, 20);
+                        spk[23] = 0x88; /* OP_EQUALVERIFY  */
+                        spk[24] = 0xac; /* OP_CHECKSIG     */
+                        dogecoin_spv_client_filteradd(client, spk, sizeof(spk));
+                        printf("[bip157] watching address (cli): %s\n", tok);
+                    }
+                    tok = strtok_r(NULL, " ", &saveptr);
+                }
+                dogecoin_free(addr_copy);
+            }
             /* Also watch script_pubkeys from previously-tracked UTXOs (hex → raw). */
             dogecoin_utxo* utxo;
             dogecoin_utxo* tmp_utxo;
