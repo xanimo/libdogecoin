@@ -1600,6 +1600,7 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
                     (unsigned int)pi, buf->node_id, buf->batch_start, buf->batch_end);
 
                 /* Reset slot and re-issue from the stalled start height */
+                int stalled_node_id = buf->node_id;
                 uint32_t retry_start = buf->batch_start;
                 dogecoin_free(buf->records);
                 buf->records  = NULL;
@@ -1608,14 +1609,26 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
                 buf->received = 0;
                 cfstate->par_next_height = retry_start; /* back up */
 
-                /* Find any connected peer to take over */
+                /* Find any connected peer OTHER than the stalled one to take over */
                 unsigned int ni;
+                dogecoin_bool reassigned = false;
                 for (ni = 0; ni < client->nodegroup->nodes->len; ni++) {
                     dogecoin_node *rn = (dogecoin_node *)vector_idx(
                         client->nodegroup->nodes, ni);
                     if (!rn || !(rn->state & NODE_CONNECTED) || !rn->version_handshake)
                         continue;
-                    if (spv_cf_par_assign(client, rn)) break;
+                    if (rn->nodeid == stalled_node_id) continue; /* skip stalled peer */
+                    if (spv_cf_par_assign(client, rn)) { reassigned = true; break; }
+                }
+                /* No alternative peer available — fall back to the stalled node */
+                if (!reassigned) {
+                    for (ni = 0; ni < client->nodegroup->nodes->len; ni++) {
+                        dogecoin_node *rn = (dogecoin_node *)vector_idx(
+                            client->nodegroup->nodes, ni);
+                        if (!rn || !(rn->state & NODE_CONNECTED) || !rn->version_handshake)
+                            continue;
+                        if (spv_cf_par_assign(client, rn)) break;
+                    }
                 }
             }
         }
