@@ -652,7 +652,7 @@ dogecoin_bool dogecoin_psbt_from_base64(const char *b64, dogecoin_psbt **out)
     if (!b64 || !out) return false;
     unsigned int b64len = (unsigned int)strlen(b64);
     unsigned int bin_len = base64_decoded_size(b64len);
-    uint8_t *bin = dogecoin_malloc(bin_len);
+    uint8_t *bin = dogecoin_malloc(bin_len + 1); /* +1 for null terminator written by base64_decode */
     unsigned int actual = base64_decode((const unsigned char *)b64, b64len, bin);
     dogecoin_bool ok = dogecoin_psbt_deserialize(bin, actual, out);
     dogecoin_free(bin);
