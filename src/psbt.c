@@ -92,7 +92,7 @@ static dogecoin_bool psbt_parse_multisig(const cstring *script,
     p++;
 
     uint8_t n = 0;
-    while (p < end && (*p == 0x21 || *p == 0x41)) {
+    while (p < end && *p == 0x21) {
         uint8_t pklen = *p++;
         if (p + pklen > end || n >= 16) return false;
         pubkeys[n]     = p;
@@ -520,8 +520,8 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 if (!dogecoin_tx_deserialize(val, vlen, in->non_witness_utxo, &consumed)) {
                     dogecoin_free(key); dogecoin_free(val); goto fail;
                 }
-            } else if (type == PSBT_IN_PARTIAL_SIG && klen >= 34 && klen <= 66) {
-                /* key: 0x02 + pubkey (33 or 65 bytes) */
+            } else if (type == PSBT_IN_PARTIAL_SIG && klen == 34) {
+                /* key: 0x02 + 33-byte compressed pubkey */
                 if (vlen == 0 || vlen > PSBT_MAX_SIG_LEN) {
                     dogecoin_free(key); dogecoin_free(val); goto fail;
                 }

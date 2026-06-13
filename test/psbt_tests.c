@@ -32,7 +32,9 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/key.h>
 #include <dogecoin/psbt.h>
+#include <dogecoin/rmd160.h>
 #include <dogecoin/script.h>
+#include <dogecoin/sha2.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 
@@ -396,6 +398,207 @@ static void test_psbt_combiner(void)
     dogecoin_privkey_cleanse(&key2);
 }
 
+/* ── Test: P2SH 2-of-3 multisig, signed/combined OUT OF ORDER ──────
+ *
+ * This is the consensus-critical path: a bare-multisig finalizer MUST
+ * emit the signatures in the order their pubkeys appear in the redeem
+ * script, regardless of the order in which signatures were collected,
+ * because OP_CHECKMULTISIG matches sigs to pubkeys in a single forward
+ * pass.  We deliberately collect signatures in the OPPOSITE order to
+ * the redeem script (sign with key index 2 first, then merge key index
+ * 0 via the combiner) so that a finalizer which simply dumps
+ * partial_sigs in storage order would produce an invalid scriptSig and
+ * fail the ordering assertion below.
+ *
+ * It also pins the m-of-n threshold rules: finalize must refuse with
+ * fewer than m sigs, and must push EXACTLY m (not all available) sigs.
+ */
+
+/* Walk a finalized P2SH-multisig scriptSig and collect each pushed
+ * item's (ptr,len).  Layout: OP_0 <push sig...> <push redeemScript>.
+ * Returns the number of items, or -1 on a malformed push. */
+static int collect_script_pushes(const cstring *ss,
+                                  const uint8_t *items[], size_t item_lens[],
+                                  int max_items)
+{
+    const uint8_t *p   = (const uint8_t *)ss->str;
+    const uint8_t *end = p + ss->len;
+    int n = 0;
+    while (p < end && n < max_items) {
+        uint8_t op = *p++;
+        size_t len;
+        if (op == 0x00) {            /* OP_0 — the CHECKMULTISIG dummy */
+            items[n] = p; item_lens[n] = 0; n++;
+            continue;
+        } else if (op <= 0x4b) {     /* direct push of `op` bytes */
+            len = op;
+        } else if (op == 0x4c) {     /* OP_PUSHDATA1 */
+            if (p >= end) return -1;
+            len = *p++;
+        } else if (op == 0x4d) {     /* OP_PUSHDATA2 */
+            if (p + 2 > end) return -1;
+            len = (size_t)p[0] | ((size_t)p[1] << 8); p += 2;
+        } else {
+            return -1;               /* unexpected opcode in this context */
+        }
+        if (p + len > end) return -1;
+        items[n] = p; item_lens[n] = len; n++;
+        p += len;
+    }
+    return (p == end) ? n : -1;
+}
+
+static void test_psbt_multisig_2of3_out_of_order(void)
+{
+    /* Three independent keys; redeem-script order is fixed as k0,k1,k2. */
+    dogecoin_key  k[3];
+    dogecoin_pubkey pk[3];
+    for (int i = 0; i < 3; i++) {
+        dogecoin_privkey_init(&k[i]); dogecoin_privkey_gen(&k[i]);
+        dogecoin_pubkey_init(&pk[i]); dogecoin_pubkey_from_key(&k[i], &pk[i]);
+        u_assert_int_eq(dogecoin_pubkey_is_valid(&pk[i]), true);
+    }
+
+    /* Build 2-of-3 redeem script: OP_2 <pk0> <pk1> <pk2> OP_3 CHECKMULTISIG */
+    vector_t *pubkeys = vector_new(3, NULL);
+    for (int i = 0; i < 3; i++) vector_add(pubkeys, &pk[i]);
+    cstring *redeem = cstr_new_sz(110);
+    u_assert_int_eq(dogecoin_script_build_multisig(redeem, 2, pubkeys), true);
+    vector_free(pubkeys, true); /* frees backing array; elem_free_f is NULL so the stack pubkeys are untouched */
+
+    /* P2SH scriptPubKey = OP_HASH160 <hash160(redeem)> OP_EQUAL */
+    uint8_t rsha[SHA256_DIGEST_LENGTH], rh160[20];
+    sha256_raw((const uint8_t *)redeem->str, redeem->len, rsha);
+    rmd160(rsha, SHA256_DIGEST_LENGTH, rh160);
+    cstring *p2sh_spk = cstr_new_sz(23);
+    dogecoin_script_build_p2sh(p2sh_spk, rh160);
+
+    /* Funding tx: one output paying the P2SH scriptPubKey. */
+    dogecoin_tx *utxo = dogecoin_tx_new();
+    utxo->version = 1;
+    dogecoin_tx_in *uin = dogecoin_tx_in_new();
+    memset(uin->prevout.hash, 0, sizeof(uin->prevout.hash));
+    uin->prevout.n = 0xFFFFFFFF; uin->sequence = 0xFFFFFFFF;
+    if (uin->script_sig) cstr_free(uin->script_sig, true);
+    uin->script_sig = cstr_new_buf("\x01\x00", 2);
+    vector_add(utxo->vin, uin);
+    dogecoin_tx_out *uout = dogecoin_tx_out_new();
+    uout->value = 10000000000LL;
+    uout->script_pubkey = cstr_new_cstr(p2sh_spk);
+    vector_add(utxo->vout, uout);
+
+    uint8_t utxo_txid[32];
+    dogecoin_tx_hash(utxo, utxo_txid);
+
+    /* Unsigned spending tx: one input spending utxo:0, one P2PKH output. */
+    dogecoin_tx *tx = dogecoin_tx_new();
+    tx->version = 1; tx->locktime = 0;
+    dogecoin_tx_in *sin = dogecoin_tx_in_new();
+    memcpy(sin->prevout.hash, utxo_txid, 32);
+    sin->prevout.n = 0; sin->sequence = 0xFFFFFFFF;
+    if (sin->script_sig) cstr_free(sin->script_sig, true);
+    sin->script_sig = cstr_new_sz(0);
+    vector_add(tx->vin, sin);
+    dogecoin_tx_out *sout = dogecoin_tx_out_new();
+    sout->value = 9000000000LL;
+    uint8_t dest[20]; memset(dest, 0xCC, 20);
+    sout->script_pubkey = cstr_new_sz(25);
+    dogecoin_script_build_p2pkh(sout->script_pubkey, dest);
+    vector_add(tx->vout, sout);
+
+    /* ── Signer A: holds k[2] (LAST in redeem order) ── */
+    dogecoin_psbt *psbtA = dogecoin_psbt_create(tx);
+    u_assert_not_null(psbtA);
+    u_assert_int_eq(dogecoin_psbt_input_set_utxo(psbtA, 0, utxo), true);
+    u_assert_int_eq(dogecoin_psbt_input_set_redeemscript(
+                        psbtA, 0, (const uint8_t *)redeem->str, redeem->len), true);
+
+    /* Not finalizable yet: only one of two required sigs. */
+    u_assert_int_eq(dogecoin_psbt_sign_input(psbtA, 0, &k[2]), true);
+    u_assert_int_eq((int)psbtA->inputs[0].num_partial_sigs, 1);
+    u_assert_int_eq(dogecoin_psbt_finalize(psbtA), false);
+    u_assert_int_eq(dogecoin_psbt_is_finalized(psbtA), false);
+
+    /* ── Signer B: holds k[0] (FIRST in redeem order) ── */
+    dogecoin_psbt *psbtB = dogecoin_psbt_create(tx);
+    u_assert_not_null(psbtB);
+    u_assert_int_eq(dogecoin_psbt_input_set_utxo(psbtB, 0, utxo), true);
+    u_assert_int_eq(dogecoin_psbt_input_set_redeemscript(
+                        psbtB, 0, (const uint8_t *)redeem->str, redeem->len), true);
+    u_assert_int_eq(dogecoin_psbt_sign_input(psbtB, 0, &k[0]), true);
+    u_assert_int_eq((int)psbtB->inputs[0].num_partial_sigs, 1);
+
+    dogecoin_tx_free(tx);
+
+    /* ── Combiner: A absorbs B.  Storage order is now [k2, k0] —
+     *    i.e. REVERSED relative to the redeem script. ── */
+    u_assert_int_eq(dogecoin_psbt_combine(psbtA, psbtB), true);
+    u_assert_int_eq((int)psbtA->inputs[0].num_partial_sigs, 2);
+    /* Confirm the stored order really is k2-before-k0, so the test is
+     * exercising the reorder rather than passing by luck. */
+    u_assert_int_eq(memcmp(psbtA->inputs[0].partial_sigs[0].pubkey,
+                           pk[2].pubkey, DOGECOIN_ECKEY_COMPRESSED_LENGTH), 0);
+    u_assert_int_eq(memcmp(psbtA->inputs[0].partial_sigs[1].pubkey,
+                           pk[0].pubkey, DOGECOIN_ECKEY_COMPRESSED_LENGTH), 0);
+
+    /* Snapshot each signer's sig BEFORE finalize, because the finalizer
+     * clears partial_sigs (BIP174 §7.5).  Identify by pubkey. */
+    uint8_t  sig_k0_buf[PSBT_MAX_SIG_LEN], sig_k2_buf[PSBT_MAX_SIG_LEN];
+    size_t   sig_k0_len = 0, sig_k2_len = 0;
+    for (size_t j = 0; j < psbtA->inputs[0].num_partial_sigs; j++) {
+        const dogecoin_psbt_partialsig *ps = &psbtA->inputs[0].partial_sigs[j];
+        if (memcmp(ps->pubkey, pk[0].pubkey, DOGECOIN_ECKEY_COMPRESSED_LENGTH) == 0) {
+            memcpy(sig_k0_buf, ps->sig, ps->sig_len); sig_k0_len = ps->sig_len;
+        }
+        if (memcmp(ps->pubkey, pk[2].pubkey, DOGECOIN_ECKEY_COMPRESSED_LENGTH) == 0) {
+            memcpy(sig_k2_buf, ps->sig, ps->sig_len); sig_k2_len = ps->sig_len;
+        }
+    }
+    u_assert_int_eq((int)(sig_k0_len > 0), 1);
+    u_assert_int_eq((int)(sig_k2_len > 0), 1);
+
+    /* ── Finalize: now has m=2 sigs, must succeed. ── */
+    u_assert_int_eq(dogecoin_psbt_finalize(psbtA), true);
+    u_assert_int_eq(dogecoin_psbt_is_finalized(psbtA), true);
+
+    cstring *fss = psbtA->inputs[0].final_script_sig;
+    u_assert_not_null(fss);
+
+    /* Decode the scriptSig pushes: expect OP_0, sig, sig, redeemScript. */
+    const uint8_t *items[8]; size_t ilens[8];
+    int npush = collect_script_pushes(fss, items, ilens, 8);
+    u_assert_int_eq(npush, 4);            /* dummy + 2 sigs + redeem (NOT 3 sigs) */
+    u_assert_int_eq((int)ilens[0], 0);    /* OP_0 dummy */
+
+    /* Last push must be the redeem script verbatim. */
+    u_assert_int_eq((int)ilens[3], (int)redeem->len);
+    u_assert_int_eq(memcmp(items[3], redeem->str, redeem->len), 0);
+
+    /* THE assertion: the two sigs must appear in redeem-script pubkey
+     * order — k0's signature first, then k2's — even though they were
+     * collected k2-then-k0.  items[1] == k0's sig, items[2] == k2's. */
+    u_assert_int_eq((int)ilens[1], (int)sig_k0_len);
+    u_assert_int_eq(memcmp(items[1], sig_k0_buf, sig_k0_len), 0);
+    u_assert_int_eq((int)ilens[2], (int)sig_k2_len);
+    u_assert_int_eq(memcmp(items[2], sig_k2_buf, sig_k2_len), 0);
+
+    /* Extractor produces a tx carrying that scriptSig. */
+    dogecoin_tx *final_tx = dogecoin_psbt_extract(psbtA);
+    u_assert_not_null(final_tx);
+    dogecoin_tx_in *fin = vector_idx(final_tx->vin, 0);
+    u_assert_not_null(fin->script_sig);
+    u_assert_int_eq(fin->script_sig->len, fss->len);
+    u_assert_int_eq(memcmp(fin->script_sig->str, fss->str, fss->len), 0);
+
+    dogecoin_tx_free(final_tx);
+    dogecoin_tx_free(utxo);
+    cstr_free(redeem, true);
+    cstr_free(p2sh_spk, true);
+    dogecoin_psbt_free(psbtA);
+    dogecoin_psbt_free(psbtB);
+    for (int i = 0; i < 3; i++) dogecoin_privkey_cleanse(&k[i]);
+}
+
 /* ── Test: serialize → deserialize with all fields set ──────── */
 static void test_psbt_roundtrip_full(void)
 {
@@ -718,6 +921,7 @@ void test_psbt(void)
     test_psbt_updater();
     test_psbt_sign_finalize_extract();
     test_psbt_combiner();
+    test_psbt_multisig_2of3_out_of_order();
     test_psbt_roundtrip_full();
     test_psbt_invalid();
     test_psbt_bip174_invalid_vectors();
