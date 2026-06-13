@@ -281,7 +281,7 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
 
     # Build and test the OP-TEE OS and client
     # make -j 4 check
-    make LINUX_MODULES=y -j 4 && \
+    make LINUX_MODULES=y -j 4 'TPL_BIN=$(BINARIES_PATH)/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.21.bin' && \
     cd /src && \
     [ ! -d optee_client ] && git clone https://github.com/OP-TEE/optee_client.git && \
     cd optee_client && \
