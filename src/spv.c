@@ -608,10 +608,10 @@ static dogecoin_bool spv_cf_par_assign(dogecoin_spv_client *client, dogecoin_nod
             }
             if (!resolved) {
                 uint32_t cp_h = cf_find_checkpoint_stop(client->chainparams, end, stop_hash);
-                if (cp_h > 0) {
-                    end = cp_h; /* may extend or shrink the batch */
-                    if (end > tip) end = tip;
+                if (cp_h > 0 && cp_h <= tip) {
+                    end = cp_h;
                 } else if (tip_bi) {
+                    /* checkpoint beyond tip or not found — use tip */
                     memcpy(stop_hash, tip_bi->hash, 32);
                     end = (uint32_t)tip_bi->height;
                 }
