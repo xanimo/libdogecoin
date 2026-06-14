@@ -94,7 +94,7 @@ The reference uses `mpmath` (Python) for the rounded Gaussian sampler. MPFR is
 the C analogue: arbitrary-precision floating-point with IEEE-754 correct
 rounding at user-controlled precision. GMP is its transitive dependency. They
 are vendored via `depends/packages/gmp.mk` and `depends/packages/mpfr.mk`
-behind `RACCOON_G=y` so that this build path is reproducible and pinned to
+behind `RACCOON_G=1` so that this build path is reproducible and pinned to
 the same numerics as the reference.
 
 ## File layout
@@ -159,7 +159,7 @@ re-validation.
 
 ## CI
 
-`.github/workflows/ci.yml` includes an `x86_64-linux-raccoon-g` matrix
+`.github/workflows/ci.yml` includes an `x86_64-linux-pqc-raccoon-g` matrix
 entry which builds with `--enable-static --disable-shared
 --enable-raccoon-g` (installing `libgmp-dev` / `libmpfr-dev` for the
 in-tree Gaussian sampler) and runs the full unit test suite, including

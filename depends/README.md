@@ -41,19 +41,19 @@ The following can be set when running make: make FOO=bar
     ANDROID_TOOLCHAIN_BIN: Path to Android toolchain if installed via Android SDK Manager
     ANDROID_API_LEVEL: API level corresponding to the Android version targeted
     FALLBACK_DOWNLOAD_PATH: If a source file can't be fetched, try here before giving up
-    NO_LIBOQS: set to skip building liboqs (PQC library). Leave empty to include it (e.g. NO_LIBOQS=)
-    RACCOON_G: set to 'y' to build GMP and MPFR for the in-tree Raccoon-G
+    LIBOQS: set to '1' to build liboqs (PQC library)
+    RACCOON_G: set to '1' to build GMP and MPFR for the in-tree Raccoon-G
                implementation (--enable-raccoon-g). MPFR is the C analogue of
                Python's mpmath and is required to make the Raccoon-G Gaussian
                sampler byte-exact against the upstream Python reference.
     ZK_CARRIER: set to '1' to vendor herumi/mcl for native Groth16
                 verification in the ZK carrier module.  When unset,
                 Groth16 verification is delegated to off-box snarkjs.
+    YUBIKEY: set to '1' to include yubikey packages for the enclave hosts
+    NASM: set to '1' to build native_nasm (for --enable-intel-avx2/--enable-intel-sse or -DUSE_AVX2=ON/-DUSE_SSE=ON).
     DEBUG: disable some optimizations and enable more runtime checking
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids
-    YUBIKEY: set to 'y' to include yubikey packages for the enclave hosts
-    NASM: set to 1 to build native_nasm (for --enable-intel-avx2/--enable-intel-sse or -DUSE_AVX2=ON/-DUSE_SSE=ON). Default: off.
 
 If some packages are not built, the appropriate
 options will be passed to libdogecoin's configure. In this case, `--disable-net`.
