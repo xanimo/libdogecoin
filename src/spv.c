@@ -134,6 +134,7 @@ static uint32_t spv_elapsed(const dogecoin_spv_client *client) {
 /* ================================================================ */
 
 static dogecoin_bool spv_cf_par_assign(dogecoin_spv_client *client, dogecoin_node *node);
+static uint32_t cf_find_checkpoint_stop(const dogecoin_chainparams *params, uint32_t target_height, uint256_t hash_out);
 
 /* Send one GETCFHEADERS batch for a chunk, clamped to batch_max.
  * Fills stop_hash from headers DB / cfcheckpt fallback. */
@@ -592,6 +593,32 @@ static dogecoin_bool spv_cf_par_assign(dogecoin_spv_client *client, dogecoin_nod
     uint32_t end = start + MAX_GETCFILTERS_SIZE - 1;
     if (end > tip) end = tip;
 
+    /* Resolve stop hash BEFORE allocating records so end can be adjusted. */
+    uint256_t stop_hash;
+    dogecoin_blockindex *tip_bi = client->headers_db->getchaintip(client->headers_db_ctx);
+    if (tip_bi && end == (uint32_t)tip_bi->height) {
+        memcpy(stop_hash, tip_bi->hash, 32);
+    } else {
+        dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
+        if (!dogecoin_headers_db_get_block_hash_at_height(hdb, end, stop_hash)) {
+            dogecoin_bool resolved = false;
+            if (client->aux_hash_db && client->aux_hash_db_ctx) {
+                dogecoin_headers_db *aux = (dogecoin_headers_db *)client->aux_hash_db_ctx;
+                resolved = dogecoin_headers_db_get_block_hash_at_height(aux, end, stop_hash);
+            }
+            if (!resolved) {
+                uint32_t cp_h = cf_find_checkpoint_stop(client->chainparams, end, stop_hash);
+                if (cp_h > 0) {
+                    end = cp_h; /* may extend or shrink the batch */
+                    if (end > tip) end = tip;
+                } else if (tip_bi) {
+                    memcpy(stop_hash, tip_bi->hash, 32);
+                    end = (uint32_t)tip_bi->height;
+                }
+            }
+        }
+    }
+
     uint32_t count = end - start + 1;
     cf_par_buf *buf = &cfstate->par_bufs[slot];
     buf->node_id     = node->nodeid;
@@ -607,23 +634,6 @@ static dogecoin_bool spv_cf_par_assign(dogecoin_spv_client *client, dogecoin_nod
     node->cf_batch_end   = end;
     node->cf_cur_height  = start;
     cfstate->par_next_height = end + 1;
-
-    /* Resolve stop hash */
-    uint256_t stop_hash;
-    dogecoin_blockindex *tip_bi = client->headers_db->getchaintip(client->headers_db_ctx);
-    if (tip_bi && end == (uint32_t)tip_bi->height) {
-        memcpy(stop_hash, tip_bi->hash, 32);
-    } else {
-        dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
-        if (!dogecoin_headers_db_get_block_hash_at_height(hdb, end, stop_hash)) {
-            dogecoin_bool aux_found = false;
-            if (client->aux_hash_db && client->aux_hash_db_ctx) {
-                dogecoin_headers_db *aux = (dogecoin_headers_db *)client->aux_hash_db_ctx;
-                aux_found = dogecoin_headers_db_get_block_hash_at_height(aux, end, stop_hash);
-            }
-            if (!aux_found && tip_bi) memcpy(stop_hash, tip_bi->hash, 32);
-        }
-    }
 
     dogecoin_getcfilters_msg gcf_msg;
     gcf_msg.filter_type  = GCS_BASIC_FILTER_TYPE;
