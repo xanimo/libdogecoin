@@ -660,8 +660,9 @@ void dogecoin_node_connection_state_changed(dogecoin_node* node)
         if ((node->state & NODE_CONNECTED) == NODE_CONNECTED || (node->state & NODE_CONNECTING) == NODE_CONNECTING) {
             dogecoin_node_disconnect(node);
         }
-    } else
+    } else if ((node->state & NODE_CONNECTED) == NODE_CONNECTED && node->event_bev) {
         dogecoin_node_send_version(node);
+    }
 }
 
 /**
@@ -674,7 +675,7 @@ void dogecoin_node_connection_state_changed(dogecoin_node* node)
  */
 void dogecoin_node_send(dogecoin_node* node, cstring* data)
 {
-    if ((node->state & NODE_CONNECTED) != NODE_CONNECTED)
+    if ((node->state & NODE_CONNECTED) != NODE_CONNECTED || !node->event_bev)
         return;
 
     bufferevent_write(node->event_bev, data->str, data->len);

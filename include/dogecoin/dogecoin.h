@@ -34,11 +34,62 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Pull in libdogecoin-config.h early so platform gates below (e.g. USE_OPTEE)
+ * are visible before we decide whether to enable a pthread-backed mutex. */
 #if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
 #include <config/libdogecoin-config.h>
 #endif
 
+#ifdef _WIN32
+/* Require Windows 8+ so both winnls.h's NormalizationKD/NormalizeString and
+ * winsock2.h's htonll/ntohll prototypes are visible to all consumers of this
+ * header. (NormalizationKD needs 0x0600, htonll needs 0x0602.) */
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0602
+#endif
+#ifndef WINVER
+#define WINVER 0x0602
+#endif
+/* Avoid pulling in legacy <winsock.h> from <windows.h>, which would conflict
+ * with <winsock2.h> included by libdogecoin's net code on MSVC. */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#define DOGECOIN_HAVE_THREADS 1
+/* Only enable pthread-backed mutexes on hosted POSIX-like targets where we
+ * know <pthread.h> exists AND the pthread runtime will be linked.  Bare-metal
+ * / freestanding targets such as OP-TEE Trusted Applications (libutee) ship a
+ * <pthread.h> via the cross toolchain headers but cannot resolve
+ * pthread_mutex_* at link time, so they fall through to the no-op stubs. */
+#elif !defined(USE_OPTEE) && \
+      (defined(__GLIBC__) || defined(__BIONIC__) || defined(__APPLE__) || \
+       defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+       defined(__DragonFly__) || defined(__CYGWIN__) || defined(__MINGW32__) || \
+       defined(__MINGW64__) || defined(__sun) || defined(__HAIKU__))
+#include <pthread.h>
+#define DOGECOIN_HAVE_THREADS 1
+#endif
+
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
+
+struct dogecoin_context_;
+/* Short-form context alias used by the `_ts` API surface. */
+typedef struct dogecoin_context_ dogecoin_ctx;
+
+typedef struct dogecoin_mutex_ {
+#ifdef _WIN32
+    CRITICAL_SECTION handle;
+#elif defined(DOGECOIN_HAVE_THREADS)
+    pthread_mutex_t handle;
+#else
+    /* Freestanding/baremetal targets (e.g. OP-TEE TAs) without a threading
+     * runtime: keep the struct compilable; the inline helpers below become
+     * no-ops, and TS APIs must not be invoked in such builds. */
+    int handle;
+#endif
+    dogecoin_bool initialized;
+} dogecoin_mutex_t;
 
 #ifndef __cplusplus
 #ifndef true
@@ -70,6 +121,17 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 #else
 #define LIBDOGECOIN_API
 #endif
+#endif
+
+#if defined(_MSC_VER)
+#define DOGECOIN_THREAD_LOCAL __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define DOGECOIN_THREAD_LOCAL _Thread_local
+#elif defined(__GNUC__) || defined(__clang__)
+#define DOGECOIN_THREAD_LOCAL __thread
+#else
+/* Fallback for compilers without TLS support. */
+#define DOGECOIN_THREAD_LOCAL
 #endif
 
 #if defined(_MSC_VER)
@@ -157,6 +219,67 @@ typedef uint8_t uint160_t[20];
 typedef uint8_t SEED[MAX_SEED_SIZE];
 
 static const int WIDTH = 0x0000100/32;
+
+LIBDOGECOIN_API dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net);
+LIBDOGECOIN_API dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
+LIBDOGECOIN_API void dogecoin_ctx_acquire(dogecoin_ctx* ctx);
+LIBDOGECOIN_API void dogecoin_ctx_release(dogecoin_ctx* ctx);
+LIBDOGECOIN_API int dogecoin_ctx_is_thread_safe(const dogecoin_ctx* ctx);
+
+static inline dogecoin_bool dogecoin_mutex_init(dogecoin_mutex_t* mutex)
+{
+    if (!mutex) return false;
+#ifdef _WIN32
+    InitializeCriticalSection(&mutex->handle);
+    mutex->initialized = true;
+    return true;
+#elif defined(DOGECOIN_HAVE_THREADS)
+    if (pthread_mutex_init(&mutex->handle, NULL) != 0) {
+        mutex->initialized = false;
+        return false;
+    }
+    mutex->initialized = true;
+    return true;
+#else
+    (void)mutex;
+    return false;
+#endif
+}
+
+static inline void dogecoin_mutex_lock(dogecoin_mutex_t* mutex)
+{
+    if (!mutex || !mutex->initialized) return;
+#ifdef _WIN32
+    EnterCriticalSection(&mutex->handle);
+#elif defined(DOGECOIN_HAVE_THREADS)
+    pthread_mutex_lock(&mutex->handle);
+#else
+    (void)mutex;
+#endif
+}
+
+static inline void dogecoin_mutex_unlock(dogecoin_mutex_t* mutex)
+{
+    if (!mutex || !mutex->initialized) return;
+#ifdef _WIN32
+    LeaveCriticalSection(&mutex->handle);
+#elif defined(DOGECOIN_HAVE_THREADS)
+    pthread_mutex_unlock(&mutex->handle);
+#else
+    (void)mutex;
+#endif
+}
+
+static inline void dogecoin_mutex_destroy(dogecoin_mutex_t* mutex)
+{
+    if (!mutex || !mutex->initialized) return;
+#ifdef _WIN32
+    DeleteCriticalSection(&mutex->handle);
+#elif defined(DOGECOIN_HAVE_THREADS)
+    pthread_mutex_destroy(&mutex->handle);
+#endif
+    mutex->initialized = false;
+}
 
 LIBDOGECOIN_END_DECL
 
