@@ -884,6 +884,10 @@ dogecoin_bool  dogecoin_psbt_from_hex(const char* hex, dogecoin_psbt** out);
 char*          dogecoin_psbt_to_base64(const dogecoin_psbt* psbt);
 dogecoin_bool  dogecoin_psbt_from_base64(const char* b64, dogecoin_psbt** out);
 
+/* serialization: raw bytes (caller frees the cstring with cstr_free) */
+cstring*       dogecoin_psbt_serialize(const dogecoin_psbt* psbt);
+dogecoin_bool  dogecoin_psbt_deserialize(const uint8_t* data, size_t len, dogecoin_psbt** out);
+
 /* updater role: attach full previous tx for input idx (enables sighash derivation) */
 dogecoin_bool  dogecoin_psbt_input_set_utxo(dogecoin_psbt* psbt, size_t idx, const dogecoin_tx* utxo);
 /* updater role: attach P2SH redeem script for input idx */
@@ -892,6 +896,10 @@ dogecoin_bool  dogecoin_psbt_input_set_redeemscript(dogecoin_psbt* psbt, size_t 
 dogecoin_bool  dogecoin_psbt_input_set_sighash(dogecoin_psbt* psbt, size_t idx, uint32_t sighash_type);
 /* updater role: attach BIP32 derivation path to a pubkey for input idx */
 dogecoin_bool  dogecoin_psbt_input_add_keypath(dogecoin_psbt* psbt, size_t idx, const uint8_t* pubkey, size_t pubkey_len, uint32_t fingerprint, const uint32_t* path, size_t path_len);
+/* updater role: attach P2SH redeem script for output idx */
+dogecoin_bool  dogecoin_psbt_output_set_redeemscript(dogecoin_psbt* psbt, size_t idx, const uint8_t* script, size_t len);
+/* updater role: attach BIP32 derivation path to a pubkey for output idx */
+dogecoin_bool  dogecoin_psbt_output_add_keypath(dogecoin_psbt* psbt, size_t idx, const uint8_t* pubkey, size_t pubkey_len, uint32_t fingerprint, const uint32_t* path, size_t path_len);
 
 /* signer role: sign all inputs that can be signed with this key; returns true if ≥1 signed */
 dogecoin_bool  dogecoin_psbt_sign(dogecoin_psbt* psbt, const dogecoin_key* privkey);

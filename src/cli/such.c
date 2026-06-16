@@ -805,6 +805,9 @@ static void print_usage()
         printf("pqc_chunk_hex (-x <hex_payload> [-h <max_chunk_bytes, default 520>]),\n");
     printf("psbt_create (-x <unsigned_tx_hex>),\n");
     printf("psbt_decode (-x <psbt_hex>),\n");
+    printf("psbt_set_utxo (-x <psbt_hex> -i <input_index> -s <utxo_tx_hex>),\n");
+    printf("psbt_set_redeemscript (-x <psbt_hex> -i <input_index> -s <redeem_script_hex>),\n");
+    printf("psbt_set_sighash (-x <psbt_hex> -i <input_index> -h <sighash_type>),\n");
     printf("psbt_sign (-x <psbt_hex> -p <wif_privkey>),\n");
     printf("psbt_finalize (-x <psbt_hex>),\n");
     printf("psbt_extract (-x <psbt_hex>),\n");
@@ -3634,6 +3637,79 @@ int main(int argc, char* argv[])
         dogecoin_free(txhex_out);
         cstr_free(raw, true);
         dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "psbt_set_utxo") == 0) {
+        // ./such -c psbt_set_utxo -x <psbt_hex> -i <input_index> -s <utxo_tx_hex>
+        if (!txhex || !scripthex)
+            return showError("Missing PSBT hex (-x) or UTXO tx hex (-s)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        size_t utxo_bin_len = strlen(scripthex) / 2;
+        uint8_t* utxo_bin = dogecoin_uint8_vla(utxo_bin_len);
+        size_t utxo_outlen = 0;
+        utils_hex_to_bin(scripthex, utxo_bin, strlen(scripthex), &utxo_outlen);
+        dogecoin_tx* utxo = dogecoin_tx_new();
+        size_t consumed = 0;
+        if (!dogecoin_tx_deserialize(utxo_bin, utxo_outlen, utxo, &consumed)) {
+            dogecoin_tx_free(utxo); dogecoin_free(utxo_bin); dogecoin_psbt_free(psbt);
+            return showError("Invalid UTXO transaction hex\n");
+        }
+        dogecoin_bool ok = dogecoin_psbt_input_set_utxo(psbt, inputindex, utxo);
+        dogecoin_tx_free(utxo); dogecoin_free(utxo_bin);
+        if (!ok) {
+            dogecoin_psbt_free(psbt);
+            return showError("Failed to set UTXO (index out of range?)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex); dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_set_redeemscript") == 0) {
+        // ./such -c psbt_set_redeemscript -x <psbt_hex> -i <input_index> -s <redeem_script_hex>
+        if (!txhex || !scripthex)
+            return showError("Missing PSBT hex (-x) or redeem script hex (-s)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        size_t rs_bin_len = strlen(scripthex) / 2;
+        uint8_t* rs_bin = dogecoin_uint8_vla(rs_bin_len);
+        size_t rs_outlen = 0;
+        utils_hex_to_bin(scripthex, rs_bin, strlen(scripthex), &rs_outlen);
+        dogecoin_bool ok = dogecoin_psbt_input_set_redeemscript(psbt, inputindex, rs_bin, rs_outlen);
+        dogecoin_free(rs_bin);
+        if (!ok) {
+            dogecoin_psbt_free(psbt);
+            return showError("Failed to set redeem script (index out of range?)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex); dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_set_sighash") == 0) {
+        // ./such -c psbt_set_sighash -x <psbt_hex> -i <input_index> -h <sighash_type>
+        if (!txhex)
+            return showError("Missing PSBT hex (use -x)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        dogecoin_bool ok = dogecoin_psbt_input_set_sighash(psbt, inputindex, (uint32_t)sighashtype);
+        if (!ok) {
+            dogecoin_psbt_free(psbt);
+            return showError("Failed to set sighash type (index out of range?)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex); dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
     }
     else {
         print_usage();

@@ -193,7 +193,7 @@ typedef struct dogecoin_psbt_input {
     dogecoin_tx *non_witness_utxo;      /* 0x00: full previous tx */
     cstring     *redeem_script;         /* 0x04: P2SH redeem script */
     cstring     *final_script_sig;      /* 0x07: finalized scriptSig */
-    uint32_t     sighash_type;          /* 0x03: sighash flag (0 = use SIGHASH_ALL) */
+    uint32_t     sighash_type;          /* 0x03: 0 = unset, use SIGHASH_ALL */
     dogecoin_bool has_sighash_type;
 
     dogecoin_psbt_partialsig *partial_sigs;
@@ -201,18 +201,25 @@ typedef struct dogecoin_psbt_input {
 
     dogecoin_psbt_keypath    *keypaths;
     size_t                    num_keypaths;
+
+    dogecoin_psbt_unknown    *unknowns;     /* proprietary / unrecognized keys, preserved on round-trip */
+    size_t                    num_unknowns;
 } dogecoin_psbt_input;
 ```
 
 ### dogecoin_psbt_output
 
-Per-output metadata. Currently holds an optional P2SH redeem script and BIP32 keypath entries for change outputs.
+Per-output metadata. Currently holds an optional P2SH redeem script, BIP32 keypath entries for change outputs, and any unrecognized keys preserved on round-trip.
 
 ```c
 typedef struct dogecoin_psbt_output {
-    cstring *redeem_script;
+    cstring *redeem_script;             /* 0x00: P2SH redeem script */
+
     dogecoin_psbt_keypath *keypaths;
     size_t                 num_keypaths;
+
+    dogecoin_psbt_unknown *unknowns;    /* proprietary / unrecognized keys */
+    size_t                 num_unknowns;
 } dogecoin_psbt_output;
 ```
 
@@ -223,14 +230,46 @@ The top-level PSBT container.
 ```c
 typedef struct dogecoin_psbt {
     dogecoin_tx         *tx;          /* unsigned transaction */
-    uint32_t             version;     /* PSBT_VERSION_0 or PSBT_VERSION_2 */
+    uint32_t             version;     /* version field (BIP370 §2.1.4); v0 semantics only */
+
+    dogecoin_psbt_xpub   *xpubs;      /* 0x01: global extended public keys */
+    size_t                num_xpubs;
 
     dogecoin_psbt_input  *inputs;
     size_t                num_inputs;
 
     dogecoin_psbt_output *outputs;
     size_t                num_outputs;
+
+    dogecoin_psbt_unknown *unknowns;  /* global proprietary / unrecognized keys */
+    size_t                 num_unknowns;
 } dogecoin_psbt;
+```
+
+### dogecoin_psbt_xpub
+
+A global extended public key entry (BIP174 `PSBT_GLOBAL_XPUB`, type `0x01`).
+
+```c
+typedef struct dogecoin_psbt_xpub {
+    uint8_t  xpub[78];     /* BIP32 serialized extended public key */
+    uint32_t fingerprint;  /* master key fingerprint */
+    uint32_t *path;        /* derivation path (each element host-endian) */
+    size_t   path_len;
+} dogecoin_psbt_xpub;
+```
+
+### dogecoin_psbt_unknown
+
+A key/value pair whose key type is not recognized by this implementation. Unknown keys are retained verbatim and re-emitted on serialization, so a PSBT can round-trip through libdogecoin without losing proprietary fields. Duplicate unknown keys within a map are rejected during deserialization, per BIP174 §2.
+
+```c
+typedef struct dogecoin_psbt_unknown {
+    uint8_t *key;
+    size_t   key_len;
+    uint8_t *value;
+    size_t   value_len;
+} dogecoin_psbt_unknown;
 ```
 
 ---
@@ -249,7 +288,7 @@ Include `dogecoin/libdogecoin.h` (or `dogecoin/psbt.h` for internal use).
 dogecoin_psbt* dogecoin_psbt_new(void);
 ```
 
-Allocate an empty PSBT with no transaction and no inputs or outputs. Useful when constructing a PSBT by hand before calling `dogecoin_psbt_deserialize`.
+Allocate an empty PSBT with a fresh (empty) transaction and no inputs or outputs. Useful when constructing a PSBT by hand before calling `dogecoin_psbt_deserialize`.
 
 _C usage:_
 ```c
@@ -373,6 +412,42 @@ dogecoin_psbt_free(psbt);
 
 ---
 
+#### dogecoin_psbt_serialize
+
+```c
+cstring* dogecoin_psbt_serialize(const dogecoin_psbt* psbt);
+```
+
+Serialize a PSBT to raw bytes (the canonical binary wire format that the hex and base64 helpers wrap). Returns a newly allocated `cstring`; caller frees with `cstr_free(s, true)`. Returns `NULL` on error.
+
+_C usage:_
+```c
+cstring* raw = dogecoin_psbt_serialize(psbt);
+/* raw->str / raw->len hold the bytes */
+cstr_free(raw, true);
+```
+
+---
+
+#### dogecoin_psbt_deserialize
+
+```c
+dogecoin_bool dogecoin_psbt_deserialize(const uint8_t* data, size_t len, dogecoin_psbt** out);
+```
+
+Deserialize a PSBT from raw bytes. On success, `*out` points to a newly allocated `dogecoin_psbt`; caller frees with `dogecoin_psbt_free`. Returns `false` on parse error, including BIP174 §2 violations such as duplicate keys within a map.
+
+_C usage:_
+```c
+dogecoin_psbt* psbt = NULL;
+if (!dogecoin_psbt_deserialize(buf, buf_len, &psbt)) {
+    /* parse error */
+}
+dogecoin_psbt_free(psbt);
+```
+
+---
+
 ### Updater Role
 
 The updater attaches metadata to inputs and outputs so that downstream signers have everything they need to compute sighashes.
@@ -427,6 +502,30 @@ dogecoin_bool dogecoin_psbt_input_add_keypath(
 ```
 
 Add a BIP32 derivation path entry for a public key on input `idx` (key type `0x06`). Hardware wallets use this to locate the signing key without scanning the full keystore. `fingerprint` is the 4-byte master key fingerprint; `path` is an array of `path_len` hardened/unhardened BIP32 index values. Returns `false` if `idx` is out of range.
+
+---
+
+#### dogecoin_psbt_output_set_redeemscript
+
+```c
+dogecoin_bool dogecoin_psbt_output_set_redeemscript(
+    dogecoin_psbt* psbt, size_t idx, const uint8_t* script, size_t len);
+```
+
+Attach a P2SH redeem script for output `idx` (per-output key type `0x00`). Used to describe a change output so a watching wallet can recognize it as its own. Returns `false` if `idx` is out of range.
+
+---
+
+#### dogecoin_psbt_output_add_keypath
+
+```c
+dogecoin_bool dogecoin_psbt_output_add_keypath(
+    dogecoin_psbt* psbt, size_t idx,
+    const uint8_t* pubkey, size_t pubkey_len,
+    uint32_t fingerprint, const uint32_t* path, size_t path_len);
+```
+
+Add a BIP32 derivation path entry for a public key on output `idx` (per-output key type `0x02`). Lets a wallet verify that a change output pays to a key it controls. Arguments mirror `dogecoin_psbt_input_add_keypath`. Returns `false` if `idx` is out of range.
 
 ---
 
@@ -601,6 +700,42 @@ input[0].has_utxo: false
 input[0].partial_sigs: 0
 input[0].finalized: false
 ```
+
+---
+
+### psbt_set_utxo
+
+```
+./such -c psbt_set_utxo -x <psbt_hex> -i <input_index> -s <utxo_tx_hex>
+```
+
+Updater role: attach the full previous transaction (the UTXO being spent) to input `<input_index>`. The signer needs this to compute the sighash. `<utxo_tx_hex>` is the raw serialized previous transaction. Prints the updated PSBT hex and base64.
+
+```
+$ ./such -c psbt_set_utxo -x 70736274ff... -i 0 -s 0200000001...
+psbt_hex: 70736274ff...
+psbt_base64: cHNidP8B...
+```
+
+---
+
+### psbt_set_redeemscript
+
+```
+./such -c psbt_set_redeemscript -x <psbt_hex> -i <input_index> -s <redeem_script_hex>
+```
+
+Updater role: attach a P2SH redeem script to input `<input_index>` so the finalizer can build a valid scriptSig. Prints the updated PSBT hex and base64.
+
+---
+
+### psbt_set_sighash
+
+```
+./such -c psbt_set_sighash -x <psbt_hex> -i <input_index> -h <sighash_type>
+```
+
+Updater role: set the sighash type for input `<input_index>` (e.g. `1` for SIGHASH_ALL). Prints the updated PSBT hex and base64.
 
 ---
 
