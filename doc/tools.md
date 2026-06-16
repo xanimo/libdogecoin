@@ -27,8 +27,10 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - sign
 - comp2der
 - bip32maintotest
+- slip39_split
+- slip39_recover
 - signmessage
-- verify_message
+- verifymessage
 - transaction
 - set_scriptsig
 - pqc_chunk_hex
@@ -112,8 +114,10 @@ Below is a list of all the commands and the flags that they require. As a remind
 | print_keys                | -p                     | -t   | Print all keys associated with the provided private key.
 | sign                      | -x, -s, -i, -h, -p     | -t   | See the definition of sign_raw_transaction in the Transaction API.
 | comp2der                  | -s                     | None | Convert a compact signature to a DER signature.
+| slip39_split              | -x, -o, -i             | None | Split a 16–32 byte master secret (hex) into SLIP-0039 mnemonic shares; -o is threshold (1..16), -i is share count (≥ threshold, ≤ 16).
+| slip39_recover            | -x                     | None | Recover the master secret from a comma-separated list of SLIP-0039 mnemonic shares; prints the recovered secret in hex.
 | signmessage               | -x, -p                 | None | Sign a message and output a base64 encoded signature and address.
-| verify_message             | -x, -s, -k             | None | Verify a message by public key recovery of base64 decoded signature and comparison of addresses.
+| verifymessage             | -x, -s, -k             | None | Verify a message by public key recovery of base64 decoded signature and comparison of addresses.
 | transaction               | None                   | None | Start the interactive transaction app. [Usage instructions below.]() |
 | set_scriptsig             | -x, -i, -s            | None | Set a custom scriptSig on a transaction input. |
 | pqc_chunk_hex             | -x                     | -h   | Splits a hex payload into ≤max_chunk_bytes chunks (default 520). |

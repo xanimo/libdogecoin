@@ -69,6 +69,7 @@ extern void test_sha_256();
 extern void test_sha_512();
 extern void test_sha_hmac();
 extern void test_signmsg();
+extern void test_slip0039();
 extern void test_smpv();
 extern void test_signmsg_ext();
 extern void test_signmsg_ts_contexts();
@@ -201,6 +202,7 @@ int main()
     u_run_test(test_signmsg_ts_contexts);
     u_run_test(test_eckey_ts_retain_release);
     u_run_test(test_eckey_idx_not_reused);
+    u_run_test(test_slip0039);
     u_run_test(test_smpv);
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);

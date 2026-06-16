@@ -62,6 +62,7 @@
 #include <dogecoin/seal.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/sign.h>
+#include <dogecoin/slip0039.h>
 #include <dogecoin/script.h>
 #include <dogecoin/tool.h>
 #include <dogecoin/transaction.h>
@@ -810,6 +811,8 @@ static void print_usage()
     printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
     printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("slip39_split (requires -x <secret_hex 16..32 bytes>, -o <threshold>, -i <share_count>),\n");
+    printf("slip39_recover (requires -x <\"share1 mnemonic\",\"share2 mnemonic\",...>),\n");
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
@@ -2351,6 +2354,103 @@ int main(int argc, char* argv[])
             dogecoin_mem_zero(pass, strlen(pass));
             dogecoin_free(pass);
             }
+        }
+    else if (strcmp(cmd, "slip0039_split") == 0 || strcmp(cmd, "slip39_split") == 0) {
+        /* ./such -c slip39_split -x <secret_hex> -o <threshold> -i <share_count> */
+        const uint8_t s39_threshold   = (uint8_t)account;
+        const uint8_t s39_share_count = (uint8_t)inputindex;
+
+        if (!txhex || !account || !inputindex) {
+            return showError("slip39_split requires -x <secret_hex>, -o <threshold>, -i <share_count>\n");
+            }
+        if (s39_threshold > SLIP0039_MAX_SHARES || s39_share_count > SLIP0039_MAX_SHARES ||
+                s39_threshold > s39_share_count) {
+            return showError("Invalid threshold or share_count for slip39_split\n");
+            }
+
+        size_t hlen = strlen(txhex);
+        if (hlen == 0 || (hlen % 2) != 0 || hlen > (MAX_SEED_SIZE * 2)) {
+            return showError("Invalid secret hex length for slip39_split\n");
+            }
+        for (size_t hi = 0; hi < hlen; ++hi) {
+            if (utils_hex_digit(txhex[hi]) < 0) {
+                return showError("Invalid secret hex data for slip39_split\n");
+                }
+            }
+
+        uint8_t s39_secret[MAX_SEED_SIZE];
+        dogecoin_mem_zero(s39_secret, sizeof(s39_secret));
+        size_t s39_secret_len = 0;
+        utils_hex_to_bin(txhex, s39_secret, hlen, &s39_secret_len);
+        if (!s39_secret_len || s39_secret_len > MAX_SEED_SIZE) {
+            return showError("Failed to parse secret hex for slip39_split\n");
+            }
+
+        SLIP0039_SHARE s39_shares[SLIP0039_MAX_SHARES];
+        dogecoin_mem_zero(s39_shares, sizeof(s39_shares));
+        if (dogecoin_slip0039_generate_shares(s39_secret, s39_secret_len, s39_threshold,
+                                              s39_share_count, s39_shares) != 0) {
+            dogecoin_mem_zero(s39_secret, sizeof(s39_secret));
+            return showError("Failed to generate SLIP-0039 shares\n");
+            }
+        for (uint32_t si = 0; si < s39_share_count; ++si) {
+            printf("%s\n", s39_shares[si]);
+            }
+        dogecoin_mem_zero(s39_secret, sizeof(s39_secret));
+        dogecoin_mem_zero(s39_shares, sizeof(s39_shares));
+        }
+    else if (strcmp(cmd, "slip0039_recover") == 0 || strcmp(cmd, "slip39_recover") == 0) {
+        /* ./such -c slip39_recover -x "<share1>,<share2>,..." */
+        if (!txhex || strlen(txhex) == 0) {
+            return showError("slip39_recover requires -x <share1,share2,...>\n");
+            }
+
+        size_t s39_csv_len = strlen(txhex);
+        char* s39_csv = dogecoin_char_vla(s39_csv_len + 1);
+        if (!s39_csv) {
+            return showError("Failed to allocate memory for share list\n");
+            }
+        memcpy(s39_csv, txhex, s39_csv_len + 1);
+
+        const char* s39_share_ptrs[SLIP0039_MAX_SHARES];
+        size_t s39_share_count = 0;
+        char* s39_tok = strtok(s39_csv, ",");
+        while (s39_tok && s39_share_count < SLIP0039_MAX_SHARES) {
+            while (*s39_tok == ' ') s39_tok++;
+            s39_share_ptrs[s39_share_count++] = s39_tok;
+            s39_tok = strtok(NULL, ",");
+            }
+        if (s39_tok != NULL) {
+            dogecoin_mem_zero(s39_csv, s39_csv_len + 1);
+            dogecoin_free(s39_csv);
+            return showError("Too many shares for slip39_recover\n");
+            }
+        if (s39_share_count == 0) {
+            dogecoin_mem_zero(s39_csv, s39_csv_len + 1);
+            dogecoin_free(s39_csv);
+            return showError("No shares supplied for slip39_recover\n");
+            }
+
+        uint8_t s39_recovered[MAX_SEED_SIZE];
+        dogecoin_mem_zero(s39_recovered, sizeof(s39_recovered));
+        size_t s39_recovered_len = sizeof(s39_recovered);
+        if (dogecoin_slip0039_recover_secret(s39_share_ptrs, s39_share_count, NULL, 0,
+                                             s39_recovered, &s39_recovered_len) != 0) {
+            dogecoin_mem_zero(s39_csv, s39_csv_len + 1);
+            dogecoin_free(s39_csv);
+            dogecoin_mem_zero(s39_recovered, sizeof(s39_recovered));
+            return showError("Failed to recover SLIP-0039 secret\n");
+            }
+
+        char s39_hex[(MAX_SEED_SIZE * 2) + 1];
+        dogecoin_mem_zero(s39_hex, sizeof(s39_hex));
+        utils_bin_to_hex(s39_recovered, s39_recovered_len, s39_hex);
+        printf("%s\n", s39_hex);
+
+        dogecoin_mem_zero(s39_hex, sizeof(s39_hex));
+        dogecoin_mem_zero(s39_csv, s39_csv_len + 1);
+        dogecoin_free(s39_csv);
+        dogecoin_mem_zero(s39_recovered, sizeof(s39_recovered));
         }
     else if (strcmp(cmd, "signmessage") == 0) {
         // ./such -c signmessage -x "<message>" -p <private key>
