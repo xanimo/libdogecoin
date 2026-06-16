@@ -432,6 +432,7 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
 
     /* ── Parse global map ── */
     dogecoin_bool got_tx = false;
+    dogecoin_bool got_version = false;
     while (true) {
         uint8_t *key = NULL, *val = NULL;
         size_t   klen, vlen;
@@ -444,9 +445,16 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             if (got_tx || vlen == 0) { dogecoin_free(key); dogecoin_free(val); goto fail; }
             psbt->tx = dogecoin_tx_new();
             size_t consumed;
-            if (!dogecoin_tx_deserialize(val, vlen, psbt->tx, &consumed)) {
+            /* BIP174 global unsigned tx uses legacy (non-witness) encoding;
+             * deserialize in non-witness mode so a 0-input tx is not misread
+             * as a SegWit marker byte. */
+            if (!dogecoin_tx_deserialize_ex(val, vlen, psbt->tx, &consumed, false)) {
                 dogecoin_free(key); dogecoin_free(val); goto fail;
             }
+            /* BIP174: the value must be exactly a transaction with no trailing
+             * bytes — reject when the stated value length does not match what
+             * the tx deserializer consumed. */
+            if (consumed != vlen) { dogecoin_free(key); dogecoin_free(val); goto fail; }
             /* BIP174: tx inputs must have empty scriptSigs */
             for (size_t i = 0; i < psbt->tx->vin->len; i++) {
                 dogecoin_tx_in *txin = vector_idx(psbt->tx->vin, i);
@@ -461,12 +469,20 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             psbt->outputs = dogecoin_calloc(psbt->num_outputs, sizeof(*psbt->outputs));
 
         } else if (type == PSBT_GLOBAL_VERSION && klen == 1) {
-            if (vlen != 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
+            /* BIP174 §2: a key must be unique within its map */
+            if (got_version || vlen != 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
             memcpy(&psbt->version, val, 4);
             psbt->version = le32toh(psbt->version);
+            got_version = true;
 
         } else if (type == PSBT_GLOBAL_XPUB && klen == 79) {
             if (vlen < 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
+            /* BIP174 §2: reject a duplicate xpub key (compared on the 78 key bytes) */
+            for (size_t k = 0; k < psbt->num_xpubs; k++) {
+                if (memcmp(psbt->xpubs[k].xpub, key + 1, 78) == 0) {
+                    dogecoin_free(key); dogecoin_free(val); goto fail;
+                }
+            }
             size_t path_len = (vlen - 4) / 4;
             psbt->xpubs = dogecoin_realloc(psbt->xpubs,
                               (psbt->num_xpubs + 1) * sizeof(*psbt->xpubs));
@@ -481,6 +497,10 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 memcpy(&c, val + 4 + i * 4, 4);
                 x->path[i] = le32toh(c);
             }
+        } else if (type == PSBT_GLOBAL_UNSIGNED_TX || type == PSBT_GLOBAL_XPUB ||
+                   type == PSBT_GLOBAL_VERSION) {
+            /* Known global key type with a wrong key length — reject. */
+            dogecoin_free(key); dogecoin_free(val); goto fail;
         } else {
             /* Duplicate unknown key is invalid (BIP174 §Encoding) */
             for (size_t k = 0; k < psbt->num_unknowns; k++) {
@@ -526,6 +546,13 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                     dogecoin_free(key); dogecoin_free(val); goto fail;
                 }
                 size_t pklen = klen - 1;
+                /* BIP174 §2: reject a duplicate partial sig key (same pubkey) */
+                for (size_t k = 0; k < in->num_partial_sigs; k++) {
+                    if (in->partial_sigs[k].pubkey_len == pklen &&
+                        memcmp(in->partial_sigs[k].pubkey, key + 1, pklen) == 0) {
+                        dogecoin_free(key); dogecoin_free(val); goto fail;
+                    }
+                }
                 in->partial_sigs = dogecoin_realloc(in->partial_sigs,
                     (in->num_partial_sigs + 1) * sizeof(*in->partial_sigs));
                 dogecoin_psbt_partialsig *ps = &in->partial_sigs[in->num_partial_sigs++];
@@ -534,7 +561,8 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 memcpy(ps->sig, val, vlen);
                 ps->sig_len = vlen;
             } else if (type == PSBT_IN_SIGHASH_TYPE && klen == 1) {
-                if (vlen != 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
+                /* BIP174 §2: a key must be unique within its map */
+                if (in->has_sighash_type || vlen != 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 uint32_t sh; memcpy(&sh, val, 4); in->sighash_type = le32toh(sh);
                 in->has_sighash_type = true;
             } else if (type == PSBT_IN_REDEEM_SCRIPT && klen == 1) {
@@ -543,6 +571,13 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             } else if (type == PSBT_IN_BIP32_DERIVATION && klen >= 34) {
                 size_t pklen = klen - 1;
                 if (vlen < 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
+                /* BIP174 §2: reject a duplicate derivation key (same pubkey) */
+                for (size_t k = 0; k < in->num_keypaths; k++) {
+                    if (in->keypaths[k].pubkey_len == pklen &&
+                        memcmp(in->keypaths[k].pubkey, key + 1, pklen) == 0) {
+                        dogecoin_free(key); dogecoin_free(val); goto fail;
+                    }
+                }
                 size_t path_len = (vlen - 4) / 4;
                 in->keypaths = dogecoin_realloc(in->keypaths,
                     (in->num_keypaths + 1) * sizeof(*in->keypaths));
@@ -558,6 +593,14 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             } else if (type == PSBT_IN_FINAL_SCRIPTSIG && klen == 1) {
                 if (in->final_script_sig) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 in->final_script_sig = cstr_new_buf((const char *)val, vlen);
+            } else if (type == PSBT_IN_NON_WITNESS_UTXO || type == PSBT_IN_PARTIAL_SIG ||
+                       type == PSBT_IN_SIGHASH_TYPE || type == PSBT_IN_REDEEM_SCRIPT ||
+                       type == PSBT_IN_BIP32_DERIVATION || type == PSBT_IN_FINAL_SCRIPTSIG) {
+                /* A known input key type reached here only because its key length
+                 * was wrong for that type (e.g. a partial-sig key with a short
+                 * pubkey). BIP174 requires a correctly-formed key, so reject
+                 * rather than silently storing it as an unknown. */
+                dogecoin_free(key); dogecoin_free(val); goto fail;
             } else {
                 for (size_t k = 0; k < in->num_unknowns; k++) {
                     if (in->unknowns[k].key_len == klen &&
@@ -593,6 +636,13 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             } else if (type == PSBT_OUT_BIP32_DERIVATION && klen >= 34) {
                 size_t pklen = klen - 1;
                 if (vlen < 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
+                /* BIP174 §2: reject a duplicate derivation key (same pubkey) */
+                for (size_t k = 0; k < out->num_keypaths; k++) {
+                    if (out->keypaths[k].pubkey_len == pklen &&
+                        memcmp(out->keypaths[k].pubkey, key + 1, pklen) == 0) {
+                        dogecoin_free(key); dogecoin_free(val); goto fail;
+                    }
+                }
                 size_t path_len = (vlen - 4) / 4;
                 out->keypaths = dogecoin_realloc(out->keypaths,
                     (out->num_keypaths + 1) * sizeof(*out->keypaths));
@@ -605,6 +655,9 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
                 for (size_t k = 0; k < path_len; k++) {
                     uint32_t c; memcpy(&c, val + 4 + k * 4, 4); kp->path[k] = le32toh(c);
                 }
+            } else if (type == PSBT_OUT_REDEEM_SCRIPT || type == PSBT_OUT_BIP32_DERIVATION) {
+                /* Known output key type with a wrong key length — reject. */
+                dogecoin_free(key); dogecoin_free(val); goto fail;
             } else {
                 for (size_t k = 0; k < out->num_unknowns; k++) {
                     if (out->unknowns[k].key_len == klen &&
@@ -909,22 +962,41 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
         dogecoin_psbt_input       *di = &dst->inputs[i];
         const dogecoin_psbt_input *si = &src->inputs[i];
 
-        /* Merge non_witness_utxo */
-        if (!di->non_witness_utxo && si->non_witness_utxo) {
+        /* Merge non_witness_utxo (conflict if both set and differ) */
+        if (di->non_witness_utxo && si->non_witness_utxo) {
+            cstring *dn = cstr_new_sz(256), *sn = cstr_new_sz(256);
+            dogecoin_tx_serialize(dn, di->non_witness_utxo);
+            dogecoin_tx_serialize(sn, si->non_witness_utxo);
+            dogecoin_bool eq = (dn->len == sn->len && memcmp(dn->str, sn->str, dn->len) == 0);
+            cstr_free(dn, true); cstr_free(sn, true);
+            if (!eq) return false;
+        } else if (!di->non_witness_utxo && si->non_witness_utxo) {
             di->non_witness_utxo = dogecoin_tx_new();
             dogecoin_tx_copy(di->non_witness_utxo, si->non_witness_utxo);
         }
 
-        /* Merge redeem script */
-        if (!di->redeem_script && si->redeem_script)
+        /* Merge redeem script (conflict if both set and differ) */
+        if (di->redeem_script && si->redeem_script) {
+            if (di->redeem_script->len != si->redeem_script->len ||
+                memcmp(di->redeem_script->str, si->redeem_script->str, di->redeem_script->len) != 0)
+                return false;
+        } else if (!di->redeem_script && si->redeem_script) {
             di->redeem_script = cstr_new_cstr(si->redeem_script);
+        }
 
-        /* Merge final_script_sig */
-        if (!di->final_script_sig && si->final_script_sig)
+        /* Merge final_script_sig (conflict if both set and differ) */
+        if (di->final_script_sig && si->final_script_sig) {
+            if (di->final_script_sig->len != si->final_script_sig->len ||
+                memcmp(di->final_script_sig->str, si->final_script_sig->str, di->final_script_sig->len) != 0)
+                return false;
+        } else if (!di->final_script_sig && si->final_script_sig) {
             di->final_script_sig = cstr_new_cstr(si->final_script_sig);
+        }
 
-        /* Merge sighash */
-        if (!di->has_sighash_type && si->has_sighash_type) {
+        /* Merge sighash (conflict if both set and differ) */
+        if (di->has_sighash_type && si->has_sighash_type) {
+            if (di->sighash_type != si->sighash_type) return false;
+        } else if (!di->has_sighash_type && si->has_sighash_type) {
             di->sighash_type     = si->sighash_type;
             di->has_sighash_type = true;
         }
@@ -966,13 +1038,16 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
             }
         }
 
-        /* Merge per-input unknowns */
+        /* Merge per-input unknowns (conflict if same key, different value) */
         for (size_t j = 0; j < si->num_unknowns; j++) {
             const dogecoin_psbt_unknown *su = &si->unknowns[j];
             dogecoin_bool found = false;
             for (size_t k = 0; k < di->num_unknowns; k++) {
                 if (di->unknowns[k].key_len == su->key_len &&
                     memcmp(di->unknowns[k].key, su->key, su->key_len) == 0) {
+                    if (di->unknowns[k].value_len != su->value_len ||
+                        memcmp(di->unknowns[k].value, su->value, su->value_len) != 0)
+                        return false;
                     found = true; break;
                 }
             }
@@ -993,8 +1068,13 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
     for (size_t i = 0; i < dst->num_outputs; i++) {
         dogecoin_psbt_output       *dout = &dst->outputs[i];
         const dogecoin_psbt_output *sout = &src->outputs[i];
-        if (!dout->redeem_script && sout->redeem_script)
+        if (dout->redeem_script && sout->redeem_script) {
+            if (dout->redeem_script->len != sout->redeem_script->len ||
+                memcmp(dout->redeem_script->str, sout->redeem_script->str, dout->redeem_script->len) != 0)
+                return false;
+        } else if (!dout->redeem_script && sout->redeem_script) {
             dout->redeem_script = cstr_new_cstr(sout->redeem_script);
+        }
         for (size_t j = 0; j < sout->num_keypaths; j++) {
             const dogecoin_psbt_keypath *sk = &sout->keypaths[j];
             dogecoin_bool found = false;
@@ -1014,13 +1094,16 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
             }
         }
 
-        /* Merge per-output unknowns */
+        /* Merge per-output unknowns (conflict if same key, different value) */
         for (size_t j = 0; j < sout->num_unknowns; j++) {
             const dogecoin_psbt_unknown *su = &sout->unknowns[j];
             dogecoin_bool found = false;
             for (size_t k = 0; k < dout->num_unknowns; k++) {
                 if (dout->unknowns[k].key_len == su->key_len &&
                     memcmp(dout->unknowns[k].key, su->key, su->key_len) == 0) {
+                    if (dout->unknowns[k].value_len != su->value_len ||
+                        memcmp(dout->unknowns[k].value, su->value, su->value_len) != 0)
+                        return false;
                     found = true; break;
                 }
             }
@@ -1066,6 +1149,9 @@ dogecoin_bool dogecoin_psbt_combine(dogecoin_psbt *dst, const dogecoin_psbt *src
         for (size_t k = 0; k < dst->num_unknowns; k++) {
             if (dst->unknowns[k].key_len == su->key_len &&
                 memcmp(dst->unknowns[k].key, su->key, su->key_len) == 0) {
+                if (dst->unknowns[k].value_len != su->value_len ||
+                    memcmp(dst->unknowns[k].value, su->value, su->value_len) != 0)
+                    return false;
                 found = true; break;
             }
         }
