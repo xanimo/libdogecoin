@@ -84,18 +84,19 @@ static const char* SUCH_MULTISIG_REDEEM_SCRIPT_LABEL = "multisig redeem script: 
 static const char* SUCH_MULTISIG_P2SH_ADDRESS_LABEL = "multisig p2sh address: %s\n";
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
+#include <dogecoin/threadsafe.h>
 #ifdef WITH_NET
 #include <dogecoin/net.h>
 void broadcasting_menu(int txindex, int is_testnet) {
     int running = 1;
     int selected = -1;
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
-    working_transaction* tx = find_transaction(txindex);
-    char* raw_hexadecimal_tx = get_raw_transaction(txindex);
-    int length = HASH_COUNT(transactions);
+    working_transaction* tx = cli_find_transaction(txindex);
+    char* raw_hexadecimal_tx = cli_get_raw_transaction(txindex);
     while (running) {
+        int length = cli_get_transaction_count();
         printf("length: %d\n", length);
-        for (int i = 0; i <= length; i++) {
+        for (int i = 0; i < length; i++) {
             printf("\n--------------------------------\n");
             printf("transaction to broadcast: %s\n", raw_hexadecimal_tx);
             selected == i ? printf("confirm:         [X]\n") : 0;
@@ -192,7 +193,7 @@ void signing_menu(int txindex, int is_testnet) {
                              getl("redeem script hex (blank for single-key P2PKH)"));
 
                     if (choice == 1) {
-                        raw_hexadecimal_tx = get_raw_transaction(txindex);
+                        raw_hexadecimal_tx = cli_get_raw_transaction(txindex);
                     } else {
                         raw_hexadecimal_tx = (char*)get_raw_tx("raw transaction");
                     }
@@ -229,7 +230,7 @@ void signing_menu(int txindex, int is_testnet) {
                     break;
                 }
                 case 3:
-                    printf("raw_tx: %s\n", get_raw_transaction(txindex));
+                    printf("raw_tx: %s\n", cli_get_raw_transaction(txindex));
                     break;
                 case 4:
                     running = 0;
@@ -336,32 +337,32 @@ void sub_menu(int txindex, int is_testnet) {
         printf(" 9. main menu\n\n");
         switch (atoi(getl("command"))) {
                 case 1:
-                    printf("raw_tx: %s\n", get_raw_transaction(txindex));
+                    printf("raw_tx: %s\n", cli_get_raw_transaction(txindex));
                     temp_vout_index = atoi(getl("vout index")); // 1
                     temp_hex_utxo_txid = (char*)getl("txid"); // b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074 & 42113bdc65fc2943cf0359ea1a24ced0b6b0b5290db4c63a3329c6601c4616e2
-                    add_utxo(txindex, temp_hex_utxo_txid, temp_vout_index);
-                    printf("raw_tx: %s\n", get_raw_transaction(txindex));
+                    cli_add_utxo(txindex, temp_hex_utxo_txid, temp_vout_index);
+                    printf("raw_tx: %s\n", cli_get_raw_transaction(txindex));
                     break;
                 case 2:
                     /* getl() returns a pointer into a single static buffer,
                      * so the second getl() below would overwrite the amount
-                     * before add_output() reads it. Snapshot it first. */
+                     * before cli_add_output() reads it. Snapshot it first. */
                     {
                         char temp_amt_buf[64];
                         const char* _amt = getl("amount to send to destination address"); // 5
                         snprintf(temp_amt_buf, sizeof(temp_amt_buf), "%s", _amt);
                         temp_ext_p2pkh = getl("destination address"); // nbGfXLskPh7eM1iG5zz5EfDkkNTo9TRmde
                         printf("destination: %s\n", temp_ext_p2pkh);
-                        printf("addout success: %d\n", add_output(txindex, (char*)temp_ext_p2pkh, temp_amt_buf));
+                        printf("addout success: %d\n", cli_add_output(txindex, (char*)temp_ext_p2pkh, temp_amt_buf));
                     }
-                    char* str = get_raw_transaction(txindex);
+                    char* str = cli_get_raw_transaction(txindex);
                     printf("raw_tx: %s\n", str);
                     break;
                 case 3:
                     /* getl() returns a pointer into a single static buffer,
                      * so each subsequent call overwrites the previous return
                      * value. Snapshot every prompt into its own buffer before
-                     * passing them to finalize_transaction(). */
+                     * passing them to cli_finalize_transaction(). */
                     {
                         char out_addr_buf[128], fee_buf[64], total_buf[64], change_buf[128];
                         snprintf(out_addr_buf, sizeof(out_addr_buf), "%s",
@@ -372,7 +373,7 @@ void sub_menu(int txindex, int is_testnet) {
                                  getl("total amount for verification"));
                         snprintf(change_buf, sizeof(change_buf), "%s",
                                  getl("senders address"));
-                        raw_hexadecimal_transaction = finalize_transaction(
+                        raw_hexadecimal_transaction = cli_finalize_transaction(
                             txindex, out_addr_buf, fee_buf, total_buf, change_buf);
                     }
                     printf("raw_tx: %s\n", raw_hexadecimal_transaction);
@@ -392,7 +393,7 @@ void sub_menu(int txindex, int is_testnet) {
                     break;
 #endif
                 case 8:
-                    printf("raw_tx: %s\n", get_raw_transaction(txindex));
+                    printf("raw_tx: %s\n", cli_get_raw_transaction(txindex));
                     break;
                 case 9:
                     running = 0;
@@ -406,7 +407,7 @@ void sub_menu(int txindex, int is_testnet) {
 void transaction_input_menu(int txindex, int is_testnet) {
 #pragma GCC diagnostic pop
     int running_transaction_input_menu = 1;
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = cli_find_transaction(txindex);
     while (running_transaction_input_menu) {
         int length = tx->transaction->vin->len;
         int selected = -1;
@@ -456,7 +457,7 @@ void transaction_input_menu(int txindex, int is_testnet) {
                                         script_pubkey = dogecoin_private_key_wif_to_pubkey_hash(private_key_wif);
                                         cstr_erase(tx_in->script_sig, 0, tx_in->script_sig->len);
                                         // 76a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac
-                                        raw_hexadecimal_tx = get_raw_transaction(txindex);
+                                        raw_hexadecimal_tx = cli_get_raw_transaction(txindex);
                                         printf("raw_hexadecimal_transaction: %s\n", raw_hexadecimal_tx);
                                         // 76a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac
                                         if (!sign_indexed_raw_transaction(txindex, input_to_sign, raw_hexadecimal_tx, script_pubkey, 1, private_key_wif)) {
@@ -508,7 +509,7 @@ void transaction_output_menu(int txindex, int is_testnet) {
         uint64_t koinu_amount;
         uint64_t tx_out_total = 0;
         const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
-        working_transaction* tx = find_transaction(txindex);
+        working_transaction* tx = cli_find_transaction(txindex);
         int length = tx->transaction->vout->len;
         int selected = -1;
         printf("length: %d\n", length);
@@ -638,7 +639,7 @@ void main_menu() {
     wow();
 
     // load existing testnet transaction into memory for demonstration purposes.
-    save_raw_transaction(start_transaction(), "0100000002746007aed61e8531faba1af6610f10a5422c70a2a7eb6ffb51cb7a7b7b5e45b40100000000ffffffffe216461c60c629333ac6b40d29b5b0b6d0ce241aea5903cf4329fc65dc3b11420100000000ffffffff020065cd1d000000001976a9144da2f8202789567d402f7f717c01d98837e4325488ac30b4b529000000001976a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac00000000");
+    cli_save_raw_transaction(cli_start_transaction(), "0100000002746007aed61e8531faba1af6610f10a5422c70a2a7eb6ffb51cb7a7b7b5e45b40100000000ffffffffe216461c60c629333ac6b40d29b5b0b6d0ce241aea5903cf4329fc65dc3b11420100000000ffffffff020065cd1d000000001976a9144da2f8202789567d402f7f717c01d98837e4325488ac30b4b529000000001976a914d8c43e6f68ca4ea1e9b93da2d1e3a95118fa4a7c88ac00000000");
     while (running) {
         printf("\nsuch transaction: \n\n");
         printf(" 1. add transaction\n");
@@ -659,11 +660,11 @@ void main_menu() {
 #endif
         switch (atoi(getl("\ncommand"))) {
                 case 1:
-                    sub_menu(start_transaction(), is_testnet);
+                    sub_menu(cli_start_transaction(), is_testnet);
                     break;
                 case 2:
                     temp = atoi(getl("ID of transaction to edit"));
-                    s = find_transaction(temp);
+                    s = cli_find_transaction(temp);
                     if (s) {
                         edit_menu(temp, is_testnet);
                         }
@@ -672,12 +673,12 @@ void main_menu() {
                         }
                     break;
                 case 3:
-                    s = find_transaction(atoi(getl("ID to find")));
-                    s ? printf("transaction: %s\n", get_raw_transaction(s->idx)) : printf("\nno transaction found with that id. please try again!\n");
+                    s = cli_find_transaction(atoi(getl("ID to find")));
+                    s ? printf("transaction: %s\n", cli_get_raw_transaction(s->idx)) : printf("\nno transaction found with that id. please try again!\n");
                     break;
                 case 4:
                     temp = atoi(getl("ID of transaction to sign"));
-                    s = find_transaction(temp);
+                    s = cli_find_transaction(temp);
                     if (s) {
                         signing_menu(temp, is_testnet);
                         }
@@ -686,27 +687,27 @@ void main_menu() {
                         }
                     break;
                 case 5:
-                    s = find_transaction(atoi(getl("ID to delete")));
+                    s = cli_find_transaction(atoi(getl("ID to delete")));
                     if (s) {
-                        remove_transaction(s);
+                        cli_remove_transaction(s);
                         }
                     else {
                         printf("\nno transaction found with that id. please try again!\n");
                         }
                     break;
                 case 6:
-                    remove_all();
+                    cli_remove_all();
                     break;
                 case 7:
                     count_transactions();
                     print_transactions();
                     break;
                 case 8:
-                    txindex = start_transaction();
-                    int res = save_raw_transaction(txindex, get_raw_tx("raw transaction"));
+                    txindex = cli_start_transaction();
+                    int res = cli_save_raw_transaction(txindex, get_raw_tx("raw transaction"));
                     if (!res) {
                         printf("error saving transaction!\n");
-                        clear_transaction(txindex);
+                        cli_clear_transaction(txindex);
                         }
                     else {
                         printf("successfully saved raw transaction to memory for the session!\n");
@@ -716,7 +717,7 @@ void main_menu() {
 #ifdef WITH_NET
                 case 9:
                     temp = atoi(getl("ID of transaction to edit"));
-                    s = find_transaction(temp);
+                    s = cli_find_transaction(temp);
                     if (s) {
                         broadcasting_menu(temp, is_testnet);
                         }
@@ -740,7 +741,7 @@ void main_menu() {
 #endif
             }
         }
-    remove_all();
+    cli_remove_all();
     }
 
 // ******************************** END TRANSACTION MENU ********************************
@@ -1303,6 +1304,13 @@ int main(int argc, char* argv[])
 
     /* start ECC context */
     dogecoin_ecc_start();
+
+    /* Exercise the thread-safe context API (refcount mutex) in the `_ts`
+       build. such has no long-lived context-owned object, so the context is
+       created, queried and released here; the thread-safe transaction builder,
+       transaction-context and eckey-context APIs are routed via the cli_*
+       wrappers below. */
+    cli_ts_context_finish(cli_ts_context_start("such", false));
 
     /* WIF / extended-key length sanity check for commands that consume -p as
        a base58-encoded private key.  PQC carrier and PQC signing commands
@@ -2434,7 +2442,7 @@ int main(int argc, char* argv[])
             return showError("tx too large (max 100kb)\n");
             }
 
-        eckey* key = new_eckey_from_privkey(pkey);
+        eckey* key = cli_eckey_from_privkey(pkey);
         char* sig = sign_message(key->private_key_wif, txhex);
         printf("message: %s\n", txhex);
         printf("content: %s\n", sig);

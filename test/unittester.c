@@ -52,6 +52,8 @@ extern void test_cstr();
 extern void test_ecc();
 extern void test_hash();
 extern void test_key();
+extern void test_context_keypair_ex();
+extern void test_context_ts_refcount();
 extern void test_koinu();
 extern void test_memory();
 extern void test_moon();
@@ -69,8 +71,14 @@ extern void test_signmsg();
 extern void test_slip0039();
 extern void test_smpv();
 extern void test_signmsg_ext();
+extern void test_signmsg_ts_contexts();
 extern void test_tpm();
 extern void test_transaction();
+extern void test_transaction_ts_contexts();
+extern void test_transaction_ts_wrappers();
+#if !defined(_WIN32)
+extern void test_transaction_ts_multithread_stress();
+#endif
 extern void test_validation();
 extern void test_tx_serialization();
 extern void test_tx_sighash();
@@ -118,6 +126,10 @@ extern void test_examples();
 extern void test_wallet_basics();
 extern void test_wallet();
 extern void test_wallet_reorg_utxo_update();
+extern void test_wallet_ts_wrappers();
+#if !defined(_WIN32)
+extern void test_wallet_ts_multithread_stress();
+#endif
 extern void test_wallet_balance_accounts_for_spends();
 #endif
 
@@ -163,6 +175,8 @@ int main()
     u_run_test(test_ecc);
     u_run_test(test_hash);
     u_run_test(test_key);
+    u_run_test(test_context_keypair_ex);
+    u_run_test(test_context_ts_refcount);
     u_run_test(test_koinu);
     u_run_test(test_memory);
     u_run_test(test_moon);
@@ -179,11 +193,19 @@ int main()
     u_run_test(test_signmsg);
     u_run_test(test_signmsg_ext);
     u_run_test(test_slip0039);
+    u_run_test(test_signmsg_ts_contexts);
     u_run_test(test_smpv);
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);
 #endif
     u_run_test(test_transaction);
+    u_run_test(test_transaction_ts_contexts);
+#ifndef USE_OPTEE
+    u_run_test(test_transaction_ts_wrappers);
+#if !defined(_WIN32)
+    u_run_test(test_transaction_ts_multithread_stress);
+#endif
+#endif
     u_run_test(test_validation);
     u_run_test(test_tx_serialization);
     u_run_test(test_invalid_tx_deser);
@@ -231,6 +253,12 @@ int main()
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
     u_run_test(test_wallet_reorg_utxo_update);
+#ifndef USE_OPTEE
+    u_run_test(test_wallet_ts_wrappers);
+#if !defined(_WIN32)
+    u_run_test(test_wallet_ts_multithread_stress);
+#endif
+#endif
     u_run_test(test_wallet_balance_accounts_for_spends);
 #endif
 

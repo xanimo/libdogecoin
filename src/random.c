@@ -112,7 +112,7 @@ void dogecoin_random_init_internal(void);
 dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed);
 
 static const dogecoin_rnd_mapper default_rnd_mapper = { dogecoin_random_init_internal, dogecoin_random_bytes_internal };
-static dogecoin_rnd_mapper current_rnd_mapper = { dogecoin_random_init_internal, dogecoin_random_bytes_internal };
+static DOGECOIN_THREAD_LOCAL dogecoin_rnd_mapper current_rnd_mapper = { dogecoin_random_init_internal, dogecoin_random_bytes_internal };
 
 void dogecoin_rnd_set_mapper_default()
     {
@@ -149,7 +149,7 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     }
 #else
 /* Define a function pointer for random */
-int (*rng_ptr) (void*, size_t) = NULL;
+DOGECOIN_THREAD_LOCAL int (*rng_ptr) (void*, size_t) = NULL;
 void set_rng(int (*ptr)(void *, size_t))
     {
     rng_ptr = ptr;

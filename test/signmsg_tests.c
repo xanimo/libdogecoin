@@ -63,3 +63,27 @@ void test_signmsg_ext() {
     dogecoin_free(key);
     dogecoin_free(sig);
 }
+
+void test_signmsg_ts_contexts() {
+    dogecoin_eckey_context* ctx1 = dogecoin_eckey_context_new();
+    dogecoin_eckey_context* ctx2 = dogecoin_eckey_context_new();
+    u_assert_true(ctx1 != NULL);
+    u_assert_true(ctx2 != NULL);
+
+    int key_id1 = start_key_ts(ctx1, false);
+    int key_id2 = start_key_ts(ctx2, false);
+    u_assert_int_eq(key_id1, 1);
+    u_assert_int_eq(key_id2, 1);
+
+    eckey* key1 = find_eckey_ts(ctx1, key_id1);
+    eckey* key2 = find_eckey_ts(ctx2, key_id2);
+    u_assert_true(key1 != NULL);
+    u_assert_true(key2 != NULL);
+
+    u_assert_true(key1 != key2);
+
+    remove_eckey_ts(ctx1, key1);
+    remove_eckey_ts(ctx2, key2);
+    dogecoin_eckey_context_free(ctx1);
+    dogecoin_eckey_context_free(ctx2);
+}

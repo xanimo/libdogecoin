@@ -73,6 +73,7 @@ noinst_HEADERS = \
     include/dogecoin/slip0039.h \
     include/dogecoin/sha2.h \
     include/dogecoin/smpv.h \
+    include/dogecoin/threadsafe.h \
     include/dogecoin/tool.h \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \
@@ -99,6 +100,7 @@ libdogecoin_la_SOURCES = \
     src/block.c \
     src/buffer.c \
     src/chacha20.c \
+    src/context.c \
     src/chainparams.c \
     src/cstr.c \
     src/ctaes.c \
@@ -270,6 +272,7 @@ tests_SOURCES = \
     test/block_tests.c \
     test/buffer_tests.c \
     test/chacha20_tests.c \
+    test/context_tests.c \
     test/cstr_tests.c \
     test/ecc_tests.c \
     test/hash_tests.c \
@@ -437,6 +440,15 @@ such_CFLAGS = $(libdogecoin_la_CFLAGS)
 such_CPPFLAGS = -I$(top_srcdir)/src
 such_LDFLAGS = -static
 
+# Thread-safe variant: same sources compiled with DOGECOIN_TS so the CLI routes
+# through the thread-safe (`_ts`) library APIs. See doc/thread_safety.md.
+inst_PROGRAMS += such_ts
+such_ts_LDADD = $(such_LDADD)
+such_ts_SOURCES = $(such_SOURCES)
+such_ts_CFLAGS = $(such_CFLAGS)
+such_ts_CPPFLAGS = $(such_CPPFLAGS) -DDOGECOIN_TS=1
+such_ts_LDFLAGS = $(such_LDFLAGS)
+
 if WITH_NET
 inst_PROGRAMS += sendtx
 sendtx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBSECP256K1) $(ASM_LIB_FILES)
@@ -446,13 +458,27 @@ sendtx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS
 sendtx_CPPFLAGS = -I$(top_srcdir)/src
 sendtx_LDFLAGS = -static
 
+inst_PROGRAMS += sendtx_ts
+sendtx_ts_LDADD = $(sendtx_LDADD)
+sendtx_ts_SOURCES = $(sendtx_SOURCES)
+sendtx_ts_CFLAGS = $(sendtx_CFLAGS)
+sendtx_ts_CPPFLAGS = $(sendtx_CPPFLAGS) -DDOGECOIN_TS=1
+sendtx_ts_LDFLAGS = $(sendtx_LDFLAGS)
+
 inst_PROGRAMS += spvnode
-spvnode_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+spvnode_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ASM_LIB_FILES)
 spvnode_SOURCES = \
     src/cli/spvnode.c
-spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
+spvnode_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
+
+inst_PROGRAMS += spvnode_ts
+spvnode_ts_LDADD = $(spvnode_LDADD)
+spvnode_ts_SOURCES = $(spvnode_SOURCES)
+spvnode_ts_CFLAGS = $(spvnode_CFLAGS)
+spvnode_ts_CPPFLAGS = $(spvnode_CPPFLAGS) -DDOGECOIN_TS=1
+spvnode_ts_LDFLAGS = $(spvnode_LDFLAGS)
 endif
 endif
 

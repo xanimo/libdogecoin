@@ -83,7 +83,8 @@ IF(WITH_NET)
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include/event2" DESTINATION "${PROJECT_SOURCE_DIR}/include")
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
-        FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+        FIND_LIBRARY(LIBEVENT NAMES event HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+        SET(LIBEVENT_PTHREADS "")
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)
     ELSE()
         # build libevent
@@ -105,7 +106,8 @@ IF(WITH_NET)
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include/event2" DESTINATION "${PROJECT_SOURCE_DIR}/include")
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
-        FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+        FIND_LIBRARY(LIBEVENT NAMES event HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+        FIND_LIBRARY(LIBEVENT_PTHREADS NAMES event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
     ENDIF()
 ENDIF()
 
@@ -374,6 +376,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/block.c
     src/buffer.c
     src/chacha20.c
+    src/context.c
     src/cstr.c
     src/ctaes.c
     src/ecc.c
@@ -535,6 +538,7 @@ IF(USE_TESTS)
         test/block_tests.c
         test/buffer_tests.c
         test/chacha20_tests.c
+        test/context_tests.c
         test/cstr_tests.c
         test/ecc_tests.c
         test/hash_tests.c
@@ -649,7 +653,7 @@ IF(WITH_NET)
     )
 
     IF(WIN32 AND USE_TPM2)
-        TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS} tbs ncrypt crypt32)
+        TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} tbs ncrypt crypt32)
     ELSEIF(USE_TSS2)
         TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS} ${LIBTSS2})
     ELSE()
@@ -682,19 +686,51 @@ IF(WITH_TOOLS)
     ENDIF()
     TARGET_INCLUDE_DIRECTORIES(such ${visibility} src)
 
+    # Thread-safe variant: same sources, DOGECOIN_TS routes through the `_ts`
+    # library APIs (see doc/thread_safety.md).
+    ADD_EXECUTABLE(such_ts src/cli/such.c)
+    INSTALL(TARGETS such_ts RUNTIME)
+    IF (WIN32 AND USE_TPM2)
+        TARGET_LINK_LIBRARIES(such_ts ${LIBS} tbs ncrypt crypt32)
+    ELSEIF (USE_TSS2)
+        TARGET_LINK_LIBRARIES(such_ts ${LIBS} ${LIBTSS2})
+    ELSE()
+        TARGET_LINK_LIBRARIES(such_ts ${LIBS})
+    ENDIF()
+    TARGET_INCLUDE_DIRECTORIES(such_ts ${visibility} src)
+    TARGET_COMPILE_DEFINITIONS(such_ts ${visibility} DOGECOIN_TS=1)
+
     IF(WITH_NET)
         ADD_EXECUTABLE(sendtx src/cli/sendtx.c)
         INSTALL(TARGETS sendtx RUNTIME)
         TARGET_LINK_LIBRARIES(sendtx ${LIBDOGECOIN_NAME})
         TARGET_INCLUDE_DIRECTORIES(sendtx ${visibility} src)
+
+        ADD_EXECUTABLE(sendtx_ts src/cli/sendtx.c)
+        INSTALL(TARGETS sendtx_ts RUNTIME)
+        TARGET_LINK_LIBRARIES(sendtx_ts ${LIBDOGECOIN_NAME})
+        TARGET_INCLUDE_DIRECTORIES(sendtx_ts ${visibility} src)
+        TARGET_COMPILE_DEFINITIONS(sendtx_ts ${visibility} DOGECOIN_TS=1)
+
         ADD_EXECUTABLE(spvnode src/cli/spvnode.c)
         INSTALL(TARGETS spvnode RUNTIME)
 
         IF (WIN32 AND USE_TPM2)
-            TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME} tbs ncrypt crypt32)
+            TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME} ${LIBEVENT} tbs ncrypt crypt32)
         ELSE()
-            TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME})
+            TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS})
         ENDIF()
         TARGET_INCLUDE_DIRECTORIES(spvnode ${visibility} src)
+
+        ADD_EXECUTABLE(spvnode_ts src/cli/spvnode.c)
+        INSTALL(TARGETS spvnode_ts RUNTIME)
+
+        IF (WIN32 AND USE_TPM2)
+            TARGET_LINK_LIBRARIES(spvnode_ts ${LIBDOGECOIN_NAME} ${LIBEVENT} tbs ncrypt crypt32)
+        ELSE()
+            TARGET_LINK_LIBRARIES(spvnode_ts ${LIBDOGECOIN_NAME} ${LIBEVENT} ${LIBEVENT_PTHREADS})
+        ENDIF()
+        TARGET_INCLUDE_DIRECTORIES(spvnode_ts ${visibility} src)
+        TARGET_COMPILE_DEFINITIONS(spvnode_ts ${visibility} DOGECOIN_TS=1)
     ENDIF()
 ENDIF()
