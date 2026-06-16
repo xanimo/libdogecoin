@@ -368,6 +368,23 @@ int dogecoin_verify_mnemonic (const char* mnemonic, const char* language, const 
 /* Generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a mnemonic */
 int getDerivedHDAddressFromMnemonic(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, const MNEMONIC mnemonic, const PASS pass, char* p2pkh_pubkey, const bool is_testnet);
 
+/* SLIP-0039 (Shamir's Secret-Sharing for Mnemonic Codes) */
+#ifndef SLIP0039_DECLS_DEFINED
+#define SLIP0039_DECLS_DEFINED
+#define SLIP0039_MAX_SHARES 16
+#define SLIP0039_MAX_SHARE_STR_SIZE 320
+#define SLIP0039_MIN_SECRET_BYTES 16
+#define SLIP0039_MAX_SECRET_BYTES 32
+
+typedef char SLIP0039_SHARE[SLIP0039_MAX_SHARE_STR_SIZE];
+
+/* Splits a secret into SLIP-0039 mnemonic shares */
+LIBDOGECOIN_API int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len, uint8_t threshold, uint8_t share_count, char shares[][SLIP0039_MAX_SHARE_STR_SIZE]);
+
+/* Recovers a secret from a set of SLIP-0039 mnemonic shares */
+LIBDOGECOIN_API int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count, const uint8_t* passphrase, size_t passphrase_len, uint8_t* secret_out, size_t* secret_len_out);
+#endif /* SLIP0039_DECLS_DEFINED */
+
 /* Generates a HD master key and p2pkh address from a mnemonic */
 int generateHDMasterPubKeypairFromMnemonic(char hd_privkey_master[HDKEYLEN], char p2pkh_pubkey_master[P2PKHLEN], const MNEMONIC mnemonic, const PASS pass, const dogecoin_bool is_testnet);
 
