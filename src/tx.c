@@ -466,6 +466,11 @@ dogecoin_bool dogecoin_tx_out_deserialize(dogecoin_tx_out* tx_out, struct const_
  */
 int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length)
 {
+    return dogecoin_tx_deserialize_ex(tx_serialized, inlen, tx, consumed_length, true);
+}
+
+int dogecoin_tx_deserialize_ex(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length, dogecoin_bool allow_witness)
+{
     struct const_buffer buf = {tx_serialized, inlen};
     if (consumed_length) {
         *consumed_length = 0;
@@ -482,7 +487,7 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
     }
 
     uint8_t flags = 0;
-    if (vlen == 0) {
+    if (vlen == 0 && allow_witness) {
         /* We read a dummy or an empty vin. */
         deser_bytes(&flags, &buf, 1);
         if (flags != 0) {
@@ -492,6 +497,8 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
             }
         }
     }
+    /* When allow_witness is false a zero vin count is a genuine 0-input tx;
+     * the next varint is the output count, so no flag byte is consumed. */
 
     unsigned int i;
     for (i = 0; i < vlen; i++) {

@@ -97,6 +97,11 @@ LIBDOGECOIN_API void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 
 //!deserialize/parse a p2p serialized dogecoin transaction
 LIBDOGECOIN_API int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length);
+/* Like dogecoin_tx_deserialize, but when allow_witness is false a zero input
+ * count is always treated as a genuine 0-input transaction rather than a SegWit
+ * marker. PSBT unsigned transactions (BIP174) use legacy, non-witness encoding,
+ * so the 0-input/0-output case must not be misread as a witness marker byte. */
+LIBDOGECOIN_API int dogecoin_tx_deserialize_ex(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length, dogecoin_bool allow_witness);
 
 //!serialize a dogecoin data structure into a p2p serialized buffer
 LIBDOGECOIN_API void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx);
