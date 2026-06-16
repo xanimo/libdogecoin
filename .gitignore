@@ -79,8 +79,11 @@ config.status
 configure
 libtool
 such
+such_ts
 sendtx
+sendtx_ts
 spvnode
+spvnode_ts
 config/libdogecoin-config.h
 config/libdogecoin-config.h.in
 config/libdogecoin-config.h.in~
@@ -163,6 +166,9 @@ store/*
 !/src/optee/host/Makefile
 !/src/optee/ta/Makefile
 /src/optee/build
+
+# Out-of-tree build directories for the independent library/test/CLI builds
+build-*/
 
 # Node.js (snarkjs etc. for ZK helpers)
 node_modules/

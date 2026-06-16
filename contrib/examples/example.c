@@ -342,8 +342,10 @@ int main() {
 		return -1;
 	}
 
-	printf("Transaction hex: %s\n", get_raw_transaction(idx));
-	printf("Transaction hex length: %ld\n", strlen(get_raw_transaction(idx)));
+	char txhex_buf[TXHEXMAXLEN + 1] = {0};
+	get_raw_transaction_ex(idx, txhex_buf, sizeof(txhex_buf));
+	printf("Transaction hex: %s\n", txhex_buf);
+	printf("Transaction hex length: %ld\n", strlen(txhex_buf));
 	printf("Transaction unsigned hex: %s\n", get_raw_transaction(idx2));
 	printf("Transaction unsigned hex length: %ld\n", strlen(get_raw_transaction(idx2)));
 	printf("str: %s\n", str);
@@ -351,9 +353,9 @@ int main() {
 	printf("my script pubkey length: %ld\n", strlen(myscriptpubkey));
 	printf("privkeywif: %s\n", wifstr);
 
-	// sign transaction
-	if (sign_transaction(idx, myscriptpubkey, wifstr)) {
-		printf("\nAll transaction inputs signed successfully. \nFinal transaction hex: %s\n.", get_raw_transaction(idx));
+	// sign transaction using buffered _ex API
+	if (sign_transaction_ex(idx, myscriptpubkey, wifstr, txhex_buf, sizeof(txhex_buf))) {
+		printf("\nAll transaction inputs signed successfully. \nFinal transaction hex: %s\n.", txhex_buf);
 	}
 	else {
 		printf("Error occurred.\n");

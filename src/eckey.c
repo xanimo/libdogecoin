@@ -33,6 +33,25 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
 
+static dogecoin_eckey_context* default_eckey_context(void) {
+    static DOGECOIN_THREAD_LOCAL dogecoin_eckey_context default_ctx = {0};
+    return &default_ctx;
+}
+
+dogecoin_eckey_context* dogecoin_eckey_context_new(void) {
+    return (dogecoin_eckey_context*)dogecoin_calloc(1, sizeof(dogecoin_eckey_context));
+}
+
+void dogecoin_eckey_context_free(dogecoin_eckey_context* ctx) {
+    if (!ctx) return;
+    eckey* current;
+    eckey* tmp;
+    HASH_ITER(hh, ctx->keys, current, tmp) {
+        remove_eckey_ts(ctx, current);
+    }
+    dogecoin_free(ctx);
+}
+
 /**
  * @brief This function instantiates a new working eckey,
  * but does not add it to the hash table.
@@ -40,6 +59,11 @@
  * @return A pointer to the new working eckey.
  */
 eckey* new_eckey(dogecoin_bool is_testnet) {
+    return new_eckey_ts(default_eckey_context(), is_testnet);
+}
+
+eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
+    if (!ctx) return NULL;
     eckey* key = (struct eckey*)dogecoin_calloc(1, sizeof *key);
     dogecoin_privkey_init(&key->private_key);
     assert(dogecoin_privkey_is_valid(&key->private_key) == 0);
@@ -54,9 +78,9 @@ eckey* new_eckey(dogecoin_bool is_testnet) {
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], &key->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return false;
-    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return false;
-    key->idx = HASH_COUNT(keys) + 1;
+    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return NULL;
+    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return NULL;
+    key->idx = HASH_COUNT(ctx->keys) + 1;
     return key;
 }
 
@@ -67,10 +91,15 @@ eckey* new_eckey(dogecoin_bool is_testnet) {
  * @return A pointer to the new working eckey.
  */
 eckey* new_eckey_from_privkey(char* private_key) {
+    return new_eckey_from_privkey_ts(default_eckey_context(), private_key);
+}
+
+eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key) {
+    if (!ctx || !private_key) return NULL;
     eckey* key = (struct eckey*)dogecoin_calloc(1, sizeof *key);
     dogecoin_privkey_init(&key->private_key);
     const dogecoin_chainparams* chain = chain_from_b58_prefix(private_key);
-    if (!dogecoin_privkey_decode_wif(private_key, chain, &key->private_key)) return false;
+    if (!dogecoin_privkey_decode_wif(private_key, chain, &key->private_key)) return NULL;
     assert(dogecoin_privkey_is_valid(&key->private_key)==1);
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
@@ -80,9 +109,9 @@ eckey* new_eckey_from_privkey(char* private_key) {
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], &key->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return false;
-    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return false;
-    key->idx = HASH_COUNT(keys) + 1;
+    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return NULL;
+    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return NULL;
+    key->idx = HASH_COUNT(ctx->keys) + 1;
     return key;
 }
 
@@ -95,12 +124,17 @@ eckey* new_eckey_from_privkey(char* private_key) {
  * @return Nothing.
  */
 void add_eckey(eckey *key) {
+    add_eckey_ts(default_eckey_context(), key);
+}
+
+void add_eckey_ts(dogecoin_eckey_context* ctx, eckey *key) {
+    if (!ctx || !key) return;
     eckey* key_old;
-    HASH_FIND_INT(keys, &key->idx, key_old);
+    HASH_FIND_INT(ctx->keys, &key->idx, key_old);
     if (key_old == NULL) {
-        HASH_ADD_INT(keys, idx, key);
+        HASH_ADD_INT(ctx->keys, idx, key);
     } else {
-        HASH_REPLACE_INT(keys, idx, key, key_old);
+        HASH_REPLACE_INT(ctx->keys, idx, key, key_old);
     }
     dogecoin_free(key_old);
 }
@@ -115,8 +149,13 @@ void add_eckey(eckey *key) {
  * the provided index.
  */
 eckey* find_eckey(int idx) {
+    return find_eckey_ts(default_eckey_context(), idx);
+}
+
+eckey* find_eckey_ts(dogecoin_eckey_context* ctx, int idx) {
+    if (!ctx) return NULL;
     eckey* key;
-    HASH_FIND_INT(keys, &idx, key);
+    HASH_FIND_INT(ctx->keys, &idx, key);
     return key;
 }
 
@@ -129,7 +168,12 @@ eckey* find_eckey(int idx) {
  * @return Nothing.
  */
 void remove_eckey(eckey* key) {
-    HASH_DEL(keys, key); /* delete it (keys advances to next) */
+    remove_eckey_ts(default_eckey_context(), key);
+}
+
+void remove_eckey_ts(dogecoin_eckey_context* ctx, eckey* key) {
+    if (!ctx || !key) return;
+    HASH_DEL(ctx->keys, key); /* delete it (keys advances to next) */
     dogecoin_privkey_cleanse(&key->private_key);
     dogecoin_pubkey_cleanse(&key->public_key);
     dogecoin_key_free(key);
@@ -158,8 +202,14 @@ void dogecoin_key_free(eckey* eckey)
  * @return The index of the new key.
  */
 int start_key(dogecoin_bool is_testnet) {
-    eckey* key = new_eckey(is_testnet);
+    return start_key_ts(default_eckey_context(), is_testnet);
+}
+
+int start_key_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
+    if (!ctx) return -1;
+    eckey* key = new_eckey_ts(ctx, is_testnet);
+    if (!key) return -1;
     int index = key->idx;
-    add_eckey(key);
+    add_eckey_ts(ctx, key);
     return index;
 }

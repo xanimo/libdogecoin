@@ -78,6 +78,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
+#include <dogecoin/threadsafe.h>
 
 #ifndef WIN32
 #define BD_NO_CHDIR          01 /* Don't chdir ("/") */
@@ -575,6 +576,7 @@ int main(int argc, char* argv[]) {
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
+        dogecoin_ctx* ts_ctx = cli_ts_context_start("spvnode", chain == &dogecoin_chainparams_test);
         in_memory_headers = (dbfile && ((strcmp(dbfile, "0") == 0) || (strcmp(dbfile, "no") == 0)));
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, in_memory_headers, use_checkpoint, full_sync, maxnodes, http_server);
 
@@ -597,7 +599,8 @@ int main(int argc, char* argv[]) {
             .master_key = master_key,
             .prompt = prompt
         };
-        dogecoin_wallet* wallet = dogecoin_wallet_init(
+        dogecoin_wallet* wallet = cli_wallet_init(
+            ts_ctx,
             chain,
             address,
             name,
@@ -609,10 +612,14 @@ int main(int argc, char* argv[]) {
                 dogecoin_mem_zero (pass, strlen(pass));
                 dogecoin_free(pass);
                 }
+            cli_ts_context_finish(ts_ctx);
             dogecoin_spv_client_free(client);
             dogecoin_ecc_stop();
             return EXIT_FAILURE;
         }
+        /* The wallet now holds its own reference to the thread-safe context
+           (released by dogecoin_wallet_free), so drop our standalone one. */
+        cli_ts_context_finish(ts_ctx);
         // clear and free the passphrase
         if (pass) {
             dogecoin_mem_zero (pass, strlen(pass));
@@ -654,7 +661,7 @@ int main(int argc, char* argv[]) {
             dogecoin_bip37_filter* filter = dogecoin_bip37_filter_new(0, 1); /* random tweak, UPDATE_ALL */
             if (!filter) {
                 printf("Failed to initialize BIP37 bloom filter\n");
-                dogecoin_wallet_free(wallet);
+                cli_wallet_free(wallet);
                 dogecoin_spv_client_free(client);
                 dogecoin_ecc_stop();
                 return EXIT_FAILURE;
@@ -742,7 +749,7 @@ int main(int argc, char* argv[]) {
         if (!response) {
             printf("Could not load or create headers database...aborting\n");
 #if WITH_WALLET
-            dogecoin_wallet_free(wallet);
+            cli_wallet_free(wallet);
 #endif
             dogecoin_spv_client_free(client);
             dogecoin_ecc_stop();
@@ -828,7 +835,7 @@ int main(int argc, char* argv[]) {
                 }
                 dogecoin_spv_client_free(client);
 #if WITH_WALLET
-                dogecoin_wallet_free(wallet);
+                cli_wallet_free(wallet);
 #endif
                 dogecoin_ecc_stop();
                 return EXIT_FAILURE;
@@ -840,7 +847,7 @@ int main(int argc, char* argv[]) {
             printf("done\n");
             ret = EXIT_SUCCESS;
 #if WITH_WALLET
-            dogecoin_wallet_free(wallet);
+            cli_wallet_free(wallet);
 #endif
             }
         dogecoin_ecc_stop();
@@ -927,7 +934,7 @@ int main(int argc, char* argv[]) {
                 printf( "File 'tmp.bin' copied to '%s'\n", tmp->filename);
             }
         }
-        dogecoin_wallet_free(tmp);
+        cli_wallet_free(tmp);
         dogecoin_free(address_copy);
     }
 
