@@ -37,7 +37,7 @@ void* dogecoin_realloc_internal(void* ptr, size_t size);
 void dogecoin_free_internal(void* ptr);
 
 static const dogecoin_mem_mapper default_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
-static dogecoin_mem_mapper current_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
+static DOGECOIN_THREAD_LOCAL dogecoin_mem_mapper current_mem_mapper = {dogecoin_malloc_internal, dogecoin_calloc_internal, dogecoin_realloc_internal, dogecoin_free_internal};
 
 
 /**

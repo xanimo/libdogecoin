@@ -40,25 +40,31 @@ commands2.append(["?", 1])
 commands2.append(["-t -s 8 -d 0200000001554fb2f9", 1])
 commands2.append(["-t -s 5 -i 127.0.0.1:44556 0200000001554fb2f97f8fe299bf01004c70ec1930bc3c51fe162d1f81b18089e4f7cae470000000006a47304402207f5af3a9724be2946741e15b89bd2c989c9c20a0dfb519cb14b4efdaad945dc502206507ec7a3ba91be7794312961294c7a09a7bc693d918ab5a93712ff8576995fc012103caef57fae78ec425f5ff99d805fddd2417f3bfa7c7b0ec3b6b860cf6cc0e1d99ffffffff0100c63e05000000001976a91415e7469e21938db38e943abd7a2c1073c00e0edd88ac00000000", 0])
 
-baseCommand = "./such"
-baseCommand2 = "./sendtx"
+# Exercise both the plain CLI binaries and, when present, their thread-safe
+# (`_ts`) counterparts so CI covers the thread-safe library routing. The `_ts`
+# binaries are built from the same sources with -DDOGECOIN_TS and route through
+# the matching `_ts` library API (see include/dogecoin/threadsafe.h).
+suchVariants = [v for v in ["./such", "./such_ts"] if os.path.isfile(v)]
+sendtxVariants = [v for v in ["./sendtx", "./sendtx_ts"] if os.path.isfile(v)]
 if valgrind == True:
-    baseCommand = "valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes  --error-exitcode=1 "+baseCommand
-    baseCommand2 = "valgrind --track-origins=yes --error-exitcode=1 --leak-check=full "+baseCommand2
+    suchVariants = ["valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes  --error-exitcode=1 "+v for v in suchVariants]
+    sendtxVariants = ["valgrind --track-origins=yes --error-exitcode=1 --leak-check=full "+v for v in sendtxVariants]
 
 errored = False
-for cmd in commands:
-    retcode = call(baseCommand+" "+cmd[0], shell=True)
-    if retcode != cmd[1]:
-        print("ERROR during "+cmd[0])
-        sys.exit(os.EX_DATAERR)
+for baseCommand in suchVariants:
+    for cmd in commands:
+        retcode = call(baseCommand+" "+cmd[0], shell=True)
+        if retcode != cmd[1]:
+            print("ERROR during "+baseCommand+" "+cmd[0])
+            sys.exit(os.EX_DATAERR)
 
 errored = False
-for cmd in commands2:
-    retcode = call(baseCommand2+" "+cmd[0], shell=True)
-    if retcode != cmd[1]:
-        print("ERROR during "+cmd[0])
-        sys.exit(os.EX_DATAERR)
+for baseCommand2 in sendtxVariants:
+    for cmd in commands2:
+        retcode = call(baseCommand2+" "+cmd[0], shell=True)
+        if retcode != cmd[1]:
+            print("ERROR during "+baseCommand2+" "+cmd[0])
+            sys.exit(os.EX_DATAERR)
 
 # PSBT (BIP174) commands
 UNSIGNED_TX = "0200000001b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae0760740000000000ffffffff0100ca9a3b000000001976a91415e7469e21938db38e943abd7a2c1073c00e0edd88ac00000000"

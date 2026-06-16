@@ -66,6 +66,22 @@ typedef struct dogecoin_checkpoint_ {
     uint32_t target;
 } dogecoin_checkpoint;
 
+struct dogecoin_transaction_context;
+struct dogecoin_eckey_context;
+typedef struct dogecoin_context_ {
+    const dogecoin_chainparams* chain_params;
+    struct dogecoin_transaction_context* tx_ctx;
+    struct dogecoin_eckey_context* key_ctx;
+    void* ecc_ctx;
+    void* rng_state;
+    void* refcount_lock;
+    int enable_net;
+    int error_code;
+    uint32_t refcount;
+    int thread_safe; /* nonzero when constructed via dogecoin_ctx_new_ts() (alias in dogecoin.h) */
+    char last_error[256];
+} dogecoin_context;
+
 /* forward declarations for opaque types referenced by the PQC and ZK APIs */
 typedef struct cstring cstring;
 
@@ -101,6 +117,32 @@ extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[24];
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
 int chain_from_b58_prefix_bool(char* address);
+
+dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enable_net);
+void dogecoin_context_acquire(dogecoin_context* ctx);
+void dogecoin_context_release(dogecoin_context* ctx);
+const dogecoin_chainparams* dogecoin_context_get_chainparams(const dogecoin_context* ctx);
+struct dogecoin_transaction_context* dogecoin_context_get_transaction_context(dogecoin_context* ctx);
+struct dogecoin_eckey_context* dogecoin_context_get_eckey_context(dogecoin_context* ctx);
+void* dogecoin_context_get_ecc_context(dogecoin_context* ctx);
+void* dogecoin_context_get_rng_state(dogecoin_context* ctx);
+void dogecoin_context_set_error(dogecoin_context* ctx, int code, const char* msg);
+int dogecoin_context_get_error_code(const dogecoin_context* ctx);
+const char* dogecoin_context_get_error(const dogecoin_context* ctx);
+int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_size, char* addr, size_t* addr_size);
+
+/* THREAD-SAFE short-form aliases for the dogecoin_context API.
+ * dogecoin_ctx_new() returns a context whose refcount is guarded by a
+ * process-wide mutex; dogecoin_ctx_new_ts() additionally tags the context
+ * as thread-safe so dependent subsystems (wallet / tx / spv helpers) can
+ * select per-object locking when wired through the context. The non-_ts
+ * constructor remains thread-compatible: any single owning thread may use
+ * it, and reference counting is always atomic. */
+dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net);
+dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
+void dogecoin_ctx_acquire(dogecoin_ctx* ctx);
+void dogecoin_ctx_release(dogecoin_ctx* ctx);
+int dogecoin_ctx_is_thread_safe(const dogecoin_ctx* ctx);
 
 /* basic address functions: return 1 if succesful
    ----------------------------------------------
@@ -624,11 +666,6 @@ typedef struct eckey {
     UT_hash_handle hh;
 } eckey;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-static eckey *keys = NULL;
-#pragma GCC diagnostic pop
-
 // instantiates a new eckey
 eckey* new_eckey(dogecoin_bool is_testnet);
 // instantiates a new eckey from a WIF-encoded private key
@@ -658,16 +695,6 @@ int verify_message(char* sig, char* msg, char* address);
 /* Vector API
 --------------------------------------------------------------------------
 */
-
-typedef struct vector_t {
-    void** data;  /* array of pointers */
-    size_t len;   /* array element count */
-    size_t alloc; /* allocated array elements */
-
-    void (*elem_free_f)(void*);
-} vector_t;
-
-#define vector_idx(vec, idx) vec->data[idx]
 
 /* create a new vector with initial reserve and optional element destructor */
 vector_t* vector_new(size_t res, void (*free_f)(void*));

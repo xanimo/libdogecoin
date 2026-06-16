@@ -9,7 +9,7 @@
 #include "secp256k1/include/secp256k1.h"
 #include "secp256k1/include/secp256k1_recovery.h"
 
-static secp256k1_context* secp256k1_ctx = NULL;
+static DOGECOIN_THREAD_LOCAL secp256k1_context* secp256k1_ctx = NULL;
 
 dogecoin_bool dogecoin_ecc_start(void)
 {
