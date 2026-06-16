@@ -38,6 +38,9 @@
 #define WINVER 0x0600
 #endif
 #include <windows.h>
+/* WIN32_LEAN_AND_MEAN (defined upstream) strips winnls.h from windows.h;
+ * include it explicitly so NormalizeString and NormalizationKD are declared. */
+#include <winnls.h>
 #endif
 
 /*

@@ -45,29 +45,37 @@ typedef struct eckey {
     UT_hash_handle hh;
 } eckey;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-static eckey *keys = NULL;
-#pragma GCC diagnostic pop
+typedef struct dogecoin_eckey_context {
+    eckey* keys;
+} dogecoin_eckey_context;
 
 // instantiates a new eckey
 LIBDOGECOIN_API eckey* new_eckey(dogecoin_bool is_testnet);
+LIBDOGECOIN_API eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet);
 
 LIBDOGECOIN_API eckey* new_eckey_from_privkey(char* key);
+LIBDOGECOIN_API eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* key);
 
 // adds eckey structure to hash table
 LIBDOGECOIN_API void add_eckey(eckey *key);
+LIBDOGECOIN_API void add_eckey_ts(dogecoin_eckey_context* ctx, eckey *key);
 
 // find eckey from the hash table
 LIBDOGECOIN_API eckey* find_eckey(int idx);
+LIBDOGECOIN_API eckey* find_eckey_ts(dogecoin_eckey_context* ctx, int idx);
 
 // remove eckey from the hash table
 LIBDOGECOIN_API void remove_eckey(eckey *key);
+LIBDOGECOIN_API void remove_eckey_ts(dogecoin_eckey_context* ctx, eckey *key);
 
 LIBDOGECOIN_API void dogecoin_key_free(eckey* eckey);
 
 // instantiates and adds key to the hash table
 LIBDOGECOIN_API int start_key(dogecoin_bool is_testnet);
+LIBDOGECOIN_API int start_key_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet);
+
+LIBDOGECOIN_API dogecoin_eckey_context* dogecoin_eckey_context_new(void);
+LIBDOGECOIN_API void dogecoin_eckey_context_free(dogecoin_eckey_context* ctx);
 
 LIBDOGECOIN_END_DECL
 

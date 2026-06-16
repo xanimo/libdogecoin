@@ -33,16 +33,6 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-typedef struct vector_t {
-    void** data;  /* array of pointers */
-    size_t len;   /* array element count */
-    size_t alloc; /* allocated array elements */
-
-    void (*elem_free_f)(void*);
-} vector_t;
-
-#define vector_idx(vec, idx) vec->data[idx]
-
 LIBDOGECOIN_API vector_t* vector_new(size_t res, void (*free_f)(void*));
 LIBDOGECOIN_API void vector_free(vector_t* vec, dogecoin_bool free_array);
 
