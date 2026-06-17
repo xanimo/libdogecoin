@@ -66,7 +66,10 @@ void add_transaction(working_transaction *working_tx) {
     } else {
         HASH_REPLACE_INT(transactions, idx, working_tx, tx);
     }
-    dogecoin_free(tx);
+    if (tx) {
+        dogecoin_tx_free(tx->transaction);
+        dogecoin_free(tx);
+    }
 }
 
 /**
@@ -271,8 +274,13 @@ int save_raw_transaction(int txindex, const char* hexadecimal_transaction) {
         printf("invalid tx hex");
         return false;
     }
-    // free byte array
     working_transaction* tx_raw = find_transaction(txindex);
+    if (!tx_raw) {
+        dogecoin_tx_free(txtmp);
+        dogecoin_free(data_bin);
+        printf("transaction not found\n");
+        return false;
+    }
     dogecoin_tx_copy(tx_raw->transaction, txtmp);
     dogecoin_tx_free(txtmp);
     dogecoin_free(data_bin);
@@ -361,7 +369,8 @@ int add_output(int txindex, char* destinationaddress, char* amount) {
  * @return 1 if the additional output was created successfully, 0 otherwise.
  */
 static int make_change(int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount) {
-    if (amount==subtractedfee) return false; // utxos already fully spent, no change needed
+    if (amount == subtractedfee) return false; // utxos already fully spent, no change needed
+    if (subtractedfee > amount) return false;  // fee exceeds remaining amount
     // find working transaction by index and pass to funciton local variable to manipulate:
     working_transaction* tx = find_transaction(txindex);
 
@@ -402,8 +411,13 @@ char* finalize_transaction(int txindex, char* destinationaddress, char* subtract
     uint64_t subtractedfee_koinu = coins_to_koinu_str(subtractedfee);
     uint64_t out_koinu_for_verification = coins_to_koinu_str(out_dogeamount_for_verification);
 
+    if (subtractedfee_koinu > out_koinu_for_verification) {
+        printf("fee exceeds total input amount\n");
+        return false;
+    }
+
     // calculate total minus desired fees
-    uint64_t total = (uint64_t)out_koinu_for_verification - (uint64_t)subtractedfee_koinu, tx_out_total = 0;
+    uint64_t total = out_koinu_for_verification - subtractedfee_koinu, tx_out_total = 0;
 
     int i, p2pkh_count = 0, length = (int)tx->transaction->vout->len;
 
@@ -491,7 +505,7 @@ void clear_transaction(int txindex) {
  * @return 1 if the raw transaction was signed successfully, 0 otherwise.
  */
 int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, int sighashtype, char* privkey) {
-    if(!incomingrawtx || !scripthex) return false;
+    if(!incomingrawtx || !scripthex || !privkey) return false;
 
     size_t tx_hex_len = strspn(incomingrawtx, VALID_HEX_CHARS);
     if (tx_hex_len == 0 || (tx_hex_len % 2) != 0 || incomingrawtx[tx_hex_len] != '\0' || tx_hex_len > TXHEXMAXLEN) {
@@ -577,7 +591,10 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
         enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(txtmp, script, &key, inputindex, sighashtype, sigcompact, sigder_plus_hashtype, &sigderlen);
         cstr_free(script, true);
 
-        if (res != DOGECOIN_SIGN_OK) return false;
+        if (res != DOGECOIN_SIGN_OK) {
+            dogecoin_tx_free(txtmp);
+            return false;
+        }
 
         char sigcompacthex[64*2+1] = {0};
         utils_bin_to_hex((unsigned char *)sigcompact, 64, sigcompacthex);
@@ -650,6 +667,7 @@ int sign_indexed_raw_transaction(int txindex, int inputindex, char* incomingrawt
  */
 int sign_transaction(int txindex, char* script_pubkey, char* privkey) {
     char* raw_hexadecimal_transaction = get_raw_transaction(txindex);
+    if (!raw_hexadecimal_transaction) return false;
     // deserialize transaction
     dogecoin_tx* txtmp = dogecoin_tx_new();
     uint8_t* data_bin = dogecoin_malloc(strlen(raw_hexadecimal_transaction) / 2);
@@ -691,7 +709,10 @@ int sign_transaction(int txindex, char* script_pubkey, char* privkey) {
 int sign_transaction_w_privkey(int txindex, int vout_index, char* privkey) {
     char* script_pubkey = dogecoin_private_key_wif_to_pubkey_hash(privkey);
     char* raw_hexadecimal_transaction = get_raw_transaction(txindex);
-
+    if (!raw_hexadecimal_transaction) {
+        dogecoin_free(script_pubkey);
+        return false;
+    }
     // deserialize transaction
     dogecoin_tx* txtmp = dogecoin_tx_new();
     uint8_t* data_bin = dogecoin_malloc(strlen(raw_hexadecimal_transaction) / 2);
@@ -966,6 +987,10 @@ int finalize_transaction_ex(int   txindex,
     int      is_testnet     = chain_from_b58_prefix_bool(destinationaddress);
     uint64_t fee_koinu      = coins_to_koinu_str(subtractedfee);
     uint64_t total_in_koinu = coins_to_koinu_str(out_dogeamount_for_verification);
+    if (fee_koinu > total_in_koinu) {
+        printf("fee exceeds total input amount\n");
+        return 0;
+    }
     uint64_t expected_total = total_in_koinu - fee_koinu;
     uint64_t tx_out_total   = 0;
     int      p2pkh_hits     = 0;

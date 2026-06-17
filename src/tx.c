@@ -175,6 +175,7 @@ dogecoin_tx_out* dogecoin_tx_out_new()
  */
 void dogecoin_tx_free(dogecoin_tx* tx)
 {
+    if (!tx) return;
     if (tx->vin) {
         vector_free(tx->vin, true);
         tx->vin = NULL;
@@ -230,6 +231,8 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
     }
     if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, P2PKHLEN)) {
         printf("failed to convert hash160 to p2pkh!\n");
+        dogecoin_free(stripped_array);
+        dogecoin_tx_out_free(copy);
         return false;
     }
     dogecoin_free(stripped_array);
@@ -271,6 +274,7 @@ dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, siz
     }
     if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, P2PKHLEN)) {
         printf("failed to convert hash160 to p2pkh!\n");
+        dogecoin_free(stripped_array);
         return false;
     }
     dogecoin_free(stripped_array);
@@ -383,7 +387,11 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
     dogecoin_pubkey_cleanse(&pubkey);
     //2* (3-byte header + 20-byte hash + 2-byte footer) + 1-byte null terminator
     char* script_hash = dogecoin_malloc(40 + 6 + 4 + 1);
-    if (!dogecoin_p2pkh_address_to_pubkey_hash(new_p2pkh_pubkey, script_hash)) return false;
+    if (!dogecoin_p2pkh_address_to_pubkey_hash(new_p2pkh_pubkey, script_hash)) {
+        free(new_p2pkh_pubkey);
+        dogecoin_free(script_hash);
+        return false;
+    }
     free(new_p2pkh_pubkey);
     return script_hash;
 }
@@ -683,6 +691,11 @@ void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_tx_out* src)
 {
     dest->value = src->value;
 
+    if (dest->script_pubkey) {
+        cstr_free(dest->script_pubkey, true);
+        dest->script_pubkey = NULL;
+    }
+
     if (!src->script_pubkey) {
         dest->script_pubkey = NULL;
     } else {
@@ -742,7 +755,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
         for (i = 0; i < src->vout->len; i++) {
             dogecoin_tx_out *tx_out_old, *tx_out_new;
             tx_out_old = vector_idx(src->vout, i);
-            tx_out_new = dogecoin_malloc(sizeof(*tx_out_new));
+            tx_out_new = dogecoin_tx_out_new();
             dogecoin_tx_out_copy(tx_out_new, tx_out_old);
             vector_add(dest->vout, tx_out_new);
         }
@@ -1254,7 +1267,7 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
     assert(sigderlen <= 74 && sigderlen >= 70);
     sigder_plus_hashtype[sigderlen] = sighashtype;
     sigderlen += 1; //+hashtype
-    if (sigcompact_out) {
+    if (sigder_out) {
         memcpy_safe(sigder_out, sigder_plus_hashtype, sigderlen);
     }
     if (sigder_len_out) {
