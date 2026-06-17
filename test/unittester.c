@@ -60,6 +60,7 @@ extern void test_random();
 extern void test_rmd160();
 extern void test_scrypt();
 extern void test_serialize();
+extern void test_sweep();
 extern void test_sha1();
 extern void test_sha1_hmac();
 extern void test_sha_256();
@@ -71,6 +72,7 @@ extern void test_signmsg_ext();
 extern void test_tpm();
 extern void test_psbt();
 extern void test_transaction();
+extern void test_transaction_large(void);
 extern void test_validation();
 extern void test_tx_serialization();
 extern void test_tx_sighash();
@@ -171,6 +173,7 @@ int main()
     u_run_test(test_rmd160);
     u_run_test(test_scrypt);
     u_run_test(test_serialize);
+    u_run_test(test_sweep);
     u_run_test(test_sha1);
     u_run_test(test_sha1_hmac);
     u_run_test(test_sha_256);
@@ -184,6 +187,7 @@ int main()
 #endif
     u_run_test(test_psbt);
     u_run_test(test_transaction);
+    u_run_test(test_transaction_large);
     u_run_test(test_validation);
     u_run_test(test_tx_serialization);
     u_run_test(test_invalid_tx_deser);

@@ -60,6 +60,8 @@ case $host in
     build_windows=yes
     TARGET_OS=windows
     NASMFLAGS="-Werror -fwin64 -Xvc -gcv8 -DWIN_ABI"
+    # utf8proc is vendored into libdogecoin; static MinGW links need no dllimport.
+    CFLAGS="$CFLAGS -DUTF8PROC_STATIC"
     AC_CHECK_LIB([pthread],      [main],, AC_MSG_ERROR(lib missing))
     AC_CHECK_LIB([winpthread],      [main],, AC_MSG_ERROR(lib missing))
     AC_CHECK_LIB([shell32],      [main],, AC_MSG_ERROR(lib missing))

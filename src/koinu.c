@@ -157,6 +157,11 @@ int koinu_to_coins_str(uint64_t koinu, char* str) {
             } else str[i] = '0';
         }
         for (; i < 10; i++, j++) str[i] = swap[j];
+        /* length < 9 always writes 10 chars to str[0..9]; terminate here (the
+         * length >= 9 branch already null-terminates). Found during BIP38
+         * paper-wallet sweep work: small fee koinu hit this path and
+         * finalize_transaction failed without a proper C string. */
+        str[10] = '\0';
         free(swap);
     } else {
         char tmp[21];

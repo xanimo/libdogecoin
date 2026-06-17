@@ -24,6 +24,8 @@ include_HEADERS = \
     include/dogecoin/constants.h \
     include/dogecoin/dogecoin.h \
     include/dogecoin/libdogecoin.h \
+    include/dogecoin/bip38.h \
+    include/dogecoin/sweep.h \
     include/dogecoin/uthash.h \
     config/libdogecoin-config.h
 noinst_HEADERS = \
@@ -34,6 +36,7 @@ noinst_HEADERS = \
     include/dogecoin/auxpow.h \
     include/dogecoin/base58.h \
     include/dogecoin/bip37.h \
+    include/dogecoin/bip38.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
     include/dogecoin/bip44.h \
@@ -67,6 +70,7 @@ noinst_HEADERS = \
     include/dogecoin/rmd160.h \
     include/dogecoin/script.h \
     include/dogecoin/scrypt.h \
+    include/dogecoin/sweep.h \
     include/dogecoin/sign.h \
     include/dogecoin/serialize.h \
     include/dogecoin/seal.h \
@@ -93,6 +97,7 @@ libdogecoin_la_SOURCES = \
     src/arith_uint256.c \
     src/auxpow.c \
     src/base58.c \
+    src/bip38.c \
     src/bip32.c \
     src/bip39.c \
     src/bip44.c \
@@ -121,6 +126,7 @@ libdogecoin_la_SOURCES = \
     src/scrypt.c \
     src/seal.c \
     src/sign.c \
+    src/sweep.c \
     src/serialize.c \
     src/sha2.c \
     src/smpv.c \
@@ -232,7 +238,7 @@ libdogecoin_la_SOURCES += \
     src/scrypt-sse2.c
 endif
 
-libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC
+libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC -DUTF8PROC_STATIC
 # Linking $(ASM_LIB_FILES) here triggers a libtool "non-portable" warning
 # but is needed so libdogecoin.so ships the asm symbols. Only one of the
 # USE_AVX2 / USE_SSE asm blocks above is active at a time (the SSE block
@@ -283,6 +289,7 @@ tests_SOURCES = \
     test/rmd160_tests.c \
     test/scrypt_tests.c \
     test/serialize_tests.c \
+    test/sweep_tests.c \
     test/sha1_tests.c \
     test/sha2_tests.c \
     test/signmsg_tests.c \

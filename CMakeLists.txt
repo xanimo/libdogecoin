@@ -348,6 +348,9 @@ MESSAGE(STATUS "")
 FILE(TOUCH config/libdogecoin-config.h)
 
 ADD_LIBRARY(${LIBDOGECOIN_NAME} ${ASM_SOURCES})
+IF(WIN32 AND NOT BUILD_SHARED_LIBS)
+    TARGET_COMPILE_DEFINITIONS(${LIBDOGECOIN_NAME} PRIVATE UTF8PROC_STATIC)
+ENDIF()
 INSTALL(TARGETS
     ${LIBDOGECOIN_NAME}
     LIBRARY DESTINATION lib
@@ -369,6 +372,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/auxpow.c
     src/base58.c
     src/bip32.c
+    src/bip38.c
     src/bip39.c
     src/bip44.c
     src/block.c
@@ -397,6 +401,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/serialize.c
     src/sha2.c
     src/sign.c
+    src/sweep.c
     src/smpv.c
     src/cli/tool.c
     src/transaction.c
@@ -549,6 +554,7 @@ IF(USE_TESTS)
         test/rmd160_tests.c
         test/scrypt_tests.c
         test/serialize_tests.c
+        test/sweep_tests.c
         test/sha1_tests.c
         test/sha2_tests.c
         test/signmsg_tests.c

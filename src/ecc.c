@@ -66,6 +66,16 @@ dogecoin_bool dogecoin_ecc_private_key_tweak_add(uint8_t* private_key, const uin
     return ok;
 }
 
+/* BIP-0038 EC-multiplied (0x43) decrypt: derived privkey = passfactor * factorB (mod n). */
+dogecoin_bool dogecoin_ecc_private_key_tweak_mul(uint8_t* private_key, const uint8_t* tweak)
+{
+    assert(secp256k1_ctx);
+    enable_DIT();
+    dogecoin_bool ok = secp256k1_ec_privkey_tweak_mul(secp256k1_ctx, (unsigned char*)private_key, (const unsigned char*)tweak);
+    disable_DIT();
+    return ok;
+}
+
 dogecoin_bool dogecoin_ecc_public_key_tweak_add(uint8_t* public_key_inout, const uint8_t* tweak)
 {
     size_t out = DOGECOIN_ECKEY_COMPRESSED_LENGTH;
@@ -78,6 +88,45 @@ dogecoin_bool dogecoin_ecc_public_key_tweak_add(uint8_t* public_key_inout, const
     if (!secp256k1_ec_pubkey_serialize(secp256k1_ctx, public_key_inout, &out, &pubkey, SECP256K1_EC_COMPRESSED))
         return false;
     return true;
+}
+
+/* BIP-0038 EC-multiplied encrypt/decrypt: scalar-multiply passpoint or pointB in place. */
+dogecoin_bool dogecoin_ecc_public_key_tweak_mul(uint8_t* public_key_inout, const uint8_t* tweak)
+{
+    size_t out = DOGECOIN_ECKEY_COMPRESSED_LENGTH;
+    secp256k1_pubkey pubkey;
+    assert(secp256k1_ctx);
+    if (!secp256k1_ec_pubkey_parse(secp256k1_ctx, &pubkey, public_key_inout, 33))
+        return false;
+    if (!secp256k1_ec_pubkey_tweak_mul(secp256k1_ctx, &pubkey, (const unsigned char*)tweak))
+        return false;
+    if (!secp256k1_ec_pubkey_serialize(secp256k1_ctx, public_key_inout, &out, &pubkey, SECP256K1_EC_COMPRESSED))
+        return false;
+    return true;
+}
+
+/* BIP-0038 address-hash step: tweak_mul leaves a 33-byte point; re-encode for compressed flag. */
+dogecoin_bool dogecoin_ecc_point_serialize(
+    const uint8_t* point,
+    size_t point_len,
+    uint8_t* pubkey_out,
+    size_t* pubkey_len,
+    dogecoin_bool compressed)
+{
+    secp256k1_pubkey pubkey;
+    assert(secp256k1_ctx);
+    if (!point || !pubkey_out || !pubkey_len) {
+        return false;
+    }
+    if (!secp256k1_ec_pubkey_parse(secp256k1_ctx, &pubkey, point, point_len)) {
+        return false;
+    }
+    return secp256k1_ec_pubkey_serialize(
+        secp256k1_ctx,
+        pubkey_out,
+        pubkey_len,
+        &pubkey,
+        compressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
 }
 
 dogecoin_bool dogecoin_ecc_verify_privatekey(const uint8_t* private_key)
