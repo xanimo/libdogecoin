@@ -593,7 +593,8 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("confirmations:  %d\n", utxo->confirmations);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
-                wallet_total_u64 += coins_to_koinu_str(utxo->amount);
+                uint64_t spent_koinu = coins_to_koinu_str(utxo->amount);
+                wallet_total_u64 = spent_koinu > UINT64_MAX - wallet_total_u64 ? UINT64_MAX : wallet_total_u64 + spent_koinu;
             }
         }
         koinu_to_coins_str(wallet_total_u64, wallet_total);
@@ -612,7 +613,8 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("confirmations:  %d\n", utxo->confirmations);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
-                wallet_total_u64 += coins_to_koinu_str(utxo->amount);
+                uint64_t unspent_koinu = coins_to_koinu_str(utxo->amount);
+                wallet_total_u64 = unspent_koinu > UINT64_MAX - wallet_total_u64 ? UINT64_MAX : wallet_total_u64 + unspent_koinu;
             }
         }
         koinu_to_coins_str(wallet_total_u64, wallet_total);
@@ -1906,34 +1908,37 @@ unsigned int dogecoin_get_utxos_length(char* address) {
 uint8_t* dogecoin_get_utxos(char* address) {
     if (!address) return false;
     dogecoin_wallet* wallet = dogecoin_wallet_read(address);
-    char* concat_str = dogecoin_char_vla(HASH_COUNT(utxos) * 55);
-    dogecoin_mem_zero(concat_str, HASH_COUNT(utxos) * 55);
-    if (HASH_COUNT(utxos) > 0) {
-        unsigned int i;
-        for (i = 0; i < HASH_COUNT(utxos); i++) {
-            dogecoin_utxo* utxo = find_dogecoin_utxo(i + 1);
-            if (strncmp(utxo->address, address, strlen(utxo->address))==0 && !is_spent(utxo)) {
-                int utxo_index_length = integer_length(i);
-                char* utxo_index_hex = dogecoin_char_vla(utxo_index_length+1);
-                sprintf(utxo_index_hex, "%d", i);
-                // index
-                concat_str = concat(concat_str, utxo_index_hex);
-                char* txid_hex = utils_uint8_to_hex(utxo->txid, 32);
-                int vout_length = integer_length(utxo->vout);
-                char* vout_hex = dogecoin_char_vla(vout_length);
-                sprintf(vout_hex, "%d", utxo->vout);
-                // txid
-                concat_str = concat(concat_str, txid_hex);
-                // vout index
-                concat_str = concat(concat_str, vout_hex);
-                char amount_hex[21];
-                uint64_t utxo_amount = coins_to_koinu_str(utxo->amount);
-                sprintf(amount_hex, "%" PRIx64, utxo_amount);
-                // amount
-                concat_str = concat(concat_str, amount_hex);
-            }
+    if (!HASH_COUNT(utxos)) {
+        dogecoin_wallet_free(wallet);
+        return false;
+    }
+    char* concat_str = dogecoin_char_vla(1);
+    dogecoin_mem_zero(concat_str, 1);
+    unsigned int i;
+    for (i = 0; i < HASH_COUNT(utxos); i++) {
+        dogecoin_utxo* utxo = find_dogecoin_utxo(i + 1);
+        if (strncmp(utxo->address, address, strlen(utxo->address))==0 && !is_spent(utxo)) {
+            int utxo_index_length = integer_length(i);
+            char* utxo_index_hex = dogecoin_char_vla(utxo_index_length + 1);
+            sprintf(utxo_index_hex, "%d", i);
+            char* prev;
+            // index
+            prev = concat_str; concat_str = concat(prev, utxo_index_hex); dogecoin_free(prev); dogecoin_free(utxo_index_hex);
+            char* txid_hex = utils_uint8_to_hex(utxo->txid, 32);
+            int vout_length = integer_length(utxo->vout);
+            char* vout_hex = dogecoin_char_vla(vout_length + 1);
+            sprintf(vout_hex, "%d", utxo->vout);
+            // txid
+            prev = concat_str; concat_str = concat(prev, txid_hex); dogecoin_free(prev);
+            // vout index
+            prev = concat_str; concat_str = concat(prev, vout_hex); dogecoin_free(prev); dogecoin_free(vout_hex);
+            char amount_hex[21];
+            uint64_t utxo_amount = coins_to_koinu_str(utxo->amount);
+            sprintf(amount_hex, "%" PRIx64, utxo_amount);
+            // amount
+            prev = concat_str; concat_str = concat(prev, amount_hex); dogecoin_free(prev);
         }
-    } else return false;
+    }
     uint8_t* utxos = utils_hex_to_uint8(concat_str);
     dogecoin_free(concat_str);
     dogecoin_wallet_free(wallet);
@@ -2002,6 +2007,10 @@ char* dogecoin_get_utxo_amount(char* address, unsigned int index) {
             i++;
         }
     }
+    if (!utxo) {
+        dogecoin_wallet_free(wallet);
+        return NULL;
+    }
     char* amount = (char*)dogecoin_calloc(1, 21);
     memcpy_safe(amount, utxo->amount, 21);
     dogecoin_wallet_free(wallet);
@@ -2017,7 +2026,8 @@ uint64_t dogecoin_get_balance(char* address) {
         dogecoin_utxo* tmp;
         HASH_ITER(hh, utxos, utxo, tmp) {
             if (!is_spent(utxo) && strcmp(address, utxo->address) == 0) {
-                wallet_total_u64 += coins_to_koinu_str(utxo->amount);
+                uint64_t utxo_koinu = coins_to_koinu_str(utxo->amount);
+                wallet_total_u64 = utxo_koinu > UINT64_MAX - wallet_total_u64 ? UINT64_MAX : wallet_total_u64 + utxo_koinu;
             }
         }
     }
@@ -2027,7 +2037,7 @@ uint64_t dogecoin_get_balance(char* address) {
 
 char* dogecoin_get_balance_str(char* address) {
     if (!address) return false;
-    char* wallet_total = dogecoin_char_vla(21);
+    char* wallet_total = dogecoin_calloc(1, 21);
     uint64_t wallet_total_u64 = dogecoin_get_balance(address);
     koinu_to_coins_str(wallet_total_u64, wallet_total);
     return wallet_total;

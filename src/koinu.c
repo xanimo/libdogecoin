@@ -94,8 +94,7 @@ enum conversion_type validate_conversion(uint64_t converted, const char* src, co
         if (src_end == src) {
             type = CONVERSION_NON_DECIMAL;
             debug_print("%s: not a decimal\n", src);
-        }
-        if (*target_end != *src_end) {
+        } else if (*target_end != *src_end) {
             type = CONVERSION_INVALID_STR_TERMINATION;
             debug_print("%s: extra characters at end of input: %s\n", src, src_end);
         }
@@ -157,6 +156,7 @@ int koinu_to_coins_str(uint64_t koinu, char* str) {
             } else str[i] = '0';
         }
         for (; i < 10; i++, j++) str[i] = swap[j];
+        str[10] = '\0';
         free(swap);
     } else {
         char tmp[21];
@@ -187,10 +187,6 @@ uint64_t coins_to_koinu_str(char* coins) {
     for (; i < length; i++) { 
         dogecoin_string[i] = coins[i];
         if (coins[i] == '.') {
-            j = i;
-            while (j < i + 8) { 
-                dogecoin_string[j] = '0'; j++; 
-            }
             dogecoin_string[i] = '\0';
             i++;
             break;
@@ -206,7 +202,7 @@ uint64_t coins_to_koinu_str(char* coins) {
         for (i = mantissa_length; i < 8; i++) {
             koinu_string[i] = '0';
         }
-    } else koinu_string[strlen(koinu_string)] = '\0';
+    }
 
     errno = 0;
     uint64_t dogecoin = strtoull(dogecoin_string, &end, 10);
