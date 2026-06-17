@@ -92,6 +92,23 @@ dogecoin_paper_wallet_free(w);
 
 `dogecoin_paper_wallet_set_encrypted()` uses Dogecoin-mainnet BIP38 decrypt semantics (`BIP38_ADDRESS_MATCH_MAINNET`). For strict Bitcoin-only BIP-0038 interop vectors, call `dogecoin_bip38_decrypt_ex()` with `BIP38_ADDRESS_MATCH_INTEROP` directly.
 
+### Address-match semantics (quick reference)
+
+| API | Mode | Accepts |
+|-----|------|---------|
+| `dogecoin_bip38_decrypt()` | mainnet (default) | Dogecoin mainnet P2PKH address hash |
+| `dogecoin_bip38_decrypt_ex(..., INTEROP, ...)` | interoperability | mainnet + testnet + regtest + legacy Bitcoin `1…` P2PKH |
+| `dogecoin_bip38_confirm_passphrase()` | mainnet (default) | Same mainnet check; outputs matching `D…` address |
+| `dogecoin_bip38_confirm_passphrase_ex(..., INTEROP, ...)` | interoperability | Same multi-chain/legacy matching as decrypt interop |
+| `dogecoin_paper_wallet_set_encrypted()` | mainnet wrapper | Decrypt via `MAINNET`; address from your `chain_params` |
+| `dogecoin_bip38_verify_address_hash()` | literal helper | Embedded hash vs one address string you supply (no mode flag) |
+
+Official BIP-0038 reference vectors that use legacy Bitcoin addresses require `BIP38_ADDRESS_MATCH_INTEROP` on the `_ex` decrypt/confirm helpers — plain `dogecoin_bip38_decrypt()` will reject them by design.
+
+### Scrypt note
+
+BIP38 passphrase KDF uses RFC 7914 scrypt with caller-chosen `N/r/p` via `dogecoin_scrypt_rfc7914()` in `scrypt.c`. That is separate from the fixed PoW entry point `scrypt_1024_1_1_256()` (mining parameters, 32-byte output). BIP38 calls the RFC helper internally; applications normally do not call it directly.
+
 ## Sweep API — caller supplies chain data
 
 ### Single UTXO
@@ -249,7 +266,7 @@ make check    # autotools
 | `dogecoin_bip38_encrypt_from_intermediate` | Printer-side EC encrypt from intermediate |
 | `dogecoin_bip38_encrypt_ec_multiplied` | One-shot EC encrypt (+ optional confirmation) |
 | `dogecoin_bip38_confirm_passphrase` | Verify confirmation code (mainnet address out) |
-| `dogecoin_bip38_confirm_passphrase_ex` | Verify confirmation with address-match mode |
+| `dogecoin_bip38_confirm_passphrase_ex` | Verify confirmation; `INTEROP` matches decrypt interop chains |
 | `dogecoin_bip38_private_key_to_wif` | Raw 32-byte key → WIF for chain |
 | `dogecoin_bip38_wif_to_private_key` | WIF → raw key |
 | `dogecoin_bip38_is_valid` | Valid `6P…` encrypted key |

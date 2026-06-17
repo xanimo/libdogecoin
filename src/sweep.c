@@ -71,6 +71,21 @@ static void sweep_secure_free(char* s)
     dogecoin_free(s);
 }
 
+static void sweep_paper_wallet_clear_sensitive(dogecoin_paper_wallet* wallet)
+{
+    if (!wallet) {
+        return;
+    }
+    sweep_secure_free(wallet->private_key_wif);
+    wallet->private_key_wif = NULL;
+    sweep_secure_free(wallet->private_key_hex);
+    wallet->private_key_hex = NULL;
+    sweep_secure_free(wallet->encrypted_private_key);
+    wallet->encrypted_private_key = NULL;
+    sweep_secure_free(wallet->passphrase);
+    wallet->passphrase = NULL;
+}
+
 static void sweep_result_fail(dogecoin_sweep_result* r, const char* msg)
 {
     if (!r || !msg) return;
@@ -519,10 +534,7 @@ dogecoin_paper_wallet* dogecoin_paper_wallet_new(void) {
 void dogecoin_paper_wallet_free(dogecoin_paper_wallet* wallet) {
     if (!wallet) return;
 
-    sweep_secure_free(wallet->private_key_wif);
-    sweep_secure_free(wallet->private_key_hex);
-    sweep_secure_free(wallet->encrypted_private_key);
-    sweep_secure_free(wallet->passphrase);
+    sweep_paper_wallet_clear_sensitive(wallet);
     sweep_secure_free(wallet->address);
 
     dogecoin_free(wallet);
@@ -610,6 +622,8 @@ dogecoin_bool dogecoin_paper_wallet_set_wif(
     const dogecoin_chainparams* chain_params
 ) {
     if (!wallet || !wif_private_key || !chain_params) return false;
+
+    sweep_paper_wallet_clear_sensitive(wallet);
     
     uint8_t private_key[DOGECOIN_ECKEY_PKEY_LENGTH];
     dogecoin_bool compressed = true;
@@ -637,7 +651,8 @@ dogecoin_bool dogecoin_paper_wallet_set_wif(
     
     wallet->address = dogecoin_calloc(1, strlen(address) + 1);
     if (!wallet->address) {
-        dogecoin_free(wallet->private_key_wif);
+        sweep_secure_free(wallet->private_key_wif);
+        wallet->private_key_wif = NULL;
         return false;
     }
     strcpy(wallet->address, address);
@@ -656,6 +671,8 @@ dogecoin_bool dogecoin_paper_wallet_set_hex(
     const dogecoin_chainparams* chain_params
 ) {
     if (!wallet || !hex_private_key || !chain_params) return false;
+
+    sweep_paper_wallet_clear_sensitive(wallet);
     
     /* Convert hex to bytes */
     uint8_t private_key[DOGECOIN_ECKEY_PKEY_LENGTH];
@@ -690,7 +707,8 @@ dogecoin_bool dogecoin_paper_wallet_set_hex(
     
     wallet->address = dogecoin_calloc(1, strlen(address) + 1);
     if (!wallet->address) {
-        dogecoin_free(wallet->private_key_hex);
+        sweep_secure_free(wallet->private_key_hex);
+        wallet->private_key_hex = NULL;
         return false;
     }
     strcpy(wallet->address, address);
@@ -710,11 +728,18 @@ dogecoin_bool dogecoin_paper_wallet_set_encrypted(
     const dogecoin_chainparams* chain_params
 ) {
     if (!wallet || !encrypted_private_key || !passphrase || !chain_params) return false;
+
+    sweep_paper_wallet_clear_sensitive(wallet);
     
-    /* Decrypt private key */
+    /* Decrypt private key (Dogecoin-mainnet BIP38 semantics). */
     uint8_t private_key[DOGECOIN_ECKEY_PKEY_LENGTH];
     dogecoin_bool compressed;
-    if (!dogecoin_bip38_decrypt(encrypted_private_key, passphrase, private_key, &compressed)) {
+    if (!dogecoin_bip38_decrypt_ex(
+            encrypted_private_key,
+            passphrase,
+            BIP38_ADDRESS_MATCH_MAINNET,
+            private_key,
+            &compressed)) {
         return false;
     }
 
@@ -1375,3 +1400,4 @@ uint64_t dogecoin_sweep_result_get_fee_paid(const dogecoin_sweep_result* result)
 const char* dogecoin_sweep_result_get_destination_address(const dogecoin_sweep_result* result) {
     return result ? result->destination_address : NULL;
 }
+
