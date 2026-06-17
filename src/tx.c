@@ -1271,7 +1271,7 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         memcpy_safe(sigcompact_out, sig, siglen);
     }
 
-    // form normalized DER signature & hashtype
+    // form normalized DER signature & hashtype (normalized DER is 69-72 bytes on secp256k1)
     unsigned char sigder_plus_hashtype[74 + 1];
     size_t sigderlen = sizeof(sigder_plus_hashtype) - 1; // capacity hint, reserving 1 byte for hashtype
     /* A low-S normalized secp256k1 DER signature is at most 72 bytes:

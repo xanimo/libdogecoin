@@ -1266,3 +1266,310 @@ dogecoin_zk_err_t dogecoin_zk_generate_plonk_proof(
 
 /* Human-readable error string.  Never returns NULL. */
 const char* dogecoin_zk_strerror(dogecoin_zk_err_t err);
+
+/* BIP38 API
+--------------------------------------------------------------------------
+*/
+
+/* Encrypt a private key using BIP38 */
+dogecoin_bool dogecoin_bip38_encrypt(
+    const uint8_t* private_key,
+    const char* passphrase,
+    const char* address,
+    dogecoin_bool compressed,
+    char* encrypted_key_out,
+    size_t* encrypted_key_size);
+/* Decrypt a BIP38 encrypted private key */
+dogecoin_bool dogecoin_bip38_decrypt(
+    const char* encrypted_key,
+    const char* passphrase,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out);
+/* Decrypt with explicit address-hash matching mode (see BIP38_ADDRESS_MATCH_* in bip38.h) */
+dogecoin_bool dogecoin_bip38_decrypt_ex(
+    const char* encrypted_key,
+    const char* passphrase,
+    unsigned int address_match_mode,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out);
+/* Decrypt with explicit passphrase byte length (NFC applied; supports embedded NUL) */
+dogecoin_bool dogecoin_bip38_decrypt_passphrase(
+    const char* encrypted_key,
+    const uint8_t* passphrase,
+    size_t passphrase_len,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out);
+/* Decrypt with explicit passphrase length and address-hash matching mode */
+dogecoin_bool dogecoin_bip38_decrypt_passphrase_ex(
+    const char* encrypted_key,
+    const uint8_t* passphrase,
+    size_t passphrase_len,
+    unsigned int address_match_mode,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out);
+/* Non-EC encrypt with explicit passphrase byte length (NFC applied; supports embedded NUL) */
+dogecoin_bool dogecoin_bip38_encrypt_passphrase(
+    const uint8_t* private_key,
+    const uint8_t* passphrase,
+    size_t passphrase_len,
+    const char* address,
+    dogecoin_bool compressed,
+    char* encrypted_key_out,
+    size_t* encrypted_key_size);
+/* Decrypt a BIP38 encrypted private key with lot/sequence */
+dogecoin_bool dogecoin_bip38_decrypt_with_lot_sequence(
+    const char* encrypted_key,
+    const char* passphrase,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out,
+    uint32_t* lot_out,
+    uint32_t* sequence_out);
+/* Decrypt with lot/sequence and explicit address-hash matching mode */
+dogecoin_bool dogecoin_bip38_decrypt_with_lot_sequence_ex(
+    const char* encrypted_key,
+    const char* passphrase,
+    unsigned int address_match_mode,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out,
+    uint32_t* lot_out,
+    uint32_t* sequence_out);
+/* Check if a string is a valid BIP38 encrypted key */
+dogecoin_bool dogecoin_bip38_is_valid(const char* encrypted_key);
+/* Get the address hash from a BIP38 encrypted key */
+dogecoin_bool dogecoin_bip38_get_address_hash(
+    const char* encrypted_key,
+    uint8_t* address_hash_out);
+/* Verify the address hash matches the given address */
+dogecoin_bool dogecoin_bip38_verify_address_hash(
+    const char* encrypted_key,
+    const char* address);
+/* Get the flag byte from a BIP38 encrypted key */
+dogecoin_bool dogecoin_bip38_get_flag_byte(
+    const char* encrypted_key,
+    uint8_t* flag_byte_out);
+/* Check if a BIP38 encrypted key is compressed */
+dogecoin_bool dogecoin_bip38_is_compressed(const char* encrypted_key);
+/* Check if a BIP38 encrypted key has lot/sequence */
+dogecoin_bool dogecoin_bip38_has_lot_sequence(const char* encrypted_key);
+/* Check if a BIP38 encrypted key is EC multiplied */
+dogecoin_bool dogecoin_bip38_is_ec_multiplied(const char* encrypted_key);
+/* Generate a random lot and sequence for BIP38 */
+void dogecoin_bip38_generate_lot_sequence(
+    uint32_t* lot_out,
+    uint32_t* sequence_out);
+/* Convert a private key to WIF format */
+dogecoin_bool dogecoin_bip38_private_key_to_wif(
+    const uint8_t* private_key,
+    const dogecoin_chainparams* chain,
+    dogecoin_bool compressed,
+    char* wif_out,
+    size_t* wif_size);
+/* Convert a WIF private key to raw format */
+dogecoin_bool dogecoin_bip38_wif_to_private_key(
+    const char* wif,
+    const dogecoin_chainparams* chain,
+    uint8_t* private_key_out,
+    dogecoin_bool* compressed_out);
+/* Owner-side intermediate passphrase string (starts with "passphrase") */
+dogecoin_bool dogecoin_bip38_generate_intermediate_code(
+    const char* passphrase,
+    dogecoin_bool use_lot_sequence,
+    uint32_t lot,
+    uint32_t sequence,
+    const uint8_t* ownerentropy_override,
+    char* intermediate_code_out,
+    size_t* intermediate_code_size);
+/* Printer-side: create encrypted key (+ optional confirmation code) from intermediate code */
+dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
+    const char* intermediate_code,
+    dogecoin_bool compressed,
+    const uint8_t* seedb_override,
+    const char* address_chain_hint,
+    uint8_t* private_key_out,
+    char* encrypted_key_out,
+    size_t* encrypted_key_size,
+    char* confirmation_code_out,
+    size_t* confirmation_code_size);
+/* Owner verifies confirmation code matches passphrase (and optional lot/sequence) */
+dogecoin_bool dogecoin_bip38_confirm_passphrase(
+    const char* passphrase,
+    const char* confirmation_code,
+    char* address_out,
+    size_t address_size,
+    dogecoin_bool* compressed_out,
+    uint32_t* lot_out,
+    uint32_t* sequence_out);
+/* Owner verifies confirmation code (Dogecoin mainnet address output by default) */
+dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
+    const char* passphrase,
+    const char* confirmation_code,
+    unsigned int address_match_mode,
+    char* address_out,
+    size_t address_size,
+    dogecoin_bool* compressed_out,
+    uint32_t* lot_out,
+    uint32_t* sequence_out);
+/* One-shot EC-multiplied encrypt (optional lot/sequence, optional confirmation code) */
+dogecoin_bool dogecoin_bip38_encrypt_ec_multiplied(
+    const char* passphrase,
+    dogecoin_bool compressed,
+    dogecoin_bool use_lot_sequence,
+    uint32_t lot,
+    uint32_t sequence,
+    const char* address_chain_hint,
+    uint8_t* private_key_out,
+    char* encrypted_key_out,
+    size_t* encrypted_key_size,
+    char* confirmation_code_out,
+    size_t* confirmation_code_size);
+/* Check if a string is a BIP38 intermediate passphrase code */
+dogecoin_bool dogecoin_bip38_is_intermediate_code(const char* code);
+/* Check if a string is a BIP38 confirmation code */
+dogecoin_bool dogecoin_bip38_is_confirmation_code(const char* code);
+
+/* Paper wallet sweep API
+--------------------------------------------------------------------------
+*/
+
+typedef struct dogecoin_paper_wallet_ dogecoin_paper_wallet;
+typedef struct dogecoin_sweep_result_ dogecoin_sweep_result;
+typedef struct dogecoin_sweep_options_ dogecoin_sweep_options;
+typedef struct dogecoin_sweep_utxo_ dogecoin_sweep_utxo;
+typedef dogecoin_tx dogecoin_transaction;
+
+/* Initialize a paper wallet structure */
+dogecoin_paper_wallet* dogecoin_paper_wallet_new(void);
+/* Free a paper wallet structure */
+void dogecoin_paper_wallet_free(dogecoin_paper_wallet* wallet);
+/* Initialize a sweep result structure */
+dogecoin_sweep_result* dogecoin_sweep_result_new(void);
+/* Free a sweep result structure */
+void dogecoin_sweep_result_free(dogecoin_sweep_result* result);
+/* Initialize sweep options with defaults */
+dogecoin_sweep_options* dogecoin_sweep_options_new(const dogecoin_chainparams* chain_params);
+/* Free sweep options */
+void dogecoin_sweep_options_free(dogecoin_sweep_options* options);
+/* Set paper wallet from WIF private key */
+dogecoin_bool dogecoin_paper_wallet_set_wif(
+    dogecoin_paper_wallet* wallet,
+    const char* wif_private_key,
+    const dogecoin_chainparams* chain_params);
+/* Set paper wallet from hex private key */
+dogecoin_bool dogecoin_paper_wallet_set_hex(
+    dogecoin_paper_wallet* wallet,
+    const char* hex_private_key,
+    const dogecoin_chainparams* chain_params);
+/* Set paper wallet from a BIP38 encrypted private key (Dogecoin-mainnet decrypt semantics) */
+dogecoin_bool dogecoin_paper_wallet_set_encrypted(
+    dogecoin_paper_wallet* wallet,
+    const char* encrypted_private_key,
+    const char* passphrase,
+    const dogecoin_chainparams* chain_params);
+/* Get the address from a paper wallet */
+dogecoin_bool dogecoin_paper_wallet_get_address(
+    const dogecoin_paper_wallet* wallet,
+    char* address_out,
+    size_t address_size);
+/* Get the private key from a paper wallet */
+dogecoin_bool dogecoin_paper_wallet_get_private_key(
+    const dogecoin_paper_wallet* wallet,
+    uint8_t* private_key_out);
+/* Get the WIF private key from a paper wallet */
+dogecoin_bool dogecoin_paper_wallet_get_wif(
+    const dogecoin_paper_wallet* wallet,
+    char* wif_out,
+    size_t wif_size);
+/* Check if a paper wallet is valid */
+dogecoin_bool dogecoin_paper_wallet_is_valid(const dogecoin_paper_wallet* wallet);
+/* Sweep a paper wallet to a destination address (requires UTXO on options) */
+dogecoin_sweep_result* dogecoin_sweep_paper_wallet(
+    const dogecoin_paper_wallet* wallet,
+    const dogecoin_sweep_options* options);
+/* Sweep multiple paper wallets to a destination address */
+dogecoin_sweep_result* dogecoin_sweep_multiple_paper_wallets(
+    const dogecoin_paper_wallet* wallets,
+    size_t wallet_count,
+    const dogecoin_sweep_options* options);
+/* Estimate the fee for sweeping a paper wallet */
+uint64_t dogecoin_sweep_estimate_fee(
+    const dogecoin_paper_wallet* wallet,
+    const dogecoin_sweep_options* options);
+/* Get the balance of a paper wallet address */
+dogecoin_bool dogecoin_sweep_get_balance(
+    const char* address,
+    const dogecoin_chainparams* chain_params,
+    uint64_t* balance_out);
+/* Create an unsigned sweep transaction (free with dogecoin_tx_free) */
+dogecoin_transaction* dogecoin_sweep_create_transaction(
+    const dogecoin_paper_wallet* wallet,
+    const dogecoin_sweep_options* options);
+/* Sign a sweep transaction */
+dogecoin_bool dogecoin_sweep_sign_transaction(
+    dogecoin_transaction* transaction,
+    const dogecoin_paper_wallet* wallet);
+/* Broadcast a sweep transaction */
+dogecoin_bool dogecoin_sweep_broadcast_transaction(
+    const dogecoin_transaction* transaction,
+    const dogecoin_chainparams* chain_params,
+    char* transaction_id_out,
+    size_t transaction_id_size);
+/* Validate a sweep transaction */
+dogecoin_bool dogecoin_sweep_validate_transaction(
+    const dogecoin_transaction* transaction,
+    const dogecoin_paper_wallet* wallet,
+    const dogecoin_sweep_options* options);
+/* Get sweep transaction statistics */
+dogecoin_bool dogecoin_sweep_get_stats(
+    const dogecoin_transaction* transaction,
+    const dogecoin_sweep_options* options,
+    uint64_t* input_count_out,
+    uint64_t* output_count_out,
+    uint64_t* total_input_value_out,
+    uint64_t* total_output_value_out,
+    uint64_t* fee_out);
+/* Set sweep options destination address */
+dogecoin_bool dogecoin_sweep_options_set_destination(
+    dogecoin_sweep_options* options,
+    const char* destination_address);
+/* Set sweep options fee */
+dogecoin_bool dogecoin_sweep_options_set_fee(
+    dogecoin_sweep_options* options,
+    uint64_t fee_per_byte,
+    uint64_t min_fee,
+    uint64_t max_fee);
+/* Set sweep options RBF */
+void dogecoin_sweep_options_set_rbf(
+    dogecoin_sweep_options* options,
+    dogecoin_bool use_rbf);
+/* Set sweep options locktime */
+void dogecoin_sweep_options_set_locktime(
+    dogecoin_sweep_options* options,
+    uint32_t locktime);
+/* Replace all UTXOs with a single prevout */
+dogecoin_bool dogecoin_sweep_options_set_utxo(
+    dogecoin_sweep_options* options,
+    const char* txid_hex,
+    int vout,
+    const char* total_input_doge);
+/* Append a prevout for multi-UTXO sweeps */
+dogecoin_bool dogecoin_sweep_options_add_utxo(
+    dogecoin_sweep_options* options,
+    const char* txid_hex,
+    int vout,
+    const char* amount_doge);
+/* Number of prevouts configured on options */
+size_t dogecoin_sweep_options_utxo_count(const dogecoin_sweep_options* options);
+/* Map fee-per-kB to fee-per-byte for sweep options */
+uint64_t dogecoin_sweep_fee_per_kb_to_per_byte(uint64_t fee_per_kb);
+/* Get sweep result error message */
+const char* dogecoin_sweep_result_get_error(const dogecoin_sweep_result* result);
+/* Get sweep result transaction hex */
+const char* dogecoin_sweep_result_get_transaction_hex(const dogecoin_sweep_result* result);
+/* Get sweep result transaction ID */
+const char* dogecoin_sweep_result_get_transaction_id(const dogecoin_sweep_result* result);
+/* Get sweep result amount swept */
+uint64_t dogecoin_sweep_result_get_amount_swept(const dogecoin_sweep_result* result);
+/* Get sweep result fee paid */
+uint64_t dogecoin_sweep_result_get_fee_paid(const dogecoin_sweep_result* result);
+/* Get sweep result destination address */
+const char* dogecoin_sweep_result_get_destination_address(const dogecoin_sweep_result* result);
