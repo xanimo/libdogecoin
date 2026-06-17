@@ -300,7 +300,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_bip38_confirm_passphrase(
     uint32_t* sequence_out
 );
 
-/* Owner verifies confirmation code (Dogecoin mainnet address output by default). */
+/* Owner verifies confirmation code (Dogecoin mainnet address output by default).
+ * INTEROP mode uses the same multi-chain address matching as decrypt_ex. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
     const char* passphrase,
     const char* confirmation_code,

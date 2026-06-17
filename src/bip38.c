@@ -194,14 +194,6 @@ static dogecoin_bool bip38_derive_key_bytes(
     return ok;
 }
 
-static dogecoin_bool bip38_derive_key(
-    const char* passphrase,
-    const uint8_t salt[4],
-    uint8_t derived_key[64])
-{
-    return bip38_derive_key_bytes((const uint8_t*)passphrase, 0, salt, derived_key);
-}
-
 static void bip38_encrypt_halves(
     const uint8_t* private_key,
     const uint8_t* derived_64,
@@ -646,26 +638,22 @@ static dogecoin_bool bip38_encrypt_ec_with_passphrase(
     char* confirmation_code_out,
     size_t* confirmation_code_size);
 
-static dogecoin_bool bip38_privkey_matches_addresshash(
-    const uint8_t* private_key,
-    dogecoin_bool compressed,
+static dogecoin_bool bip38_pubkey_find_matching_address(
+    const dogecoin_pubkey* pubkey,
     const uint8_t expected_hash[4],
-    unsigned int address_match_mode)
+    unsigned int address_match_mode,
+    char* address_out)
 {
-    dogecoin_pubkey pubkey;
-    dogecoin_pubkey_init(&pubkey);
-    size_t pubkey_len = compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH;
-    dogecoin_ecc_get_pubkey(private_key, pubkey.pubkey, &pubkey_len, compressed);
-    pubkey.compressed = compressed;
+    char address[P2PKHLEN];
+    uint8_t calc_hash[4];
 
-    {
-        char address[P2PKHLEN];
-        if (dogecoin_pubkey_getaddr_p2pkh(&pubkey, &dogecoin_chainparams_main, address)) {
-            uint8_t calc_hash[4];
-            bip38_address_hash(address, calc_hash);
-            if (bip38_mem_eq(calc_hash, expected_hash, 4)) {
-                return true;
+    if (dogecoin_pubkey_getaddr_p2pkh(pubkey, &dogecoin_chainparams_main, address)) {
+        bip38_address_hash(address, calc_hash);
+        if (bip38_mem_eq(calc_hash, expected_hash, 4)) {
+            if (address_out) {
+                memcpy(address_out, address, P2PKHLEN);
             }
+            return true;
         }
     }
 
@@ -680,38 +668,52 @@ static dogecoin_bool bip38_privkey_matches_addresshash(
         };
         size_t i;
         for (i = 0; i < sizeof(chains) / sizeof(chains[0]); i++) {
-            char address[P2PKHLEN];
-            if (!dogecoin_pubkey_getaddr_p2pkh(&pubkey, chains[i], address)) {
+            if (!dogecoin_pubkey_getaddr_p2pkh(pubkey, chains[i], address)) {
                 continue;
             }
-            uint8_t calc_hash[4];
             bip38_address_hash(address, calc_hash);
             if (bip38_mem_eq(calc_hash, expected_hash, 4)) {
+                if (address_out) {
+                    memcpy(address_out, address, P2PKHLEN);
+                }
                 return true;
             }
         }
     }
 
-    /*
-     * BIP-0038 interoperability: some encrypted keys (e.g. spec test vectors) embed an
-     * address hash from a legacy P2PKH prefix (0x00).
-     */
     {
         uint8_t hash160[sizeof(uint160_t)];
-        dogecoin_pubkey_get_hash160(&pubkey, hash160);
-        char address[P2PKHLEN];
+        dogecoin_pubkey_get_hash160(pubkey, hash160);
         uint8_t payload[21];
         payload[0] = 0x00;
         memcpy(payload + 1, hash160, sizeof(hash160));
         if (dogecoin_base58_encode_check(payload, 21, address, sizeof(address)) != 0) {
-            uint8_t calc_hash[4];
             bip38_address_hash(address, calc_hash);
             if (bip38_mem_eq(calc_hash, expected_hash, 4)) {
+                if (address_out) {
+                    memcpy(address_out, address, P2PKHLEN);
+                }
                 return true;
             }
         }
     }
     return false;
+}
+
+static dogecoin_bool bip38_privkey_matches_addresshash(
+    const uint8_t* private_key,
+    dogecoin_bool compressed,
+    const uint8_t expected_hash[4],
+    unsigned int address_match_mode)
+{
+    dogecoin_pubkey pubkey;
+    dogecoin_pubkey_init(&pubkey);
+    size_t pubkey_len = compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH;
+    dogecoin_ecc_get_pubkey(private_key, pubkey.pubkey, &pubkey_len, compressed);
+    pubkey.compressed = compressed;
+
+    return bip38_pubkey_find_matching_address(
+        &pubkey, expected_hash, address_match_mode, NULL);
 }
 
 static dogecoin_bool bip38_decrypt_non_ec_bytes(
@@ -1035,13 +1037,13 @@ dogecoin_bool dogecoin_bip38_get_address_hash(
     const char* encrypted_key,
     uint8_t* address_hash_out)
 {
+    uint8_t decoded[BIP38_BASE58_DECODE_BUFLEN];
+    size_t declen;
+
     if (!encrypted_key || !address_hash_out) {
         return false;
     }
-
-    uint8_t decoded[BIP38_BASE58_DECODE_BUFLEN];
-    size_t declen = dogecoin_base58_decode_check(encrypted_key, decoded, sizeof(decoded));
-    if (declen != BIP38_PAYLOAD_LEN + 4) {
+    if (!bip38_decode_encrypted_payload(encrypted_key, decoded, &declen)) {
         return false;
     }
 
@@ -1070,13 +1072,13 @@ dogecoin_bool dogecoin_bip38_get_flag_byte(
     const char* encrypted_key,
     uint8_t* flag_byte_out)
 {
+    uint8_t decoded[BIP38_BASE58_DECODE_BUFLEN];
+    size_t declen;
+
     if (!encrypted_key || !flag_byte_out) {
         return false;
     }
-
-    uint8_t decoded[BIP38_BASE58_DECODE_BUFLEN];
-    size_t declen = dogecoin_base58_decode_check(encrypted_key, decoded, sizeof(decoded));
-    if (declen != BIP38_PAYLOAD_LEN + 4) {
+    if (!bip38_decode_encrypted_payload(encrypted_key, decoded, &declen)) {
         return false;
     }
 
@@ -1234,7 +1236,7 @@ dogecoin_bool dogecoin_bip38_is_confirmation_code(const char* code)
     if (declen != BIP38_CONFIRMATION_PAYLOAD_LEN + 4) {
         return false;
     }
-    return memcmp(decoded, BIP38_CONFIRMATION_MAGIC, 5) == 0;
+    return bip38_mem_eq(decoded, BIP38_CONFIRMATION_MAGIC, 5);
 }
 
 dogecoin_bool dogecoin_bip38_encrypt_ec_multiplied(
@@ -1477,7 +1479,6 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
     size_t pointb_len;
     dogecoin_bool has_lot_sequence;
     dogecoin_bool compressed;
-    const dogecoin_chainparams* chain;
 
     if (!passphrase || !confirmation_code || !address_out || address_size < P2PKHLEN) {
         return false;
@@ -1532,32 +1533,24 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
     dogecoin_mem_zero(passfactor, sizeof(passfactor));
     (void)passpoint;
 
-    chain = (address_match_mode == BIP38_ADDRESS_MATCH_INTEROP)
-        ? NULL
-        : &dogecoin_chainparams_main;
-
     {
-        char candidate_address[P2PKHLEN];
+        dogecoin_pubkey pubkey;
         uint8_t pubkey_buf[DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH];
         size_t pubkey_len = compressed ? 33u : 65u;
+
+        dogecoin_pubkey_init(&pubkey);
         if (!dogecoin_ecc_point_serialize(pointb, 33, pubkey_buf, &pubkey_len, compressed)) {
             dogecoin_mem_zero(derived, sizeof(derived));
             return false;
         }
-        if (!bip38_pubkey_to_address(pubkey_buf, pubkey_len, compressed, chain, candidate_address)) {
+        memcpy(pubkey.pubkey, pubkey_buf, pubkey_len);
+        pubkey.compressed = compressed;
+
+        if (!bip38_pubkey_find_matching_address(
+                &pubkey, addresshash, address_match_mode, address_out)) {
             dogecoin_mem_zero(derived, sizeof(derived));
             return false;
         }
-
-        {
-            uint8_t calc_hash[4];
-            bip38_address_hash(candidate_address, calc_hash);
-            if (!bip38_mem_eq(calc_hash, addresshash, 4)) {
-                dogecoin_mem_zero(derived, sizeof(derived));
-                return false;
-            }
-        }
-        memcpy(address_out, candidate_address, P2PKHLEN);
     }
 
     if (compressed_out) {
