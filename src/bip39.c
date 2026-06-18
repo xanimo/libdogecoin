@@ -957,6 +957,9 @@ int dogecoin_verify_mnemonic (const char* mnemonic, const char* language, const 
     /* load custom word file into memory if path is valid */
     if (filename != NULL) {
         if (get_custom_words (filename, (char **) wordlist) == -1) {
+            for (int i = 0; i < LANG_WORD_CNT; i++) {
+                dogecoin_free(wordlist[i]);
+            }
             return -1;
         }
     }

@@ -100,7 +100,7 @@ char* sign_message(char* privkey, char* msg) {
  *
  */
 int verify_message(char* sig, char* msg, char* address) {
-    if (!(sig || msg || address)) return false;
+    if (!sig || !msg || !address) return false;
 
     uint256_t message_bytes;
     hash_message(msg, message_bytes);

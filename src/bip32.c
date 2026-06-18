@@ -610,7 +610,7 @@ dogecoin_bool getHDPubKey(const char hdkey[HDKEYLEN], const dogecoin_bool is_tes
 dogecoin_bool deriveExtKeyFromHDKey(const char extkey[HDKEYLEN], const char keypath[KEYPATHMAXLEN], const dogecoin_bool is_testnet, char key[HDKEYLEN]) {
     dogecoin_hdnode node, parent;
     size_t key_len = HDKEYLEN;
-    dogecoin_hdnode_deserialize(extkey, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, &parent);
+    if (!dogecoin_hdnode_deserialize(extkey, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, &parent)) return false;
     dogecoin_hd_generate_key(&node, keypath, parent.private_key, parent.depth, parent.chain_code, false);
     dogecoin_hdnode_serialize_private(&node, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, key, key_len);
     return true;
@@ -629,7 +629,7 @@ dogecoin_bool deriveExtKeyFromHDKey(const char extkey[HDKEYLEN], const char keyp
 dogecoin_bool deriveExtPubKeyFromHDKey(const char extpubkey[HDKEYLEN], const char keypath[KEYPATHMAXLEN], const dogecoin_bool is_testnet, char pubkey[HDKEYLEN]) {
     dogecoin_hdnode node, parent;
     size_t key_len = HDKEYLEN;
-    dogecoin_hdnode_deserialize(extpubkey, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, &parent);
+    if (!dogecoin_hdnode_deserialize(extpubkey, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, &parent)) return false;
     dogecoin_hd_generate_key(&node, keypath, parent.public_key, parent.depth, parent.chain_code, true);
     dogecoin_hdnode_serialize_public(&node, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, pubkey, key_len);
     return true;
