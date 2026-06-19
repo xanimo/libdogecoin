@@ -55,10 +55,18 @@ dogecoin_transaction_context* dogecoin_transaction_context_new(void) {
     dogecoin_transaction_context* ctx =
         (dogecoin_transaction_context*)dogecoin_calloc(1, sizeof(dogecoin_transaction_context));
     if (!ctx) return NULL;
+#if defined(_WIN32) || defined(DOGECOIN_HAVE_THREADS)
+    /* With a threading runtime, a failed mutex init is a real error. Without
+       one (e.g. OP-TEE/enclave builds), dogecoin_mutex_init() returns false by
+       design and the lock no-ops; the context is still valid, so don't treat
+       that as a construction failure. */
     if (!dogecoin_mutex_init(&ctx->lock)) {
         dogecoin_free(ctx);
         return NULL;
     }
+#else
+    (void)dogecoin_mutex_init(&ctx->lock); /* no-op; lock stays uninitialized */
+#endif
     return ctx;
 }
 
