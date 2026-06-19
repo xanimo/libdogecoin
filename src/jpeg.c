@@ -207,8 +207,8 @@ static void jpec_huff_encode_block_impl(jpec_block_t* block, jpec_huff_state_t* 
  */
 static void jpec_huff_write_bits(jpec_huff_state_t* s, unsigned int bits, int n) {
 	assert(s && n > 0 && n <= 16);
-	int32_t mask = (((int32_t)1) << n) - 1;
-	int32_t buffer = (int32_t)bits;
+	uint32_t mask = (((uint32_t)1) << n) - 1;
+	uint32_t buffer = bits;
 	int nbits = s->nbits + n;
 	buffer &= mask;
 	buffer <<= 24 - nbits;
