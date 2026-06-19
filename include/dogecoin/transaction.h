@@ -42,6 +42,14 @@ LIBDOGECOIN_BEGIN_DECL
 typedef struct working_transaction {
     int idx;
     dogecoin_tx* transaction;
+    /* Lifetime fields for the _ts retain-under-lock model; both guarded by the
+       owning dogecoin_transaction_context->lock. refcount counts outstanding
+       holders handed out by find_transaction_ts(); pending_delete marks an
+       entry unlinked from the registry but not yet freed because a holder is
+       still using it. Unused (stay zero) for entries in the thread-local
+       default context, which is never shared. */
+    int refcount;
+    int pending_delete;
     UT_hash_handle hh;
 } working_transaction;
 
@@ -62,6 +70,7 @@ LIBDOGECOIN_API void add_transaction_ts(dogecoin_transaction_context* ctx, worki
 
 LIBDOGECOIN_API working_transaction* find_transaction(int idx);
 LIBDOGECOIN_API working_transaction* find_transaction_ts(dogecoin_transaction_context* ctx, int idx);
+LIBDOGECOIN_API void release_transaction_ts(dogecoin_transaction_context* ctx, working_transaction* working_tx);
 
 LIBDOGECOIN_API void remove_transaction(working_transaction *working_tx);
 LIBDOGECOIN_API void remove_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *working_tx);
