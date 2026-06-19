@@ -126,6 +126,7 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     ctx->refcount = 1;
     ctx->refcount_lock = dogecoin_calloc(1, dogecoin_refcount_lock_size());
     if (!ctx->refcount_lock) {
+        fprintf(stderr, "CTXNEW FAIL: refcount_lock alloc\n");
         dogecoin_free(ctx);
         return NULL;
     }
@@ -133,6 +134,7 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     InitializeCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
 #else
     if (pthread_mutex_init((pthread_mutex_t*)ctx->refcount_lock, NULL) != 0) {
+        fprintf(stderr, "CTXNEW FAIL: pthread_mutex_init\n");
         dogecoin_free(ctx->refcount_lock);
         ctx->refcount_lock = NULL;
         dogecoin_free(ctx);
@@ -141,6 +143,7 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
 #endif
     ctx->ecc_ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
     if (!ctx->ecc_ctx) {
+        fprintf(stderr, "CTXNEW FAIL: secp256k1_context_create\n");
         dogecoin_context_cleanup(ctx);
         dogecoin_free(ctx);
         return NULL;
@@ -151,6 +154,7 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     } randomization_seed;
     if (!dogecoin_random_bytes(randomization_seed.bytes, sizeof(randomization_seed.bytes), 0) ||
         !secp256k1_context_randomize((secp256k1_context*)ctx->ecc_ctx, randomization_seed.bytes)) {
+        fprintf(stderr, "CTXNEW FAIL: random_bytes/randomize\n");
         dogecoin_mem_zero(randomization_seed.bytes, sizeof(randomization_seed.bytes));
         dogecoin_context_cleanup(ctx);
         dogecoin_free(ctx);
@@ -162,6 +166,8 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     ctx->tx_ctx = dogecoin_transaction_context_new();
     ctx->key_ctx = dogecoin_eckey_context_new();
     if (!ctx->rng_state || !ctx->tx_ctx || !ctx->key_ctx) {
+        fprintf(stderr, "CTXNEW FAIL: rng=%p tx=%p key=%p\n",
+                (void*)ctx->rng_state, (void*)ctx->tx_ctx, (void*)ctx->key_ctx);
         dogecoin_context_cleanup(ctx);
         dogecoin_free(ctx);
         return NULL;
