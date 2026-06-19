@@ -116,8 +116,8 @@ eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], &key->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return NULL;
-    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return NULL;
+    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) { dogecoin_key_free(key); return NULL; }
+    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) { dogecoin_key_free(key); return NULL; }
     dogecoin_mutex_lock(&ctx->lock);
     key->idx = HASH_COUNT(ctx->keys) + 1;
     dogecoin_mutex_unlock(&ctx->lock);
@@ -139,7 +139,7 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
     eckey* key = (struct eckey*)dogecoin_calloc(1, sizeof *key);
     dogecoin_privkey_init(&key->private_key);
     const dogecoin_chainparams* chain = chain_from_b58_prefix(private_key);
-    if (!dogecoin_privkey_decode_wif(private_key, chain, &key->private_key)) return NULL;
+    if (!dogecoin_privkey_decode_wif(private_key, chain, &key->private_key)) { dogecoin_key_free(key); return NULL; }
     assert(dogecoin_privkey_is_valid(&key->private_key)==1);
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
@@ -149,8 +149,8 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], &key->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return NULL;
-    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return NULL;
+    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) { dogecoin_key_free(key); return NULL; }
+    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) { dogecoin_key_free(key); return NULL; }
     dogecoin_mutex_lock(&ctx->lock);
     key->idx = HASH_COUNT(ctx->keys) + 1;
     dogecoin_mutex_unlock(&ctx->lock);
