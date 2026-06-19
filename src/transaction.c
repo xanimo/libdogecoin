@@ -103,9 +103,26 @@ static working_transaction* find_transaction_locked(dogecoin_transaction_context
 }
 
 static void remove_transaction_locked(dogecoin_transaction_context* ctx, working_transaction *working_tx) {
-    HASH_DEL(ctx->transactions, working_tx); /* delete it (transactions advances to next) */
+    HASH_DEL(ctx->transactions, working_tx); /* unlink so no new finder can reach it */
+    if (working_tx->refcount > 0) {
+        /* A holder from find_transaction_ts() is still using it; defer the free
+           to the last release. The entry is already out of the registry. */
+        working_tx->pending_delete = 1;
+        return;
+    }
     dogecoin_tx_free(working_tx->transaction);
     dogecoin_free(working_tx);
+}
+
+/* Drop a reference taken by find_transaction_ts(). Caller MUST hold ctx->lock.
+   Frees the entry if it was removed while referenced and this was the last ref. */
+static void release_transaction_locked(working_transaction *working_tx) {
+    if (!working_tx) return;
+    if (working_tx->refcount > 0) working_tx->refcount--;
+    if (working_tx->refcount == 0 && working_tx->pending_delete) {
+        dogecoin_tx_free(working_tx->transaction);
+        dogecoin_free(working_tx);
+    }
 }
 
 /**
@@ -172,8 +189,19 @@ working_transaction* find_transaction_ts(dogecoin_transaction_context* ctx, int 
     if (!ctx) return NULL;
     dogecoin_mutex_lock(&ctx->lock);
     working_transaction* working_tx = find_transaction_locked(ctx, idx);
+    if (working_tx) working_tx->refcount++; /* retain under the registry lock */
     dogecoin_mutex_unlock(&ctx->lock);
     return working_tx;
+}
+
+/* Release a reference obtained from find_transaction_ts(). Every successful
+   (non-NULL) find_transaction_ts() must be paired with exactly one call here
+   once the caller is done dereferencing the returned entry. */
+void release_transaction_ts(dogecoin_transaction_context* ctx, working_transaction* working_tx) {
+    if (!ctx || !working_tx) return;
+    dogecoin_mutex_lock(&ctx->lock);
+    release_transaction_locked(working_tx);
+    dogecoin_mutex_unlock(&ctx->lock);
 }
 
 /**
@@ -522,6 +550,7 @@ int save_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex, cons
     if (locked) dogecoin_mutex_unlock(&tx_raw->transaction->lock);
     dogecoin_tx_free(txtmp);
     dogecoin_free(data_bin);
+    release_transaction_ts(ctx, tx_raw);
     return true;
 }
 
@@ -548,9 +577,9 @@ int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, char* hex_utxo_t
     if (tx == NULL) return false;
 
     // validate hex txid: must be exactly 64 hex characters
-    if (!hex_utxo_txid) return false;
+    if (!hex_utxo_txid) { release_transaction_ts(ctx, tx); return false; }
     size_t hex_len = strspn(hex_utxo_txid, VALID_HEX_CHARS);
-    if (hex_len != DOGECOIN_HASH_LENGTH * 2 || hex_utxo_txid[hex_len] != '\0') return false;
+    if (hex_len != DOGECOIN_HASH_LENGTH * 2 || hex_utxo_txid[hex_len] != '\0') { release_transaction_ts(ctx, tx); return false; }
 
     size_t flag = tx->transaction->vin->len;
 
@@ -572,7 +601,9 @@ int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, char* hex_utxo_t
 
     // ensure the length of our working tx inputs length has incremented by 1
     // which will return true if successful:
-    return added && (flag + 1 == tx->transaction->vin->len);
+    int result = added && (flag + 1 == tx->transaction->vin->len);
+    release_transaction_ts(ctx, tx);
+    return result;
 }
 
 /**
@@ -637,7 +668,9 @@ int add_output_ts(dogecoin_transaction_context* ctx, int txindex, char* destinat
     uint64_t koinu = coins_to_koinu_str(amount);
     // calculate total minus fees
     // route through the thread-safe output primitive:
-    return add_address_output_ts(tx, chain, (int64_t)koinu, destinationaddress);
+    int result = add_address_output_ts(tx, chain, (int64_t)koinu, destinationaddress);
+    release_transaction_ts(ctx, tx);
+    return result;
 }
 
 /**
@@ -731,15 +764,17 @@ char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, ch
 
     if (p2pkh_count < 1) {
         printf("p2pkh address not found from any output script hash!\n");
+        release_transaction_ts(ctx, tx);
         return NULL;
     }
 
-    if (tx_out_total != total) return NULL;
+    if (tx_out_total != total) { release_transaction_ts(ctx, tx); return NULL; }
 
     // run the thread-safe finalization integrity pass before serializing:
     dogecoin_tx_finalize_ts(tx->transaction);
 
     // pass in transaction obect, network paramters, amount of dogecoin to send to address and finally p2pkh address:
+    release_transaction_ts(ctx, tx);
     return get_raw_transaction_ts(ctx, txindex);
 }
 
@@ -779,6 +814,7 @@ char* get_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex) {
 
     if (locked) dogecoin_mutex_unlock(&tx->transaction->lock);
 
+    release_transaction_ts(ctx, tx);
     return hexadecimal_buffer;
 }
 
