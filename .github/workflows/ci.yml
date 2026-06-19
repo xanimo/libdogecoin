@@ -664,6 +664,70 @@ jobs:
             ${{ github.workspace }}/src/openenclave/build/host/host
             ${{ github.workspace }}/src/openenclave/build/enclave/enclave.signed
 
+  # ---------------------------------------------------------------------------
+  # ASAN + UBSAN gate.
+  #
+  # Self-contained native build (not a matrix entry) so the sanitizer CFLAGS,
+  # which contain spaces, don't have to flow through the shared configure step
+  # that every other target uses. Catches the bug classes valgrind cannot:
+  # global-buffer-overflow, signed-integer-overflow, and unaligned loads.
+  #
+  # secp256k1's field asm is incompatible with -fsanitize (register pressure ->
+  # "impossible constraints"), so build its C field impl via --with-asm=no.
+  # The depends libs (libevent, etc.) are left uninstrumented; that is safe for
+  # ASAN/UBSAN (no false positives), only MSan would require instrumenting them.
+  # ---------------------------------------------------------------------------
+  sanitizers:
+    name: x86_64-linux-asan-ubsan
+    runs-on: ubuntu-22.04
+    env:
+      HOST: x86_64-pc-linux-gnu
+      SAN_CFLAGS: "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1 -g"
+      SAN_LDFLAGS: "-fsanitize=address,undefined"
+
+    steps:
+      - name: install packages
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            autoconf automake libtool-bin build-essential curl python3 python3-dev libgmp-dev
+
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: dependency cache
+        uses: actions/cache@v4
+        env:
+          cache-name: depends-asan
+        with:
+          path: ./depends/built
+          key: asan-${{ env.cache-name }}-${{ hashFiles('depends/packages/*') }}
+
+      - name: build depends
+        run: make -C depends HOST="$HOST" DEBUG=1 SPEED=slow V=1 -j"$(getconf _NPROCESSORS_ONLN)"
+
+      - name: configure (ASAN+UBSAN)
+        run: |
+          ./autogen.sh
+          ./configure \
+            --prefix="$(pwd)/depends/$HOST" \
+            --enable-debug \
+            --enable-static --disable-shared \
+            --with-asm=no \
+            CFLAGS="$SAN_CFLAGS" \
+            CXXFLAGS="$SAN_CFLAGS" \
+            LDFLAGS="$SAN_LDFLAGS" \
+            HOST="$HOST" || ( cat config.log && false )
+
+      - name: build libdogecoin
+        run: make -j"$(getconf _NPROCESSORS_ONLN)" SPEED=slow V=1
+
+      - name: test (any ASAN/UBSAN error fails the job)
+        env:
+          ASAN_OPTIONS: "detect_leaks=1:halt_on_error=1:abort_on_error=1:strict_string_checks=1"
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+        run: make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
+
   sign-x86_64-win:
     needs: build
     runs-on: windows-2022
