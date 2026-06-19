@@ -47,6 +47,8 @@ typedef struct working_transaction {
 
 typedef struct dogecoin_transaction_context {
     working_transaction* transactions;
+    dogecoin_mutex_t lock; /* guards the registry root above; no-op for the
+                              zero-initialized per-thread default context */
 } dogecoin_transaction_context;
 
 struct dogecoin_wallet_;
