@@ -125,7 +125,7 @@ arith_uint256* div_arith_uint256(arith_uint256* a, arith_uint256* b) {
         // Set the least significant bit of remainder to bit i of a
         int word_idx = i / 32;
         int bit_idx = i % 32;
-        if ((a->pn[word_idx] & (1 << bit_idx)) != 0) {
+        if ((a->pn[word_idx] & (1u << bit_idx)) != 0) {
             remainder->pn[0] |= 1;
         }
 
