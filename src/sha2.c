@@ -907,6 +907,16 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
     sha2_word32 T1, *W256;
     int j;
 
+    /* Callers may pass a byte buffer that is not 4-byte aligned;
+     * dereferencing it as sha2_word32 is UB and faults on strict-
+     * alignment targets. Copy into an aligned buffer only when needed,
+     * so the common (already-aligned) path stays zero-cost. */
+    sha2_word32 aligned_block[16];
+    if (((uintptr_t)data & (sizeof(sha2_word32) - 1)) != 0) {
+        memcpy(aligned_block, data, SHA256_BLOCK_LENGTH);
+        data = aligned_block;
+    }
+
     W256 = (sha2_word32*)context->buffer;
 
     /* Initialize registers with the prev. intermediate value */
@@ -974,6 +984,16 @@ static void sha256_transform(sha256_context* context, const sha2_word32* data)
     sha2_word32 a, b, c, d, e, f, g, h, s0, s1;
     sha2_word32 T1, T2, *W256;
     int j;
+
+    /* Callers may pass a byte buffer that is not 4-byte aligned;
+     * dereferencing it as sha2_word32 is UB and faults on strict-
+     * alignment targets. Copy into an aligned buffer only when needed,
+     * so the common (already-aligned) path stays zero-cost. */
+    sha2_word32 aligned_block[16];
+    if (((uintptr_t)data & (sizeof(sha2_word32) - 1)) != 0) {
+        memcpy(aligned_block, data, SHA256_BLOCK_LENGTH);
+        data = aligned_block;
+    }
 
     W256 = (sha2_word32*)context->buffer;
 
