@@ -32,7 +32,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
 #include <pthread.h>
 #endif
 
@@ -53,8 +53,10 @@ static size_t dogecoin_refcount_lock_size(void)
 {
 #ifdef _WIN32
     return sizeof(CRITICAL_SECTION);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     return sizeof(pthread_mutex_t);
+#else
+    return sizeof(int); /* no threading runtime: lock is a no-op placeholder */
 #endif
 }
 
@@ -79,7 +81,7 @@ static void dogecoin_context_cleanup(dogecoin_context* ctx)
     if (ctx->refcount_lock) {
 #ifdef _WIN32
         DeleteCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
         pthread_mutex_destroy((pthread_mutex_t*)ctx->refcount_lock);
 #endif
         dogecoin_free(ctx->refcount_lock);
@@ -131,7 +133,7 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     }
 #ifdef _WIN32
     InitializeCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     if (pthread_mutex_init((pthread_mutex_t*)ctx->refcount_lock, NULL) != 0) {
         dogecoin_free(ctx->refcount_lock);
         ctx->refcount_lock = NULL;
@@ -186,13 +188,13 @@ void dogecoin_context_acquire(dogecoin_context* ctx)
     if (!ctx->refcount_lock) return;
 #ifdef _WIN32
     EnterCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_lock((pthread_mutex_t*)ctx->refcount_lock);
 #endif
     ctx->refcount++;
 #ifdef _WIN32
     LeaveCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_unlock((pthread_mutex_t*)ctx->refcount_lock);
 #endif
 }
@@ -214,14 +216,14 @@ void dogecoin_context_release(dogecoin_context* ctx)
     if (!ctx->refcount_lock) return;
 #ifdef _WIN32
     EnterCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_lock((pthread_mutex_t*)ctx->refcount_lock);
 #endif
     if (ctx->refcount > 0) ctx->refcount--;
     if (ctx->refcount == 0) should_free = true;
 #ifdef _WIN32
     LeaveCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_unlock((pthread_mutex_t*)ctx->refcount_lock);
 #endif
     if (!should_free) return;
