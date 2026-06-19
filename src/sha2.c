@@ -2006,37 +2006,40 @@ void hmac_sha1_prepare(const uint8_t *key, const uint32_t keylen, uint32_t *opad
 
 void hmac_sha256_prepare(const uint8_t *key, const uint32_t keylen,
                          uint32_t *opad_digest, uint32_t *ipad_digest) {
-  static CONFIDENTIAL uint32_t key_pad[SHA256_BLOCK_LENGTH / sizeof(uint32_t)];
+  /* Precompute the SHA-256 intermediate state after compressing the single
+   * padded key block, so the per-message HMAC can resume from it. */
+  static CONFIDENTIAL uint8_t key_block[SHA256_BLOCK_LENGTH];
+  static CONFIDENTIAL uint8_t pad_block[SHA256_BLOCK_LENGTH];
+  sha256_context ctx;
+  int i;
 
-  dogecoin_mem_zero(key_pad, sizeof(key_pad));
+  dogecoin_mem_zero(key_block, sizeof(key_block));
   if (keylen > SHA256_BLOCK_LENGTH) {
-    static CONFIDENTIAL sha256_context context;
-    sha256_init(&context);
-    sha256_write(&context, key, keylen);
-    sha256_finalize(&context, (uint8_t *)key_pad);
+    /* Long keys are hashed to 32 bytes; the remaining block stays zero. */
+    sha256_raw(key, keylen, key_block);
   } else {
-    memcpy_safe(key_pad, key, keylen);
+    memcpy_safe(key_block, key, keylen);
   }
 
-  /* compute o_key_pad and its digest */
-  int i = 0;
-  for (; i < SHA256_BLOCK_LENGTH / (int)sizeof(uint32_t); i++) {
-    uint32_t data = 0;
-#if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE32(key_pad[i], data);
-#else
-    data = key_pad[i];
-#endif
-    key_pad[i] = data ^ 0x5c5c5c5c;
+  /* opad digest: compress (key_block ^ 0x5c) starting from the initial state. */
+  for (i = 0; i < SHA256_BLOCK_LENGTH; i++) {
+    pad_block[i] = (uint8_t)(key_block[i] ^ 0x5c);
   }
-  sha256_transform((sha256_context*)key_pad, opad_digest);
+  sha256_init(&ctx);
+  sha256_transform(&ctx, (const sha2_word32 *)pad_block);
+  memcpy(opad_digest, ctx.state, SHA256_DIGEST_LENGTH);
 
-  /* convert o_key_pad to i_key_pad and compute its digest */
-  for (i = 0; i < SHA256_BLOCK_LENGTH / (int)sizeof(uint32_t); i++) {
-    key_pad[i] = key_pad[i] ^ 0x5c5c5c5c ^ 0x36363636;
+  /* ipad digest: compress (key_block ^ 0x36) starting from the initial state. */
+  for (i = 0; i < SHA256_BLOCK_LENGTH; i++) {
+    pad_block[i] = (uint8_t)(key_block[i] ^ 0x36);
   }
-  sha256_transform((sha256_context*)key_pad, ipad_digest);
-  dogecoin_mem_zero(key_pad, sizeof(key_pad));
+  sha256_init(&ctx);
+  sha256_transform(&ctx, (const sha2_word32 *)pad_block);
+  memcpy(ipad_digest, ctx.state, SHA256_DIGEST_LENGTH);
+
+  dogecoin_mem_zero(key_block, sizeof(key_block));
+  dogecoin_mem_zero(pad_block, sizeof(pad_block));
+  dogecoin_mem_zero(&ctx, sizeof(ctx));
 }
 
 void hmac_sha256_init(hmac_sha256_context *hctx, const uint8_t *key, const uint32_t keylen)
