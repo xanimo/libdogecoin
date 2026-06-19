@@ -40,7 +40,7 @@ static uint32_t bip37_murmur3(const uint8_t* key, size_t len, uint32_t seed)
     uint32_t h = seed;
     size_t i = 0;
     for (; i + 4 <= len; i += 4) {
-        uint32_t k = key[i] | (key[i + 1] << 8) | (key[i + 2] << 16) | (key[i + 3] << 24);
+        uint32_t k = (uint32_t)key[i] | ((uint32_t)key[i + 1] << 8) | ((uint32_t)key[i + 2] << 16) | ((uint32_t)key[i + 3] << 24);
         k *= 0xcc9e2d51u;
         k = (k << 15) | (k >> 17);
         k *= 0x1b873593u;
