@@ -276,3 +276,76 @@ remain tracked here for a future pass:
   future pass could parallelize header/block validation behind an opt-in `_ts`
   entry point.
 
+
+## Transaction registry entry lifetime: the find/release contract
+
+This section covers the lifetime of `working_transaction` *entries* in a
+`dogecoin_transaction_context`. This is a **per-entry** reference count, distinct
+from the **per-context** refcount (`dogecoin_ctx_acquire` / `dogecoin_ctx_release`)
+documented above — the two are unrelated mechanisms that happen to share the word
+"refcount".
+
+### Two registries, two rules
+
+A `working_transaction` is reached one of two ways, with different lifetime
+rules:
+
+1. **Thread-local default context** — used by the legacy, non-`_ts` API
+   (`find_transaction`, `add_transaction`, `start_transaction`, ...). Per-thread,
+   never shared.
+2. **Heap context** from `dogecoin_transaction_context_new()` — used by the `_ts`
+   API and documented above as safe to share across threads.
+
+### `_ts` API on a shared context: find must be paired with release
+
+`find_transaction_ts(ctx, idx)` returns an entry **with a reference held**, taken
+under the registry lock, so the entry cannot be freed by a concurrent
+`clear_transaction_ts` / `remove_transaction_ts` while you hold it.
+
+Therefore **every successful (non-NULL) `find_transaction_ts` must be paired with
+exactly one `release_transaction_ts(ctx, working_tx)`** once you are done with the
+entry. Not releasing leaks the entry. Calling `release_transaction_ts` more times
+than `find_transaction_ts` returned the entry drops the reference count below the
+true number of holders; if the entry has also been removed, it can then be freed
+while another holder still references it (a use-after-free). Release exactly once
+per successful find.
+
+```c
+working_transaction* tx = find_transaction_ts(ctx, idx);
+if (tx) {
+    /* ... use tx ... */
+    release_transaction_ts(ctx, tx);   /* required, exactly once */
+}
+```
+
+**Deferred free.** If another thread removes the entry while you hold a
+reference, the entry is unlinked from the registry immediately but its memory is
+not freed until the last reference is released. This is what makes the returned
+pointer safe to dereference. The entry carries an internal reference count and a
+deferred-delete flag, both managed under the registry lock; they are not part of
+the supported API and must not be read or written directly.
+
+The in-library `_ts` callers that look up an entry already pair correctly:
+`save_raw_transaction_ts`, `add_utxo_ts`, `add_output_ts`,
+`finalize_transaction_ts`, `get_raw_transaction_ts`, and the internal
+`make_change_ts`. The contract above applies to **external** code that calls
+`find_transaction_ts` directly.
+
+### Legacy API on the default context: borrowed pointer, no pairing
+
+The non-`_ts` lookups (`find_transaction`, ...) operate on the thread-local
+default context, which is never shared. `find_transaction` takes the registry
+lock, calls the non-retaining internal lookup, and returns a **borrowed pointer
+that does not retain** — default-context entries are never reference-counted, so
+legacy callers have **no** `release_transaction_ts` obligation. The existing
+single-threaded contract is unchanged: callers of `find_transaction` neither
+expect nor need to release.
+
+### ABI / contract summary
+
+* `working_transaction` gained two internally-managed fields (`refcount`,
+  `pending_delete`) — an additive layout change to a public struct.
+* `release_transaction_ts` is a new `LIBDOGECOIN_API` function; pairing it with
+  `find_transaction_ts` is mandatory for external direct callers.
+* The legacy default-context API is unchanged in contract: borrowed pointers, no
+  release required.
