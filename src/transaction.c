@@ -190,7 +190,17 @@ void add_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *
  * the provided index.
  */
 working_transaction* find_transaction(int idx) {
-    return find_transaction_ts(default_transaction_context(), idx);
+    /* Legacy lookup on the thread-local default context, which is never shared
+       across threads. Return a borrowed pointer without retaining so the
+       default context's entries keep refcount == 0 per the documented
+       invariant (see working_transaction.refcount); the legacy callers of this
+       API have no release_transaction_ts() pairing. */
+    dogecoin_transaction_context* ctx = default_transaction_context();
+    if (!ctx) return NULL;
+    dogecoin_mutex_lock(&ctx->lock);
+    working_transaction* working_tx = find_transaction_locked(ctx, idx);
+    dogecoin_mutex_unlock(&ctx->lock);
+    return working_tx;
 }
 
 working_transaction* find_transaction_ts(dogecoin_transaction_context* ctx, int idx) {
@@ -725,7 +735,11 @@ static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, char* 
     uint64_t total_change_back = amount - subtractedfee;
 
     // route the change output through the thread-safe output primitive:
-    return add_address_output_ts(tx, chain, (int64_t)total_change_back, public_key);
+    int result = add_address_output_ts(tx, chain, (int64_t)total_change_back, public_key);
+
+    // release the reference retained by find_transaction_ts() above:
+    release_transaction_ts(ctx, tx);
+    return result;
 }
 
 /**
