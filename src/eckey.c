@@ -38,17 +38,63 @@ static dogecoin_eckey_context* default_eckey_context(void) {
     return &default_ctx;
 }
 
+/* ---- internal registry helpers; caller MUST hold ctx->lock ----
+ * Raw uthash operations with no locking, so the public _ts entry points and the
+ * composed start/free paths take the lock once and stay deadlock-free on the
+ * non-recursive mutex. */
+static void add_eckey_locked(dogecoin_eckey_context* ctx, eckey *key) {
+    eckey* key_old;
+    HASH_FIND_INT(ctx->keys, &key->idx, key_old);
+    if (key_old == NULL) {
+        HASH_ADD_INT(ctx->keys, idx, key);
+    } else {
+        HASH_REPLACE_INT(ctx->keys, idx, key, key_old);
+    }
+    dogecoin_free(key_old);
+}
+
+static eckey* find_eckey_locked(dogecoin_eckey_context* ctx, int idx) {
+    eckey* key;
+    HASH_FIND_INT(ctx->keys, &idx, key);
+    return key;
+}
+
+static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    HASH_DEL(ctx->keys, key); /* delete it (keys advances to next) */
+    dogecoin_privkey_cleanse(&key->private_key);
+    dogecoin_pubkey_cleanse(&key->public_key);
+    dogecoin_key_free(key);
+}
+
 dogecoin_eckey_context* dogecoin_eckey_context_new(void) {
-    return (dogecoin_eckey_context*)dogecoin_calloc(1, sizeof(dogecoin_eckey_context));
+    dogecoin_eckey_context* ctx =
+        (dogecoin_eckey_context*)dogecoin_calloc(1, sizeof(dogecoin_eckey_context));
+    if (!ctx) return NULL;
+#if defined(_WIN32) || defined(DOGECOIN_HAVE_THREADS)
+    /* With a threading runtime, a failed mutex init is a real error. Without
+       one (e.g. OP-TEE/enclave builds), dogecoin_mutex_init() returns false by
+       design and the lock no-ops; the context is still valid, so don't treat
+       that as a construction failure. */
+    if (!dogecoin_mutex_init(&ctx->lock)) {
+        dogecoin_free(ctx);
+        return NULL;
+    }
+#else
+    (void)dogecoin_mutex_init(&ctx->lock); /* no-op; lock stays uninitialized */
+#endif
+    return ctx;
 }
 
 void dogecoin_eckey_context_free(dogecoin_eckey_context* ctx) {
     if (!ctx) return;
     eckey* current;
     eckey* tmp;
+    dogecoin_mutex_lock(&ctx->lock);
     HASH_ITER(hh, ctx->keys, current, tmp) {
-        remove_eckey_ts(ctx, current);
+        remove_eckey_locked(ctx, current);
     }
+    dogecoin_mutex_unlock(&ctx->lock);
+    dogecoin_mutex_destroy(&ctx->lock);
     dogecoin_free(ctx);
 }
 
@@ -78,9 +124,11 @@ eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], &key->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return NULL;
-    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return NULL;
+    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) { dogecoin_key_free(key); return NULL; }
+    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) { dogecoin_key_free(key); return NULL; }
+    dogecoin_mutex_lock(&ctx->lock);
     key->idx = HASH_COUNT(ctx->keys) + 1;
+    dogecoin_mutex_unlock(&ctx->lock);
     return key;
 }
 
@@ -99,7 +147,7 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
     eckey* key = (struct eckey*)dogecoin_calloc(1, sizeof *key);
     dogecoin_privkey_init(&key->private_key);
     const dogecoin_chainparams* chain = chain_from_b58_prefix(private_key);
-    if (!dogecoin_privkey_decode_wif(private_key, chain, &key->private_key)) return NULL;
+    if (!dogecoin_privkey_decode_wif(private_key, chain, &key->private_key)) { dogecoin_key_free(key); return NULL; }
     assert(dogecoin_privkey_is_valid(&key->private_key)==1);
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
@@ -109,9 +157,11 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], &key->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) return NULL;
-    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) return NULL;
+    if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) { dogecoin_key_free(key); return NULL; }
+    if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) { dogecoin_key_free(key); return NULL; }
+    dogecoin_mutex_lock(&ctx->lock);
     key->idx = HASH_COUNT(ctx->keys) + 1;
+    dogecoin_mutex_unlock(&ctx->lock);
     return key;
 }
 
@@ -129,14 +179,9 @@ void add_eckey(eckey *key) {
 
 void add_eckey_ts(dogecoin_eckey_context* ctx, eckey *key) {
     if (!ctx || !key) return;
-    eckey* key_old;
-    HASH_FIND_INT(ctx->keys, &key->idx, key_old);
-    if (key_old == NULL) {
-        HASH_ADD_INT(ctx->keys, idx, key);
-    } else {
-        HASH_REPLACE_INT(ctx->keys, idx, key, key_old);
-    }
-    dogecoin_free(key_old);
+    dogecoin_mutex_lock(&ctx->lock);
+    add_eckey_locked(ctx, key);
+    dogecoin_mutex_unlock(&ctx->lock);
 }
 
 /**
@@ -154,8 +199,9 @@ eckey* find_eckey(int idx) {
 
 eckey* find_eckey_ts(dogecoin_eckey_context* ctx, int idx) {
     if (!ctx) return NULL;
-    eckey* key;
-    HASH_FIND_INT(ctx->keys, &idx, key);
+    dogecoin_mutex_lock(&ctx->lock);
+    eckey* key = find_eckey_locked(ctx, idx);
+    dogecoin_mutex_unlock(&ctx->lock);
     return key;
 }
 
@@ -173,10 +219,9 @@ void remove_eckey(eckey* key) {
 
 void remove_eckey_ts(dogecoin_eckey_context* ctx, eckey* key) {
     if (!ctx || !key) return;
-    HASH_DEL(ctx->keys, key); /* delete it (keys advances to next) */
-    dogecoin_privkey_cleanse(&key->private_key);
-    dogecoin_pubkey_cleanse(&key->public_key);
-    dogecoin_key_free(key);
+    dogecoin_mutex_lock(&ctx->lock);
+    remove_eckey_locked(ctx, key);
+    dogecoin_mutex_unlock(&ctx->lock);
 }
 
 /**
@@ -207,9 +252,16 @@ int start_key(dogecoin_bool is_testnet) {
 
 int start_key_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
     if (!ctx) return -1;
+    /* Build the key without the lock (the EC work touches no registry state),
+       then assign the index and insert under a single lock acquisition so the
+       HASH_COUNT()->HASH_ADD() allocation is atomic. new_eckey_ts assigns a
+       provisional idx; we overwrite it here under the same lock as the insert. */
     eckey* key = new_eckey_ts(ctx, is_testnet);
     if (!key) return -1;
+    dogecoin_mutex_lock(&ctx->lock);
+    key->idx = HASH_COUNT(ctx->keys) + 1;
+    add_eckey_locked(ctx, key);
     int index = key->idx;
-    add_eckey_ts(ctx, key);
+    dogecoin_mutex_unlock(&ctx->lock);
     return index;
 }

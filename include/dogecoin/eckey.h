@@ -47,6 +47,8 @@ typedef struct eckey {
 
 typedef struct dogecoin_eckey_context {
     eckey* keys;
+    dogecoin_mutex_t lock; /* guards the registry root above; no-op for the
+                              zero-initialized per-thread default context */
 } dogecoin_eckey_context;
 
 // instantiates a new eckey
