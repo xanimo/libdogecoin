@@ -239,9 +239,13 @@ additionally validated by the unit-test suite (`test/transaction_tests.c`,
 
 Notes:
 
-* The registry and eckey contexts hold only a hashmap and rely on per-thread
-  isolation (no internal mutex); the real locks live on `dogecoin_tx.lock`,
-  `dogecoin_wallet.lock` and the `dogecoin_ctx` refcount mutex.
+* The per-thread default registry and eckey contexts are zero-initialized;
+  their `lock.initialized == false`, so all mutex helpers no-op and they remain
+  effectively lock-free for single-threaded use. Explicitly allocated contexts
+  (`dogecoin_transaction_context_new`, `dogecoin_eckey_context_new`) carry a
+  live `dogecoin_mutex_t lock` that guards the registry root. The real
+  per-object locks live on `dogecoin_tx.lock`, `dogecoin_wallet.lock`, and the
+  `dogecoin_ctx` refcount mutex.
 * The index-based transaction API binds to the per-thread *default* transaction
   context, so the `cli_*` registry/index wrappers target that same default
   context to keep index lookups consistent.
@@ -341,11 +345,29 @@ legacy callers have **no** `release_transaction_ts` obligation. The existing
 single-threaded contract is unchanged: callers of `find_transaction` neither
 expect nor need to release.
 
+### `find_eckey_ts`: borrowed pointer, no retain
+
+Unlike `find_transaction_ts`, `find_eckey_ts` does **not** increment a
+reference count. It locks the context, locates the entry, unlocks, and returns
+a raw pointer. The returned pointer is valid only as long as no other thread
+concurrently calls `remove_eckey_ts` on the same context and key. For the
+common usage pattern — one thread owns each `dogecoin_eckey_context` — this is
+safe. Code that shares an eckey context across threads must coordinate its own
+lifetime guarantee before dereferencing the returned pointer, or restrict usage
+to within the lock by calling the internal `find_eckey_locked` directly (not a
+public API).
+
+There is **no** `release_eckey_ts` function; callers of `find_eckey_ts` have
+no release obligation.
+
 ### ABI / contract summary
 
 * `working_transaction` gained two internally-managed fields (`refcount`,
   `pending_delete`) — an additive layout change to a public struct.
 * `release_transaction_ts` is a new `LIBDOGECOIN_API` function; pairing it with
   `find_transaction_ts` is mandatory for external direct callers.
+* `find_eckey_ts` returns a borrowed pointer with no retain; no release is
+  required, but the pointer is only safe to dereference while no concurrent
+  removal can occur on the same context.
 * The legacy default-context API is unchanged in contract: borrowed pointers, no
   release required.
