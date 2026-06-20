@@ -836,8 +836,13 @@ void test_transaction_ts_contexts() {
 
     u_assert_true(wtx1 != wtx2);
 
+    /* remove then release: remove_transaction_ts unlinks the entry from the
+       registry and marks pending_delete because refcount > 0; the paired
+       release_transaction_ts drops the count to zero and completes the free. */
     remove_transaction_ts(ctx1, wtx1);
+    release_transaction_ts(ctx1, wtx1);
     remove_transaction_ts(ctx2, wtx2);
+    release_transaction_ts(ctx2, wtx2);
     dogecoin_transaction_context_free(ctx1);
     dogecoin_transaction_context_free(ctx2);
 }
