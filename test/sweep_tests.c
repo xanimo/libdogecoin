@@ -587,6 +587,84 @@ static void test_paper_wallet_private_key_extraction(void)
     printf("  Paper wallet private key extraction tests passed\n");
 }
 
+/* Re-set on one wallet object must not leak the prior address buffer. */
+static void test_paper_wallet_reuse(void)
+{
+    printf("Testing paper wallet set_* reuse...\n");
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+
+    dogecoin_paper_wallet* wallet = dogecoin_paper_wallet_new();
+    u_assert_not_null(wallet);
+
+    dogecoin_key wkey;
+    dogecoin_privkey_init(&wkey);
+    u_assert_true(dogecoin_privkey_gen(&wkey));
+    char test_wif[PRIVKEYWIFLEN];
+    size_t wif_sz = sizeof(test_wif);
+    dogecoin_privkey_encode_wif(&wkey, chain, test_wif, &wif_sz);
+    dogecoin_privkey_cleanse(&wkey);
+
+    u_assert_true(dogecoin_paper_wallet_set_wif(wallet, test_wif, chain));
+    char addr1[P2PKHLEN];
+    u_assert_true(dogecoin_paper_wallet_get_address(wallet, addr1, sizeof(addr1)));
+
+    const char* test_hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    u_assert_true(dogecoin_paper_wallet_set_hex(wallet, test_hex, chain));
+    char addr2[P2PKHLEN];
+    u_assert_true(dogecoin_paper_wallet_get_address(wallet, addr2, sizeof(addr2)));
+    u_assert_true(strcmp(addr1, addr2) != 0);
+
+    uint8_t priv[DOGECOIN_ECKEY_PKEY_LENGTH];
+    u_assert_true(dogecoin_paper_wallet_get_private_key(wallet, priv));
+    char hex_out[65];
+    utils_bin_to_hex(priv, DOGECOIN_ECKEY_PKEY_LENGTH, hex_out);
+    u_assert_str_eq(test_hex, hex_out);
+    dogecoin_mem_zero(priv, sizeof(priv));
+
+    dogecoin_paper_wallet_free(wallet);
+    printf("  Paper wallet reuse tests passed\n");
+}
+
+static void test_bip38_confirm_interop_testnet(void)
+{
+    printf("Testing BIP38 INTEROP confirm (testnet address hash)...\n");
+
+    const char* passphrase = "interop_testnet_confirm";
+    char encrypted[BIP38_ENCRYPTED_KEY_LENGTH + 1];
+    size_t enc_sz = sizeof(encrypted);
+    char confirmation[BIP38_CONFIRMATION_CODE_MAXLEN];
+    size_t confirm_sz = sizeof(confirmation);
+    uint8_t gen_priv[DOGECOIN_ECKEY_PKEY_LENGTH];
+
+    u_assert_true(dogecoin_bip38_encrypt_ec_multiplied(
+        passphrase,
+        true,
+        false,
+        0,
+        0,
+        "nConfirmInteropHint",
+        gen_priv,
+        encrypted,
+        &enc_sz,
+        confirmation,
+        &confirm_sz));
+
+    char confirmed_address[P2PKHLEN];
+    u_assert_true(dogecoin_bip38_confirm_passphrase_ex(
+        passphrase,
+        confirmation,
+        BIP38_ADDRESS_MATCH_INTEROP,
+        confirmed_address,
+        sizeof(confirmed_address),
+        NULL,
+        NULL,
+        NULL));
+    u_assert_true(confirmed_address[0] == 'n' || confirmed_address[0] == 'm');
+
+    dogecoin_mem_zero(gen_priv, sizeof(gen_priv));
+    printf("  BIP38 INTEROP confirm testnet tests passed\n");
+}
+
 /* Test BIP38 validation */
 static void test_bip38_validation(void)
 {
@@ -610,6 +688,12 @@ static void test_bip38_validation(void)
         payload[2] = 0xFF;
         u_assert_true(dogecoin_base58_encode_check(payload, 39, bad, sizeof(bad)) != 0);
         u_assert_int_eq((int)dogecoin_bip38_is_valid(bad), 0);
+        {
+            uint8_t hash_out[4];
+            uint8_t flag_out = 0;
+            u_assert_int_eq((int)dogecoin_bip38_get_address_hash(bad, hash_out), 0);
+            u_assert_int_eq((int)dogecoin_bip38_get_flag_byte(bad, &flag_out), 0);
+        }
     }
 
     printf("  BIP38 validation tests passed\n");
@@ -935,6 +1019,7 @@ void test_sweep(void)
     test_sweep_options();
     test_sweep_result();
     test_paper_wallet_private_key_extraction();
+    test_paper_wallet_reuse();
     test_bip38_validation();
     test_bip38_negative_cases();
     test_bip38_reference_vectors();
@@ -942,6 +1027,7 @@ void test_sweep(void)
     test_bip38_ec_intermediate_encrypt_roundtrip();
     test_bip38_ec_lot_sequence_vectors();
     test_bip38_ec_lot_sequence_greek_vector();
+    test_bip38_confirm_interop_testnet();
     test_bip38_nfc_passphrase_vector();
     test_sweep_functionality();
     test_bip38_generate_and_sweep();

@@ -84,6 +84,8 @@ static void sweep_paper_wallet_clear_sensitive(dogecoin_paper_wallet* wallet)
     wallet->encrypted_private_key = NULL;
     sweep_secure_free(wallet->passphrase);
     wallet->passphrase = NULL;
+    sweep_secure_free(wallet->address);
+    wallet->address = NULL;
 }
 
 static void sweep_result_fail(dogecoin_sweep_result* r, const char* msg)
@@ -535,7 +537,6 @@ void dogecoin_paper_wallet_free(dogecoin_paper_wallet* wallet) {
     if (!wallet) return;
 
     sweep_paper_wallet_clear_sensitive(wallet);
-    sweep_secure_free(wallet->address);
 
     dogecoin_free(wallet);
 }
