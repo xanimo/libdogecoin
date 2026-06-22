@@ -437,6 +437,28 @@ void test_transaction()
     // transaction with both inputs signed:
     u_assert_str_eq(raw_hexadecimal_transaction, expected_signed_raw_hexadecimal_transaction);
 
+    // ----------------------------------------------------------------
+    // regression: sign_raw_transaction must not write past the caller's buffer.
+    // Previously it strncpy'd a fixed TO_UINT8_HEX_BUF_LEN-1 (200000) bytes into
+    // incomingrawtx, overflowing any buffer sized to the input tx rather than to
+    // TXHEXMAXLEN. Callers (e.g. language bindings) that pass a tightly-sized
+    // buffer got heap corruption -> SIGABRT. Here we sign in place using a heap
+    // buffer sized to the unsigned input plus modest headroom; under ASan this
+    // call traps the regression, and the trailing canary guards a plain build.
+    {
+        size_t in_len   = strlen(unsigned_hexadecimal_transaction);
+        size_t scratch  = in_len + 256;          // ample for signature growth
+        char*  small    = dogecoin_malloc(scratch + 1);
+        u_assert_not_null(small);
+        memcpy(small, unsigned_hexadecimal_transaction, in_len + 1);
+        small[scratch] = (char)0xAB;             // canary just past usable region
+
+        u_assert_int_eq(sign_raw_transaction(0, small, utxo_scriptpubkey, 1, private_key_wif), 1);
+
+        u_assert_str_eq(small, expected_single_input_signed_transaction);
+        u_assert_true((unsigned char)small[scratch] == 0xAB); // canary intact
+        dogecoin_free(small);
+    }
 
     // ----------------------------------------------------------------
     // test building transaction and signing with sign_transaction_w_privkey:
