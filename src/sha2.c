@@ -2008,8 +2008,8 @@ void hmac_sha256_prepare(const uint8_t *key, const uint32_t keylen,
                          uint32_t *opad_digest, uint32_t *ipad_digest) {
   /* Precompute the SHA-256 intermediate state after compressing the single
    * padded key block, so the per-message HMAC can resume from it. */
-  static CONFIDENTIAL uint8_t key_block[SHA256_BLOCK_LENGTH];
-  static CONFIDENTIAL uint8_t pad_block[SHA256_BLOCK_LENGTH];
+  CONFIDENTIAL uint8_t key_block[SHA256_BLOCK_LENGTH];
+  CONFIDENTIAL uint8_t pad_block[SHA256_BLOCK_LENGTH];
   sha256_context ctx;
   int i;
 
