@@ -275,9 +275,9 @@ make check    # autotools
 | `dogecoin_bip38_is_compressed` | Compressed pubkey flag in key |
 | `dogecoin_bip38_is_ec_multiplied` | 0x43 EC-multiplied type |
 | `dogecoin_bip38_has_lot_sequence` | Lot/sequence present |
-| `dogecoin_bip38_get_address_hash` | Extract 4-byte address hash |
-| `dogecoin_bip38_verify_address_hash` | Compare embedded hash to address |
-| `dogecoin_bip38_get_flag_byte` | Raw BIP38 flag byte |
+| `dogecoin_bip38_get_address_hash` | Extract 4-byte address hash (valid BIP38 payload only) |
+| `dogecoin_bip38_verify_address_hash` | Compare embedded hash to one address string |
+| `dogecoin_bip38_get_flag_byte` | Raw BIP38 flag byte (valid payload; rejects bad magic/type/flags) |
 | `dogecoin_bip38_generate_lot_sequence` | Random lot + sequence for EC flow |
 
 Constants: `BIP38_ADDRESS_MATCH_MAINNET`, `BIP38_ADDRESS_MATCH_INTEROP`, buffer sizes (`BIP38_ENCRYPTED_KEY_LENGTH`, `BIP38_INTERMEDIATE_CODE_MAXLEN`, etc.) — see `include/dogecoin/bip38.h`.
