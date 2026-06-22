@@ -956,15 +956,12 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
     if (dogecoin_privkey_decode_wif(privkey, chain, &key)) {
         sign = true;
     } else {
-        if (privkey) {
-            if (strlen(privkey) > 50) {
-                dogecoin_tx_free(txtmp);
-                cstr_free(script, true);
-                return false;
-            }
-        } else {
-            return false;
-        }
+        // WIF decode failed: the key is unusable. Previously this leaked txtmp
+        // and script and fell through to `return true` (claiming success on a
+        // bad key) whenever strlen(privkey) <= 50. Always clean up and fail.
+        dogecoin_tx_free(txtmp);
+        cstr_free(script, true);
+        return false;
     }
     if (sign) {
         uint8_t sigcompact[64] = {0};
