@@ -408,6 +408,20 @@ void test_transaction()
     }
 
     // ----------------------------------------------------------------
+    // regression: a malformed WIF must fail cleanly. Previously the decode
+    // failure path only freed txtmp/script and returned false when
+    // strlen(privkey) > 50; a short invalid WIF leaked both allocations and
+    // fell through to `return true`, reporting success on an unusable key.
+    {
+        char badbuf[2048];
+        strcpy(badbuf, unsigned_hexadecimal_transaction);
+        // short (<= 50 char) invalid WIF -- exercises the previously-leaking path
+        u_assert_int_eq(sign_raw_transaction(0, badbuf, utxo_scriptpubkey, 1, "notavalidwifkey"), 0);
+        // buffer must be left untouched on failure
+        u_assert_str_eq(badbuf, unsigned_hexadecimal_transaction);
+    }
+
+    // ----------------------------------------------------------------
     // test building transaction and signing with sign_transaction_w_privkey:
 
     // instantiate a new working_transaction object by calling start_transaction()
