@@ -602,8 +602,16 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
             free(signed_tx_hex);
             return false;
         }
-        strncpy(incomingrawtx, signed_tx_hex, TO_UINT8_HEX_BUF_LEN - 1);
-        incomingrawtx[TO_UINT8_HEX_BUF_LEN - 1] = '\0';
+        // Overwrite the caller's buffer in place. Copy only the actual signed
+        // length (+ NUL), never a fixed TO_UINT8_HEX_BUF_LEN: strncpy with a
+        // fixed count NUL-fills the destination out to that count, writing
+        // 200001 bytes into a buffer the caller sized to the input tx. That
+        // overflows any binding/caller buffer not pre-sized to TXHEXMAXLEN
+        // (heap corruption -> SIGABRT). The in-place contract requires the
+        // caller's buffer to be at least signed_len + 1; the signed tx is only
+        // marginally larger than the unsigned input it replaces.
+        memcpy(incomingrawtx, signed_tx_hex, signed_len);
+        incomingrawtx[signed_len] = '\0';
         debug_print("signed TX: %s\n", incomingrawtx);
         cstr_free(signed_tx, true);
         dogecoin_tx_free(txtmp);
