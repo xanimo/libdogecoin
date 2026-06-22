@@ -233,7 +233,28 @@ dogecoin_sweep_get_stats(tx, opt, &inputs, &outputs, &in_value, &out_value, &fee
 
 ## Example program
 
-`contrib/examples/sweep_example.c` shows WIF and BIP38 sweep flows. Build from the repo root after `make`:
+`contrib/examples/sweep_example.c` shows WIF and BIP38 sweep flows (offline, no broadcast).
+
+`contrib/examples/mainnet_sweep_driver.c` is a CLI driver for the full sweep API on mainnet (create, sign, validate, optional broadcast). Built automatically by `contrib/mainnet_bip38_sweep_test.sh`, or manually:
+
+```bash
+gcc contrib/examples/mainnet_sweep_driver.c .libs/libdogecoin.a \
+    $(pkg-config --libs libevent) -lpthread -Iinclude -Iinclude/dogecoin \
+    -o mainnet_sweep_driver
+```
+
+### Mainnet end-to-end test script
+
+`contrib/mainnet_bip38_sweep_test.sh` runs unit tests, builds the sweep driver, sweeps all UTXOs from a funded address via the sweep API (with optional BIP38 encrypt/decrypt round trip), and exercises SPV checkpoint sync. **Requires** a funded mainnet wallet via environment variables (no credentials in the script):
+
+```bash
+export FUNDED_WIF="your_mainnet_wif"
+export FUNDED_ADDR="your_D_address"
+# optional: SKIP_BROADCAST=1
+./contrib/mainnet_bip38_sweep_test.sh
+```
+
+Build from the repo root after `make`:
 
 ```bash
 gcc contrib/examples/sweep_example.c .libs/libdogecoin.a -Iinclude/dogecoin -o sweep_example
@@ -323,5 +344,7 @@ Constants: `BIP38_ADDRESS_MATCH_MAINNET`, `BIP38_ADDRESS_MATCH_INTEROP`, buffer 
 ### Related
 
 - `include/dogecoin/scrypt.h` — `dogecoin_scrypt_rfc7914()` (RFC 7914 KDF used by BIP38; normally called internally)
-- `contrib/examples/sweep_example.c` — minimal integration sample
+- `contrib/examples/sweep_example.c` — minimal offline integration sample
+- `contrib/examples/mainnet_sweep_driver.c` — mainnet sweep API CLI driver
+- `contrib/mainnet_bip38_sweep_test.sh` — mainnet E2E test (requires `FUNDED_WIF` / `FUNDED_ADDR`)
 - `test/sweep_tests.c` — vectors and integration tests
