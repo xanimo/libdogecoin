@@ -132,7 +132,7 @@ static dogecoin_bool bip38_validate_flags(uint8_t type_byte, uint8_t flag_byte)
         return true;
     }
     if (type_byte == BIP38_TYPE_EC_MULTIPLIED) {
-        if ((flag_byte & 0x10) != 0) {
+        if ((flag_byte & BIP38_FLAG_RESERVED_BIT) != 0) {
             return false;
         }
         if ((flag_byte & BIP38_HAS_LOT_SEQUENCE_FLAG) != 0) {
@@ -256,6 +256,8 @@ static void bip38_decrypt_halves(
     AES256_decrypt(&ctx, 1, block, encrypted + 16);
     for (unsigned i = 0; i < 16; i++)
         private_key_out[16 + i] = block[i] ^ derivedhalf1[16 + i];
+
+    dogecoin_mem_zero(block, sizeof(block));
 }
 
 static void bip38_aes256_decrypt_block(
@@ -272,6 +274,8 @@ static void bip38_aes256_decrypt_block(
     AES256_decrypt(&ctx, 1, block, cipher);
     for (unsigned i = 0; i < 16; i++)
         plain[i] = block[i] ^ derivedhalf1[derivedhalf1_offset + i];
+
+    dogecoin_mem_zero(block, sizeof(block));
 }
 
 static void bip38_aes256_encrypt_block(
@@ -811,6 +815,7 @@ static dogecoin_bool bip38_decrypt_ec_multiplied_bytes(
             derived,
             BIP38_SCRYPT_DERIVED_SIZE)) {
         dogecoin_mem_zero(passfactor, sizeof(passfactor));
+        dogecoin_mem_zero(passpoint, sizeof(passpoint));
         return false;
     }
 
@@ -831,8 +836,11 @@ static dogecoin_bool bip38_decrypt_ec_multiplied_bytes(
 
     memcpy(private_key_out, passfactor, 32);
     dogecoin_mem_zero(passfactor, sizeof(passfactor));
+    dogecoin_mem_zero(passpoint, sizeof(passpoint));
     dogecoin_mem_zero(derived, sizeof(derived));
     dogecoin_mem_zero(seedb, sizeof(seedb));
+    dogecoin_mem_zero(decrypted2, sizeof(decrypted2));
+    dogecoin_mem_zero(encryptedpart1_full, sizeof(encryptedpart1_full));
 
     if (!dogecoin_ecc_private_key_tweak_mul(private_key_out, factorb)) {
         dogecoin_mem_zero(private_key_out, DOGECOIN_ECKEY_PKEY_LENGTH);
