@@ -376,17 +376,34 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
-    if (!deser_varlen((uint32_t*)&block->parent_merkle_count, buffer)) {
+    /* Read the count into a properly-typed local. Previously this wrote a full
+       uint32_t through (uint32_t*)&parent_merkle_count, a uint8_t field: a
+       4-byte store through a 1-byte-typed pointer (undefined behavior, and it
+       clobbered adjacent struct bytes). It also silently truncated the wire
+       value to 8 bits. Bound the count so the field can hold it and so a
+       malicious block can't request an enormous allocation; merkle branch
+       depth is log2(tx count), so anything beyond a byte is already invalid. */
+    uint32_t parent_merkle_count = 0;
+    if (!deser_varlen(&parent_merkle_count, buffer)) {
         printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
-    uint8_t i = 0;
+    if (parent_merkle_count > 0xff) {
+        printf("%s:%d:%s: parent_merkle_count %u out of range\n", __FILE__, __LINE__, __func__, parent_merkle_count);
+        return false;
+    }
+    block->parent_merkle_count = (uint8_t)parent_merkle_count;
+    uint32_t i = 0;
     if (block->parent_merkle_count > 0) {
         block->parent_coinbase_merkle = dogecoin_calloc(block->parent_merkle_count, sizeof(uint256_t));
+        if (!block->parent_coinbase_merkle) {
+            printf("%s:%d:%s: allocation failed\n", __FILE__, __LINE__, __func__);
+            return false;
+        }
     }
     for (; i < block->parent_merkle_count; i++) {
         if (!deser_u256(block->parent_coinbase_merkle[i], buffer)) {
-            printf("%d:%s:%d\n", __LINE__, __func__, i);
+            printf("%d:%s:%u\n", __LINE__, __func__, i);
             return false;
         }
         }
@@ -395,16 +412,26 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
-    if (!deser_varlen((uint32_t*)&block->aux_merkle_count, buffer)) {
+    uint32_t aux_merkle_count = 0;
+    if (!deser_varlen(&aux_merkle_count, buffer)) {
         printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
         return false;
     }
+    if (aux_merkle_count > 0xff) {
+        printf("%s:%d:%s: aux_merkle_count %u out of range\n", __FILE__, __LINE__, __func__, aux_merkle_count);
+        return false;
+    }
+    block->aux_merkle_count = (uint8_t)aux_merkle_count;
     if (block->aux_merkle_count > 0) {
         block->aux_merkle_branch = dogecoin_calloc(block->aux_merkle_count, sizeof(uint256_t));
+        if (!block->aux_merkle_branch) {
+            printf("%s:%d:%s: allocation failed\n", __FILE__, __LINE__, __func__);
+            return false;
+        }
     }
     for (i = 0; i < block->aux_merkle_count; i++) {
         if (!deser_u256(block->aux_merkle_branch[i], buffer)) {
-            printf("%d:%s:%d\n", __LINE__, __func__, i);
+            printf("%d:%s:%u\n", __LINE__, __func__, i);
             return false;
         }
         }

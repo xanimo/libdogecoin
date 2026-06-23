@@ -46,6 +46,8 @@ static const struct blockheadertest block_header_tests[] =
                 {"020162002770a8b89647bbb542f044754a07dc6e56545793f5dcecdf43826ae0cb7192a12466d048e51b0f8a3cbaaf8a624b9aa1212ce4c2a4feba0750f7ad14feb75f54c69de053837b091e00000000", "8afc65a42c47b5ed5862194fb846171ba4afb999a1b4cce149f56c328d8a90e4", 6422786, 1407229382, 503937923, 0, &dogecoin_chainparams_test, ""} // 158391
         };
 
+void test_auxpow_deserialize_merkle_count_bounds(void);
+
 static void test_check_merkle_branch()
 {
     size_t outlen = 0;
@@ -215,4 +217,46 @@ void test_block_header()
     u_assert_str_eq(utils_uint8_to_hex(bheader.prev_block, sizeof(bheader.prev_block)), utils_uint8_to_hex(checkhash, sizeof(checkhash)));
 
     test_check_merkle_branch();
+
+    test_auxpow_deserialize_merkle_count_bounds();
+}
+
+/* Regression for the auxpow merkle-count handling in
+   deserialize_dogecoin_auxpow_block(). The counts were read with
+   deser_varlen((uint32_t*)&block->parent_merkle_count, ...) into uint8_t fields
+   -- a 4-byte write through a 1-byte-typed pointer (undefined behavior that also
+   truncated the wire value to 8 bits). This feeds a block declaring an
+   out-of-range parent_merkle_count and asserts it is rejected cleanly: no crash,
+   no UB, and (with the fix) an explicit out-of-range rejection before any merkle
+   allocation. Runs under the CI ASan+UBSan gate, which is what catches the
+   type-punned store on the pre-fix code. A full success-path round trip would
+   require a check_auxpow()-passing parent block (real merged-mining data), which
+   is not available as a fixture here. */
+void test_auxpow_deserialize_merkle_count_bounds() {
+    /* a valid serialized transaction, used as the parent coinbase prefix */
+    const char* coinbase_hex =
+        "0100000002746007aed61e8531faba1af6610f10a5422c70a2a7eb6ffb51cb7a7b7b5e45b4"
+        "0100000000ffffffffe216461c60c629333ac6b40d29b5b0b6d0ce241aea5903cf4329fc65"
+        "dc3b11420100000000ffffffff020065cd1d000000001976a9144da2f8202789567d402f7f"
+        "717c01d98837e4325488ac30b4b529000000001976a914d8c43e6f68ca4ea1e9b93da2d1e3"
+        "a95118fa4a7c88ac00000000";
+    size_t cblen = strlen(coinbase_hex) / 2;
+    uint8_t buf[512];
+    size_t off = 0;
+    for (size_t k = 0; k < cblen; k++) {
+        unsigned b; sscanf(coinbase_hex + 2 * k, "%2x", &b); buf[off++] = (uint8_t)b;
+    }
+    /* parent_hash (32 bytes) */
+    for (int k = 0; k < 32; k++) buf[off++] = 0x11;
+    /* parent_merkle_count as a 0xFE-prefixed 4-byte varint = 301 (0x0000012D),
+       exceeds the 0xff bound; its low byte (0x2D) is nonzero so a truncating
+       read would wrongly accept it as count 45 instead of rejecting. */
+    buf[off++] = 0xFE; buf[off++] = 0x2D; buf[off++] = 0x01; buf[off++] = 0x00; buf[off++] = 0x00;
+
+    dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
+    struct const_buffer cb = { buf, off };
+    arith_uint256 cw;
+    /* must reject, not crash, not truncate-and-continue */
+    u_assert_int_eq(deserialize_dogecoin_auxpow_block(block, &cb, &dogecoin_chainparams_main, &cw), 0);
+    dogecoin_auxpow_block_free(block);
 }
