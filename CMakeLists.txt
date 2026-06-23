@@ -544,6 +544,7 @@ IF(USE_TESTS)
         test/hash_tests.c
         test/key_tests.c
         test/koinu_tests.c
+        test/map_tests.c
         test/mem_tests.c
         test/moon_tests.c
         test/opreturn_tests.c

@@ -40,7 +40,9 @@ hash* new_hash() {
     hash* h = (struct hash*)dogecoin_calloc(1, sizeof *h);
     int i = 0;
     for (; i < 8; i++) h->data.u32[i] = 0;
-    h->index = HASH_COUNT(hashes) + 1;
+    /* Mint a never-reused id. HASH_COUNT(hashes)+1 recycled ids after removals,
+       letting a later hash collide with a live one and evict it. */
+    h->index = (int)++hash_next_idx;
     return h;
 }
 
@@ -57,10 +59,14 @@ void add_hash(hash *x) {
     HASH_FIND_INT(hashes, &x->index, hash_local);
     if (hash_local == NULL) {
         HASH_ADD_INT(hashes, index, x);
-    } else {
-        HASH_REPLACE_INT(hashes, index, x, hash_local);
+        return;
     }
-    dogecoin_free(hash_local);
+    /* With monotonic, never-reused ids a collision is impossible for hashes
+       minted by new_hash(). Reaching here means a caller supplied a colliding
+       index directly. The previous code HASH_REPLACE'd and dogecoin_free()'d the
+       existing entry, silently destroying a live hash. Keep the existing entry
+       and decline the colliding insert; the caller retains ownership of x. */
+    (void)hash_local;
 }
 
 /**
@@ -167,7 +173,8 @@ map* new_map() {
     m->count = 1;
     if (HASH_COUNT(hashes) < 1) start_hash();
     m->hashes = hashes;
-    m->index = HASH_COUNT(maps) + 1;
+    /* Mint a never-reused id; see new_hash() / map_next_idx. */
+    m->index = (int)++map_next_idx;
     return m;
 }
 
@@ -197,10 +204,14 @@ void add_map(map* map_external) {
     HASH_FIND_INT(maps, &map_external->index, map_local);
     if (map_local == NULL) {
         HASH_ADD_INT(maps, index, map_external);
-    } else {
-        HASH_REPLACE_INT(maps, index, map_external, map_local);
+        return;
     }
-    dogecoin_free(map_local);
+    /* With monotonic, never-reused ids a collision is impossible for maps minted
+       by new_map(). Reaching here means a caller supplied a colliding index
+       directly. The previous code HASH_REPLACE'd and dogecoin_free()'d the
+       existing entry, silently destroying a live map. Keep the existing entry
+       and decline the colliding insert; the caller retains ownership. */
+    (void)map_local;
 }
 
 /**
