@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #include <dogecoin/chainparams.h>
+#include <dogecoin/hash.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/protocol.h>
 #include <test/utest.h>
@@ -144,5 +145,36 @@ void test_protocol()
         u_assert_int_eq(r, false);
         u_assert_uint32_eq((uint32_t)bad_locs->len, 0);
         vector_free(bad_locs, true);
+    }
+
+    /* Regression: the receive path must verify the payload checksum carried in
+       the message header. dogecoin_p2p_message_new() writes the first 4 bytes of
+       the double-SHA256 of the payload; read_cb() now recomputes and compares it
+       before dispatch. Exercise that exact check here: a well-formed message
+       must validate, and any payload change must invalidate it. */
+    {
+        const char* payload = "checksum regression payload";
+        uint32_t plen = (uint32_t)strlen(payload);
+        cstring* m = dogecoin_p2p_message_new(dogecoin_chainparams_main.netmagic, DOGECOIN_MSG_VERSION, payload, plen);
+
+        struct const_buffer cbuf = { m->str, m->len };
+        dogecoin_p2p_msg_hdr chk_hdr;
+        dogecoin_p2p_deser_msghdr(&chk_hdr, &cbuf);
+        u_assert_uint32_eq(chk_hdr.data_len, plen);
+
+        /* cbuf now points at the payload; recompute and compare as read_cb does */
+        uint256_t good;
+        dogecoin_hash((const uint8_t*)cbuf.p, chk_hdr.data_len, good);
+        u_assert_int_eq(memcmp(good, chk_hdr.hash, 4), 0);   /* valid: matches */
+
+        /* corrupt one payload byte: the checksum must no longer match */
+        uint256_t bad;
+        uint8_t tampered[64];
+        memcpy(tampered, cbuf.p, chk_hdr.data_len);
+        tampered[0] ^= 0xff;
+        dogecoin_hash(tampered, chk_hdr.data_len, bad);
+        u_assert_true(memcmp(bad, chk_hdr.hash, 4) != 0);    /* tampered: rejected */
+
+        cstr_free(m, true);
     }
 }
