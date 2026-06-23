@@ -62,6 +62,8 @@ LIBDOGECOIN_BEGIN_DECL
 #define BIP38_TYPE_NON_EC 0x42
 /** Flag byte: top bits reserved per BIP38; bit 5 = compressed pubkey. */
 #define BIP38_FLAG_BASE 0xC0
+/** EC-multiplied flag byte: bit 4 is reserved and must be zero. */
+#define BIP38_FLAG_RESERVED_BIT 0x10
 #define BIP38_SCRYPT_N 16384
 #define BIP38_SCRYPT_R 8
 #define BIP38_SCRYPT_P 8
