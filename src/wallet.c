@@ -45,6 +45,7 @@
 #endif
 
 #include <dogecoin/wallet.h>
+#include <dogecoin/protocol.h>
 #include <dogecoin/seal.h>
 
 #define COINBASE_MATURITY 100
@@ -913,11 +914,19 @@ dogecoin_bool dogecoin_wallet_load_address(dogecoin_wallet* wallet) {
 
 dogecoin_bool dogecoin_wallet_load_transaction(dogecoin_wallet* wallet, uint32_t reclen) {
     if (!wallet) return false;
+    /* reclen is read straight from the wallet file. A serialized wtx record
+       (u32 height + u256 hash + a transaction) cannot legitimately exceed the
+       maximum block/message payload, so reject anything larger before
+       allocating -- otherwise a corrupt or hostile file declaring e.g.
+       reclen=0xFFFFFFFF drives a ~4 GB allocation (memory-exhaustion DoS) and,
+       if the allocation fails, a NULL dereference in the fread below. */
+    if (reclen == 0 || reclen > DOGECOIN_MAX_P2P_MSG_SIZE) return false;
     unsigned char* buf = dogecoin_uchar_vla(reclen);
+    if (!buf) return false;
     struct const_buffer cbuf = {buf, reclen};
-    if (fread(buf, reclen, 1, wallet->dbfile) != 1) return false;
+    if (fread(buf, reclen, 1, wallet->dbfile) != 1) { dogecoin_free(buf); return false; }
     dogecoin_wtx *wtx = dogecoin_wallet_wtx_new();
-    if (!dogecoin_wallet_wtx_deserialize(wtx, &cbuf)) return false;
+    if (!dogecoin_wallet_wtx_deserialize(wtx, &cbuf)) { dogecoin_free(buf); dogecoin_wallet_wtx_free(wtx); return false; }
     dogecoin_free(buf);
     dogecoin_wallet_scrape_utxos(wallet, wtx);
     dogecoin_wallet_add_wtx_intern_move(wallet, wtx); // hands memory management over to the binary tree
@@ -1799,9 +1808,14 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
                     }
                     free(buf);
                 } else if (rectype == WALLET_DB_REC_TYPE_TX) {
+                    /* Bound the record length from the file before allocating;
+                       see dogecoin_wallet_load_transaction() for rationale. */
+                    if (reclen == 0 || reclen > DOGECOIN_MAX_P2P_MSG_SIZE) return false;
                     unsigned char* buf = dogecoin_uchar_vla(reclen);
+                    if (!buf) return false;
                     struct const_buffer cbuf = {buf, reclen};
                     if (fread(buf, reclen, 1, wallet->dbfile) != 1) {
+                        dogecoin_free(buf);
                         return false;
                     }
 

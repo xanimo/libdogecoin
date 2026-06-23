@@ -196,6 +196,39 @@ void test_wallet()
     dogecoin_wallet_free(wallet);
 }
 
+/* Regression: a wallet file whose transaction record declares an enormous
+   length must be rejected at load, not turned into a multi-gigabyte allocation
+   (and a NULL-deref when that allocation fails). Craft a minimal file with a
+   valid header and a single TX record claiming reclen = 0xFFFFFFFF, then load
+   it and assert the loader returns false instead of crashing. */
+void test_wallet_malformed_reclen()
+{
+    static const unsigned char hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5};
+    static const unsigned char rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E};
+    const char* path = "malformed_reclen_tests.wallet";
+    unlink(path);
+
+    FILE* f = fopen(path, "wb");
+    u_assert_int_eq(f != NULL, 1);
+    /* header: magic(4) + version(4, LE = 1) + genesis hash(32) */
+    fwrite(hdr_magic, 4, 1, f);
+    uint32_t ver = 1; fwrite(&ver, 4, 1, f);
+    fwrite(dogecoin_chainparams_main.genesisblockhash, 32, 1, f);
+    /* one TX record: rec_magic(4) + reclen varint (0xFE + 0xFFFFFFFF) + rectype(1 = TX = 2) */
+    fwrite(rec_magic, 4, 1, f);
+    unsigned char vlen[5] = {0xFE, 0xFF, 0xFF, 0xFF, 0xFF};
+    fwrite(vlen, 5, 1, f);
+    uint8_t rectype = 2; fwrite(&rectype, 1, 1, f);
+    fclose(f);
+
+    dogecoin_wallet* w = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    int error = 0, created = 0;
+    /* Must reject the oversized record rather than allocating ~4 GB / crashing. */
+    u_assert_int_eq(dogecoin_wallet_load(w, path, &error, &created, false), false);
+    dogecoin_wallet_free(w);
+    unlink(path);
+}
+
 void test_wallet_basics()
 {
     unlink(wallettmpfile);
