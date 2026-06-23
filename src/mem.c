@@ -246,6 +246,33 @@ volatile void* dogecoin_mem_zero(volatile void* dst, size_t len)
     return 0;
 }
 
+/**
+ * @brief Constant-time memory comparison.
+ *
+ * Compares len bytes of a and b without short-circuiting on the first
+ * differing byte, so the running time depends only on len and not on the
+ * contents or on the position of the first difference. Use this in place of
+ * memcmp() whenever either operand is secret or secret-derived (key material,
+ * MACs, password-derived verification hashes), where a data-dependent
+ * comparison time can leak information.
+ *
+ * @param a First buffer.
+ * @param b Second buffer.
+ * @param len Number of bytes to compare.
+ * @return 0 if the buffers are equal, non-zero otherwise.
+ */
+int dogecoin_mem_cmp_ct(const void* a, const void* b, size_t len)
+{
+    const volatile uint8_t* pa = (const volatile uint8_t*)a;
+    const volatile uint8_t* pb = (const volatile uint8_t*)b;
+    volatile uint8_t diff = 0;
+    size_t i;
+    for (i = 0; i < len; i++) {
+        diff |= (uint8_t)(pa[i] ^ pb[i]);
+    }
+    return diff;
+}
+
 uint8_t* dogecoin_uint8_vla(size_t size)
 {
     uint8_t* outarray;

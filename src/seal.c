@@ -1540,7 +1540,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
     sha512_raw(derived_verification_key, AES_KEY_SIZE, derived_verification_key_hash);
 
     // Compare the derived verification key hash with the stored one
-    if (memcmp(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
+    if (dogecoin_mem_cmp_ct(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
     {
         fprintf(stderr, "ERROR: Incorrect password.\n");
         fclose(fp);
@@ -2388,7 +2388,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
     sha512_raw(derived_verification_key, AES_KEY_SIZE, derived_verification_key_hash);
 
     // Compare the derived verification key hash with the stored one
-    if (memcmp(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
+    if (dogecoin_mem_cmp_ct(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
     {
         fprintf(stderr, "ERROR: Incorrect password.\n");
         fclose(fp);
@@ -3240,7 +3240,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
     sha512_raw(derived_verification_key, AES_KEY_SIZE, derived_verification_key_hash);
 
     // Compare the derived verification key hash with the stored one
-    if (memcmp(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
+    if (dogecoin_mem_cmp_ct(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
     {
         fprintf(stderr, "ERROR: Incorrect password.\n");
         fclose(fp);
