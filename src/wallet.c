@@ -252,7 +252,9 @@ dogecoin_utxo* dogecoin_wallet_utxo_new() {
 
 dogecoin_utxo* new_dogecoin_utxo() {
     dogecoin_utxo* utxo = dogecoin_wallet_utxo_new();
-    utxo->index = HASH_COUNT(utxos) + 1;
+    /* Mint a never-reused id. HASH_COUNT(utxos)+1 recycled ids after removals,
+       letting a later utxo collide with a live one and evict it. */
+    utxo->index = (int)++utxo_next_idx;
     return utxo;
 }
 
@@ -269,10 +271,15 @@ void add_dogecoin_utxo(dogecoin_utxo* utxo_external) {
     HASH_FIND_INT(utxos, &utxo_external->index, utxo_internal);
     if (utxo_internal == NULL) {
         HASH_ADD_INT(utxos, index, utxo_external);
-    } else {
-        HASH_REPLACE_INT(utxos, index, utxo_external, utxo_internal);
+        return;
     }
-    dogecoin_free(utxo_internal);
+    /* With monotonic, never-reused ids a collision is impossible for utxos minted
+       by new_dogecoin_utxo(). Reaching here means a caller supplied a colliding
+       index directly. The previous code HASH_REPLACE'd and dogecoin_free()'d the
+       existing utxo, silently destroying a tracked, possibly-spendable output.
+       Keep the existing entry and decline the colliding insert; the caller
+       retains ownership of utxo_external. */
+    (void)utxo_internal;
 }
 
 dogecoin_utxo* find_dogecoin_utxo(int index) {
