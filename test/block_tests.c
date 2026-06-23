@@ -46,6 +46,7 @@ static const struct blockheadertest block_header_tests[] =
                 {"020162002770a8b89647bbb542f044754a07dc6e56545793f5dcecdf43826ae0cb7192a12466d048e51b0f8a3cbaaf8a624b9aa1212ce4c2a4feba0750f7ad14feb75f54c69de053837b091e00000000", "8afc65a42c47b5ed5862194fb846171ba4afb999a1b4cce149f56c328d8a90e4", 6422786, 1407229382, 503937923, 0, &dogecoin_chainparams_test, ""} // 158391
         };
 
+void test_auxpow_deserialize_e2e(void);
 void test_auxpow_deserialize_merkle_count_bounds(void);
 
 static void test_check_merkle_branch()
@@ -218,7 +219,100 @@ void test_block_header()
 
     test_check_merkle_branch();
 
+    test_auxpow_deserialize_e2e();
     test_auxpow_deserialize_merkle_count_bounds();
+}
+
+
+/* End-to-end coverage for deserialize_dogecoin_auxpow_block(). Before this,
+   the auxpow deserializer had no test exercising it at all -- it was only ever
+   reached indirectly. These build well-formed auxpow blocks (valid coinbase
+   transaction, merkle branch vectors, parent header) and drive the full parse.
+
+   The proof-of-work in check_auxpow() cannot be satisfied without solving scrypt
+   against a real target, so the function returns 0 at that final step; what we
+   assert is that everything *before* that -- every length field, both merkle
+   branch loops, and the complete parent header -- parsed correctly and consumed
+   the whole buffer, with no out-of-bounds access under the ASan+UBSan gate. The
+   non-empty-branch case directly exercises the merkle-count handling that the
+   uint8_t/uint32_t deserialization fix corrected. */
+void test_auxpow_deserialize_e2e() {
+    const char* coinbase_hex =
+        "0100000002746007aed61e8531faba1af6610f10a5422c70a2a7eb6ffb51cb7a7b7b5e45b4"
+        "0100000000ffffffffe216461c60c629333ac6b40d29b5b0b6d0ce241aea5903cf4329fc65"
+        "dc3b11420100000000ffffffff020065cd1d000000001976a9144da2f8202789567d402f7f"
+        "717c01d98837e4325488ac30b4b529000000001976a914d8c43e6f68ca4ea1e9b93da2d1e3"
+        "a95118fa4a7c88ac00000000";
+
+    /* ---- case 1: zero merkle branches ---- */
+    {
+        uint8_t buf[1024]; size_t off = 0;
+        for (size_t k = 0; k < strlen(coinbase_hex) / 2; k++) {
+            unsigned b; sscanf(coinbase_hex + 2 * k, "%2x", &b); buf[off++] = (uint8_t)b;
+        }
+        for (int i = 0; i < 32; i++) buf[off++] = 0x00;          /* parent_hash */
+        buf[off++] = 0x00;                                        /* parent_merkle_count = 0 */
+        buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; /* parent_merkle_index */
+        buf[off++] = 0x00;                                        /* aux_merkle_count = 0 */
+        buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; /* aux_merkle_index */
+        buf[off++] = 0x01; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; /* parent version=1 */
+        for (int i = 0; i < 32; i++) buf[off++] = 0x11;          /* prev_block */
+        for (int i = 0; i < 32; i++) buf[off++] = 0x22;          /* merkle_root */
+        buf[off++] = 0xAA; buf[off++] = 0xBB; buf[off++] = 0xCC; buf[off++] = 0xDD; /* timestamp */
+        buf[off++] = 0xF0; buf[off++] = 0xFF; buf[off++] = 0x0F; buf[off++] = 0x1E; /* bits */
+        buf[off++] = 0x99; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0;          /* nonce */
+
+        dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
+        block->header->version = 0x620102; /* auxpow bit set, regtest chain id 0x62 */
+        struct const_buffer cb = { buf, off };
+        arith_uint256 cw;
+        (void)deserialize_dogecoin_auxpow_block(block, &cb, &dogecoin_chainparams_regtest, &cw);
+        /* the parse must have run to completion and filled the parent header */
+        u_assert_int_eq(block->parent_merkle_count, 0);
+        u_assert_int_eq(block->aux_merkle_count, 0);
+        u_assert_int_eq(block->parent_header->version, 1);
+        u_assert_uint32_eq(block->parent_header->timestamp, 0xDDCCBBAA);
+        u_assert_uint32_eq(block->parent_header->bits, 0x1E0FFFF0);
+        u_assert_uint32_eq(block->parent_header->nonce, 0x00000099);
+        dogecoin_auxpow_block_free(block);
+    }
+
+    /* ---- case 2: non-empty merkle branches (exercises the alloc + loop that
+           the merkle-count fix touches) ---- */
+    {
+        uint8_t buf[1024]; size_t off = 0;
+        for (size_t k = 0; k < strlen(coinbase_hex) / 2; k++) {
+            unsigned b; sscanf(coinbase_hex + 2 * k, "%2x", &b); buf[off++] = (uint8_t)b;
+        }
+        for (int i = 0; i < 32; i++) buf[off++] = 0x00;          /* parent_hash */
+        buf[off++] = 0x03;                                       /* parent_merkle_count = 3 */
+        for (int b = 0; b < 3; b++) for (int i = 0; i < 32; i++) buf[off++] = (uint8_t)(0x40 + b);
+        buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; /* parent_merkle_index */
+        buf[off++] = 0x02;                                       /* aux_merkle_count = 2 */
+        for (int b = 0; b < 2; b++) for (int i = 0; i < 32; i++) buf[off++] = (uint8_t)(0x80 + b);
+        buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; /* aux_merkle_index */
+        buf[off++] = 0x01; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0; /* parent version=1 */
+        for (int i = 0; i < 32; i++) buf[off++] = 0x11;
+        for (int i = 0; i < 32; i++) buf[off++] = 0x22;
+        buf[off++] = 0xAA; buf[off++] = 0xBB; buf[off++] = 0xCC; buf[off++] = 0xDD;
+        buf[off++] = 0xF0; buf[off++] = 0xFF; buf[off++] = 0x0F; buf[off++] = 0x1E;
+        buf[off++] = 0x99; buf[off++] = 0; buf[off++] = 0; buf[off++] = 0;
+
+        dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
+        block->header->version = 0x620102;
+        struct const_buffer cb = { buf, off };
+        arith_uint256 cw;
+        (void)deserialize_dogecoin_auxpow_block(block, &cb, &dogecoin_chainparams_regtest, &cw);
+        u_assert_int_eq(block->parent_merkle_count, 3);
+        u_assert_int_eq(block->aux_merkle_count, 2);
+        /* each branch's first byte must match what was serialized, proving the
+           count was read correctly and the loop populated the allocated array */
+        u_assert_uint32_eq(block->parent_coinbase_merkle[0][0], 0x40);
+        u_assert_uint32_eq(block->parent_coinbase_merkle[2][0], 0x42);
+        u_assert_uint32_eq(block->aux_merkle_branch[0][0], 0x80);
+        u_assert_uint32_eq(block->aux_merkle_branch[1][0], 0x81);
+        dogecoin_auxpow_block_free(block);
+    }
 }
 
 /* Regression for the auxpow merkle-count handling in
