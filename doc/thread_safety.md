@@ -77,9 +77,10 @@ process-wide mutex (`src/context.c`):
 
 * eckey context (`dogecoin_eckey_context_new`/`_free`, `new_eckey_ts`,
   `new_eckey_from_privkey_ts`, `add_eckey_ts`, `find_eckey_ts`,
-  `remove_eckey_ts`, `start_key_ts`).
+  `release_eckey_ts`, `with_eckey_ts`, `remove_eckey_ts`, `start_key_ts`).
 * transaction context (`dogecoin_transaction_context_new`/`_free`,
   `new_transaction_ts`, `add_transaction_ts`, `find_transaction_ts`,
+  `acquire_transaction_ts`, `release_transaction_ts`, `with_transaction_ts`,
   `remove_transaction_ts`, `remove_all_ts`, `get_transaction_count_ts`,
   `start_transaction_ts`).
 * transaction builder (`dogecoin_tx_new_ts`, `dogecoin_tx_add_input_ts`,
@@ -143,7 +144,40 @@ dogecoin_ctx_release(ctx);
   functions (`dogecoin_wallet_*_ts`) and avoid mixing direct non-`_ts` wallet
   mutation in parallel.
 * For signing, `dogecoin_tx_sign_ts()` acquires locks in a fixed order
-  (`tx->lock` then `wallet->lock`) to avoid inversion.
+  (`tx->lock` then `wallet->lock`) to avoid inversion. This order is part of the
+  global **lock hierarchy** described below and is machine-checked in debug
+  builds.
+
+### Lock hierarchy (debug-enforced ordering)
+
+When two `_ts` locks must be held at once, they are always acquired in a single
+fixed global order so no thread can take them in the opposite order and
+deadlock. Each lock class has an integer rank (`include/dogecoin/dogecoin.h`,
+`enum dogecoin_lock_rank`); a thread may only acquire a lock whose rank is
+strictly **higher** than every lock it already holds:
+
+| rank | constant | lock |
+|------|----------|------|
+| 10 | `DOGECOIN_LOCK_RANK_TX` | `dogecoin_tx.lock` |
+| 20 | `DOGECOIN_LOCK_RANK_WALLET` | `dogecoin_wallet.lock` |
+| 30 | `DOGECOIN_LOCK_RANK_REGISTRY` | eckey / transaction context registry lock |
+
+Currently only the `tx → wallet` nesting in `dogecoin_tx_sign_ts()` uses the
+ranked helpers (ranks `TX` then `WALLET`). The registry locks (`ctx->lock` in
+the eckey/transaction contexts) are taken without nesting any other `_ts` lock,
+so they are acquired with the plain helpers today; `DOGECOIN_LOCK_RANK_REGISTRY`
+is reserved at the top of the order for any future code that needs to hold a
+registry lock together with a `tx`/`wallet` lock, so the global ordering is
+already defined when that arises.
+
+Nested locks are acquired with `dogecoin_mutex_lock_ranked(mutex, rank)` and
+released (strictly LIFO) with `dogecoin_mutex_unlock_ranked(mutex, rank)`. In
+debug builds (`NDEBUG` unset) these maintain a thread-local stack of held ranks
+and `assert()` on any out-of-order acquisition, so a future call site that
+inverts the order aborts loudly under the test suite. When `NDEBUG` is defined
+the helpers compile down to the plain `dogecoin_mutex_lock`/`unlock` with zero
+overhead. New `_ts` code that nests two of these locks should use the ranked
+helpers and slot any new lock into the table above.
 
 ### Wallet `_ts` usage example
 
@@ -345,29 +379,72 @@ legacy callers have **no** `release_transaction_ts` obligation. The existing
 single-threaded contract is unchanged: callers of `find_transaction` neither
 expect nor need to release.
 
-### `find_eckey_ts`: borrowed pointer, no retain
+### `find_eckey_ts`: retained pointer, find must be paired with release
 
-Unlike `find_transaction_ts`, `find_eckey_ts` does **not** increment a
-reference count. It locks the context, locates the entry, unlocks, and returns
-a raw pointer. The returned pointer is valid only as long as no other thread
-concurrently calls `remove_eckey_ts` on the same context and key. For the
-common usage pattern — one thread owns each `dogecoin_eckey_context` — this is
-safe. Code that shares an eckey context across threads must coordinate its own
-lifetime guarantee before dereferencing the returned pointer, or restrict usage
-to within the lock by calling the internal `find_eckey_locked` directly (not a
-public API).
+Like `find_transaction_ts`, `find_eckey_ts(ctx, idx)` returns an entry **with a
+reference held**, taken under the registry lock, so the entry cannot be freed by
+a concurrent `remove_eckey_ts` while you hold it.
 
-There is **no** `release_eckey_ts` function; callers of `find_eckey_ts` have
-no release obligation.
+Therefore **every successful (non-NULL) `find_eckey_ts` must be paired with
+exactly one `release_eckey_ts(ctx, key)`** once you are done with the entry. Not
+releasing leaks the entry. Releasing more times than `find_eckey_ts` returned
+the entry drops the reference count below the true number of holders and can
+free the entry while another holder still references it (a use-after-free).
+Release exactly once per successful find.
+
+```c
+eckey* key = find_eckey_ts(ctx, idx);
+if (key) {
+    /* ... use key ... */
+    release_eckey_ts(ctx, key);   /* required, exactly once */
+}
+```
+
+**Deferred free.** If another thread removes the entry while you hold a
+reference, the entry is unlinked from the registry immediately but its memory is
+not freed (and its key material not cleansed) until the last reference is
+released. This is what makes the returned pointer safe to dereference. The
+reference count and deferred-delete flag are tracked in a side table inside the
+context (keyed by the entry pointer), managed under the registry lock, so the
+public `eckey` struct layout is unchanged; they are not part of the supported API
+and must not be read or written directly.
+
+**Callback-under-lock alternative.** For the common "look up and use
+immediately" case, `with_eckey_ts(ctx, idx, fn, arg)` invokes `fn(key, arg)`
+while the registry lock is held and returns 1 if an entry was found (0
+otherwise). The callback never sees a pointer that can outlive the lock, so
+there is no retain/release bookkeeping. The callback must not call back into the
+same context (the lock is non-recursive).
+
+### Legacy `find_eckey`: borrowed pointer, no pairing
+
+The non-`_ts` `find_eckey` operates on the thread-local default eckey context,
+which is never shared. It takes the registry lock, performs a non-retaining
+lookup, and returns a **borrowed pointer that does not retain** —
+default-context entries are never reference-counted, so legacy callers have
+**no** `release_eckey_ts` obligation. The existing single-threaded contract is
+unchanged.
 
 ### ABI / contract summary
 
 * `working_transaction` gained two internally-managed fields (`refcount`,
   `pending_delete`) — an additive layout change to a public struct.
+* `eckey`'s public struct layout is **unchanged**: the `_ts` lifetime
+  bookkeeping (reference count and deferred-delete flag) is tracked in an
+  internal side table inside `dogecoin_eckey_context` (keyed by entry pointer),
+  not in the `eckey` struct, so there is no ABI change to `eckey`.
 * `release_transaction_ts` is a new `LIBDOGECOIN_API` function; pairing it with
   `find_transaction_ts` is mandatory for external direct callers.
-* `find_eckey_ts` returns a borrowed pointer with no retain; no release is
-  required, but the pointer is only safe to dereference while no concurrent
-  removal can occur on the same context.
-* The legacy default-context API is unchanged in contract: borrowed pointers, no
-  release required.
+* `acquire_transaction_ts` is a new owning-name alias of `find_transaction_ts`,
+  and `with_transaction_ts` is a new callback-under-lock helper; both are
+  additive and the underlying retain/release mechanism is unchanged.
+* `release_eckey_ts` is a new `LIBDOGECOIN_API` function; pairing it with
+  `find_eckey_ts` is now mandatory for external direct callers (this tightens
+  the previous "borrowed, no retain" eckey contract).
+* `with_eckey_ts` is a new callback-under-lock helper requiring no
+  retain/release bookkeeping.
+* `dogecoin_mutex_lock_ranked`/`dogecoin_mutex_unlock_ranked` and
+  `enum dogecoin_lock_rank` add debug-only lock-hierarchy enforcement; they are
+  no-ops (plain lock/unlock) under `NDEBUG`.
+* The legacy default-context APIs (`find_transaction`, `find_eckey`) are
+  unchanged in contract: borrowed pointers, no release required.

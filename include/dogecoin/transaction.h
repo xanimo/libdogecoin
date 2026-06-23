@@ -70,7 +70,17 @@ LIBDOGECOIN_API void add_transaction_ts(dogecoin_transaction_context* ctx, worki
 
 LIBDOGECOIN_API working_transaction* find_transaction(int idx);
 LIBDOGECOIN_API working_transaction* find_transaction_ts(dogecoin_transaction_context* ctx, int idx);
+/* Owning-name alias of find_transaction_ts(): returns an entry with a reference
+   held under the registry lock. The name makes the "acquire => must release"
+   obligation explicit; it behaves identically to find_transaction_ts(). */
+LIBDOGECOIN_API working_transaction* acquire_transaction_ts(dogecoin_transaction_context* ctx, int idx);
 LIBDOGECOIN_API void release_transaction_ts(dogecoin_transaction_context* ctx, working_transaction* working_tx);
+/* Callback-under-lock convenience: looks up idx and, if found, invokes fn(tx,
+   arg) while the registry lock is held, so the entry cannot be removed/freed
+   for the duration of the callback and no find/release bookkeeping is needed.
+   fn must not call back into the same context (the lock is non-recursive).
+   Returns 1 if an entry was found and fn was invoked, 0 otherwise. */
+LIBDOGECOIN_API int with_transaction_ts(dogecoin_transaction_context* ctx, int idx, void (*fn)(working_transaction* working_tx, void* arg), void* arg);
 
 LIBDOGECOIN_API void remove_transaction(working_transaction *working_tx);
 LIBDOGECOIN_API void remove_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *working_tx);

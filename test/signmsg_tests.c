@@ -82,8 +82,64 @@ void test_signmsg_ts_contexts() {
 
     u_assert_true(key1 != key2);
 
+    /* remove then release: remove_eckey_ts unlinks the entry from the registry
+       and marks pending_delete because refcount > 0 (held by find_eckey_ts);
+       the paired release_eckey_ts drops the count to zero and completes the
+       free. */
     remove_eckey_ts(ctx1, key1);
+    release_eckey_ts(ctx1, key1);
     remove_eckey_ts(ctx2, key2);
+    release_eckey_ts(ctx2, key2);
     dogecoin_eckey_context_free(ctx1);
     dogecoin_eckey_context_free(ctx2);
+}
+
+/* Exercises the find/remove-while-held retain/release contract: a holder from
+   find_eckey_ts() keeps the entry alive (deferred free) across a concurrent-style
+   remove_eckey_ts(), and the final release performs the free. Also covers the
+   callback-under-lock with_eckey_ts() API. Run under TSan/helgrind per
+   doc/thread_safety.md to validate there is no use-after-free. */
+static void count_eckey_cb(eckey* key, void* arg) {
+    int* seen = (int*)arg;
+    if (key) (*seen)++;
+}
+
+void test_eckey_ts_retain_release() {
+    dogecoin_eckey_context* ctx = dogecoin_eckey_context_new();
+    u_assert_true(ctx != NULL);
+
+    int key_id = start_key_ts(ctx, false);
+    u_assert_int_eq(key_id, 1);
+
+    /* Two outstanding references to the same entry. */
+    eckey* h1 = find_eckey_ts(ctx, key_id);
+    eckey* h2 = find_eckey_ts(ctx, key_id);
+    u_assert_true(h1 != NULL);
+    u_assert_true(h1 == h2);
+
+    /* Remove while still referenced: entry is unlinked but not yet freed. */
+    remove_eckey_ts(ctx, h1);
+
+    /* A fresh lookup must no longer find the unlinked entry. */
+    eckey* gone = find_eckey_ts(ctx, key_id);
+    u_assert_true(gone == NULL);
+
+    /* The held pointer is still safe to dereference (deferred free). */
+    u_assert_int_eq(h1->idx, key_id);
+
+    /* Drop both references; the second drop performs the deferred free. */
+    release_eckey_ts(ctx, h1);
+    release_eckey_ts(ctx, h2);
+
+    /* Callback-under-lock: nothing remains, so the callback is not invoked. */
+    int seen = 0;
+    u_assert_int_eq(with_eckey_ts(ctx, key_id, count_eckey_cb, &seen), 0);
+    u_assert_int_eq(seen, 0);
+
+    /* And on a live entry the callback runs under the lock. */
+    int key_id2 = start_key_ts(ctx, false);
+    u_assert_int_eq(with_eckey_ts(ctx, key_id2, count_eckey_cb, &seen), 1);
+    u_assert_int_eq(seen, 1);
+
+    dogecoin_eckey_context_free(ctx);
 }

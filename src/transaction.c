@@ -72,6 +72,20 @@ dogecoin_transaction_context* dogecoin_transaction_context_new(void) {
 
 void dogecoin_transaction_context_free(dogecoin_transaction_context* ctx) {
     if (!ctx) return;
+#ifndef NDEBUG
+    /* Guard rail (debug builds): freeing a context while a find_transaction_ts()
+       reference is still outstanding indicates a missing release_transaction_ts()
+       and would otherwise leak the deferred-delete entry. */
+    dogecoin_mutex_lock(&ctx->lock);
+    {
+        working_transaction* cur;
+        working_transaction* tmp;
+        HASH_ITER(hh, ctx->transactions, cur, tmp) {
+            assert(cur->refcount == 0);
+        }
+    }
+    dogecoin_mutex_unlock(&ctx->lock);
+#endif
     remove_all_ts(ctx); /* self-locks; safe to call without holding ctx->lock */
     dogecoin_mutex_destroy(&ctx->lock);
     dogecoin_free(ctx);
@@ -220,6 +234,20 @@ void release_transaction_ts(dogecoin_transaction_context* ctx, working_transacti
     dogecoin_mutex_lock(&ctx->lock);
     release_transaction_locked(working_tx);
     dogecoin_mutex_unlock(&ctx->lock);
+}
+
+working_transaction* acquire_transaction_ts(dogecoin_transaction_context* ctx, int idx) {
+    /* Owning-name alias; identical retain-under-lock semantics. */
+    return find_transaction_ts(ctx, idx);
+}
+
+int with_transaction_ts(dogecoin_transaction_context* ctx, int idx, void (*fn)(working_transaction* working_tx, void* arg), void* arg) {
+    if (!ctx || !fn) return 0;
+    dogecoin_mutex_lock(&ctx->lock);
+    working_transaction* working_tx = find_transaction_locked(ctx, idx);
+    if (working_tx) fn(working_tx, arg);
+    dogecoin_mutex_unlock(&ctx->lock);
+    return working_tx != NULL;
 }
 
 /**
@@ -371,9 +399,12 @@ int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* pa
     /* Reserved for future encrypted-wallet integration. */
     (void)passphrase;
     if (!tx || !wallet || !wallet->masterkey || !dogecoin_hdnode_has_privkey(wallet->masterkey)) return false;
-    /* Lock-order contract: always acquire tx->lock before wallet->lock. */
-    if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
-    if (wallet->thread_safe) dogecoin_mutex_lock(&wallet->lock);
+    /* Lock-order contract enforced via the global lock hierarchy: tx (rank
+       DOGECOIN_LOCK_RANK_TX) is always acquired before wallet (rank
+       DOGECOIN_LOCK_RANK_WALLET). The ranked helpers assert on inversion in
+       debug builds and compile down to the plain lock/unlock in release. */
+    if (tx->thread_safe) dogecoin_mutex_lock_ranked(&tx->lock, DOGECOIN_LOCK_RANK_TX);
+    if (wallet->thread_safe) dogecoin_mutex_lock_ranked(&wallet->lock, DOGECOIN_LOCK_RANK_WALLET);
 
     dogecoin_key key;
     dogecoin_privkey_init(&key);
@@ -395,8 +426,8 @@ int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* pa
     }
 
     dogecoin_privkey_cleanse(&key);
-    if (wallet->thread_safe) dogecoin_mutex_unlock(&wallet->lock);
-    if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+    if (wallet->thread_safe) dogecoin_mutex_unlock_ranked(&wallet->lock, DOGECOIN_LOCK_RANK_WALLET);
+    if (tx->thread_safe) dogecoin_mutex_unlock_ranked(&tx->lock, DOGECOIN_LOCK_RANK_TX);
     return ok;
 }
 

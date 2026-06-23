@@ -292,6 +292,52 @@ static inline void dogecoin_mutex_destroy(dogecoin_mutex_t* mutex)
     mutex->initialized = false;
 }
 
+/* ---- Lock hierarchy enforcement ----
+ * Locks that may be held simultaneously must be acquired in a single fixed
+ * global order to prevent lock-order inversion deadlocks. Each lock class is
+ * assigned an integer rank; on any one thread a lock may only be acquired while
+ * every lock already held has a strictly lower rank. The bookkeeping is
+ * compiled out when NDEBUG is defined (or no threading runtime is present), so
+ * release builds behave exactly like the plain dogecoin_mutex_lock/unlock
+ * helpers and pay no runtime cost. */
+enum dogecoin_lock_rank {
+    DOGECOIN_LOCK_RANK_NONE     = 0,
+    DOGECOIN_LOCK_RANK_TX       = 10, /* dogecoin_tx.lock                      */
+    DOGECOIN_LOCK_RANK_WALLET   = 20, /* dogecoin_wallet.lock                  */
+    DOGECOIN_LOCK_RANK_REGISTRY = 30  /* eckey/transaction context registry    */
+};
+
+#if !defined(NDEBUG) && (defined(_WIN32) || defined(DOGECOIN_HAVE_THREADS))
+#define DOGECOIN_LOCK_RANK_CHECK 1
+/* Record/clear that the current thread holds a lock of the given rank. Defined
+ * in src/context.c; aborts (assert) on an out-of-order acquisition. */
+LIBDOGECOIN_API void dogecoin_lock_rank_push(int rank);
+LIBDOGECOIN_API void dogecoin_lock_rank_pop(int rank);
+#endif
+
+/* Acquire a mutex while enforcing the global lock hierarchy in debug builds.
+ * Use the matching dogecoin_mutex_unlock_ranked() to release. Lock/unlock pairs
+ * for nested locks must be strictly LIFO. */
+static inline void dogecoin_mutex_lock_ranked(dogecoin_mutex_t* mutex, int rank)
+{
+#ifdef DOGECOIN_LOCK_RANK_CHECK
+    dogecoin_lock_rank_push(rank);
+#else
+    (void)rank;
+#endif
+    dogecoin_mutex_lock(mutex);
+}
+
+static inline void dogecoin_mutex_unlock_ranked(dogecoin_mutex_t* mutex, int rank)
+{
+    dogecoin_mutex_unlock(mutex);
+#ifdef DOGECOIN_LOCK_RANK_CHECK
+    dogecoin_lock_rank_pop(rank);
+#else
+    (void)rank;
+#endif
+}
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_DOGECOIN_H__

@@ -59,11 +59,66 @@ static eckey* find_eckey_locked(dogecoin_eckey_context* ctx, int idx) {
     return key;
 }
 
-static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
-    HASH_DEL(ctx->keys, key); /* delete it (keys advances to next) */
+/* ---- lifetime side-table helpers; caller MUST hold ctx->lock ----
+ * The refcount/pending_delete state lives outside the eckey struct so the public
+ * eckey layout never changes. A record is created lazily the first time an entry
+ * is retained, and dropped as soon as it is no longer needed. */
+static eckey_lifetime* find_lifetime_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    eckey_lifetime* lt;
+    HASH_FIND_PTR(ctx->lifetimes, &key, lt);
+    return lt;
+}
+
+static eckey_lifetime* get_or_create_lifetime_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    eckey_lifetime* lt = find_lifetime_locked(ctx, key);
+    if (lt) return lt;
+    lt = (eckey_lifetime*)dogecoin_calloc(1, sizeof(*lt));
+    if (!lt) return NULL;
+    lt->key = key;
+    HASH_ADD_PTR(ctx->lifetimes, key, lt);
+    return lt;
+}
+
+static void drop_lifetime_locked(dogecoin_eckey_context* ctx, eckey_lifetime* lt) {
+    if (!lt) return;
+    HASH_DEL(ctx->lifetimes, lt);
+    dogecoin_free(lt);
+}
+
+/* Free the key material and the entry itself. Caller MUST hold ctx->lock and
+   must have already unlinked the entry from the registry and dropped its
+   lifetime record. */
+static void destroy_eckey_locked(eckey* key) {
     dogecoin_privkey_cleanse(&key->private_key);
     dogecoin_pubkey_cleanse(&key->public_key);
     dogecoin_key_free(key);
+}
+
+static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    HASH_DEL(ctx->keys, key); /* unlink so no new finder can reach it */
+    eckey_lifetime* lt = find_lifetime_locked(ctx, key);
+    if (lt && lt->refcount > 0) {
+        /* A holder from find_eckey_ts() is still using it; defer the free to the
+           last release. The entry is already out of the registry. */
+        lt->pending_delete = 1;
+        return;
+    }
+    drop_lifetime_locked(ctx, lt);
+    destroy_eckey_locked(key);
+}
+
+/* Drop a reference taken by find_eckey_ts(). Caller MUST hold ctx->lock. Frees
+   the entry if it was removed while referenced and this was the last ref. */
+static void release_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    if (!key) return;
+    eckey_lifetime* lt = find_lifetime_locked(ctx, key);
+    if (!lt) return;
+    if (lt->refcount > 0) lt->refcount--;
+    if (lt->refcount == 0) {
+        int pending = lt->pending_delete;
+        drop_lifetime_locked(ctx, lt);
+        if (pending) destroy_eckey_locked(key);
+    }
 }
 
 dogecoin_eckey_context* dogecoin_eckey_context_new(void) {
@@ -91,7 +146,23 @@ void dogecoin_eckey_context_free(dogecoin_eckey_context* ctx) {
     eckey* tmp;
     dogecoin_mutex_lock(&ctx->lock);
     HASH_ITER(hh, ctx->keys, current, tmp) {
+#ifndef NDEBUG
+        /* Guard rail (debug builds): freeing a context while a find_eckey_ts()
+           reference is still outstanding indicates a missing release_eckey_ts()
+           and would otherwise leak the deferred-delete entry. */
+        eckey_lifetime* lt = find_lifetime_locked(ctx, current);
+        assert(!lt || lt->refcount == 0);
+#endif
         remove_eckey_locked(ctx, current);
+    }
+    /* Any lifetime records still present here are orphans (refcount == 0 and not
+       tied to a live registry entry); drop them so the context frees cleanly. */
+    {
+        eckey_lifetime* lt_cur;
+        eckey_lifetime* lt_tmp;
+        HASH_ITER(hh, ctx->lifetimes, lt_cur, lt_tmp) {
+            drop_lifetime_locked(ctx, lt_cur);
+        }
     }
     dogecoin_mutex_unlock(&ctx->lock);
     dogecoin_mutex_destroy(&ctx->lock);
@@ -194,15 +265,53 @@ void add_eckey_ts(dogecoin_eckey_context* ctx, eckey *key) {
  * the provided index.
  */
 eckey* find_eckey(int idx) {
-    return find_eckey_ts(default_eckey_context(), idx);
+    /* Legacy lookup on the thread-local default context, which is never shared
+       across threads. Return a borrowed pointer without retaining so the
+       default context's entries keep no lifetime record per the documented
+       invariant (see eckey_lifetime); the legacy callers of this API have no
+       release_eckey_ts() pairing. */
+    dogecoin_eckey_context* ctx = default_eckey_context();
+    if (!ctx) return NULL;
+    dogecoin_mutex_lock(&ctx->lock);
+    eckey* key = find_eckey_locked(ctx, idx);
+    dogecoin_mutex_unlock(&ctx->lock);
+    return key;
 }
 
 eckey* find_eckey_ts(dogecoin_eckey_context* ctx, int idx) {
     if (!ctx) return NULL;
     dogecoin_mutex_lock(&ctx->lock);
     eckey* key = find_eckey_locked(ctx, idx);
+    if (key) {
+        /* retain under the registry lock; the lifetime record is created lazily */
+        eckey_lifetime* lt = get_or_create_lifetime_locked(ctx, key);
+        if (lt) {
+            lt->refcount++;
+        } else {
+            key = NULL; /* allocation failed; do not hand out an unretained ref */
+        }
+    }
     dogecoin_mutex_unlock(&ctx->lock);
     return key;
+}
+
+/* Release a reference obtained from find_eckey_ts(). Every successful (non-NULL)
+   find_eckey_ts() must be paired with exactly one call here once the caller is
+   done dereferencing the returned entry. */
+void release_eckey_ts(dogecoin_eckey_context* ctx, eckey* key) {
+    if (!ctx || !key) return;
+    dogecoin_mutex_lock(&ctx->lock);
+    release_eckey_locked(ctx, key);
+    dogecoin_mutex_unlock(&ctx->lock);
+}
+
+int with_eckey_ts(dogecoin_eckey_context* ctx, int idx, void (*fn)(eckey* key, void* arg), void* arg) {
+    if (!ctx || !fn) return 0;
+    dogecoin_mutex_lock(&ctx->lock);
+    eckey* key = find_eckey_locked(ctx, idx);
+    if (key) fn(key, arg);
+    dogecoin_mutex_unlock(&ctx->lock);
+    return key != NULL;
 }
 
 /**

@@ -36,6 +36,36 @@
 #include <pthread.h>
 #endif
 
+#ifdef DOGECOIN_LOCK_RANK_CHECK
+#include <assert.h>
+
+/* Per-thread stack of currently-held lock ranks used by the lock-hierarchy
+ * enforcement helpers declared in dogecoin.h. Acquisitions must be strictly
+ * increasing in rank and released in LIFO order; violations assert (abort) in
+ * debug builds. Compiled out entirely when NDEBUG is defined. */
+#define DOGECOIN_LOCK_RANK_STACK_MAX 16
+static DOGECOIN_THREAD_LOCAL int dogecoin_lock_rank_stack[DOGECOIN_LOCK_RANK_STACK_MAX];
+static DOGECOIN_THREAD_LOCAL int dogecoin_lock_rank_depth = 0;
+
+void dogecoin_lock_rank_push(int rank)
+{
+    /* Each newly acquired lock must rank strictly above every lock already held
+       on this thread, enforcing a single global acquisition order. */
+    assert(dogecoin_lock_rank_depth == 0 ||
+           rank > dogecoin_lock_rank_stack[dogecoin_lock_rank_depth - 1]);
+    assert(dogecoin_lock_rank_depth < DOGECOIN_LOCK_RANK_STACK_MAX);
+    dogecoin_lock_rank_stack[dogecoin_lock_rank_depth++] = rank;
+}
+
+void dogecoin_lock_rank_pop(int rank)
+{
+    /* The enforced call sites release nested locks in LIFO order. */
+    assert(dogecoin_lock_rank_depth > 0);
+    assert(dogecoin_lock_rank_stack[dogecoin_lock_rank_depth - 1] == rank);
+    dogecoin_lock_rank_depth--;
+}
+#endif /* DOGECOIN_LOCK_RANK_CHECK */
+
 struct dogecoin_transaction_context* dogecoin_transaction_context_new(void);
 void dogecoin_transaction_context_free(struct dogecoin_transaction_context* ctx);
 struct dogecoin_eckey_context* dogecoin_eckey_context_new(void);
