@@ -46,6 +46,7 @@ static const struct blockheadertest block_header_tests[] =
                 {"020162002770a8b89647bbb542f044754a07dc6e56545793f5dcecdf43826ae0cb7192a12466d048e51b0f8a3cbaaf8a624b9aa1212ce4c2a4feba0750f7ad14feb75f54c69de053837b091e00000000", "8afc65a42c47b5ed5862194fb846171ba4afb999a1b4cce149f56c328d8a90e4", 6422786, 1407229382, 503937923, 0, &dogecoin_chainparams_test, ""} // 158391
         };
 
+void test_auxpow_deserialize_real_vector(void);
 void test_auxpow_deserialize_e2e(void);
 void test_auxpow_deserialize_merkle_count_bounds(void);
 
@@ -219,10 +220,122 @@ void test_block_header()
 
     test_check_merkle_branch();
 
+    test_auxpow_deserialize_real_vector();
     test_auxpow_deserialize_e2e();
     test_auxpow_deserialize_merkle_count_bounds();
 }
 
+/* Real mainnet auxpow block: height 371338, hash
+   6fb5ae70a65902381bcaa63a38cadf36e8c0a9b4cbffa85bc545c1be08cd0721. This is the
+   full serialized block (getblock <hash> 0): 80-byte aux header, parent coinbase
+   transaction, parent hash, parent coinbase merkle branch, chain merkle branch,
+   and parent header. Unlike the synthetic cases above, this exercises the entire
+   path INCLUDING check_auxpow() -- the parent block's scrypt proof of work is
+   verified against the header bits, and the merge-mining merkle branches are
+   checked to link the aux block hash into the parent coinbase. A successful
+   return is a true end-to-end validation of the auxpow deserializer. */
+void test_auxpow_deserialize_real_vector() {
+    const char* block_hex =
+        "0201620053f0dc500d0fd8912622c5c2475f83529326c19dac4e955a1bffc5f9823932607df6"
+        "ee838b616413188439101f1c609b94e5143c431df75e0aab2fb2b647673661fb115490d4301b"
+        "0000000001000000010000000000000000000000000000000000000000000000000000000000"
+        "000000ffffffff380345bf09fabe6d6d5187f05b5b616c30c1945af345d1f95148963a12d0fb"
+        "215b8e7ad53a27161e3c08000000000000009bf8666459000000ffffffff01800c0c2a010000"
+        "001976a914aa3750aa18b8a0f3f0590731e1fab934856680cf88ac00000000b042af7b2a0bbb"
+        "7527fc48af101611276e60b91d2acc5875b8be25000000000003a979a636db2450363972d211"
+        "aee67b71387a3daaa3051be0fd260c5acd4739cd52a418d29d8a0e56c8714c95a0dc24e1c962"
+        "4480ec497fe2441941f3fee8f9481a3370c334178415c83d1d0c2deeec727c2330617a47691f"
+        "c5e79203669312d100000000036fa40307b3a439538195245b0de56a2c1db6ba3a64f8bdd207"
+        "1d00bc48c841b5e77b98e5c7d6f06f92dec5cf6d61277ecb9a0342406f49f34c51ee8ce4abd6"
+        "78038129485de14238bd1ca12cd2de12ff0e383aee542d90437cd664ce139446a00000000002"
+        "000000d2ec7dfeb7e8f43fe77aba3368df95ac2088034420402730ee0492a208421708f6d32f"
+        "6e7eb2941bcdcd47740f7c67a7b1930014b771a18809a86898a506250f60fb11548b54021be0"
+        "17686d0601000000010000000000000000000000000000000000000000000000000000000000"
+        "000000ffffffff0d038aaa050101062f503253482fffffffff010109d54eaf050000232102b7"
+        "3438165461b826b30a46078f211aa005d1e7e430b1e0ed461678a5fe516c73ac000000000100"
+        "000009bc1d305c59dd1809a6546010bbc43e8c25ad5d241cd83e582010f9930677ae8a270000"
+        "006a473044022100ece82d985cfedfb30b9227ae71bf154673beeba85a8667dcb492fedfc8b6"
+        "d87f021f2cb89b285b0f7964f613696c0b7b27c4f1476b954df17f63a2d7d23b559218012103"
+        "bb439b7328630b2985dd73c711d79dfa54e644fe33e44de49d5475e7f6fde985ffffffffcd1a"
+        "eddb2ae887734ec3a16aff82c198d83af739e1923cf93aa28d74519665a1010000006b483045"
+        "022100e4ac71b6650c586f04e8ca9d37bf7fbf2483107dae076bffb06d5c6cd471b90502201f"
+        "d946bb433637c1c05170f7f2af13d82b4d37595659b85eadec8db85f9b48fd0121024cc4de99"
+        "ad5ebf4c0ff81d66b5d1953ec7b28cb7e558ef758376e685391badecffffffff182fe5662129"
+        "bc59a78ef49bddeab1281d34cf9dbdac3cbfb9e0090051789bd03b0000006a4730440220527b"
+        "19bb4858ace5f9e3e12cc68c91b04cb2cc8af88e4a3efbbca40f107ad2310220574bace2eda1"
+        "1bce2e7dd593642c3bd537a0075448378cc185cd65953f985f9701210256bdef145ceaddaf7a"
+        "fc1ece0fecfd6548f3d34e54a3123d5f36c75b15fbc2feffffffff15c0dd130c3c37f6765465"
+        "c2659d4ef8cc7c8a382baad02fafbd3fd527f7bfb1010000006b483045022100bc05ef192be8"
+        "fb2f272efb7be8158815251f88fed7878e5df4431aa94585a2ef02203e7194d0cd4f8481e8a8"
+        "be7e24474aced48a712cfef64b0fc1f10ca7faea2f8f012103eae1c39387a87e782810342bcd"
+        "59b11b6ba18aee1fcb9997744b649b76707624ffffffff12d739cc5cb2cb80c4cd8b76d5a9e2"
+        "d8b29a2752be8f5d5fd2d8f6757c817fe4010000006b483045022100a1870aa5d56b0c79cdd7"
+        "b119f5377cb05d4c4bd1dc1cf553598c2364d0d99df8022067ea779f0f19bc992b4660820ae9"
+        "9c27b452049a70ac7efa7b73ef4d0e5ddb19012103f0f23aad840a2270d53501cc008a8953ff"
+        "d867dec5d2535ea6ba0c17f4963615ffffffffd7fe105770ec91f57f066b5ec91930a117b882"
+        "e47ceafc376dadd1fe2c285a10010000006a473044022072b5345c6b4bb5496862393d49618f"
+        "ef778ad879fc94b24bcac9b5595143557a02200e919b915e3cecde82ce6f95a7a52844ca44d5"
+        "cc553ed75e1a4de452218c778e012102fd3c13362dc56adfe990de025274593cbf3294d09a78"
+        "c002119120056087df90ffffffffba55152dd60fe6c3bdd078047e4812f642b5af890efd14fe"
+        "2f1a733999929934010000006a473044022000cb23f9ea744e293f87750cd154ab96a06a6178"
+        "ea4323e3d7f5a6458a25f41002200a73f4f26d48ce022c3f7eee520eb4ee57a88b8b8d984cf7"
+        "597ce032eac7df8b01210304a5713d3350d4181e4e2eaf923e25a6820d44a8b82e731fd37ff1"
+        "32c459bb2cffffffff50e7e2a34b00dc3cd664af02fcdba9ac22de118fa24bbff7ea6f49bb4c"
+        "93f374000000006b483045022100efbaebfe27f2fa925ab4e98b4040119ce4347a7cde53cbdc"
+        "42b4c1243211eb4c02201fac79a49a6201aa17051ca1ad6c12d0a52582cc1c19310e2eff204b"
+        "828a8077012103433e7a65c0b66947d98f92ae0d5e4ccf9fe0a1eba9934098614fc1bf2a4d2b"
+        "33ffffffff59a7866891da6616de39d60799d9a328de26b68eb122482bba0e1028fe18405500"
+        "0000006a47304402205209f3da5971ac77ce54229aeff8a08833f08cee4c074a156dbfd7041c"
+        "0a19fb02201242b373983a2d8a74c4ab52206cd4fb4a65ce0fe4e5d62f90333cd929a2ee6c01"
+        "210270b236c412b4fae735368f194dbb14bb22f6bb55f907699d42295e45a1dc364affffffff"
+        "02b47aba8dae1c00001976a91413b37bc2a0b57fd3740f3632c5d0038b49173eff88acb464ff"
+        "05000000001976a914ff4dfe9fc4fce9b1a118d4ca18d634452ccef14188ac00000000010000"
+        "000159a484082af8d2311cce82e8571ae1ef738f03aee982d4fee2b397e7f0e8045d01000000"
+        "6c493046022100c73ff48629dd1a56d167879a0da40439b5700dbe89635a7dc46a80ae76aa56"
+        "50022100db7dc935ff9b52a2a494181b83aa1b5dcf472e70b228e6672482279f8aa56f5a0121"
+        "033fcc1cb9c1b7b11758eb2cd3a25b4ff917a5e248f5d6fcc74160dd6a450acf8bffffffff02"
+        "0061e600030000001976a9140fa60d44a3a53066ada76ea81e8c2a313e08899b88ac18eeb300"
+        "64ae04001976a914a1ea13863020f36897b671ad328d98e9364f12b488ac0000000001000000"
+        "01ba8131daa48a8f43b1153f54fd627d0f7f98d020fc3af349741668db359efc83010000006b"
+        "4830450220523bd4c8478af0345b1f91ff66a04ae3487f708dfdcabc16cd984d1ce7022bbf02"
+        "2100b02950d0be848a5436fec0d03f52bdba8477a47a6f9085ce5b1aff0488e4ede5012102e2"
+        "89b43973439cba87a5466abaa425262244e242d1082b0ec58dbeba2b0d225bffffffff026180"
+        "288b050000001976a914b7ddc901f636827e5766d1920f3892d4d4bee50088ac78b8dccd9b02"
+        "00001976a91427fe37db47615924826ae39169005a14f3e9cafe88ac000000000100000001ee"
+        "1cf26c8d505d963a2fc659d6ba9a68f46544e01bae0af69a5a5015ff821440010000006c4930"
+        "46022100c4bbcd51537d033a2bdbb3ac0b999410397aca873b5ece0d8fdabb874a4056bf0221"
+        "00cac7617e110a20856f04ef1498195867d0772e3e148f6a2a03ed45fe2cfc36a70121033fcc"
+        "1cb9c1b7b11758eb2cd3a25b4ff917a5e248f5d6fcc74160dd6a450acf8bffffffff0200aea6"
+        "8f020000001976a9141be533a3aff7aec0bfca73c5b7407627d018265788acaa5f8470877900"
+        "001976a914a1ea13863020f36897b671ad328d98e9364f12b488ac000000000100000001369e"
+        "1a4c499dfe270f99426ee906e39a525c04ca23a266e7195ad0ed80888454000000006a473044"
+        "02201ba3e871eb8dcbf3edc26bab4a36eac3e676c573fe3d527bd75a862e51ed8a8a022023e9"
+        "7b7783d840eb17578ea98f51613a4e7aa0752dd98c3f67f8b93b3f9790a601210215323532e0"
+        "d509a3237519c489050351c7ef194d7ef0b0f74ce58097b6b335f4ffffffff0100005a620200"
+        "00001976a91481db1aa49ebc6a71cad96949eb28e22af85eb0bd88ac00000000";
+
+    size_t hexlen = strlen(block_hex);
+    size_t blen = hexlen / 2;
+    uint8_t* buf = dogecoin_malloc(blen);
+    for (size_t k = 0; k < blen; k++) {
+        unsigned b; sscanf(block_hex + 2 * k, "%2x", &b); buf[k] = (uint8_t)b;
+    }
+
+    dogecoin_block_header* header = dogecoin_block_header_new();
+    struct const_buffer cb = { buf, blen };
+    arith_uint256 chainwork;
+    /* full parse + check_auxpow (scrypt PoW on the parent + merkle linkage) */
+    int r = dogecoin_block_header_deserialize(header, &cb, &dogecoin_chainparams_main, &chainwork);
+    u_assert_int_eq(r, 1);
+    /* the deserialized aux header must match the known height-371338 values */
+    u_assert_uint32_eq((uint32_t)header->version, 0x00620102);
+    u_assert_uint32_eq(header->timestamp, 1410464609);
+    u_assert_uint32_eq(header->bits, 456184976);
+    u_assert_uint32_eq(header->nonce, 0);
+
+    dogecoin_block_header_free(header);
+    dogecoin_free(buf);
+}
 
 /* End-to-end coverage for deserialize_dogecoin_auxpow_block(). Before this,
    the auxpow deserializer had no test exercising it at all -- it was only ever
