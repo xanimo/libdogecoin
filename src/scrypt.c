@@ -179,7 +179,19 @@ void scrypt_1024_1_1_256_sp_generic(const char *input, char *output, char *scrat
 #if defined(USE_SSE2)
 void (*scrypt_1024_1_1_256_sp_detected)(const char *input, char *output, char *scratchpad) = &scrypt_1024_1_1_256_sp_generic;
 
-void scrypt_detect_sse2()
+/* One-time guard so the runtime dispatch pointer above is published exactly
+   once. The pointer starts at the always-valid generic implementation and is
+   assigned its final value under the once-init below, so concurrent first use
+   can never observe a torn or double-written pointer. */
+#ifdef _WIN32
+static INIT_ONCE scrypt_detect_once = INIT_ONCE_STATIC_INIT;
+#elif defined(DOGECOIN_HAVE_THREADS)
+static pthread_once_t scrypt_detect_once = PTHREAD_ONCE_INIT;
+#else
+static int scrypt_detect_once = 0;
+#endif
+
+static void scrypt_detect_sse2_impl(void)
 {
 #if defined(USE_SSE2_ALWAYS)
     printf("scrypt: using scrypt-sse2 as built.\n");
@@ -209,10 +221,46 @@ void scrypt_detect_sse2()
     }
 #endif // USE_SSE2_ALWAYS
 }
+
+#ifdef _WIN32
+static BOOL CALLBACK scrypt_detect_sse2_once_cb(PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context)
+{
+    (void)InitOnce;
+    (void)Parameter;
+    (void)Context;
+    scrypt_detect_sse2_impl();
+    return TRUE;
+}
+#endif
+
+void scrypt_detect_sse2()
+{
+    /* Idempotent and thread-safe: the detection body runs at most once even
+       under concurrent calls. */
+#ifdef _WIN32
+    InitOnceExecuteOnce(&scrypt_detect_once, scrypt_detect_sse2_once_cb, NULL, NULL);
+#elif defined(DOGECOIN_HAVE_THREADS)
+    pthread_once(&scrypt_detect_once, scrypt_detect_sse2_impl);
+#else
+    /* No threading runtime is present on this target (e.g. OP-TEE TAs), so
+       execution is single-threaded by construction and this plain guard is
+       sufficient — there are no concurrent callers to race on the assignment.
+       This mirrors how dogecoin_mutex_* degrade to no-ops on such builds. */
+    if (!scrypt_detect_once) {
+        scrypt_detect_once = 1;
+        scrypt_detect_sse2_impl();
+    }
+#endif
+}
 #endif
 
 void scrypt_1024_1_1_256(const char *input, char *output)
 {
+#if defined(USE_SSE2) && !defined(USE_SSE2_ALWAYS)
+    /* Ensure the runtime dispatch pointer is initialized exactly once before
+       its first use. */
+    scrypt_detect_sse2();
+#endif
     char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
     memset(scratchpad, 0, sizeof(scratchpad));
     scrypt_1024_1_1_256_sp(input, output, scratchpad);

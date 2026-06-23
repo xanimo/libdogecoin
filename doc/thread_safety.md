@@ -36,6 +36,25 @@ The SPV client itself runs its message loop on the single libevent IO thread;
 there is no internal worker pool. Apps that want concurrency drive their own
 threads and share only the `_ts`-protected objects described below.
 
+3. **One-time initialization for lazily-resolved process globals.** A few
+   process-wide globals are resolved on first use rather than at load time. These
+   are published exactly once with a platform one-time-init primitive
+   (`InitOnceExecuteOnce` on Windows, `pthread_once` on POSIX, with a no-op
+   fallback on single-threaded/freestanding targets), so concurrent first use can
+   neither double-initialize nor observe a half-initialized value, and the global
+   is immutable (and lock-free to read) afterwards:
+   * the Windows RNG loader in `src/random.c` (`BCryptGenRandom` resolution and
+     the legacy `CryptGenRandom` provider handle), and
+   * the scrypt runtime dispatch pointer `scrypt_1024_1_1_256_sp_detected` in
+     `src/scrypt.c`, which is initialized to the always-valid generic
+     implementation and assigned its CPU-feature-detected target under
+     `scrypt_detect_sse2()` before first use.
+
+   Note: the vendored `src/libevent/**` third-party code keeps its own global
+   mutable state by design; its thread-safety depends on libevent's own
+   synchronization model (build with `evthread` support) and is treated as an
+   external dependency, not libdogecoin-core state.
+
 ## Mutex helpers
 
 `include/dogecoin/dogecoin.h` provides a tiny portable mutex wrapper used by all

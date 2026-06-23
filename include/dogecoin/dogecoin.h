@@ -28,6 +28,28 @@
 #ifndef __LIBDOGECOIN_DOGECOIN_H__
 #define __LIBDOGECOIN_DOGECOIN_H__
 
+/* Require Windows 8+ (0x0602) so winsock2.h's htonll/ntohll, winnls.h's
+ * NormalizationKD/NormalizeString and synchapi.h's InitOnceExecuteOnce are all
+ * declared for every consumer of this header.
+ *
+ * This MUST run before any standard header (e.g. <stdio.h>) is included below:
+ * the mingw-w64 CRT headers pull in <sdkddkver.h>, which locks _WIN32_WINNT to
+ * a toolchain-specific default when the macro is still undefined. On toolchains
+ * whose default is below 0x0602 (e.g. the mingw-w64 shipped with Ubuntu 22.04)
+ * that would leave a #ifndef guard a no-op and InitOnceExecuteOnce/htonll would
+ * fall back to implicit (undecorated) declarations that fail to link. Force the
+ * floor rather than merely defaulting it. */
+#ifdef _WIN32
+#if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0602)
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0602
+#endif
+#if !defined(WINVER) || (WINVER < 0x0602)
+#undef WINVER
+#define WINVER 0x0602
+#endif
+#endif
+
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -41,15 +63,8 @@
 #endif
 
 #ifdef _WIN32
-/* Require Windows 8+ so both winnls.h's NormalizationKD/NormalizeString and
- * winsock2.h's htonll/ntohll prototypes are visible to all consumers of this
- * header. (NormalizationKD needs 0x0600, htonll needs 0x0602.) */
-#ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0602
-#endif
-#ifndef WINVER
-#define WINVER 0x0602
-#endif
+/* _WIN32_WINNT / WINVER are pinned to >= 0x0602 at the top of this header,
+ * before any CRT header had a chance to lock them to a lower default. */
 /* Avoid pulling in legacy <winsock.h> from <windows.h>, which would conflict
  * with <winsock2.h> included by libdogecoin's net code on MSVC. */
 #ifndef WIN32_LEAN_AND_MEAN

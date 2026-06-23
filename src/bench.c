@@ -97,13 +97,17 @@ static void bench_require(int ok, const char* op) {
 /* ---- timing helpers ---- */
 static double gettimedouble(void) {
 #ifdef _WIN32
-    /* Use GetTickCount64 if available (Vista+), otherwise fall back to GetTickCount */
-    #if defined(_WIN64) || (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600)
-        return (double)GetTickCount64() / 1000.0;
-    #else
-        /* For 32-bit Windows or older MinGW, use GetTickCount (32-bit, wraps every 49.7 days) */
-        return (double)GetTickCount() / 1000.0;
-    #endif
+    /* Use QueryPerformanceCounter, which is available on all supported Windows
+     * versions (since Windows 2000) for both 32-bit and 64-bit targets. This
+     * avoids depending on GetTickCount64, whose import is unavailable in some
+     * MinGW toolchains and causes an undefined reference at link time. */
+    LARGE_INTEGER freq, counter;
+    if (QueryPerformanceFrequency(&freq) && freq.QuadPart != 0) {
+        QueryPerformanceCounter(&counter);
+        return (double)counter.QuadPart / (double)freq.QuadPart;
+    }
+    /* Fallback for the unlikely case a high-resolution counter is unavailable. */
+    return (double)GetTickCount() / 1000.0;
 #else
     struct timeval tv;
     gettimeofday(&tv, NULL);
