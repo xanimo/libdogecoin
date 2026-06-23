@@ -751,6 +751,20 @@ void test_transaction()
     // verify signature
     u_assert_true(dogecoin_falcon512_verify(pk, pk_len, msg, sizeof msg, sig, sig_len));
 
+    // wrapper output lengths must match the algorithm's fixed sizes, and the
+    // verifier must reject a tampered message, a tampered signature, and a
+    // wrong-length public key. These guard against the wrapper silently
+    // mangling lengths or skipping validation.
+    u_assert_true(pk_len == 897 && sig_len > 0 && sig_len <= 752);
+    {
+        uint8_t bad_msg[32]; memcpy(bad_msg, msg, sizeof msg); bad_msg[0] ^= 0xff;
+        u_assert_true(!dogecoin_falcon512_verify(pk, pk_len, bad_msg, sizeof bad_msg, sig, sig_len));
+        uint8_t* bad_sig = malloc(sig_len); memcpy(bad_sig, sig, sig_len); bad_sig[sig_len/2] ^= 0xff;
+        u_assert_true(!dogecoin_falcon512_verify(pk, pk_len, msg, sizeof msg, bad_sig, sig_len));
+        free(bad_sig);
+        u_assert_true(!dogecoin_falcon512_verify(pk, pk_len - 1, msg, sizeof msg, sig, sig_len));
+    }
+
     // compute commit = SHA256(pk||sig)
     uint8_t commit32[32];
     u_assert_true(dogecoin_falcon512_commit_bytes(pk, pk_len, sig, sig_len, commit32));
@@ -776,6 +790,17 @@ void test_transaction()
     u_assert_true(dogecoin_dilithium2_keypair(&dpk, &dpk_len, &dsk, &dsk_len));
     u_assert_true(dogecoin_dilithium2_sign(dsk, dsk_len, msg, sizeof msg, &dsig, &dsig_len));
     u_assert_true(dogecoin_dilithium2_verify(dpk, dpk_len, msg, sizeof msg, dsig, dsig_len));
+
+    // wrapper length/negative checks (see Falcon block above for rationale)
+    u_assert_true(dpk_len == 1312 && dsig_len > 0 && dsig_len <= 2420);
+    {
+        uint8_t bad_msg[32]; memcpy(bad_msg, msg, sizeof msg); bad_msg[0] ^= 0xff;
+        u_assert_true(!dogecoin_dilithium2_verify(dpk, dpk_len, bad_msg, sizeof bad_msg, dsig, dsig_len));
+        uint8_t* bad_sig = malloc(dsig_len); memcpy(bad_sig, dsig, dsig_len); bad_sig[dsig_len/2] ^= 0xff;
+        u_assert_true(!dogecoin_dilithium2_verify(dpk, dpk_len, msg, sizeof msg, bad_sig, dsig_len));
+        free(bad_sig);
+        u_assert_true(!dogecoin_dilithium2_verify(dpk, dpk_len - 1, msg, sizeof msg, dsig, dsig_len));
+    }
 
     uint8_t dcommit32[32];
     u_assert_true(dogecoin_dilithium2_commit_bytes(dpk, dpk_len, dsig, dsig_len, dcommit32));
