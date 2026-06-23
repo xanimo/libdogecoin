@@ -144,43 +144,40 @@ void test_eckey_ts_retain_release() {
     dogecoin_eckey_context_free(ctx);
 }
 
-/* Regression: an idx collision inside add_eckey_locked() must not free a key a
-   find_eckey_ts() holder still references. Key ids are minted as HASH_COUNT()+1,
-   so ids recycle after a removal and a fresh start_key_ts() can collide with a
-   retained-but-lower entry. Before the fix the collision path raw-freed the
-   displaced key (bypassing the lifetime side table AND destroy_eckey_locked()'s
-   cleanse), leaving the holder dangling and private-key bytes in freed heap.
-   Deterministic; ASan/TSan trap the use-after-free directly. */
-void test_eckey_ts_replace_retained() {
+/* Regression: eckey ids must never be reused. Under the old HASH_COUNT(keys)+1
+   scheme, removing a key let the next start_key_ts() mint the id of a still-live
+   key, which add_eckey_locked() then evicted via HASH_REPLACE -- destroying a
+   live key and, because dogecoin_key_free() does not cleanse, leaving its
+   private-key bytes in freed heap. With a monotonic id source the third key gets
+   a fresh id and the second survives. */
+void test_eckey_idx_not_reused()
+{
     dogecoin_eckey_context* ctx = dogecoin_eckey_context_new();
     u_assert_true(ctx != NULL);
 
-    int a = start_key_ts(ctx, false);           /* idx 1 */
-    int b = start_key_ts(ctx, false);           /* idx 2 */
-    u_assert_int_eq(a, 1);
-    u_assert_int_eq(b, 2);
+    int a = start_key_ts(ctx, false);
+    int b = start_key_ts(ctx, false);
+    u_assert_true(a > 0 && b > 0 && a != b);
 
-    /* Drop the lower id so the next mint recomputes idx = HASH_COUNT+1 = 2 == b. */
+    /* Remove a per the find/remove/release contract: remove defers while the
+       finder ref is held, release completes the free. */
     eckey* ka = find_eckey_ts(ctx, a);
     u_assert_true(ka != NULL);
-    release_eckey_ts(ctx, ka);                  /* drop the finder ref ... */
-    remove_eckey_ts(ctx, ka);                   /* ... then destroy + unlink */
+    remove_eckey_ts(ctx, ka);
+    release_eckey_ts(ctx, ka);
 
-    /* Legitimately retain entry b per the find/release contract. */
-    eckey* held = find_eckey_ts(ctx, b);
-    u_assert_true(held != NULL);
-    char wif0 = held->private_key_wif[0];
-
-    /* Collides with the retained entry b -> HASH_REPLACE displaces it. */
     int c = start_key_ts(ctx, false);
-    u_assert_int_eq(c, b);
+    u_assert_true(c != b);                       /* must not recycle b's id */
 
-    /* The still-retained entry must remain valid and unmodified (deferred free). */
-    u_assert_int_eq(held->idx, b);
-    u_assert_true(held->private_key_wif[0] == wif0);
-
-    /* Contract-mandated release completes the deferred free without a double free. */
-    release_eckey_ts(ctx, held);
-
+    /* b survived (not evicted) and c exists; balance every find with a release
+       so no retained entry leaks. */
+    eckey* kb = find_eckey_ts(ctx, b);
+    u_assert_true(kb != NULL);                   /* b survived */
+    eckey* kc = find_eckey_ts(ctx, c);
+    u_assert_true(kc != NULL);
+    remove_eckey_ts(ctx, kb);
+    release_eckey_ts(ctx, kb);
+    remove_eckey_ts(ctx, kc);
+    release_eckey_ts(ctx, kc);
     dogecoin_eckey_context_free(ctx);
 }

@@ -55,13 +55,16 @@ static void add_eckey_locked(dogecoin_eckey_context* ctx, eckey *key) {
         HASH_ADD_INT(ctx->keys, idx, key);
         return;
     }
-    /* Idx collision: HASH_REPLACE_INT unlinks the displaced key. It may still be
-       retained by a find_eckey_ts() holder, so dispose of it through the same
-       deferred-delete path as an explicit removal rather than a bare free --
-       which would free it out from under that holder AND skip
-       destroy_eckey_locked()'s cleanse, leaving private-key bytes in freed heap. */
-    HASH_REPLACE_INT(ctx->keys, idx, key, key_old);
-    dispose_unlinked_eckey_locked(ctx, key_old);
+    /* With monotonic, never-reused ids (see new_eckey_ts) a collision is
+       impossible for keys minted by new_eckey_ts()/start_key_ts(). Reaching here
+       means a caller supplied a colliding idx directly. The previous code
+       HASH_REPLACE'd and freed the displaced key -- destroying a live key AND,
+       because dogecoin_key_free() does not cleanse, leaving its private-key bytes
+       in freed heap. Keep the existing key and decline the colliding insert; the
+       caller retains ownership of `key`. (Real removals still go through
+       remove_eckey_locked -> dispose_unlinked_eckey_locked, which preserves the
+       refcount-safe deferred delete and destroy_eckey_locked()'s cleanse.) */
+    (void)key_old;
 }
 
 static eckey* find_eckey_locked(dogecoin_eckey_context* ctx, int idx) {
@@ -216,7 +219,7 @@ eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
     if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) { dogecoin_key_free(key); return NULL; }
     if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) { dogecoin_key_free(key); return NULL; }
     dogecoin_mutex_lock(&ctx->lock);
-    key->idx = HASH_COUNT(ctx->keys) + 1;
+    key->idx = (int)++ctx->next_idx; /* never-reused id; see dogecoin_eckey_context.next_idx */
     dogecoin_mutex_unlock(&ctx->lock);
     return key;
 }
@@ -249,7 +252,7 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
     if (dogecoin_base58_encode_check(pkeybase58c, sizeof(pkeybase58c), key->private_key_wif, sizeof(key->private_key_wif)) == 0) { dogecoin_key_free(key); return NULL; }
     if (!dogecoin_pubkey_getaddr_p2pkh(&key->public_key, chain, (char*)&key->address)) { dogecoin_key_free(key); return NULL; }
     dogecoin_mutex_lock(&ctx->lock);
-    key->idx = HASH_COUNT(ctx->keys) + 1;
+    key->idx = (int)++ctx->next_idx; /* never-reused id; see dogecoin_eckey_context.next_idx */
     dogecoin_mutex_unlock(&ctx->lock);
     return key;
 }
@@ -385,8 +388,9 @@ int start_key_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
        provisional idx; we overwrite it here under the same lock as the insert. */
     eckey* key = new_eckey_ts(ctx, is_testnet);
     if (!key) return -1;
+    /* new_eckey_ts() already minted a unique, never-reused idx under the lock.
+       Just insert it (re-minting here would burn a second counter value). */
     dogecoin_mutex_lock(&ctx->lock);
-    key->idx = HASH_COUNT(ctx->keys) + 1;
     add_eckey_locked(ctx, key);
     int index = key->idx;
     dogecoin_mutex_unlock(&ctx->lock);

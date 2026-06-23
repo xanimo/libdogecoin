@@ -64,6 +64,13 @@ typedef struct dogecoin_eckey_context {
     eckey_lifetime* lifetimes; /* side table guarding _ts refcounts, keyed by key ptr */
     dogecoin_mutex_t lock; /* guards the registry roots above; no-op for the
                               zero-initialized per-thread default context */
+    uint32_t next_idx;     /* monotonic id source, guarded by lock. Never reused:
+                              deriving ids from HASH_COUNT()+1 recycled an id after
+                              any removal, so a later start_key could mint the id of
+                              a still-live key and evict it via HASH_REPLACE -- which
+                              freed the displaced key WITHOUT cleansing it, leaving
+                              private-key bytes in freed heap. Zero-initialized;
+                              first minted id is 1. */
 } dogecoin_eckey_context;
 
 // instantiates a new eckey
