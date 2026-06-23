@@ -491,7 +491,7 @@ void clear_transaction(int txindex) {
  * @return 1 if the raw transaction was signed successfully, 0 otherwise.
  */
 int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, int sighashtype, char* privkey) {
-    if(!incomingrawtx || !scripthex) return false;
+    if(!incomingrawtx || !scripthex || !privkey) return false;
 
     size_t tx_hex_len = strspn(incomingrawtx, VALID_HEX_CHARS);
     if (tx_hex_len == 0 || (tx_hex_len % 2) != 0 || incomingrawtx[tx_hex_len] != '\0' || tx_hex_len > TXHEXMAXLEN) {
@@ -574,7 +574,10 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
         enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(txtmp, script, &key, inputindex, sighashtype, sigcompact, sigder_plus_hashtype, &sigderlen);
         cstr_free(script, true);
 
-        if (res != DOGECOIN_SIGN_OK) return false;
+        if (res != DOGECOIN_SIGN_OK) {
+            dogecoin_tx_free(txtmp);
+            return false;
+        }
 
         char sigcompacthex[64*2+1] = {0};
         utils_bin_to_hex((unsigned char *)sigcompact, 64, sigcompacthex);
