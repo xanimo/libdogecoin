@@ -465,8 +465,11 @@ int deser_varlen_file(uint32_t* lo, FILE* file, uint8_t* rawdata, size_t* buflen
     unsigned char c;
     const unsigned char bufp[sizeof(uint64_t)];
 
-    /* check min size of the buffer */
-    if (*buflen_inout < sizeof(len))
+    /* The caller's buffer must hold the 1-byte length prefix plus up to a
+       uint32 of length bytes (the 253/254/255 encodings write rawdata[0] then
+       up to sizeof(len) more bytes). Requiring only sizeof(len) here let a
+       caller pass a buffer one byte too small, overflowing it by one byte. */
+    if (*buflen_inout < sizeof(len) + 1)
         return false;
 
     if (fread(&c, 1, 1, file) != 1)
