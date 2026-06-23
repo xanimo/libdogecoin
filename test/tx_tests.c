@@ -1139,6 +1139,24 @@ void test_script_op_codeseperator()
     free(hexbuf);
     cstr_free(new_script, true);
     cstr_free(script, true);
+
+    /* Regression: a script whose OP_PUSHDATA4 declares a length far larger than
+       the remaining bytes must be rejected cleanly. Previously this hit
+       assert(data_len < 0xFFFFFF) -- a process abort in debug builds (a DoS
+       reachable via dogecoin_tx_sighash) and, with NDEBUG, a multi-gigabyte
+       dogecoin_calloc() before deser_bytes failed. The parser now bounds the
+       push against the buffer before allocating, matching
+       dogecoin_script_get_ops. */
+    {
+        /* OP_PUSHDATA4 (0x4e) + length 0xFFFFFFFE + two payload bytes */
+        uint8_t bad[] = { 0x4e, 0xfe, 0xff, 0xff, 0xff, 0xaa, 0xbb };
+        cstring* bad_in = cstr_new_buf(bad, sizeof(bad));
+        cstring* bad_out = cstr_new_sz(16);
+        dogecoin_bool r = dogecoin_script_copy_without_op_codeseperator(bad_in, bad_out);
+        u_assert_int_eq(r, false);
+        cstr_free(bad_out, true);
+        cstr_free(bad_in, true);
+    }
 }
 
 void test_invalid_tx_deser()
