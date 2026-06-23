@@ -572,6 +572,25 @@ TARGET_SOURCES(tests ${visibility}
         test/zk_carrier_tests.c
 )
 ENDIF()
+IF(USE_RACCOON_G)
+TARGET_SOURCES(tests ${visibility}
+        test/raccoong_polyr_tests.c
+        test/raccoong_ntt_tests.c
+        test/raccoong_shake_tests.c
+        test/raccoong_xof_sample_q_tests.c
+        test/raccoong_matvec_tests.c
+        test/raccoong_keygen_t_tests.c
+        test/raccoong_keypair_tests.c
+        test/raccoong_gaussian_tests.c
+        test/raccoong_hd_derive_tests.c
+        test/raccoong_signature_serialize_tests.c
+        test/raccoong_buff_mu_tests.c
+        test/raccoong_chal_poly_tests.c
+        test/raccoong_hash_vec_tests.c
+        test/raccoong_sign_tests.c
+)
+TARGET_INCLUDE_DIRECTORIES(tests ${visibility} ${CMAKE_SOURCE_DIR})
+ENDIF()
 IF (USE_YUBIKEY)
     SET(LIBS ${LIBDOGECOIN_NAME} ${LIBYKPIV})
 ELSE()
@@ -587,6 +606,9 @@ ELSEIF (USE_TSS2)
     TARGET_LINK_LIBRARIES(tests ${LIBS} ${LIBTSS2})
 ELSE()
     TARGET_LINK_LIBRARIES(tests ${LIBS})
+ENDIF()
+IF(USE_RACCOON_G)
+    TARGET_LINK_LIBRARIES(tests m ${LIBMPFR} ${LIBGMP})
 ENDIF()
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
     # move test/wordlist to build
