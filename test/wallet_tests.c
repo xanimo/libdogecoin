@@ -222,7 +222,8 @@ void test_wallet_malformed_reclen()
     fclose(f);
 
     dogecoin_wallet* w = dogecoin_wallet_new(&dogecoin_chainparams_main);
-    int error = 0, created = 0;
+    int error = 0;
+    dogecoin_bool created = false;
     /* Must reject the oversized record rather than allocating ~4 GB / crashing. */
     u_assert_int_eq(dogecoin_wallet_load(w, path, &error, &created, false), false);
     dogecoin_wallet_free(w);
