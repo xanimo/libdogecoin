@@ -568,7 +568,7 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             } else if (type == PSBT_IN_REDEEM_SCRIPT && klen == 1) {
                 if (in->redeem_script) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 in->redeem_script = cstr_new_buf((const char *)val, vlen);
-            } else if (type == PSBT_IN_BIP32_DERIVATION && klen >= 34) {
+            } else if (type == PSBT_IN_BIP32_DERIVATION && klen == 34) {
                 size_t pklen = klen - 1;
                 if (vlen < 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 /* BIP174 §2: reject a duplicate derivation key (same pubkey) */
@@ -633,7 +633,7 @@ dogecoin_bool dogecoin_psbt_deserialize(const uint8_t *data, size_t len, dogecoi
             if (type == PSBT_OUT_REDEEM_SCRIPT && klen == 1) {
                 if (out->redeem_script) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 out->redeem_script = cstr_new_buf((const char *)val, vlen);
-            } else if (type == PSBT_OUT_BIP32_DERIVATION && klen >= 34) {
+            } else if (type == PSBT_OUT_BIP32_DERIVATION && klen == 34) {
                 size_t pklen = klen - 1;
                 if (vlen < 4) { dogecoin_free(key); dogecoin_free(val); goto fail; }
                 /* BIP174 §2: reject a duplicate derivation key (same pubkey) */
