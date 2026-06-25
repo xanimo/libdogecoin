@@ -171,3 +171,10 @@ package-lock.json
 
 # Generated ZK carrier circuit/proving artifacts
 /contrib/zk_carrier/circuits/build/
+# fuzzing artifacts and scratch
+fuzz_psbt
+crash-*
+oom-*
+*.bak
+*.diff
+*.patch
