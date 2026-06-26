@@ -20,6 +20,7 @@
 #include <dogecoin/buffer.h>
 #include <dogecoin/vector.h>
 #include <dogecoin/cstr.h>
+#include <dogecoin/mem.h>
 
 static void free_locator(void *p) { dogecoin_free(p); }
 
