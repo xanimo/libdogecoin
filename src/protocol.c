@@ -381,6 +381,12 @@ dogecoin_bool dogecoin_p2p_deser_msg_getheaders(vector_t* blocklocators, uint256
         return false;
     if (!deser_varlen(&vsize, buf))
         return false;
+    /* Each locator is a 32-byte hash that must be present in the buffer;
+     * a larger count is malformed and would force an oversized allocation
+     * in vector_resize (remote DoS via an unauthenticated getheaders). */
+    if (vsize > buf->len / sizeof(uint256_t)) {
+        return false;
+    }
     vector_resize(blocklocators, vsize);
     for (unsigned int i = 0; i < vsize; i++) {
         uint256_t *hash = dogecoin_malloc(DOGECOIN_HASH_LENGTH);
