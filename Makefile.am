@@ -479,5 +479,19 @@ fuzz_fuzz_protocol_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_protocol_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_protocol_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
 
-fuzz: fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_protocol
+noinst_PROGRAMS += fuzz/fuzz_wtx
+fuzz_fuzz_wtx_SOURCES = fuzz/fuzz_wtx.c
+fuzz_fuzz_wtx_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_wtx_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_wtx_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_wtx_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+noinst_PROGRAMS += fuzz/fuzz_logdb
+fuzz_fuzz_logdb_SOURCES = fuzz/fuzz_logdb.c
+fuzz_fuzz_logdb_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
+fuzz_fuzz_logdb_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_logdb_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_logdb_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+fuzz: fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_protocol fuzz/fuzz_wtx fuzz/fuzz_logdb
 endif
