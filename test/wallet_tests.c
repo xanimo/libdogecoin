@@ -317,6 +317,7 @@ void test_wallet_reorg_utxo_update() {
 
     dogecoin_wallet_flush(wallet);
     dogecoin_wallet_wtx_free(wtx_new);
+    dogecoin_wallet_wtx_free(wtx);
     dogecoin_wallet_free(wallet);
     dogecoin_hdnode_free(node);
     remove_all_utxos();
