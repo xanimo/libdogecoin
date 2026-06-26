@@ -166,4 +166,36 @@ void test_base58()
         i_raw += 2;
         i_cmd += 2;
     }
+
+    /* Regression: short payloads must round-trip through encode_check ->
+       decode_check. The previous code passed the encoded string length to the
+       decoder as an exact output-width hint; for several short payloads that
+       made the decoder's high-word zeromask reject an otherwise-valid value,
+       so decode_check returned 0. These specific raw payloads all failed under
+       the old hint and must now decode back to their exact bytes. */
+    static const char* short_payload_vectors[] = {
+        "0488ade400",  /* the payload cited in the fix; 5 bytes */
+        "ff",          /* single byte, high value */
+        "ffff",        /* two bytes, full */
+        "01",          /* single byte, small value */
+        "abcdef",      /* three bytes */
+        "123456789a",  /* five bytes */
+        0,
+    };
+    for (const char** v = short_payload_vectors; *v; v++) {
+        size_t len = strlen(*v) / 2;
+        uint8_t raw[64];
+        memcpy_safe(raw, utils_hex_to_uint8(*v), len);
+
+        char enc[128];
+        size_t enc_len = dogecoin_base58_encode_check(raw, len, enc, sizeof(enc));
+        assert(enc_len == strlen(enc) + 1);
+
+        uint8_t dec[64];
+        size_t dec_len = dogecoin_base58_decode_check(enc, dec, sizeof(dec));
+        /* decode_check returns payload + 4 checksum bytes; the leading dec_len-4
+           bytes must equal the original payload. */
+        assert(dec_len == len + 4);
+        assert(memcmp(dec, raw, len) == 0);
+    }
 }

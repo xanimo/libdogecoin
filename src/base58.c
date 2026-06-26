@@ -228,11 +228,27 @@ size_t dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datal
     if (strl > 128 || datalen < strl) {
         return 0;
     }
-    size_t binsize = strl;
+    /* dogecoin_base58_decode uses its size argument both to size its working
+       word array and to derive a high-word zeromask that rejects any value
+       not fitting in exactly that many bytes. Passing the raw string length
+       (strl) as that size makes it reject otherwise-valid inputs: strl is not
+       the decoded width, and strl % sizeof(word) can yield a mask that drops a
+       legitimately full top word (failures observed at payload lengths 1, 2,
+       5, ... depending on leading-digit magnitude, e.g. raw payload
+       0488ade400). Empirically the decoder needs the hint to exceed strl by a
+       whole word for the mask to clear. A base58 string always decodes to
+       fewer bytes than its length, so strl + sizeof(word) is a safe upper
+       bound on the field width; the decoder returns the true (leading-zero
+       stripped) length in binsize and the value is left-aligned below. */
+    size_t binhint = strl + sizeof(uint32_t);
+    if (binhint > datalen) {
+        binhint = datalen;
+    }
+    size_t binsize = binhint;
     if (!dogecoin_base58_decode(data, &binsize, str, strl)) {
         return 0;
     }
-    memmove(data, data + strl - binsize, binsize);
+    memmove(data, data + binhint - binsize, binsize);
     dogecoin_mem_zero(data + binsize, datalen - binsize);
     if (dogecoin_b58check(data, binsize, str) < 0) {
         ret = 0;
