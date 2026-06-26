@@ -69,6 +69,7 @@ extern void test_signmsg();
 extern void test_smpv();
 extern void test_signmsg_ext();
 extern void test_tpm();
+extern void test_psbt();
 extern void test_transaction();
 extern void test_validation();
 extern void test_tx_serialization();
@@ -181,6 +182,7 @@ int main()
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);
 #endif
+    u_run_test(test_psbt);
     u_run_test(test_transaction);
     u_run_test(test_validation);
     u_run_test(test_tx_serialization);

@@ -77,6 +77,8 @@ typedef struct dogecoin_wallet_ dogecoin_wallet;
 /* forward declarations for transaction container types */
 typedef struct dogecoin_tx_ dogecoin_tx;
 typedef struct dogecoin_smpv_tx_ dogecoin_smpv_tx;
+/* forward declaration for PSBT (BIP174/BIP370) container type */
+typedef struct dogecoin_psbt dogecoin_psbt;
 typedef struct dogecoin_smpv_watcher_ dogecoin_smpv_watcher;
 
 /* forward declaration for the SMPV client context type */
@@ -853,6 +855,71 @@ dogecoin_bool dogecoin_tx_add_p2pkh_hash160_out(dogecoin_tx* tx, int64_t amount,
 dogecoin_bool dogecoin_tx_add_p2sh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160);
 /* add an op_return-style data output */
 dogecoin_bool dogecoin_tx_add_data_out(dogecoin_tx* tx, const int64_t amount, const uint8_t* data, const size_t datalen);
+
+/* PSBT API (BIP174 / BIP370)
+--------------------------------------------------------------------------
+Partially Signed Dogecoin Transactions: a six-role pipeline —
+creator → updater → signer → combiner → finalizer → extractor.
+All hex and base64 output strings are heap-allocated; free with dogecoin_free().
+The extracted dogecoin_tx* is heap-allocated; free with dogecoin_tx_free().
+*/
+
+/* wire-format magic length and version constants */
+#define PSBT_MAGIC_LEN  5u         /* "psbt\xff" */
+#define PSBT_VERSION_0  0x00000000u
+#define PSBT_VERSION_2  0x00000002u
+
+/* lifecycle */
+dogecoin_psbt* dogecoin_psbt_new(void);
+void           dogecoin_psbt_free(dogecoin_psbt* psbt);
+
+/* creator role: wrap an unsigned tx in a new PSBT (all inputs must have empty scriptSigs) */
+dogecoin_psbt* dogecoin_psbt_create(const dogecoin_tx* tx);
+
+/* serialization: hex (caller frees with dogecoin_free) */
+char*          dogecoin_psbt_to_hex(const dogecoin_psbt* psbt);
+dogecoin_bool  dogecoin_psbt_from_hex(const char* hex, dogecoin_psbt** out);
+
+/* serialization: base64 (canonical PSBT wire format; caller frees with dogecoin_free) */
+char*          dogecoin_psbt_to_base64(const dogecoin_psbt* psbt);
+dogecoin_bool  dogecoin_psbt_from_base64(const char* b64, dogecoin_psbt** out);
+
+/* serialization: raw bytes (caller frees the cstring with cstr_free) */
+cstring*       dogecoin_psbt_serialize(const dogecoin_psbt* psbt);
+dogecoin_bool  dogecoin_psbt_deserialize(const uint8_t* data, size_t len, dogecoin_psbt** out);
+
+/* updater role: attach full previous tx for input idx (enables sighash derivation) */
+dogecoin_bool  dogecoin_psbt_input_set_utxo(dogecoin_psbt* psbt, size_t idx, const dogecoin_tx* utxo);
+/* updater role: attach P2SH redeem script for input idx */
+dogecoin_bool  dogecoin_psbt_input_set_redeemscript(dogecoin_psbt* psbt, size_t idx, const uint8_t* script, size_t len);
+/* updater role: set the sighash type for input idx */
+dogecoin_bool  dogecoin_psbt_input_set_sighash(dogecoin_psbt* psbt, size_t idx, uint32_t sighash_type);
+/* updater role: attach BIP32 derivation path to a pubkey for input idx */
+dogecoin_bool  dogecoin_psbt_input_add_keypath(dogecoin_psbt* psbt, size_t idx, const uint8_t* pubkey, size_t pubkey_len, uint32_t fingerprint, const uint32_t* path, size_t path_len);
+/* updater role: attach P2SH redeem script for output idx */
+dogecoin_bool  dogecoin_psbt_output_set_redeemscript(dogecoin_psbt* psbt, size_t idx, const uint8_t* script, size_t len);
+/* updater role: attach BIP32 derivation path to a pubkey for output idx */
+dogecoin_bool  dogecoin_psbt_output_add_keypath(dogecoin_psbt* psbt, size_t idx, const uint8_t* pubkey, size_t pubkey_len, uint32_t fingerprint, const uint32_t* path, size_t path_len);
+
+/* signer role: sign all inputs that can be signed with this key; returns true if ≥1 signed */
+dogecoin_bool  dogecoin_psbt_sign(dogecoin_psbt* psbt, const dogecoin_key* privkey);
+/* signer role: sign a specific input by index */
+dogecoin_bool  dogecoin_psbt_sign_input(dogecoin_psbt* psbt, size_t idx, const dogecoin_key* privkey);
+
+/* combiner role: merge partial signatures from src into dst */
+dogecoin_bool  dogecoin_psbt_combine(dogecoin_psbt* dst, const dogecoin_psbt* src);
+
+/* finalizer role: build final_script_sig for all inputs; returns true when all inputs are finalized */
+dogecoin_bool  dogecoin_psbt_finalize(dogecoin_psbt* psbt);
+/* finalizer role: build final_script_sig for a single input */
+dogecoin_bool  dogecoin_psbt_finalize_input(dogecoin_psbt* psbt, size_t idx);
+
+/* extractor role: produce the fully-signed tx; returns NULL if any input lacks final_script_sig */
+dogecoin_tx*   dogecoin_psbt_extract(const dogecoin_psbt* psbt);
+
+/* validation helpers */
+dogecoin_bool  dogecoin_psbt_is_valid(const dogecoin_psbt* psbt);
+dogecoin_bool  dogecoin_psbt_is_finalized(const dogecoin_psbt* psbt);
 
 /* Post-Quantum Cryptography (PQC) API: PQC carrier helpers and Falcon-512 /
    Dilithium2 (USE_LIBOQS) / Raccoon-G-44 (USE_RACCOON_G) signature schemes. */

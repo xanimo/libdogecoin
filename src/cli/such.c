@@ -71,6 +71,7 @@
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
 #include <dogecoin/pqc_carrier.h>
+#include <dogecoin/psbt.h>
 #ifdef USE_RACCOON_G
 #include <dogecoin/pqc_raccoon.h>
 #endif
@@ -802,6 +803,14 @@ static void print_usage()
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
         printf("set_scriptsig (-x <raw hex tx> -i <input index> -s <scriptSig hex>),\n");
         printf("pqc_chunk_hex (-x <hex_payload> [-h <max_chunk_bytes, default 520>]),\n");
+    printf("psbt_create (-x <unsigned_tx_hex>),\n");
+    printf("psbt_decode (-x <psbt_hex>),\n");
+    printf("psbt_set_utxo (-x <psbt_hex> -i <input_index> -s <utxo_tx_hex>),\n");
+    printf("psbt_set_redeemscript (-x <psbt_hex> -i <input_index> -s <redeem_script_hex>),\n");
+    printf("psbt_set_sighash (-x <psbt_hex> -i <input_index> -h <sighash_type>),\n");
+    printf("psbt_sign (-x <psbt_hex> -p <wif_privkey>),\n");
+    printf("psbt_finalize (-x <psbt_hex>),\n");
+    printf("psbt_extract (-x <psbt_hex>),\n");
 #ifdef USE_LIBOQS
     printf("tx_sighash32 (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>),\n");
     printf("pqc_carrier_redeemscript,\n");
@@ -3511,6 +3520,197 @@ int main(int argc, char* argv[])
         dogecoin_tx_free(tx);
     }
 #endif
+    else if (strcmp(cmd, "psbt_create") == 0) {
+        // ./such -c psbt_create -x <unsigned_tx_hex>
+        if (!txhex)
+            return showError("Missing unsigned tx hex (use -x)\n");
+        if (strlen(txhex) % 2 != 0 || strlen(txhex) > 1024 * 100)
+            return showError("Invalid tx hex\n");
+        size_t bin_len = strlen(txhex) / 2;
+        uint8_t* bin = dogecoin_malloc(bin_len + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, bin, strlen(txhex), &outlen);
+        dogecoin_tx* tx = dogecoin_tx_new();
+        if (!dogecoin_tx_deserialize(bin, outlen, tx, NULL)) {
+            dogecoin_free(bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(bin);
+        dogecoin_psbt* psbt = dogecoin_psbt_create(tx);
+        dogecoin_tx_free(tx);
+        if (!psbt)
+            return showError("psbt_create failed: inputs must have empty scriptSigs\n");
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex);
+        dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_decode") == 0) {
+        // ./such -c psbt_decode -x <psbt_hex>
+        if (!txhex)
+            return showError("Missing PSBT hex (use -x)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        size_t n_in  = psbt->num_inputs;
+        size_t n_out = psbt->num_outputs;
+        printf("psbt_version: %u\n", (unsigned)psbt->version);
+        printf("psbt_inputs: %zu\n",  n_in);
+        printf("psbt_outputs: %zu\n", n_out);
+        printf("psbt_valid: %s\n",     dogecoin_psbt_is_valid(psbt)     ? "true" : "false");
+        printf("psbt_finalized: %s\n", dogecoin_psbt_is_finalized(psbt) ? "true" : "false");
+        for (size_t i = 0; i < n_in; i++) {
+            printf("input[%zu].has_utxo: %s\n", i,
+                psbt->inputs[i].non_witness_utxo ? "true" : "false");
+            printf("input[%zu].partial_sigs: %zu\n", i, psbt->inputs[i].num_partial_sigs);
+            printf("input[%zu].finalized: %s\n", i,
+                psbt->inputs[i].final_script_sig ? "true" : "false");
+        }
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_sign") == 0) {
+        // ./such -c psbt_sign -x <psbt_hex> -p <wif_privkey>
+        if (!txhex || !pkey)
+            return showError("Missing PSBT hex (-x) or private key (-p)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        dogecoin_key key;
+        dogecoin_privkey_init(&key);
+        if (!dogecoin_privkey_decode_wif(pkey, chain, &key)) {
+            dogecoin_psbt_free(psbt);
+            return showError("Invalid WIF private key\n");
+        }
+        dogecoin_bool signed_any = dogecoin_psbt_sign(psbt, &key);
+        dogecoin_privkey_cleanse(&key);
+        if (!signed_any) {
+            dogecoin_psbt_free(psbt);
+            return showError("No inputs signed (missing UTXO or key mismatch)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex);
+        dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_finalize") == 0) {
+        // ./such -c psbt_finalize -x <psbt_hex>
+        if (!txhex)
+            return showError("Missing PSBT hex (use -x)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        if (!dogecoin_psbt_finalize(psbt)) {
+            dogecoin_psbt_free(psbt);
+            return showError("Finalization failed (inputs may lack partial signatures)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex);
+        dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_extract") == 0) {
+        // ./such -c psbt_extract -x <psbt_hex>
+        if (!txhex)
+            return showError("Missing PSBT hex (use -x)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        dogecoin_tx* tx = dogecoin_psbt_extract(psbt);
+        dogecoin_psbt_free(psbt);
+        if (!tx)
+            return showError("Extraction failed: PSBT is not fully finalized\n");
+        cstring* raw = cstr_new_sz(1024);
+        dogecoin_tx_serialize(raw, tx);
+        char* txhex_out = dogecoin_malloc(raw->len * 2 + 1);
+        utils_bin_to_hex((unsigned char*)raw->str, raw->len, txhex_out);
+        printf("tx_hex: %s\n", txhex_out);
+        dogecoin_free(txhex_out);
+        cstr_free(raw, true);
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "psbt_set_utxo") == 0) {
+        // ./such -c psbt_set_utxo -x <psbt_hex> -i <input_index> -s <utxo_tx_hex>
+        if (!txhex || !scripthex)
+            return showError("Missing PSBT hex (-x) or UTXO tx hex (-s)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        size_t utxo_bin_len = strlen(scripthex) / 2;
+        uint8_t* utxo_bin = dogecoin_uint8_vla(utxo_bin_len);
+        size_t utxo_outlen = 0;
+        utils_hex_to_bin(scripthex, utxo_bin, strlen(scripthex), &utxo_outlen);
+        dogecoin_tx* utxo = dogecoin_tx_new();
+        size_t consumed = 0;
+        if (!dogecoin_tx_deserialize(utxo_bin, utxo_outlen, utxo, &consumed)) {
+            dogecoin_tx_free(utxo); dogecoin_free(utxo_bin); dogecoin_psbt_free(psbt);
+            return showError("Invalid UTXO transaction hex\n");
+        }
+        dogecoin_bool ok = dogecoin_psbt_input_set_utxo(psbt, inputindex, utxo);
+        dogecoin_tx_free(utxo); dogecoin_free(utxo_bin);
+        if (!ok) {
+            dogecoin_psbt_free(psbt);
+            return showError("Failed to set UTXO (index out of range?)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex); dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_set_redeemscript") == 0) {
+        // ./such -c psbt_set_redeemscript -x <psbt_hex> -i <input_index> -s <redeem_script_hex>
+        if (!txhex || !scripthex)
+            return showError("Missing PSBT hex (-x) or redeem script hex (-s)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        size_t rs_bin_len = strlen(scripthex) / 2;
+        uint8_t* rs_bin = dogecoin_uint8_vla(rs_bin_len);
+        size_t rs_outlen = 0;
+        utils_hex_to_bin(scripthex, rs_bin, strlen(scripthex), &rs_outlen);
+        dogecoin_bool ok = dogecoin_psbt_input_set_redeemscript(psbt, inputindex, rs_bin, rs_outlen);
+        dogecoin_free(rs_bin);
+        if (!ok) {
+            dogecoin_psbt_free(psbt);
+            return showError("Failed to set redeem script (index out of range?)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex); dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
+    else if (strcmp(cmd, "psbt_set_sighash") == 0) {
+        // ./such -c psbt_set_sighash -x <psbt_hex> -i <input_index> -h <sighash_type>
+        if (!txhex)
+            return showError("Missing PSBT hex (use -x)\n");
+        dogecoin_psbt* psbt = NULL;
+        if (!dogecoin_psbt_from_hex(txhex, &psbt))
+            return showError("Invalid PSBT hex\n");
+        dogecoin_bool ok = dogecoin_psbt_input_set_sighash(psbt, inputindex, (uint32_t)sighashtype);
+        if (!ok) {
+            dogecoin_psbt_free(psbt);
+            return showError("Failed to set sighash type (index out of range?)\n");
+        }
+        char* hex = dogecoin_psbt_to_hex(psbt);
+        char* b64 = dogecoin_psbt_to_base64(psbt);
+        printf("psbt_hex: %s\n", hex);
+        printf("psbt_base64: %s\n", b64);
+        dogecoin_free(hex); dogecoin_free(b64);
+        dogecoin_psbt_free(psbt);
+    }
     else {
         print_usage();
         return showError("Unknown command\n");

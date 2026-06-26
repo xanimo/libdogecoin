@@ -1200,6 +1200,145 @@ int main() {
 
 
 
+	// PSBT (BIP174) EXAMPLE
+	printf("\n\nBEGIN PSBT (BIP174) EXAMPLE:\n\n");
+	{
+		// 1. Generate a fresh EC keypair that will act as the signer.
+		dogecoin_key psbt_priv;
+		dogecoin_privkey_init(&psbt_priv);
+		if (!dogecoin_privkey_gen(&psbt_priv)) {
+			printf("Error: psbt privkey_gen failed.\n");
+			return -1;
+		}
+		dogecoin_pubkey psbt_pub;
+		dogecoin_pubkey_init(&psbt_pub);
+		psbt_pub.compressed = true;
+		dogecoin_pubkey_from_key(&psbt_priv, &psbt_pub);
+		char psbt_addr[P2PKHLEN];
+		dogecoin_pubkey_getaddr_p2pkh(&psbt_pub, &dogecoin_chainparams_main, psbt_addr);
+		printf("Signer address: %s\n", psbt_addr);
+
+		// 2. Build the "previous tx" (the UTXO being spent):
+		//    a single P2PKH output of 10 DOGE to the signer address.
+		dogecoin_tx* psbt_prev_tx = dogecoin_tx_new();
+		dogecoin_tx_add_address_out(psbt_prev_tx, &dogecoin_chainparams_main, 1000000000LL, psbt_addr);
+
+		// 3. Build an unsigned spending tx via the transaction builder.
+		//    vout=0 makes the input reference prev_tx output at index 0.
+		const char* psbt_dest = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
+		const char* psbt_dummy_txid = "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074";
+		int psbt_tix = start_transaction();
+		add_utxo(psbt_tix, psbt_dummy_txid, 0);
+		add_output(psbt_tix, psbt_dest, "9.9");
+		char* psbt_unsigned_hex = finalize_transaction(psbt_tix, psbt_dest, "0.1", "10", psbt_addr);
+		if (!psbt_unsigned_hex) {
+			printf("Error: finalize_transaction failed for PSBT example.\n");
+			dogecoin_tx_free(psbt_prev_tx);
+			dogecoin_pubkey_cleanse(&psbt_pub);
+			dogecoin_privkey_cleanse(&psbt_priv);
+			remove_all();
+			return -1;
+		}
+
+		// 4. Deserialize the unsigned hex into a dogecoin_tx object.
+		size_t psbt_hlen = strlen(psbt_unsigned_hex);
+		unsigned char* psbt_ubuf = dogecoin_uchar_vla(psbt_hlen / 2 + 1);
+		size_t psbt_ulen = 0;
+		utils_hex_to_bin(psbt_unsigned_hex, psbt_ubuf, psbt_hlen, &psbt_ulen);
+		dogecoin_tx* psbt_spend_tx = dogecoin_tx_new();
+		dogecoin_tx_deserialize(psbt_ubuf, psbt_ulen, psbt_spend_tx, NULL);
+		dogecoin_free(psbt_ubuf);
+		remove_all();
+
+		// 5. Creator role: wrap the unsigned tx in a PSBT.
+		dogecoin_psbt* psbt = dogecoin_psbt_create(psbt_spend_tx);
+		dogecoin_tx_free(psbt_spend_tx);
+		if (!psbt) {
+			printf("Error: dogecoin_psbt_create failed.\n");
+			dogecoin_tx_free(psbt_prev_tx);
+			dogecoin_pubkey_cleanse(&psbt_pub);
+			dogecoin_privkey_cleanse(&psbt_priv);
+			return -1;
+		}
+		printf("PSBT created (BIP174 creator role).\n");
+
+		// 6. Serialize to hex and base64 for transport / storage.
+		char* psbt_hex = dogecoin_psbt_to_hex(psbt);
+		char* psbt_b64 = dogecoin_psbt_to_base64(psbt);
+		printf("PSBT hex    (%zu chars): %s\n", strlen(psbt_hex), psbt_hex);
+		printf("PSBT base64 (%zu chars): %s\n", strlen(psbt_b64), psbt_b64);
+
+		// 7. Round-trip: deserialize from hex and verify the re-serialized output matches.
+		dogecoin_psbt* psbt_rt = NULL;
+		if (!dogecoin_psbt_from_hex(psbt_hex, &psbt_rt)) {
+			printf("Error: psbt hex round-trip deserialize failed.\n");
+			dogecoin_free(psbt_hex); dogecoin_free(psbt_b64);
+			dogecoin_psbt_free(psbt);
+			dogecoin_tx_free(psbt_prev_tx);
+			dogecoin_pubkey_cleanse(&psbt_pub); dogecoin_privkey_cleanse(&psbt_priv);
+			return -1;
+		}
+		char* psbt_rt_hex = dogecoin_psbt_to_hex(psbt_rt);
+		if (strcmp(psbt_hex, psbt_rt_hex) != 0) {
+			printf("Error: PSBT hex round-trip mismatch.\n");
+			dogecoin_free(psbt_hex); dogecoin_free(psbt_b64); dogecoin_free(psbt_rt_hex);
+			dogecoin_psbt_free(psbt); dogecoin_psbt_free(psbt_rt);
+			dogecoin_tx_free(psbt_prev_tx);
+			dogecoin_pubkey_cleanse(&psbt_pub); dogecoin_privkey_cleanse(&psbt_priv);
+			return -1;
+		}
+		printf("PSBT hex round-trip OK.\n");
+		dogecoin_free(psbt_rt_hex);
+		dogecoin_psbt_free(psbt_rt);
+		dogecoin_free(psbt_hex);
+		dogecoin_free(psbt_b64);
+
+		// 8. Updater role: attach the full previous tx so the signer can derive the
+		//    sighash and verify the P2PKH scriptPubKey.
+		dogecoin_psbt_input_set_utxo(psbt, 0, psbt_prev_tx);
+		dogecoin_tx_free(psbt_prev_tx);
+		printf("PSBT updater: UTXO attached to input 0.\n");
+
+		// 9. Signer role: add partial signatures for all inputs we can sign.
+		if (!dogecoin_psbt_sign(psbt, &psbt_priv)) {
+			printf("Error: dogecoin_psbt_sign failed.\n");
+			dogecoin_psbt_free(psbt);
+			dogecoin_pubkey_cleanse(&psbt_pub); dogecoin_privkey_cleanse(&psbt_priv);
+			return -1;
+		}
+		printf("PSBT signer: input 0 signed.\n");
+
+		// 10. Finalizer role: build final_script_sig for each signed input.
+		if (!dogecoin_psbt_finalize(psbt)) {
+			printf("Error: dogecoin_psbt_finalize failed.\n");
+			dogecoin_psbt_free(psbt);
+			dogecoin_pubkey_cleanse(&psbt_pub); dogecoin_privkey_cleanse(&psbt_priv);
+			return -1;
+		}
+		printf("PSBT finalizer: all inputs finalized.\n");
+
+		// 11. Extractor role: produce the fully-signed transaction.
+		dogecoin_tx* psbt_signed = dogecoin_psbt_extract(psbt);
+		if (!psbt_signed) {
+			printf("Error: dogecoin_psbt_extract failed.\n");
+			dogecoin_psbt_free(psbt);
+			dogecoin_pubkey_cleanse(&psbt_pub); dogecoin_privkey_cleanse(&psbt_priv);
+			return -1;
+		}
+		uint256_t psbt_txhash;
+		dogecoin_tx_hash(psbt_signed, psbt_txhash);
+		char psbt_txhash_hex[65];
+		utils_bin_to_hex(psbt_txhash, 32, psbt_txhash_hex);
+		printf("Extracted signed tx hash: %s\n", psbt_txhash_hex);
+		dogecoin_tx_free(psbt_signed);
+		dogecoin_psbt_free(psbt);
+		dogecoin_pubkey_cleanse(&psbt_pub);
+		dogecoin_privkey_cleanse(&psbt_priv);
+		printf("PSBT example complete.\n");
+	}
+	// END ===========================================
+
+
 	printf("\nTESTS COMPLETE!\n");
 	dogecoin_ecc_stop();
 }
