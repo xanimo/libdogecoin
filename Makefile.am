@@ -466,5 +466,12 @@ fuzz_fuzz_tx_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_tx_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_tx_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
 
-fuzz: fuzz/fuzz_tx
+noinst_PROGRAMS += fuzz/fuzz_block
+fuzz_fuzz_block_SOURCES = fuzz/fuzz_block.c
+fuzz_fuzz_block_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_block_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_block_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_block_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+fuzz: fuzz/fuzz_tx fuzz/fuzz_block
 endif
