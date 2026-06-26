@@ -139,6 +139,7 @@ enum dogecoin_tx_sign_result {
     DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE = -5,
     DOGECOIN_SIGN_INVALID_TX_OR_SCRIPT = -6,
     DOGECOIN_SIGN_INPUTINDEX_OUT_OF_RANGE = -7,
+    DOGECOIN_SIGN_INVALID_DER = -8,   // der serialization failed or exceeded the max low-s length
     DOGECOIN_SIGN_OK = 1,
 };
 const char* dogecoin_tx_sign_result_to_str(const enum dogecoin_tx_sign_result result);

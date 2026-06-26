@@ -1174,6 +1174,8 @@ const char* dogecoin_tx_sign_result_to_str(const enum dogecoin_tx_sign_result re
         return "SIGN_UNKNOWN_SCRIPT_TYPE";
     } else if (result == DOGECOIN_SIGN_SIGHASH_FAILED) {
         return "SIGHASH_FAILED";
+    } else if (result == DOGECOIN_SIGN_INVALID_DER) {
+        return "INVALID_DER";
     }
     return "UNKOWN";
 }
@@ -1256,12 +1258,23 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 
     // form normalized DER signature & hashtype
     unsigned char sigder_plus_hashtype[74 + 1];
-    size_t sigderlen = 75;
-    dogecoin_ecc_compact_to_der_normalized(sig, sigder_plus_hashtype, &sigderlen);
-    assert(sigderlen <= 74 && sigderlen >= 70);
+    size_t sigderlen = sizeof(sigder_plus_hashtype) - 1; // capacity hint, reserving 1 byte for hashtype
+    /* A low-S normalized secp256k1 DER signature is at most 72 bytes:
+     * 6 bytes of structure (seq hdr, two int hdrs) + r (<=33, may carry a
+     * sign-pad byte) + s (<=32, low-S guarantees the top byte is <=0x7f so s
+     * never sign-pads). There is no safe lower bound: r and/or s can be small
+     * (a leading zero byte stripped from the minimal encoding), so a valid
+     * signature can be much shorter - r=1,s=1 encodes to just 8 bytes. Only
+     * reject empty or oversized output, which means the encoder misbehaved or
+     * would overflow the buffer. Use a runtime check rather than assert(),
+     * which compiles out under NDEBUG exactly where a wallet needs the guard. */
+    if (!dogecoin_ecc_compact_to_der_normalized(sig, sigder_plus_hashtype, &sigderlen)
+            || sigderlen == 0 || sigderlen > 72) {
+        return DOGECOIN_SIGN_INVALID_DER;
+    }
     sigder_plus_hashtype[sigderlen] = sighashtype;
     sigderlen += 1; //+hashtype
-    if (sigcompact_out) {
+    if (sigder_out) {
         memcpy_safe(sigder_out, sigder_plus_hashtype, sigderlen);
     }
     if (sigder_len_out) {
