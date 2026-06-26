@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I build-aux/m4
 AUTOMAKE_OPTIONS = serial-tests
-.PHONY: gen
+.PHONY: gen fuzz
 .INTERMEDIATE: $(GENBIN)
 
 DIST_SUBDIRS = src/secp256k1
@@ -484,3 +484,14 @@ endif
 endif
 
 libdogecoin_la_LDFLAGS = -no-undefined -version-info $(LIB_VERSION_CURRENT):$(LIB_VERSION_REVISION):$(LIB_VERSION_AGE)
+
+if USE_FUZZ
+noinst_PROGRAMS += fuzz/fuzz_tx
+fuzz_fuzz_tx_SOURCES = fuzz/fuzz_tx.c
+fuzz_fuzz_tx_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_tx_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_tx_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_tx_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+fuzz: fuzz/fuzz_tx
+endif
