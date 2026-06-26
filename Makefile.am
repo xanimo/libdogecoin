@@ -472,12 +472,19 @@ fuzz_fuzz_block_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
 fuzz_fuzz_block_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_block_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_block_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+# fuzz_protocol drives p2p message deserializers from protocol.c, which is
+# only compiled into the library under WITH_NET (and pulls in libevent).
+# Gate the harness on the same condition so `make fuzz` still builds the
+# net-independent targets when networking is disabled.
+if WITH_NET
 noinst_PROGRAMS += fuzz/fuzz_protocol
 fuzz_fuzz_protocol_SOURCES = fuzz/fuzz_protocol.c
 fuzz_fuzz_protocol_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
 fuzz_fuzz_protocol_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_protocol_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_protocol_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+endif
 
 noinst_PROGRAMS += fuzz/fuzz_wtx
 fuzz_fuzz_wtx_SOURCES = fuzz/fuzz_wtx.c
@@ -493,5 +500,10 @@ fuzz_fuzz_logdb_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_logdb_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_logdb_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
 
-fuzz: fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_protocol fuzz/fuzz_wtx fuzz/fuzz_logdb
+FUZZ_TARGETS = fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_wtx fuzz/fuzz_logdb
+if WITH_NET
+FUZZ_TARGETS += fuzz/fuzz_protocol
+endif
+
+fuzz: $(FUZZ_TARGETS)
 endif
