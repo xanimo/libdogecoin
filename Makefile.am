@@ -500,6 +500,21 @@ fuzz_fuzz_logdb_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_logdb_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_logdb_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
 
+# Corpus seed generator for fuzz_logdb. NOT a libFuzzer target: it links
+# the plain (uninstrumented) library and emits checksum-valid single
+# records so the fuzzer can mutate past the per-record SHA256 gate.
+noinst_PROGRAMS += fuzz/seed_logdb_corpus
+fuzz_seed_logdb_corpus_SOURCES = fuzz/seed_logdb_corpus.c
+fuzz_seed_logdb_corpus_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
+fuzz_seed_logdb_corpus_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+
+# Generate a starter corpus: make fuzz-corpus CORPUS=path (default ./corpus_logdb)
+CORPUS ?= corpus_logdb
+fuzz-corpus: fuzz/seed_logdb_corpus
+	$(MKDIR_P) $(CORPUS)
+	./fuzz/seed_logdb_corpus $(CORPUS)
+
+
 FUZZ_TARGETS = fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_wtx fuzz/fuzz_logdb
 if WITH_NET
 FUZZ_TARGETS += fuzz/fuzz_protocol
