@@ -322,28 +322,31 @@ void print_block(dogecoin_auxpow_block* block) {
  */
 int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, arith_uint256* chainwork) {
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
+    int ret = false;
     if (!deser_s32(&block->header->version, buf))
-        return false;
+        goto cleanup;
     if (!deser_u256(block->header->prev_block, buf))
-        return false;
+        goto cleanup;
     if (!deser_u256(block->header->merkle_root, buf))
-        return false;
+        goto cleanup;
     if (!deser_u32(&block->header->timestamp, buf))
-        return false;
+        goto cleanup;
     if (!deser_u32(&block->header->bits, buf))
-        return false;
+        goto cleanup;
     if (!deser_u32(&block->header->nonce, buf))
-        return false;
+        goto cleanup;
     dogecoin_block_header_copy(header, block->header);
     if ((block->header->version & 0x100) != 0 && buf->len) {
         if (!deserialize_dogecoin_auxpow_block(block, buf, params, chainwork)) {
             printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
-            return false;
+            goto cleanup;
         }
         dogecoin_block_header_copy(header, block->header);
     }
+    ret = true;
+cleanup:
     dogecoin_auxpow_block_free(block);
-    return true;
+    return ret;
     }
 
 int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, arith_uint256* chainwork) {
