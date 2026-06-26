@@ -233,6 +233,11 @@ AC_ARG_ENABLE(tests,
   [use_tests=$enableval],
   [use_tests=yes])
 
+AC_ARG_ENABLE(fuzz,
+  AS_HELP_STRING([--enable-fuzz],[build libFuzzer harnesses, requires clang (default is no)]),
+  [use_fuzz=$enableval],
+  [use_fuzz=no])
+
 AC_MSG_CHECKING([for __builtin_expect])
 AC_COMPILE_IFELSE([AC_LANG_SOURCE([[void myfunc() {__builtin_expect(0,0);}]])],
   [ AC_MSG_RESULT([yes]);AC_DEFINE(HAVE_BUILTIN_EXPECT,1,[Define this symbol if __builtin_expect is available]) ],
@@ -490,6 +495,7 @@ if test x$use_intel_avx2 = xyes || test x$use_intel_sse = xyes; then
 fi
 AC_SUBST([NASM])
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
+AM_CONDITIONAL([USE_FUZZ], [test x"$use_fuzz" = x"yes"])
 AM_CONDITIONAL([WITH_BENCH], [test "x$with_bench" = "xyes"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
