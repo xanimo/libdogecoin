@@ -1286,7 +1286,7 @@ jobs:
           # getheaders locator vector) from aborting CI as raw OOM.
           RUNS=20000
           COMMON="-runs=$RUNS -max_len=8192 -rss_limit_mb=2048 -malloc_limit_mb=1024"
-          for t in fuzz_tx fuzz_block fuzz_wtx fuzz_logdb fuzz_protocol; do
+          for t in fuzz_tx fuzz_block fuzz_wtx fuzz_logdb fuzz_psbt fuzz_protocol; do
             if [ -x "fuzz/$t" ]; then
               echo "::group::$t"
               ./fuzz/$t $COMMON
@@ -1301,4 +1301,25 @@ jobs:
           mkdir -p corpus_logdb
           ./fuzz/seed_logdb_corpus corpus_logdb
           ./fuzz/fuzz_logdb corpus_logdb -runs=20000 -max_len=8192 -rss_limit_mb=2048
+        shell: bash
+
+      - name: replay checked-in regression corpus
+        run: |
+          # Deterministic regression gate. Replays every committed seed under
+          # test/fuzz_corpus/<target>/ exactly once (-runs=0, no mutation) so a
+          # change that reintroduces a fixed bug fails here on the exact input
+          # that originally reproduced it. New seeds are added by committing the
+          # crashing/OOM input the fuzzer wrote during triage.
+          status=0
+          for dir in test/fuzz_corpus/*/; do
+            t="fuzz_$(basename "$dir")"
+            if [ -x "fuzz/$t" ] && [ -n "$(ls -A "$dir" 2>/dev/null)" ]; then
+              echo "::group::replay $t ($(ls -1 "$dir" | wc -l) seeds)"
+              # -runs=0 executes each corpus file once and exits; any crash,
+              # leak, or OOM on a committed seed fails the job.
+              ./fuzz/$t "$dir" -runs=0 -rss_limit_mb=2048 -malloc_limit_mb=1024 || status=1
+              echo "::endgroup::"
+            fi
+          done
+          exit $status
         shell: bash
