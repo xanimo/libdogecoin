@@ -439,6 +439,7 @@ static void cfh_par_finish(dogecoin_spv_client *client, dogecoin_node *node)
      * in a prior run before these watched scripts were registered. */
     spv_rescan_cached_cfilters(client, cf_scan_start);
 
+    cfstate->cf_scan_start_height = cf_scan_start;
     if (client->cf_num_workers > 1) {
         cfstate->par_num_workers  = client->cf_num_workers;
         cfstate->par_next_height  = cf_scan_start;
@@ -771,11 +772,18 @@ static void spv_cf_par_try_flush(dogecoin_spv_client *client)
     } while (flushed);
 
     if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height) {
-        if (client->nodegroup && client->nodegroup->log_write_cb)
+        if (client->nodegroup && client->nodegroup->log_write_cb) {
+            uint32_t scan_start = cfstate->cf_scan_start_height > 0 ? cfstate->cf_scan_start_height : 1;
             client->nodegroup->log_write_cb(
-                "[bip157] all filters processed: scanned heights 1..%u (of %u), %u matched blocks [%us elapsed]\n",
-                cfstate->filters_tip_height, cfstate->cfheaders_tip_height,
+                "[bip157] all filters processed: scanned heights %u..%u (of %u), %u matched blocks [%us elapsed]\n",
+                scan_start, cfstate->filters_tip_height, cfstate->cfheaders_tip_height,
                 (unsigned int)cfstate->matched_block_hashes->len, spv_elapsed(client));
+            if (scan_start > 1)
+                client->nodegroup->log_write_cb(
+                    "[bip157] WARNING: scan started at height %u (checkpoint), not genesis — "
+                    "transactions before height %u are not covered; use --filter_hash_db for full history\n",
+                    scan_start, scan_start);
+        }
         cfstate->awaiting_response = false;
         client->stateflags &= ~SPV_CFILTER_SYNC_FLAG;
         if (cfstate->matched_block_hashes->len > 0) {
@@ -3323,11 +3331,19 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 dogecoin_blockindex *cf_tip =
                                     client->headers_db->getchaintip(client->headers_db_ctx);
                                 if (cfstate->filters_tip_height >= cfstate->cfheaders_tip_height) {
-                                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                                    if (client->nodegroup && client->nodegroup->log_write_cb) {
+                                        uint32_t scan_start = cfstate->cf_scan_start_height > 0 ? cfstate->cf_scan_start_height : 1;
                                         client->nodegroup->log_write_cb(
-                                            "[bip157] all filters processed: %u matched blocks [%us elapsed]\n",
+                                            "[bip157] all filters processed: scanned heights %u..%u, %u matched blocks [%us elapsed]\n",
+                                            scan_start, cfstate->filters_tip_height,
                                             (unsigned int)cfstate->matched_block_hashes->len,
                                             spv_elapsed(client));
+                                        if (scan_start > 1)
+                                            client->nodegroup->log_write_cb(
+                                                "[bip157] WARNING: scan started at height %u (checkpoint), not genesis — "
+                                                "transactions before height %u are not covered; use --filter_hash_db for full history\n",
+                                                scan_start, scan_start);
+                                    }
                                     cfstate->awaiting_response = false;
                                     client->stateflags &= ~SPV_CFILTER_SYNC_FLAG;
                                     if (cfstate->matched_block_hashes->len > 0) {
@@ -3637,6 +3653,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 cf_scan_start,
                                 (unsigned int)(client->cf_num_workers > 1 ? client->cf_num_workers : 1),
                                 spv_elapsed(client));
+                        cfstate->cf_scan_start_height = cf_scan_start;
                         cfstate->awaiting_response = false;
                         if (client->cf_num_workers > 1) {
                             cfstate->par_num_workers   = client->cf_num_workers;
