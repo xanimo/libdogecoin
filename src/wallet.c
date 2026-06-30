@@ -1898,6 +1898,7 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
         uint256_t blockhash;
         dogecoin_block_header_hash(&pindex->header, blockhash);
         printf("Found new relevant transaction: %s (height: %u)\n", txid_hex, pindex->height);
+        fflush(stdout);
         dogecoin_hash_set(wtx->blockhash, blockhash);
         wtx->height = pindex->height;
         dogecoin_tx_copy(wtx->tx, tx);

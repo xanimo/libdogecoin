@@ -89,6 +89,7 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t 
  */
 dogecoin_bool dogecoin_headers_db_open_for_scan(dogecoin_headers_db *db, const char *filename);
 dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *db, uint32_t target_height, uint256_t hash_out);
+dogecoin_bool dogecoin_headers_db_get_block_hash_at_height_seq(dogecoin_headers_db *db, uint32_t target_height, uint256_t hash_out);
 
 /* Defined in headersdb_file.c using typed trampolines (avoids the
  * function-pointer-cast UB that -fsanitize=function flags). */

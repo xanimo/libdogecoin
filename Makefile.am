@@ -182,37 +182,37 @@ CLEANFILES =
 %.a: %.o
 	$(AR) $(ARFLAGS) $@ $<
 
+NASM_INCLUDE = src/intel/
+ASM_LIB_FILES =
+
 if USE_AVX2
-DIR_ASM_SOURCE = src/intel/avx_t1
-DIR_ASM_INCLUDE = src/intel/
+AVX_SOURCE_FILES = $(wildcard src/intel/avx_t1/*.asm)
+AVX_OBJECT_FILES = $(AVX_SOURCE_FILES:.asm=.o)
+AVX_LIB_FILES    = $(AVX_SOURCE_FILES:.asm=.a)
+ASM_LIB_FILES   += $(AVX_LIB_FILES)
+libdogecoin_la_DEPENDENCIES = $(AVX_LIB_FILES)
+CLEANFILES = $(AVX_OBJECT_FILES)
 
-ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
-ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
-ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
+src/intel/avx_t1/%.o: src/intel/avx_t1/%.asm
+	$(NASM) $(NASMFLAGS) -I$(NASM_INCLUDE) -o $@ $<
 
-libdogecoin_la_DEPENDENCIES += $(ASM_LIB_FILES)
-
-CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
+src/intel/avx_t1/%.a: src/intel/avx_t1/%.o
+	$(AR) $(ARFLAGS) $@ $<
 endif
 
 if USE_SSE
-if !USE_AVX2
-# SSE only when AVX2 is off: src/sha2.c's C preprocessor path checks USE_AVX2
-# first, then USE_SSE. If both --enable-intel-avx2 and --enable-intel-sse are
-# specified, AVX2 takes precedence; building SSE asm alongside AVX2-defined C
-# would produce a library whose internal calls don't match the assembled symbols.
-# In that case, only AVX2 assembly is built and linked into the library.
-DIR_ASM_SOURCE = src/intel/sse_t1
-DIR_ASM_INCLUDE = src/intel/
+SSE_SOURCE_FILES = $(wildcard src/intel/sse_t1/*.asm)
+SSE_OBJECT_FILES = $(SSE_SOURCE_FILES:.asm=.o)
+SSE_LIB_FILES    = $(SSE_SOURCE_FILES:.asm=.a)
+ASM_LIB_FILES   += $(SSE_LIB_FILES)
+libdogecoin_la_DEPENDENCIES = $(SSE_LIB_FILES)
+CLEANFILES = $(SSE_OBJECT_FILES) $(SSE_LIB_FILES)
 
-ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
-ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
-ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
+src/intel/sse_t1/%.o: src/intel/sse_t1/%.asm
+	$(NASM) $(NASMFLAGS) -I$(NASM_INCLUDE) -o $@ $<
 
-libdogecoin_la_DEPENDENCIES += $(ASM_LIB_FILES)
-
-CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
-endif
+src/intel/sse_t1/%.a: src/intel/sse_t1/%.o
+	$(AR) $(ARFLAGS) $@ $<
 endif
 
 if USE_AVX2
@@ -400,23 +400,27 @@ endif
 
 if WITH_NET
 noinst_HEADERS += \
+    include/dogecoin/cfheadersdb_file.h \
     include/dogecoin/headersdb.h \
     include/dogecoin/headersdb_file.h \
     include/dogecoin/protocol.h \
     include/dogecoin/bloom.h \
     include/dogecoin/compact_block.h \
     include/dogecoin/compact_filter.h \
+    include/dogecoin/filter_bootstrap.h \
     include/dogecoin/golomb.h \
     include/dogecoin/net.h \
     include/dogecoin/rest.h \
     include/dogecoin/spv.h
 
 libdogecoin_la_SOURCES += \
+    src/cfheadersdb_file.c \
     src/headersdb_file.c \
     src/bip37.c \
     src/bloom.c \
     src/compact_block.c \
     src/compact_filter.c \
+    src/filter_bootstrap.c \
     src/golomb.c \
     src/net.c \
     src/protocol.c \

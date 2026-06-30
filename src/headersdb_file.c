@@ -675,6 +675,52 @@ dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *
     return found;
 }
 
+/* Sequential variant used during the cfilter rescan: like
+ * dogecoin_headers_db_get_block_hash_at_height but never restores the file
+ * position.  The caller (spv_rescan_cb) visits heights in strictly ascending
+ * order so the file pointer advances forward only, keeping I/O O(N) instead
+ * of O(N²) that the save/restore pattern would produce. */
+dogecoin_bool dogecoin_headers_db_get_block_hash_at_height_seq(dogecoin_headers_db *db, uint32_t target_height, uint256_t hash_out)
+{
+    if (!db) return false;
+
+    /* Fast path: in-memory prev chain — only useful for heights near the tip.
+     * Skip if target is more than max_hdr_in_mem below the tip to avoid
+     * walking the full 1440-entry chain 6M+ times during a bulk rescan. */
+    if (db->chaintip &&
+        (uint32_t)db->chaintip->height <= target_height + db->max_hdr_in_mem) {
+        dogecoin_blockindex *bi = db->chaintip;
+        while (bi && (uint32_t)bi->height > target_height)
+            bi = bi->prev;
+        if (bi && (uint32_t)bi->height == target_height) {
+            memcpy_safe(hash_out, bi->hash, sizeof(uint256_t));
+            return true;
+        }
+    }
+
+    if (!db->headers_tree_file) return false;
+
+    long start_pos = SPV_HEADERS_FILE_HDR_LEN;
+    if (db->scan_resume_height > 0 && target_height >= db->scan_resume_height)
+        start_pos = db->scan_resume_pos;
+
+    fseek(db->headers_tree_file, start_pos, SEEK_SET);
+
+    uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+    while (fread(rec, SPV_HEADERS_FILE_REC_LEN, 1, db->headers_tree_file) == 1) {
+        uint32_t h;
+        memcpy(&h, rec + 32, 4);
+        h = le32toh(h);
+        if (h == target_height) {
+            memcpy_safe(hash_out, rec, sizeof(uint256_t));
+            db->scan_resume_pos    = ftell(db->headers_tree_file);
+            db->scan_resume_height = h;
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * Set the checkpoint block to the given hash and height
  *

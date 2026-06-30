@@ -241,6 +241,7 @@ dogecoin_compact_filter_state* dogecoin_compact_filter_state_new(void) {
     state->last_request_time = 0;
     state->watched_scripts = vector_new(16, cstr_free_void);
     state->matched_block_hashes = vector_new(64, dogecoin_free);
+    state->matched_block_heights = vector_new(64, dogecoin_free);
     state->matched_blocks_fetched = 0;
     state->cf_block_fetch_active = false;
     state->par_num_workers = 0;
@@ -276,6 +277,10 @@ void dogecoin_compact_filter_state_free(dogecoin_compact_filter_state *state) {
     if (state->matched_block_hashes) {
         vector_free(state->matched_block_hashes, true);
         state->matched_block_hashes = NULL;
+    }
+    if (state->matched_block_heights) {
+        vector_free(state->matched_block_heights, true);
+        state->matched_block_heights = NULL;
     }
     if (state->par_bufs) {
         uint8_t pi;
@@ -333,6 +338,10 @@ void dogecoin_compact_filter_state_reset(dogecoin_compact_filter_state *state) {
     if (state->matched_block_hashes) {
         vector_free(state->matched_block_hashes, true);
         state->matched_block_hashes = vector_new(64, dogecoin_free);
+    }
+    if (state->matched_block_heights) {
+        vector_free(state->matched_block_heights, true);
+        state->matched_block_heights = vector_new(64, dogecoin_free);
     }
     state->matched_blocks_fetched = 0;
     state->cf_block_fetch_active = false;

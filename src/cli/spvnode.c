@@ -68,6 +68,7 @@
 #include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
 #include <dogecoin/seal.h>
+#include <dogecoin/filter_bootstrap.h>
 #include <dogecoin/smpv.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/protocol.h>
@@ -208,8 +209,10 @@ static struct option long_options[] = {
         {"cf_workers", required_argument, NULL, 'W'},
         {"genesis_headers", no_argument, NULL, 'H'},
         {"logfile", required_argument, NULL, 'L'},
-        {"cfheaders_path", required_argument, NULL, 257},
-        {"cfilters_path",  required_argument, NULL, 258},
+        {"cfheaders_path",   required_argument, NULL, 257},
+        {"cfilters_path",    required_argument, NULL, 258},
+        {"export_bootstrap", required_argument, NULL, 259},
+        {"bootstrap",        required_argument, NULL, 260},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -524,8 +527,10 @@ int main(int argc, char* argv[]) {
     dogecoin_bool genesis_headers = false;
     int selected_checkpoint_index = -1;
     char* logfile = NULL;
-    char* cfheaders_path = NULL;
-    char* cfilters_path  = NULL;
+    char* cfheaders_path      = NULL;
+    char* cfilters_path       = NULL;
+    char* export_bootstrap_dir = NULL;
+    char* bootstrap_manifest   = NULL;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
         print_usage();
@@ -643,11 +648,40 @@ int main(int argc, char* argv[]) {
                 case 258:
                     cfilters_path = optarg;
                     break;
+                case 259:
+                    export_bootstrap_dir = optarg;
+                    break;
+                case 260:
+                    bootstrap_manifest = optarg;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
             }
         }
+
+    if (export_bootstrap_dir) {
+        dogecoin_ecc_start();
+        dogecoin_bool ok = dogecoin_bootstrap_export(
+            cfheaders_path, cfilters_path,
+            export_bootstrap_dir, NULL, chain);
+        dogecoin_ecc_stop();
+        return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+    }
+
+    if (bootstrap_manifest) {
+        dogecoin_ecc_start();
+        dogecoin_bool ok = dogecoin_bootstrap_import(
+            bootstrap_manifest,
+            cfheaders_path, cfilters_path,
+            chain, NULL, NULL);
+        dogecoin_ecc_stop();
+        if (!ok) return EXIT_FAILURE;
+        /* If invoked as standalone "bootstrap" command, exit after import.
+         * If invoked as "bootstrap scan", fall through to sync. */
+        if (strcmp(data, "bootstrap") == 0) return EXIT_SUCCESS;
+        printf("bootstrap: import complete, starting sync\n");
+    }
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();

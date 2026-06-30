@@ -199,6 +199,7 @@ typedef struct dogecoin_compact_filter_state_ {
     uint256_t     genesis_filter_header;  /**< Filter header for genesis block (height 0); set from cfheaders.prev_filter_header on first batch */
     vector_t     *watched_scripts;        /**< ScriptPubKeys to match against filters (cstring*) */
     vector_t     *matched_block_hashes;   /**< Block hashes where filter matched (uint256_t*) */
+    vector_t     *matched_block_heights;  /**< Heights corresponding to matched_block_hashes (uint32_t*) */
     uint32_t      matched_blocks_fetched; /**< Number of matched blocks already received */
     dogecoin_bool cf_block_fetch_active;  /**< True while fetching full blocks for BIP157 matches */
 
