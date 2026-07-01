@@ -669,6 +669,7 @@ dogecoin_bool dogecoin_paper_wallet_set_wif(
 dogecoin_bool dogecoin_paper_wallet_set_hex(
     dogecoin_paper_wallet* wallet,
     const char* hex_private_key,
+    dogecoin_bool compressed,
     const dogecoin_chainparams* chain_params
 ) {
     if (!wallet || !hex_private_key || !chain_params) return false;
@@ -683,23 +684,19 @@ dogecoin_bool dogecoin_paper_wallet_set_hex(
         return false;
     }
     
-    /* Create key from private key */
-    dogecoin_key key;
-    memcpy(key.privkey, private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
-    
-    /* Get address from private key */
     dogecoin_pubkey pubkey;
-    dogecoin_pubkey_from_key(&key, &pubkey);
+    if (!sweep_pubkey_from_privkey(private_key, compressed, &pubkey)) {
+        dogecoin_mem_zero(private_key, sizeof(private_key));
+        return false;
+    }
     
     char address[P2PKHLEN];
     if (!dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain_params, address)) {
         dogecoin_mem_zero(private_key, sizeof(private_key));
-        dogecoin_privkey_cleanse(&key);
         return false;
     }
 
     dogecoin_mem_zero(private_key, sizeof(private_key));
-    dogecoin_privkey_cleanse(&key);
 
     /* Set wallet properties */
     wallet->private_key_hex = dogecoin_calloc(1, strlen(hex_private_key) + 1);
@@ -714,7 +711,7 @@ dogecoin_bool dogecoin_paper_wallet_set_hex(
     }
     strcpy(wallet->address, address);
     
-    wallet->compressed = true; /* Assume compressed for now */
+    wallet->compressed = compressed;
     wallet->is_encrypted = false;
     wallet->chain_params = chain_params;
     
@@ -827,6 +824,9 @@ dogecoin_bool dogecoin_paper_wallet_get_private_key(
     } else if (wallet->private_key_wif) {
         /* Decode WIF to get private key */
         dogecoin_key key;
+        if (!wallet->chain_params) {
+            return false;
+        }
         if (!dogecoin_privkey_decode_wif(wallet->private_key_wif, wallet->chain_params, &key)) {
             return false;
         }
@@ -883,6 +883,10 @@ dogecoin_bool dogecoin_paper_wallet_is_valid(const dogecoin_paper_wallet* wallet
     
     /* Check if we have an address */
     if (!wallet->address) return false;
+
+    if (wallet->private_key_wif && !wallet->chain_params) {
+        return false;
+    }
     
     /* Try to get private key to verify it's valid */
     uint8_t private_key[DOGECOIN_ECKEY_PKEY_LENGTH];
@@ -1276,6 +1280,7 @@ dogecoin_bool dogecoin_sweep_options_set_fee(
     uint64_t max_fee
 ) {
     if (!options) return false;
+    if (min_fee > max_fee) return false;
     
     options->fee_per_byte = fee_per_byte;
     options->min_fee = min_fee;

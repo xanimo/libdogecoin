@@ -278,13 +278,15 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_bip38_generate_intermediate_code(
     size_t* intermediate_code_size
 );
 
-/* Printer-side: create encrypted key (+ optional confirmation code) from intermediate code. */
+/*
+ * Printer-side: create encrypted key (+ optional confirmation code) from intermediate code.
+ * The printer never holds the owner's private key; there is no private_key_out parameter.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
     const char* intermediate_code,
     dogecoin_bool compressed,
     const uint8_t* seedb_override,
     const char* address_chain_hint,
-    uint8_t* private_key_out,
     char* encrypted_key_out,
     size_t* encrypted_key_size,
     char* confirmation_code_out,

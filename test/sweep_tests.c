@@ -182,7 +182,7 @@ static void test_bip38_ec_intermediate_encrypt_roundtrip(void)
 
     encrypted_sz = sizeof(encrypted);
     u_assert_true(dogecoin_bip38_encrypt_from_intermediate(
-        intermediate, false, NULL, NULL, NULL, encrypted, &encrypted_sz, NULL, NULL));
+        intermediate, false, NULL, NULL, encrypted, &encrypted_sz, NULL, NULL));
     u_assert_true(dogecoin_bip38_is_ec_multiplied(encrypted));
 
     uint8_t priv[DOGECOIN_ECKEY_PKEY_LENGTH];
@@ -400,8 +400,19 @@ static void test_paper_wallet_creation(void)
     u_assert_not_null(wallet2);
 
     const char* test_hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    result = dogecoin_paper_wallet_set_hex(wallet2, test_hex, chain);
+    result = dogecoin_paper_wallet_set_hex(wallet2, test_hex, true, chain);
     u_assert_true(result);
+
+    char compressed_addr[P2PKHLEN];
+    result = dogecoin_paper_wallet_get_address(wallet2, compressed_addr, sizeof(compressed_addr));
+    u_assert_true(result);
+
+    dogecoin_paper_wallet* wallet3 = dogecoin_paper_wallet_new();
+    u_assert_true(dogecoin_paper_wallet_set_hex(wallet3, test_hex, false, chain));
+    char uncompressed_addr[P2PKHLEN];
+    u_assert_true(dogecoin_paper_wallet_get_address(wallet3, uncompressed_addr, sizeof(uncompressed_addr)));
+    u_assert_str_not_eq(compressed_addr, uncompressed_addr);
+    dogecoin_paper_wallet_free(wallet3);
 
     result = dogecoin_paper_wallet_get_address(wallet2, address, sizeof(address));
     u_assert_true(result);
@@ -497,6 +508,8 @@ static void test_sweep_options(void)
     u_assert_uint64_eq(options->min_fee, 1000ULL);
     u_assert_uint64_eq(options->max_fee, 5000ULL);
 
+    u_assert_int_eq((int)dogecoin_sweep_options_set_fee(options, 1000, 5000, 1000), 0);
+
     dogecoin_sweep_options_set_rbf(options, true);
     u_assert_true(options->use_rbf);
 
@@ -572,7 +585,7 @@ static void test_paper_wallet_private_key_extraction(void)
     u_assert_not_null(wallet2);
 
     const char* test_hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    result = dogecoin_paper_wallet_set_hex(wallet2, test_hex, chain);
+    result = dogecoin_paper_wallet_set_hex(wallet2, test_hex, true, chain);
     u_assert_true(result);
 
     result = dogecoin_paper_wallet_get_private_key(wallet2, private_key);
@@ -609,7 +622,7 @@ static void test_paper_wallet_reuse(void)
     u_assert_true(dogecoin_paper_wallet_get_address(wallet, addr1, sizeof(addr1)));
 
     const char* test_hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    u_assert_true(dogecoin_paper_wallet_set_hex(wallet, test_hex, chain));
+    u_assert_true(dogecoin_paper_wallet_set_hex(wallet, test_hex, true, chain));
     char addr2[P2PKHLEN];
     u_assert_true(dogecoin_paper_wallet_get_address(wallet, addr2, sizeof(addr2)));
     u_assert_true(strcmp(addr1, addr2) != 0);
@@ -1005,6 +1018,19 @@ static void test_sweep_error_handling(void)
 
     u_assert_int_eq((int)dogecoin_paper_wallet_set_wif(wallet, "invalid_wif", chain), 0);
     u_assert_int_eq((int)dogecoin_paper_wallet_is_valid(wallet), 0);
+
+    {
+        const char* wif_stub = "6Kxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        const char* addr_stub = "D7Y55vD8nNtW7VnT9Xr6Qc4vB8hN3jK2mP";
+        wallet->private_key_wif = dogecoin_calloc(1, strlen(wif_stub) + 1);
+        wallet->address = dogecoin_calloc(1, strlen(addr_stub) + 1);
+        u_assert_not_null(wallet->private_key_wif);
+        u_assert_not_null(wallet->address);
+        strcpy(wallet->private_key_wif, wif_stub);
+        strcpy(wallet->address, addr_stub);
+        wallet->chain_params = NULL;
+        u_assert_int_eq((int)dogecoin_paper_wallet_is_valid(wallet), 0);
+    }
 
     dogecoin_paper_wallet_free(wallet);
 

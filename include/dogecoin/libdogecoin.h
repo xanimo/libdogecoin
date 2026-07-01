@@ -1358,7 +1358,6 @@ dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
     dogecoin_bool compressed,
     const uint8_t* seedb_override,
     const char* address_chain_hint,
-    uint8_t* private_key_out,
     char* encrypted_key_out,
     size_t* encrypted_key_size,
     char* confirmation_code_out,
@@ -1427,10 +1426,11 @@ dogecoin_bool dogecoin_paper_wallet_set_wif(
     dogecoin_paper_wallet* wallet,
     const char* wif_private_key,
     const dogecoin_chainparams* chain_params);
-/* Set paper wallet from hex private key */
+/* Set paper wallet from hex private key (compressed selects P2PKH address format) */
 dogecoin_bool dogecoin_paper_wallet_set_hex(
     dogecoin_paper_wallet* wallet,
     const char* hex_private_key,
+    dogecoin_bool compressed,
     const dogecoin_chainparams* chain_params);
 /* Set paper wallet from a BIP38 encrypted private key (Dogecoin-mainnet decrypt semantics) */
 dogecoin_bool dogecoin_paper_wallet_set_encrypted(

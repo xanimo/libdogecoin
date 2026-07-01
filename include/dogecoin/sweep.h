@@ -47,7 +47,7 @@ typedef struct dogecoin_sweep_result_ {
     char* destination_address;
 } dogecoin_sweep_result;
 
-/* Paper wallet structure */
+/* Paper wallet structure (chain_params required when using WIF). */
 typedef struct dogecoin_paper_wallet_ {
     char* private_key_wif;
     char* private_key_hex;
@@ -123,10 +123,11 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_paper_wallet_set_wif(
     const dogecoin_chainparams* chain_params
 );
 
-/* Set paper wallet from hex private key */
+/* Set paper wallet from hex private key (compressed selects P2PKH address format). */
 LIBDOGECOIN_API dogecoin_bool dogecoin_paper_wallet_set_hex(
     dogecoin_paper_wallet* wallet,
     const char* hex_private_key,
+    dogecoin_bool compressed,
     const dogecoin_chainparams* chain_params
 );
 

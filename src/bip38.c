@@ -454,9 +454,15 @@ static dogecoin_bool bip38_confirmation_encode(
     written = dogecoin_base58_encode_check(payload, BIP38_CONFIRMATION_PAYLOAD_LEN,
         confirmation_code_out, *confirmation_code_size);
     if (written == 0) {
+        dogecoin_mem_zero(pointb, sizeof(pointb));
+        dogecoin_mem_zero(pointbx1, sizeof(pointbx1));
+        dogecoin_mem_zero(pointbx2, sizeof(pointbx2));
         return false;
     }
     *confirmation_code_size = written;
+    dogecoin_mem_zero(pointb, sizeof(pointb));
+    dogecoin_mem_zero(pointbx1, sizeof(pointbx1));
+    dogecoin_mem_zero(pointbx2, sizeof(pointbx2));
     return true;
 }
 
@@ -516,23 +522,30 @@ static dogecoin_bool bip38_encrypt_ec_core(
         memcpy(passpoint_work, passpoint, 33);
         if (!dogecoin_ecc_public_key_tweak_mul(passpoint_work, factorb)) {
             dogecoin_mem_zero(factorb, sizeof(factorb));
+            dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
             return false;
         }
         pubkey_len = compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH;
         if (!dogecoin_ecc_point_serialize(passpoint_work, 33, pubkey_buf, &pubkey_len, compressed)) {
             dogecoin_mem_zero(factorb, sizeof(factorb));
+            dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+            dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
             return false;
         }
     }
 
     if (!bip38_pubkey_to_address(pubkey_buf, pubkey_len, compressed, chain, generated_address)) {
         dogecoin_mem_zero(factorb, sizeof(factorb));
+        dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+        dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
         return false;
     }
     bip38_address_hash(generated_address, addresshash);
 
     if (!bip38_ec_derived_key(passpoint, addresshash, ownerentropy, derived)) {
         dogecoin_mem_zero(factorb, sizeof(factorb));
+        dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+        dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
         return false;
     }
 
@@ -561,6 +574,11 @@ static dogecoin_bool bip38_encrypt_ec_core(
     if (written == 0) {
         dogecoin_mem_zero(derived, sizeof(derived));
         dogecoin_mem_zero(factorb, sizeof(factorb));
+        dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+        dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
+        dogecoin_mem_zero(block2, sizeof(block2));
+        dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
+        dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
         return false;
     }
     *encrypted_key_size = written;
@@ -570,12 +588,22 @@ static dogecoin_bool bip38_encrypt_ec_core(
                 confirmation_code_out, confirmation_code_size)) {
             dogecoin_mem_zero(derived, sizeof(derived));
             dogecoin_mem_zero(factorb, sizeof(factorb));
+            dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+            dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
+            dogecoin_mem_zero(block2, sizeof(block2));
+            dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
+            dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
             return false;
         }
     }
 
     dogecoin_mem_zero(derived, sizeof(derived));
     dogecoin_mem_zero(factorb, sizeof(factorb));
+    dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+    dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
+    dogecoin_mem_zero(block2, sizeof(block2));
+    dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
+    dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
     return true;
 }
 
@@ -1413,9 +1441,11 @@ dogecoin_bool dogecoin_bip38_generate_intermediate_code(
     written = dogecoin_base58_encode_check(payload, BIP38_INTERMEDIATE_PAYLOAD_LEN,
         intermediate_code_out, *intermediate_code_size);
     if (written == 0) {
+        dogecoin_mem_zero(passpoint, sizeof(passpoint));
         return false;
     }
     *intermediate_code_size = written;
+    dogecoin_mem_zero(passpoint, sizeof(passpoint));
     return true;
 }
 
@@ -1424,7 +1454,6 @@ dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
     dogecoin_bool compressed,
     const uint8_t* seedb_override,
     const char* address_chain_hint,
-    uint8_t* private_key_out,
     char* encrypted_key_out,
     size_t* encrypted_key_size,
     char* confirmation_code_out,
@@ -1435,6 +1464,7 @@ dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
     uint8_t seedb[BIP38_SEEDB_LEN];
     dogecoin_bool has_lot_sequence;
     const dogecoin_chainparams* chain;
+    dogecoin_bool ok;
 
     if (!intermediate_code || !encrypted_key_out || !encrypted_key_size) {
         return false;
@@ -1451,9 +1481,8 @@ dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
     }
 
     chain = bip38_chain_from_address_hint(address_chain_hint);
-    (void)private_key_out;
 
-    return bip38_encrypt_ec_core(
+    ok = bip38_encrypt_ec_core(
         passpoint,
         ownerentropy,
         has_lot_sequence,
@@ -1466,6 +1495,9 @@ dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
         encrypted_key_size,
         confirmation_code_out,
         confirmation_code_size);
+    dogecoin_mem_zero(passpoint, sizeof(passpoint));
+    dogecoin_mem_zero(seedb, sizeof(seedb));
+    return ok;
 }
 
 dogecoin_bool dogecoin_bip38_confirm_passphrase(
@@ -1573,6 +1605,7 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
         dogecoin_pubkey_init(&pubkey);
         if (!dogecoin_ecc_point_serialize(pointb, 33, pubkey_buf, &pubkey_len, compressed)) {
             dogecoin_mem_zero(derived, sizeof(derived));
+            dogecoin_mem_zero(pointb, sizeof(pointb));
             return false;
         }
         memcpy(pubkey.pubkey, pubkey_buf, pubkey_len);
@@ -1581,6 +1614,7 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
         if (!bip38_pubkey_find_matching_address(
                 &pubkey, addresshash, address_match_mode, address_out)) {
             dogecoin_mem_zero(derived, sizeof(derived));
+            dogecoin_mem_zero(pointb, sizeof(pointb));
             return false;
         }
     }
@@ -1609,6 +1643,7 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
     }
 
     dogecoin_mem_zero(derived, sizeof(derived));
+    dogecoin_mem_zero(pointb, sizeof(pointb));
     return true;
 }
 

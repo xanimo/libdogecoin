@@ -38,7 +38,7 @@ dogecoin_bip38_encrypt(privkey, passphrase, doge_address, compressed, enc_out, &
 
 // EC-multiplied (0x43): two-party flow
 dogecoin_bip38_generate_intermediate_code(passphrase, use_lot, lot, seq, NULL, intermediate, &isz);
-dogecoin_bip38_encrypt_from_intermediate(intermediate, compressed, NULL, "D…", NULL, enc, &esz, confirm, &csz);
+dogecoin_bip38_encrypt_from_intermediate(intermediate, compressed, NULL, "D…", enc, &esz, confirm, &csz);
 // Or one-shot: dogecoin_bip38_encrypt_ec_multiplied(passphrase, compressed, use_lot, lot, seq, "D…", priv, enc, &esz, confirm, &csz);
 
 // Decrypt (0x42 and 0x43)
@@ -78,7 +78,7 @@ Paper wallet wrapper (decrypt + derive `D…` address):
 dogecoin_paper_wallet* w = dogecoin_paper_wallet_new();
 dogecoin_paper_wallet_set_encrypted(w, "6P…", "passphrase", &dogecoin_chainparams_main);
 // or: dogecoin_paper_wallet_set_wif(w, wif, chain);
-// or: dogecoin_paper_wallet_set_hex(w, hex_privkey, chain);
+// or: dogecoin_paper_wallet_set_hex(w, hex_privkey, true /* compressed */, chain);
 
 char address[36];
 dogecoin_paper_wallet_get_address(w, address, sizeof(address));
