@@ -75,8 +75,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
     if (strcmp(path, "/getBalance") == 0) {
         /* Spendable balance across the wallet's wtx set, honoring coinbase
          * maturity and the spends index. */
-        char wallet_total[21];
-        dogecoin_mem_zero(wallet_total, 21);
+        char wallet_total[KOINU_STRINGLEN];
+        dogecoin_mem_zero(wallet_total, sizeof(wallet_total));
         int64_t balance = dogecoin_wallet_get_balance(wallet);
         koinu_to_coins_str(balance < 0 ? 0 : (uint64_t)balance, wallet_total, sizeof(wallet_total));
         evbuffer_add_printf(evb, "Wallet balance: %s\n", wallet_total);
@@ -91,8 +91,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
     } else if (strcmp(path, "/getTransactions") == 0) {
         /* Spent UTXOs received externally; skip change from our own txs to
          * avoid double-counting re-spent coins along the change chain. */
-        char wallet_total[21];
-        dogecoin_mem_zero(wallet_total, 21);
+        char wallet_total[KOINU_STRINGLEN];
+        dogecoin_mem_zero(wallet_total, sizeof(wallet_total));
         uint64_t wallet_total_u64 = 0;
 
         if (HASH_COUNT(wallet->utxos) > 0) {
@@ -129,8 +129,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         koinu_to_coins_str(wallet_total_u64, wallet_total, sizeof(wallet_total));
         evbuffer_add_printf(evb, "Spent Balance: %s\n", wallet_total);
     } else if (strcmp(path, "/getUTXOs") == 0) {
-        char wallet_total[21];
-        dogecoin_mem_zero(wallet_total, 21);
+        char wallet_total[KOINU_STRINGLEN];
+        dogecoin_mem_zero(wallet_total, sizeof(wallet_total));
         uint64_t wallet_total_u64_unspent = 0;
 
         dogecoin_utxo* utxo;
