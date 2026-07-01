@@ -176,7 +176,7 @@ int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size) {
         str[10] = '\0';
         free(swap);
     } else {
-        char tmp[21];
+        char tmp[KOINU_COINS_STR_MAX_LEN];
         string(koinu, tmp);
         for (; i < length; i++) {
             if (i < target) str[i] = tmp[i];

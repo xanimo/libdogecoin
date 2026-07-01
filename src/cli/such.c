@@ -56,6 +56,7 @@
 #include <dogecoin/bip44.h>
 #include <dogecoin/cstr.h>
 #include <dogecoin/chainparams.h>
+#include <dogecoin/constants.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/eckey.h>
 #include <dogecoin/koinu.h>
