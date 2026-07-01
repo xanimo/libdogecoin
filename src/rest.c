@@ -78,7 +78,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         char wallet_total[21];
         dogecoin_mem_zero(wallet_total, 21);
         int64_t balance = dogecoin_wallet_get_balance(wallet);
-        koinu_to_coins_str(balance < 0 ? 0 : (uint64_t)balance, wallet_total);
+        koinu_to_coins_str(balance < 0 ? 0 : (uint64_t)balance, wallet_total, sizeof(wallet_total));
         evbuffer_add_printf(evb, "Wallet balance: %s\n", wallet_total);
     } else if (strcmp(path, "/getAddresses") == 0) {
         vector_t* addresses = vector_new(10, dogecoin_free);
@@ -126,7 +126,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         }
 
         // Convert and print totals for spent UTXOs.
-        koinu_to_coins_str(wallet_total_u64, wallet_total);
+        koinu_to_coins_str(wallet_total_u64, wallet_total, sizeof(wallet_total));
         evbuffer_add_printf(evb, "Spent Balance: %s\n", wallet_total);
     } else if (strcmp(path, "/getUTXOs") == 0) {
         char wallet_total[21];
@@ -155,7 +155,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         }
 
         // Convert and print totals for unspent UTXOs.
-        koinu_to_coins_str(wallet_total_u64_unspent, wallet_total);
+        koinu_to_coins_str(wallet_total_u64_unspent, wallet_total, sizeof(wallet_total));
         evbuffer_add_printf(evb, "Total Unspent: %s\n", wallet_total);
     } else if (strcmp(path, "/getSpends") == 0) {
         /* Outgoing-tx history from vec_wtxes: for each is_from_me wtx, emit
@@ -193,11 +193,11 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
             char sent_str[KOINU_STRINGLEN]   = {0};
             char change_str[KOINU_STRINGLEN] = {0};
             char fee_str[KOINU_STRINGLEN]    = {0};
-            koinu_to_coins_str((uint64_t)debit_in,  debit_str);
-            koinu_to_coins_str((uint64_t)total_out, total_str);
-            koinu_to_coins_str((uint64_t)ext_out,   sent_str);
-            koinu_to_coins_str((uint64_t)mine_out,  change_str);
-            koinu_to_coins_str((uint64_t)fee,       fee_str);
+            koinu_to_coins_str((uint64_t)debit_in,  debit_str, sizeof(debit_str));
+            koinu_to_coins_str((uint64_t)total_out, total_str, sizeof(total_str));
+            koinu_to_coins_str((uint64_t)ext_out,   sent_str, sizeof(sent_str));
+            koinu_to_coins_str((uint64_t)mine_out,  change_str, sizeof(change_str));
+            koinu_to_coins_str((uint64_t)fee,       fee_str, sizeof(fee_str));
 
             evbuffer_add_printf(evb, "----------------------\n");
             evbuffer_add_printf(evb, "txid:           %s\n", txid_hex);
@@ -220,7 +220,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
                 }
 
                 char amt_str[KOINU_STRINGLEN] = {0};
-                koinu_to_coins_str((uint64_t)o->value, amt_str);
+                koinu_to_coins_str((uint64_t)o->value, amt_str, sizeof(amt_str));
 
                 evbuffer_add_printf(evb, "  output:\n");
                 evbuffer_add_printf(evb, "    vout:           %u\n", j);
@@ -234,7 +234,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         }
 
         char total_sent_str[KOINU_STRINGLEN] = {0};
-        koinu_to_coins_str(total_sent_u64, total_sent_str);
+        koinu_to_coins_str(total_sent_u64, total_sent_str, sizeof(total_sent_str));
         evbuffer_add_printf(evb, "----------------------\n");
         evbuffer_add_printf(evb, "Outgoing transactions: %u\n", outgoing_count);
         evbuffer_add_printf(evb, "Total Sent (excl. change): %s\n", total_sent_str);
@@ -532,11 +532,11 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
     char avg_fee_str[32]    = {0};
     char med_fee_kb_str[32] = {0};
     char avg_fee_kb_str[32] = {0};
-    koinu_to_coins_str(sum_out_value, vol_str);
-    koinu_to_coins_str(median_fee,    med_fee_str);
-    koinu_to_coins_str(avg_fee,       avg_fee_str);
-    koinu_to_coins_str(median_fee_per_kb, med_fee_kb_str);
-    koinu_to_coins_str(avg_fee_per_kb,     avg_fee_kb_str);
+    koinu_to_coins_str(sum_out_value, vol_str, sizeof(vol_str));
+    koinu_to_coins_str(median_fee,    med_fee_str, sizeof(med_fee_str));
+    koinu_to_coins_str(avg_fee,       avg_fee_str, sizeof(avg_fee_str));
+    koinu_to_coins_str(median_fee_per_kb, med_fee_kb_str, sizeof(med_fee_kb_str));
+    koinu_to_coins_str(avg_fee_per_kb,     avg_fee_kb_str, sizeof(avg_fee_kb_str));
 
     evbuffer_add_printf(evb, "=== Stats (window=%u s) ===\n", window);
     evbuffer_add_printf(evb, "blocks: %u\n", blocks);
@@ -568,8 +568,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
 
         char total_out_str[32]  = {0};
         char total_fees_str[32] = {0};
-        koinu_to_coins_str(client->stats_out_value_total, total_out_str);
-        koinu_to_coins_str(client->stats_fees_total, total_fees_str);
+        koinu_to_coins_str(client->stats_out_value_total, total_out_str, sizeof(total_out_str));
+        koinu_to_coins_str(client->stats_fees_total, total_fees_str, sizeof(total_fees_str));
 
         evbuffer_add_printf(evb, "=== Chain Stats (SPV session) ===\n");
         if (tip) {

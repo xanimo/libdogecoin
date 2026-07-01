@@ -698,7 +698,7 @@ void print_utxos(dogecoin_wallet* wallet) {
                 wallet_total_u64 += coins_to_koinu_str(utxo->amount);
             }
         }
-        koinu_to_coins_str(wallet_total_u64, wallet_total);
+        koinu_to_coins_str(wallet_total_u64, wallet_total, 21);
         printf("Spent Balance: %s\n", wallet_total);
         dogecoin_mem_zero(wallet_total, 21);
         wallet_total_u64 = 0;
@@ -717,7 +717,7 @@ void print_utxos(dogecoin_wallet* wallet) {
                 wallet_total_u64 += coins_to_koinu_str(utxo->amount);
             }
         }
-        koinu_to_coins_str(wallet_total_u64, wallet_total);
+        koinu_to_coins_str(wallet_total_u64, wallet_total, 21);
         printf("Unspent Balance: %s\n", wallet_total);
     }
 }
@@ -891,7 +891,7 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
                         // set utxo p2pkh address:
                         memcpy_safe(utxo->address, p2pkh_from_script_pubkey, P2PKHLEN);
                         // set amount of utxo:
-                        koinu_to_coins_str(tx_out->value, utxo->amount);
+                        koinu_to_coins_str(tx_out->value, utxo->amount, KOINU_STRINGLEN);
                         // set the height of the utxo:
                         utxo->height = wtx->height;
                         // finally add utxo to rbtree:
@@ -2251,6 +2251,6 @@ char* dogecoin_get_balance_str(char* address) {
     if (!address) return false;
     char* wallet_total = dogecoin_char_vla(21);
     uint64_t wallet_total_u64 = dogecoin_get_balance(address);
-    koinu_to_coins_str(wallet_total_u64, wallet_total);
+    koinu_to_coins_str(wallet_total_u64, wallet_total, 21);
     return wallet_total;
 }

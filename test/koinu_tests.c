@@ -84,11 +84,11 @@ void test_koinu() {
     int i = 0;
     for (; i < 21; i++) {
         actual_answer = coins_to_koinu_str(coin_amounts[i]);
-        char* tmp[21];
-        dogecoin_mem_zero(tmp, 21);
-        koinu_to_coins_str(actual_answer, (char*)tmp);
+        char tmp[KOINU_COINS_STR_MAX_LEN];
+        dogecoin_mem_zero(tmp, sizeof(tmp));
+        koinu_to_coins_str(actual_answer, tmp, sizeof(tmp));
         debug_print("T%d\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
-        u_assert_str_eq((char*)tmp, exp_coin_amounts[i]);
+        u_assert_str_eq(tmp, exp_coin_amounts[i]);
         u_assert_uint32_eq(actual_answer, exp_answers[i]);
         debug_print("T%d\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", i, coin_amounts[i], exp_answers[i], actual_answer);
         diff = (exp_answers[i] - actual_answer);
@@ -167,10 +167,10 @@ void test_koinu() {
     for (i = 0; i < 42; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
         actual_answer2 = coins_to_koinu_str(coin_amounts_str[i]);
-        char* coins1[21];
-        dogecoin_mem_zero(coins1, 21);
-        if (!koinu_to_coins_str(actual_answer2, (char*)coins1)) exit(EXIT_FAILURE);
-        u_assert_str_eq((char*)coins1, coin_amounts_expected[i]);
+        char coins1[KOINU_COINS_STR_MAX_LEN];
+        dogecoin_mem_zero(coins1, sizeof(coins1));
+        if (!koinu_to_coins_str(actual_answer2, coins1, sizeof(coins1))) exit(EXIT_FAILURE);
+        u_assert_str_eq(coins1, coin_amounts_expected[i]);
         diff = exp_answers2[i] - actual_answer2;
         u_assert_uint32_eq(actual_answer2, exp_answers2[i]);
         u_assert_int_eq((int)diff, 0);
@@ -296,10 +296,10 @@ void test_koinu() {
     for (i = 0; i < 35; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
         actual_answer3 = coins_to_koinu_str(varlen_coin_amounts_str[i]);
-        char* coins2[21];
-        dogecoin_mem_zero(coins2, 21);
-        koinu_to_coins_str(actual_answer3, (char*)coins2);
-        u_assert_str_eq((char*)coins2, varlen_exp_coin_amounts_str[i]);
+        char coins2[KOINU_COINS_STR_MAX_LEN];
+        dogecoin_mem_zero(coins2, sizeof(coins2));
+        koinu_to_coins_str(actual_answer3, coins2, sizeof(coins2));
+        u_assert_str_eq(coins2, varlen_exp_coin_amounts_str[i]);
         diff = exp_answers3[i] - actual_answer3;
         u_assert_uint32_eq(actual_answer3, exp_answers3[i]);
         u_assert_int_eq((int)diff, 0);
@@ -315,13 +315,23 @@ void test_koinu() {
     for (i = 0; i < 3; i++) {
         debug_print("\n-----------------------------------\nT%d build: %s\n------------------------------------\n", i, get_build());
         actual_answer4 = coins_to_koinu_str(maxout_coin_amounts_str[i]);
-        char* coins3[21];
-        dogecoin_mem_zero(coins3, 21);
-        koinu_to_coins_str(actual_answer4, (char*)coins3);
-        u_assert_str_eq((char*)coins3, maxout_exp_coin_amounts_str[i]);
+        char coins3[KOINU_COINS_STR_MAX_LEN];
+        dogecoin_mem_zero(coins3, sizeof(coins3));
+        koinu_to_coins_str(actual_answer4, coins3, sizeof(coins3));
+        u_assert_str_eq(coins3, maxout_exp_coin_amounts_str[i]);
         diff = exp_answers4[i] - actual_answer4;
         u_assert_uint32_eq(actual_answer4, exp_answers4[i]);
         u_assert_int_eq((int)diff, 0);
         debug_print("\n\n\tcoin_amt: %s\n\texpected: %"PRIu64"\n\tactual:   %"PRIu64"\n\n", maxout_coin_amounts_str[i], exp_answers4[i], actual_answer4);
         }
+
+    {
+        char small_buf[10];
+        char ok_buf[KOINU_COINS_STR_MAX_LEN];
+        dogecoin_mem_zero(small_buf, sizeof(small_buf));
+        u_assert_int_eq(koinu_to_coins_str(1000ULL, small_buf, sizeof(small_buf)), 0);
+        dogecoin_mem_zero(ok_buf, sizeof(ok_buf));
+        u_assert_int_eq(koinu_to_coins_str(1000ULL, ok_buf, sizeof(ok_buf)), 1);
+        u_assert_str_eq(ok_buf, "0.00001000");
+    }
     }

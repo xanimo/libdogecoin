@@ -614,7 +614,7 @@ dogecoin_bool broadcast_raw_tx(const dogecoin_chainparams* chain, const char* ra
 /* Koinu functions
 --------------------------------------------------------------------------
 */
-int koinu_to_coins_str(uint64_t koinu, char* str);
+int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size);
 uint64_t coins_to_koinu_str(char* coins);
 
 
