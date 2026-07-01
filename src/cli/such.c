@@ -518,7 +518,7 @@ void transaction_output_menu(int txindex, int is_testnet) {
             printf("\n--------------------------------\n");
             printf("output index:       %d\n", i);
             printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
-            koinu_to_coins_str(tx_out->value, (char*)coin_amount);
+            koinu_to_coins_str(tx_out->value, (char*)coin_amount, 21);
             printf("amount:             %s\n", (char*)coin_amount);
             // selected should only equal anything other than -1 upon setting
             // loop index in conditional targetting last iteration:
@@ -572,7 +572,7 @@ void transaction_output_menu(int txindex, int is_testnet) {
                 printf("\n\n");
                 char* subtotal[21];
                 dogecoin_mem_zero(subtotal, 21);
-                koinu_to_coins_str(tx_out_total, (char*)subtotal);
+                koinu_to_coins_str(tx_out_total, (char*)subtotal, 21);
                 printf("subtotal - desired fee: %s\n", (char*)subtotal);
                 printf("\n");
                 printf("1. select output to edit\n");

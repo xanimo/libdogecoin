@@ -138,9 +138,21 @@ void string(uint64_t input, char output[]) {
     output[length] = '\0';
 }
 
-int koinu_to_coins_str(uint64_t koinu, char* str) {
+static size_t koinu_coins_str_required_size(uint64_t koinu)
+{
+    size_t length = (size_t)calc_length(koinu);
+    if (length < 9) {
+        return KOINU_COINS_STR_MIN_LEN;
+    }
+    return length + 2;
+}
+
+int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size) {
     enum conversion_type state = validate_conversion(koinu, NULL, NULL, NULL);
     if (state != CONVERSION_SUCCESS) return false;
+    if (!str || str_size < koinu_coins_str_required_size(koinu)) {
+        return false;
+    }
 
     uint64_t i = 0, j =0, length = calc_length(koinu),
     target = length < 9 ? 10 - length : length - 9;

@@ -1576,8 +1576,12 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
 
     if (!bip38_ec_derived_key(passpoint, addresshash, ownerentropy, derived)) {
         dogecoin_mem_zero(passfactor, sizeof(passfactor));
+        dogecoin_mem_zero(passpoint, sizeof(passpoint));
         return false;
     }
+    /* passpoint is not used past this point; clear the public point so it is
+     * not left live on the stack across the remaining KDF/decrypt steps. */
+    dogecoin_mem_zero(passpoint, sizeof(passpoint));
     dogecoin_mem_zero(passfactor, sizeof(passfactor));
 
     pointb[0] = (uint8_t)(encryptedpointb[0] ^ (derived[63] & 0x01));
@@ -1586,16 +1590,17 @@ dogecoin_bool dogecoin_bip38_confirm_passphrase_ex(
 
     if (!bip38_derive_passfactor(passphrase, ownerentropy, has_lot_sequence, passfactor)) {
         dogecoin_mem_zero(derived, sizeof(derived));
+        dogecoin_mem_zero(pointb, sizeof(pointb));
         return false;
     }
 
     if (!dogecoin_ecc_public_key_tweak_mul(pointb, passfactor)) {
         dogecoin_mem_zero(passfactor, sizeof(passfactor));
         dogecoin_mem_zero(derived, sizeof(derived));
+        dogecoin_mem_zero(pointb, sizeof(pointb));
         return false;
     }
     dogecoin_mem_zero(passfactor, sizeof(passfactor));
-    (void)passpoint;
 
     {
         dogecoin_pubkey pubkey;

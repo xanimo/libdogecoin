@@ -192,7 +192,9 @@ static dogecoin_bool sweep_compute_amounts(
     uint64_t* fee_koinu_out,
     uint64_t* out_koinu_out,
     char* fee_doge,
-    char* out_doge)
+    size_t fee_doge_size,
+    char* out_doge,
+    size_t out_doge_size)
 {
     uint64_t total_koinu = sweep_options_total_koinu(options);
     size_t est_vsize = sweep_estimate_vsize(options->utxo_count);
@@ -207,10 +209,10 @@ static dogecoin_bool sweep_compute_amounts(
         return false;
     }
     uint64_t out_koinu = total_koinu - fee_koinu;
-    if (!koinu_to_coins_str(fee_koinu, fee_doge)) {
+    if (!koinu_to_coins_str(fee_koinu, fee_doge, fee_doge_size)) {
         return false;
     }
-    if (!koinu_to_coins_str(out_koinu, out_doge)) {
+    if (!koinu_to_coins_str(out_koinu, out_doge, out_doge_size)) {
         return false;
     }
     *fee_koinu_out = fee_koinu;
@@ -281,7 +283,7 @@ static dogecoin_bool sweep_build_unsigned_tx(
 
     strncpy(dest_copy, options->destination_address, sizeof(dest_copy) - 1);
     dest_copy[sizeof(dest_copy) - 1] = '\0';
-    if (!koinu_to_coins_str(sweep_options_total_koinu(options), total_copy)) {
+    if (!koinu_to_coins_str(sweep_options_total_koinu(options), total_copy, sizeof(total_copy))) {
         return false;
     }
 
@@ -477,7 +479,7 @@ static dogecoin_sweep_result* sweep_wallets_impl(
         sweep_result_fail(result, "Multi-wallet sweep requires one UTXO per wallet");
         return result;
     }
-    if (!sweep_compute_amounts(options, &fee_koinu, &out_koinu, fee_doge, out_doge)) {
+    if (!sweep_compute_amounts(options, &fee_koinu, &out_koinu, fee_doge, sizeof(fee_doge), out_doge, sizeof(out_doge))) {
         sweep_result_fail(result, "Fee exceeds input value or amount conversion failed");
         return result;
     }
@@ -1001,7 +1003,7 @@ dogecoin_transaction* dogecoin_sweep_create_transaction(
     char out_doge[64];
     uint64_t fee_koinu = 0;
     uint64_t out_koinu = 0;
-    if (!sweep_compute_amounts(options, &fee_koinu, &out_koinu, fee_doge, out_doge)) return NULL;
+    if (!sweep_compute_amounts(options, &fee_koinu, &out_koinu, fee_doge, sizeof(fee_doge), out_doge, sizeof(out_doge))) return NULL;
 
     int txindex = 0;
     if (!sweep_build_unsigned_tx(options, fee_doge, out_doge, &txindex)) return NULL;
@@ -1185,7 +1187,7 @@ dogecoin_bool dogecoin_sweep_validate_transaction(
     }
 
     if (sweep_options_utxo_ok(options)) {
-        if (!sweep_compute_amounts(options, &fee_koinu, &out_koinu, fee_doge, out_doge)) {
+        if (!sweep_compute_amounts(options, &fee_koinu, &out_koinu, fee_doge, sizeof(fee_doge), out_doge, sizeof(out_doge))) {
             return false;
         }
         outsum = 0;

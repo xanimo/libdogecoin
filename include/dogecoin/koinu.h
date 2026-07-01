@@ -33,7 +33,11 @@
 LIBDOGECOIN_BEGIN_DECL
 
 LIBDOGECOIN_API long double koinu_to_coins(uint64_t koinu);
-LIBDOGECOIN_API int koinu_to_coins_str(uint64_t koinu, char* str);
+/* Minimum str_size for small koinu (length < 9 decimal digits): "0.xxxxxxxx" + NUL. */
+#define KOINU_COINS_STR_MIN_LEN 11
+/* str_size for full uint64_t range (20 digits + '.' + 8 decimals + NUL). */
+#define KOINU_COINS_STR_MAX_LEN 22
+LIBDOGECOIN_API int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size);
 LIBDOGECOIN_API uint64_t coins_to_koinu_str(char* coins);
 LIBDOGECOIN_API unsigned long long coins_to_koinu(long double coins);
 
