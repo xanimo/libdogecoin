@@ -504,8 +504,8 @@ void transaction_output_menu(int txindex, int is_testnet) {
     int running_transaction_output_menu = 1;
     while (running_transaction_output_menu) {
         char* destinationaddress;
-        char* coin_amount[KOINU_STRINGLEN];
-        dogecoin_mem_zero(coin_amount, KOINU_STRINGLEN);
+        char coin_amount[KOINU_STRINGLEN];
+        dogecoin_mem_zero(coin_amount, sizeof(coin_amount));
         uint64_t koinu_amount;
         uint64_t tx_out_total = 0;
         const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
@@ -519,8 +519,8 @@ void transaction_output_menu(int txindex, int is_testnet) {
             printf("\n--------------------------------\n");
             printf("output index:       %d\n", i);
             printf("script public key:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
-            koinu_to_coins_str(tx_out->value, (char*)coin_amount, KOINU_STRINGLEN);
-            printf("amount:             %s\n", (char*)coin_amount);
+            koinu_to_coins_str(tx_out->value, coin_amount, sizeof(coin_amount));
+            printf("amount:             %s\n", coin_amount);
             // selected should only equal anything other than -1 upon setting
             // loop index in conditional targetting last iteration:
             selected == i ? printf("selected:           [X]\n") : 0;
@@ -541,14 +541,23 @@ void transaction_output_menu(int txindex, int is_testnet) {
                                             break;
                                             }
                                         else {
-                                            koinu_amount = coins_to_koinu_str((char*)coin_amount);
+                                            koinu_amount = coins_to_koinu_str(coin_amount);
                                             vector_remove_idx(tx->transaction->vout, i);
                                             dogecoin_tx_add_address_out(tx->transaction, chain, koinu_amount, destinationaddress);
                                             }
                                         break;
                                     case 2:
-                                        memcpy_safe(coin_amount, (char*)getl("new amount"), KOINU_STRINGLEN);
-                                        koinu_amount = coins_to_koinu_str((char*)coin_amount);
+                                        {
+                                            const char* new_amount = getl("new amount");
+                                            size_t new_amount_len = strlen(new_amount);
+                                            if (new_amount_len >= sizeof(coin_amount)) {
+                                                printf("number is invalid or set to 0\n");
+                                                break;
+                                            }
+                                            memcpy_safe(coin_amount, new_amount, new_amount_len);
+                                            coin_amount[new_amount_len] = '\0';
+                                        }
+                                        koinu_amount = coins_to_koinu_str(coin_amount);
                                         if (!koinu_amount) {
                                             printf("number is invalid or set to 0\n");
                                         } else tx_out->value = koinu_amount;
@@ -571,10 +580,10 @@ void transaction_output_menu(int txindex, int is_testnet) {
             // escape encompassing while loop so we return to previous menu
             if (i == length - 1) {
                 printf("\n\n");
-                char* subtotal[KOINU_STRINGLEN];
-                dogecoin_mem_zero(subtotal, KOINU_STRINGLEN);
-                koinu_to_coins_str(tx_out_total, (char*)subtotal, KOINU_STRINGLEN);
-                printf("subtotal - desired fee: %s\n", (char*)subtotal);
+                char subtotal[KOINU_STRINGLEN];
+                dogecoin_mem_zero(subtotal, sizeof(subtotal));
+                koinu_to_coins_str(tx_out_total, subtotal, sizeof(subtotal));
+                printf("subtotal - desired fee: %s\n", subtotal);
                 printf("\n");
                 printf("1. select output to edit\n");
                 printf("2. main menu\n");
