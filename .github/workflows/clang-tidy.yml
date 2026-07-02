@@ -44,11 +44,15 @@ jobs:
       - name: run clang-tidy over first-party sources
         run: |
           clang-tidy --version
-          # first-party C sources only; vendored trees excluded
+          # first-party C sources only; vendored trees excluded.
+          # --line-filter drops findings inside vendored uthash.h (LLVM's
+          # HeaderFilterRegex cannot express a negative match).
           find src -maxdepth 1 -name '*.c' \
             ! -name 'utf8proc*.c' \
             | xargs -P "$(nproc)" -n 4 \
-              clang-tidy -p build --quiet 2>/dev/null \
+              clang-tidy -p build --quiet \
+                --line-filter='[{"name":"uthash.h","lines":[[9999999,9999999]]},{"name":".c"},{"name":".h"}]' \
+                2>/dev/null \
             | tee clang-tidy-report.txt || true
           echo "---"
           grep -c "warning:" clang-tidy-report.txt || echo "0 warnings"

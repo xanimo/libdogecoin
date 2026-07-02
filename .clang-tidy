@@ -17,6 +17,12 @@
 #       flags every memcpy/memset; CERT's own guidance treats this as
 #       advisory. Memory-safety coverage comes from ASan/fuzzing instead.
 
+#   uthash.h suppressed via line filter in the workflow invocation:
+#       vendored third-party (Troy Hanson's uthash); generates ~127
+#       macro-parentheses findings per TU that are upstream's to fix.
+#       (clang-tidy 18's HeaderFilterRegex has no negative match; the
+#       workflow passes --line-filter to drop uthash.h instead.)
+
 Checks: >
   -*,
   cert-*,
