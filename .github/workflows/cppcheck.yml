@@ -1,0 +1,98 @@
+# static analysis: cppcheck with CWE-tagged findings
+#
+# Gating policy (phase 0): only `error` severity fails the job. The full
+# report (all severities, CWE IDs included) is uploaded as an artifact for
+# triage. Gating widens to `warning` once the initial backlog is dispositioned
+# in contrib/analysis/cppcheck-suppressions.txt.
+#
+# Vendored/third-party code is excluded at invocation time below rather than
+# via suppressions, so the suppressions file stays a record of first-party
+# triage decisions only.
+
+name: cppcheck
+
+on:
+  push:
+    branches:
+      - '*-dev-*'
+      - 'main'
+  pull_request:
+    branches:
+      - '*-dev-*'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'doc/**'
+
+jobs:
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: install cppcheck
+        run: |
+          sudo apt-get update --yes
+          sudo apt-get install -y cppcheck
+
+      - name: run cppcheck (full report, non-gating)
+        run: |
+          cppcheck --version
+          cppcheck \
+            --enable=warning,style,performance,portability \
+            --std=c99 \
+            -D__GNUC__ -D__linux__ \
+            --inline-suppr \
+            --suppressions-list=contrib/analysis/cppcheck-suppressions.txt \
+            --library=posix \
+            -I include \
+            -i src/secp256k1 \
+            -i src/libevent \
+            -i src/intel \
+            -i src/utf8proc.c \
+            -i src/utf8proc_data.c \
+            --xml --xml-version=2 \
+            --output-file=cppcheck-report.xml \
+            src/ 2>&1 | tail -20
+
+      - name: summarize findings by CWE
+        run: |
+          python3 - <<'EOF'
+          import xml.etree.ElementTree as ET
+          from collections import Counter
+          root = ET.parse('cppcheck-report.xml').getroot()
+          errors = root.findall('.//error')
+          by_sev = Counter(e.get('severity') for e in errors)
+          by_cwe = Counter(e.get('cwe') for e in errors if e.get('cwe'))
+          print(f"total findings: {len(errors)}")
+          print("by severity:", dict(by_sev))
+          print("by CWE:", dict(by_cwe.most_common(15)))
+          EOF
+
+      - name: upload full report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck-report.xml
+
+      - name: gate on error severity
+        run: |
+          cppcheck \
+            --enable=warning \
+            --std=c99 \
+            -D__GNUC__ -D__linux__ \
+            --inline-suppr \
+            --suppressions-list=contrib/analysis/cppcheck-suppressions.txt \
+            --library=posix \
+            -I include \
+            -i src/secp256k1 \
+            -i src/libevent \
+            -i src/intel \
+            -i src/utf8proc.c \
+            -i src/utf8proc_data.c \
+            --error-exitcode=1 \
+            --quiet \
+            src/

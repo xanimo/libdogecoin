@@ -1,0 +1,18 @@
+// cppcheck suppressions baseline for libdogecoin
+//
+// Format: <check-id>[:<path>[:<line>]]
+// Every suppression added here MUST carry a one-line rationale comment
+// directly above it (disposition: false-positive | out-of-scope | hardening-deferred).
+// See doc/audit: triage and disposition rules.
+//
+// Vendored/third-party code is excluded at invocation time (see
+// .github/workflows/cppcheck.yml), not suppressed here.
+
+// cppcheck cannot see inline assembly / compiler builtins used by ctaes and
+// the scrypt SSE2 path; unusedFunction is structurally noisy for a library
+// whose public surface is consumed externally.
+unusedFunction
+
+// Informational check with a very high false-positive rate on C99 designated
+// initializers; revisit after the Phase 1 backlog triage.
+missingIncludeSystem
