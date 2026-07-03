@@ -167,6 +167,7 @@ static dogecoin_bool deser_psbt_kv(struct const_buffer *buf,
 
     if (!deser_varlen(&klen, buf)) return false;
     if (klen == 0) return true; /* separator */
+    if (klen > buf->len) return false; /* declared key length exceeds remaining input */
 
     *key = dogecoin_malloc(klen);
     if (!deser_bytes(*key, buf, klen)) { dogecoin_free(*key); *key = NULL; return false; }
@@ -174,6 +175,7 @@ static dogecoin_bool deser_psbt_kv(struct const_buffer *buf,
 
     if (!deser_varlen(&vlen, buf)) { dogecoin_free(*key); *key = NULL; return false; }
     if (vlen > 0) {
+        if (vlen > buf->len) { dogecoin_free(*key); *key = NULL; return false; }
         *val = dogecoin_malloc(vlen);
         if (!deser_bytes(*val, buf, vlen)) {
             dogecoin_free(*key); dogecoin_free(*val);
