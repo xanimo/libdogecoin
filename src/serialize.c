@@ -175,7 +175,21 @@ void ser_str(cstring* s, const char* s_in, size_t maxlen)
 {
     size_t slen = strnlen(s_in, maxlen);
 
-    ser_varlen(s, slen);
+    /* ser_varlen() takes a uint32_t length, and the varint format used here is
+       uint32-bounded on both the write and read sides. Passing a size_t length
+       above UINT32_MAX would silently truncate the length prefix while
+       ser_bytes() still wrote the full slen bytes, producing a prefix/data
+       mismatch (a corrupt, non-round-trippable serialization). No current
+       caller reaches this (maxlen is always small), but guard it so the output
+       can never be corrupt: a length we cannot represent is serialized as an
+       empty string. Use a runtime check rather than assert(), which is compiled
+       out in release builds. */
+    if (slen > UINT32_MAX) {
+        ser_varlen(s, 0);
+        return;
+    }
+
+    ser_varlen(s, (uint32_t)slen);
     ser_bytes(s, s_in, slen);
 }
 
@@ -196,7 +210,16 @@ void ser_varstr(cstring* s, cstring* s_in)
         return;
     }
 
-    ser_varlen(s, s_in->len);
+    /* See ser_str(): the varint length is uint32-bounded, so a cstring longer
+       than UINT32_MAX would truncate the length prefix while the full s_in->len
+       bytes are written, corrupting the stream. Guard against it (runtime check,
+       not assert) by emitting an empty string for an unrepresentable length. */
+    if (s_in->len > UINT32_MAX) {
+        ser_varlen(s, 0);
+        return;
+    }
+
+    ser_varlen(s, (uint32_t)s_in->len);
     ser_bytes(s, s_in->str, s_in->len);
 }
 
