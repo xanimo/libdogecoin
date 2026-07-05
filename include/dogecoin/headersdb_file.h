@@ -68,17 +68,9 @@ dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db);
 void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, arith_uint256 chainwork);
 
-static const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = {
-    (void* (*)(const dogecoin_chainparams*, dogecoin_bool))dogecoin_headers_db_new,
-    (void (*)(void *))dogecoin_headers_db_free,
-    (dogecoin_bool (*)(void *, const char *, dogecoin_bool))dogecoin_headers_db_load,
-    (void (*)(void* , vector_t *))dogecoin_headers_db_fill_block_locator,
-    (dogecoin_blockindex *(*)(void* , struct const_buffer *, dogecoin_bool , dogecoin_bool *))dogecoin_headers_db_connect_hdr,
-    (dogecoin_blockindex* (*)(void *))dogecoin_headersdb_getchaintip,
-    (dogecoin_bool (*)(void *))dogecoin_headersdb_disconnect_tip,
-    (dogecoin_bool (*)(void *))dogecoin_headersdb_has_checkpoint_start,
-    (void (*)(void *, uint256_t, uint32_t, arith_uint256))dogecoin_headersdb_set_checkpoint_start
-};
+/* Defined in headersdb_file.c using typed trampolines (avoids the
+ * function-pointer-cast UB that -fsanitize=function flags). */
+extern const dogecoin_headers_db_interface dogecoin_headers_db_interface_file;
 
 LIBDOGECOIN_END_DECL
 

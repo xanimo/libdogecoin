@@ -107,12 +107,25 @@ void jpec_buffer_write_2bytes(jpec_buffer_t* b, int val) {
 static void jpec_huff_encode_block_impl(jpec_block_t* block, jpec_huff_state_t* s);
 static void jpec_huff_write_bits(jpec_huff_state_t* s, unsigned int bits, int n);
 
+/* Trampolines: the skeleton stores generic (void*) callbacks but the concrete
+ * jpec_huff functions take typed first arguments. Casting the function pointer
+ * and calling through it is UB (C §6.3.2.3/8, flagged by -fsanitize=function).
+ * These wrappers carry the generic signature and cast only the data pointer. */
+void jpec_huff_del(jpec_huff_t* h);
+void jpec_huff_encode_block(jpec_huff_t* h, jpec_block_t* block, jpec_buffer_t* buf);
+static void jpec_huff_del_tramp(void* opq) {
+	jpec_huff_del((jpec_huff_t*)opq);
+}
+static void jpec_huff_encode_block_tramp(void* opq, jpec_block_t* block, jpec_buffer_t* buf) {
+	jpec_huff_encode_block((jpec_huff_t*)opq, block, buf);
+}
+
 void jpec_huff_skel_init(jpec_huff_skel_t* skel) {
 	assert(skel);
 	memset(skel, 0, sizeof(*skel));
 	skel->opq = jpec_huff_new();
-	skel->del = (void (*)(void*))jpec_huff_del;
-	skel->encode_block = (void (*)(void*, jpec_block_t*, jpec_buffer_t*))jpec_huff_encode_block;
+	skel->del = jpec_huff_del_tramp;
+	skel->encode_block = jpec_huff_encode_block_tramp;
 }
 
 jpec_huff_t* jpec_huff_new(void) {
