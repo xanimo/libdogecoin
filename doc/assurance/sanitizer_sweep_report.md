@@ -12,8 +12,9 @@
 
 This is a documentation sweep, not a fix pass. It records which sanitizer
 faults are reachable on a **pristine** `0.1.5-dev` checkout, so each can be tied
-to a fix PR (confirming the fix addresses a live fault) or flagged as a
-candidate new finding.
+to a fix PR (confirming the fix addresses a live fault) or flagged as a new
+finding. This sweep did both: it corroborated four existing fix PRs and
+surfaced one new finding class (§3), now fixed in #361.
 
 Two passes are run because the sanitizers recover differently:
 
@@ -82,10 +83,12 @@ could miscompile it). Standard remediations: give the callback fields correctly
 -typed signatures, or route through small correctly-typed trampoline wrappers
 that internally cast, rather than casting the function pointer itself.
 
-**Disposition:** flagged, unassigned. Recommend confirming against `gh pr list`;
-if genuinely new, file as a single "fix function-pointer type mismatches in
-generic callbacks" change (Tier 2 / hardening), since the sites share one root
-cause.
+**Disposition:** confirmed new (reconciled against the full open-PR list — not
+covered by any prior audit PR) and **fixed in #361**. The fix routes each site
+through a small correctly-typed trampoline that carries the generic
+`void(*)(void*)` signature and casts only the data pointer, rather than casting
+the function pointer. A before/after UBSan run confirmed the six findings are
+eliminated with no behavioural change and the residual four (§2) untouched.
 
 ## 4. Summary
 
@@ -93,13 +96,15 @@ cause.
 |---|---|---|
 | UB confirming existing PRs | 4 sites | #324/#325/#326/#327 — merge-ready evidence |
 | Memory fault confirming existing PR | 1 site | #324 |
-| Function-type-mismatch UB | 6 sites | candidate; triage vs. PR list |
+| Function-type-mismatch UB | 6 sites | **fixed in #361** (typed trampolines, UBSan-verified) |
 
 The sweep is reproducible from a clean tree via
 `contrib/assurance/sanitizer_sweep.sh`. Re-running after the audit-series PRs
-merge should show the §2 findings cleared, leaving (if unaddressed) only the
-§3 function-type-mismatch cluster — which makes this report a concrete
-before/after checkpoint for the audit's memory-safety and UB claims.
+merge should show the §2 findings cleared; the §3 function-type-mismatch
+cluster is already resolved by #361. Re-running the sweep after all of
+#324/#325/#326/#327 and #361 merge should show a UBSan/ASan-clean test suite
+for these classes — which makes this report a concrete before/after checkpoint
+for the audit's memory-safety and UB claims.
 
 ## 5. Caveat on completeness
 

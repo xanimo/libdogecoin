@@ -118,15 +118,17 @@ per-tool triage backlogs.
 | UB + count truncation in auxpow deserialization | `src/block.c` | #334 | |
 | Integer overflow in `cstr_alloc_min_sz` sizing | `src/cstr.c` | #344 | |
 
-**Function-type-mismatch UB (candidate — NEW, not covered by any open PR).**
-The sanitizer sweep surfaced six `function-type-mismatch` sites (CWE-686) that
-reconciliation against the full open-PR list confirms are **not** addressed by
-any existing audit PR: `spv.c:534/660/725` (header-db callbacks),
-`vector.c:82` (`elem_free_f`), `jpeg.c:413/446` (huff callbacks). Root cause is
-the generic-callback idiom (typed function stored in a `void(*)(void*)`-style
-field, called through the mismatched type). Real UB, provisionally low
-severity (works on target ABIs), portability/CFI hazard. Recommended as a
-single Tier-2 hardening PR. See `sanitizer_sweep_report.md` §3.
+**Function-type-mismatch UB (NEW — fixed in #361).**
+The sanitizer sweep surfaced six `function-type-mismatch` sites (CWE-686)
+confirmed by reconciliation against the full open-PR list to be not covered by
+any prior audit PR: `spv.c:534/660/725` (header-db callbacks), `vector.c:82`
+(`elem_free_f`), `jpeg.c:413/446` (huff callbacks). Root cause is the
+generic-callback idiom (typed function stored in a `void(*)(void*)`-style
+field, called through the mismatched type). Fixed in **#361** via typed
+trampolines that carry the correct generic signature and cast only the data
+pointer; verified with a before/after UBSan run showing the six findings
+eliminated and the residual four (owned by #325/#326/#327) untouched. See
+`sanitizer_sweep_report.md` §3.
 
 ### Resource exhaustion (Tier 2)
 
@@ -155,11 +157,12 @@ confirmed against branch names and titles as of this revision.*
 
 | Item | PR | Status |
 |---|---|---|
-| Phase 0 static-analysis workflows (CodeQL filter fix + cppcheck + clang-tidy) | #359 | Approved, draft — pending un-draft/merge |
+| Phase 0 static-analysis workflows (CodeQL filter fix + cppcheck + clang-tidy) | #359 | Approved; un-drafted, open — pending merge |
 | libFuzzer harness infrastructure | #351 | Approved, open |
 | Coverage reachability tooling | #360 | Open, stacked on #351 |
 | PSBT (BIP174) fuzz harness + fixes | #357 | Open |
 | ASAN+UBSAN CI gate | #328 | Open, draft |
+| Function-pointer type-mismatch UB fix (typed trampolines) | #361 | Open — found by this sweep; verified UBSan-clean |
 | PQC test assertions / cmake liboqs / raccoon-g build | #346, #347, #348 | Open |
 
 ## 5. Independent corroboration
@@ -252,7 +255,7 @@ appended to Section 5/6.
 
 - Un-draft and merge #359; confirm the first full-tree static-analysis run.
 - File the function-type-mismatch cluster (§4 UB) as a new Tier-2 hardening PR
-  — sweep-confirmed as not covered by any existing PR.
+  — **done: #361**, verified UBSan-clean for that class.
 - Merge the sanitizer sweep as a checked-in assurance artifact
   (`contrib/assurance/sanitizer_sweep.sh` + report); decide on #328.
 - Land #351 → rebase #360 → open the BIP38 harness PR once #277 also lands.
