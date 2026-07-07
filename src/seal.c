@@ -3648,6 +3648,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEE
     {
         fprintf(stderr, "ERROR: Failed to decode management key.\n");
         dogecoin_mem_zero(mgm_key, strlen(mgm_key));
+        dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
         dogecoin_free(mgm_key);
         ykpiv_done(state);
         return false;
@@ -3666,6 +3667,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEE
 
     dogecoin_mem_zero(mgm_key, strlen(mgm_key));
     dogecoin_free(mgm_key);
+    // The decoded management key is dead after ykpiv_authenticate; scrub it so
+    // it does not linger on the stack through the save/return paths (CWE-226).
+    dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
 
     // Write the encrypted blob directly to the YubiKey using the defined tag
     if (ykpiv_save_object(state, SEED_DATA_TAG(file_num), encrypted_blob, encrypted_blob_size) != YKPIV_OK)
@@ -3716,10 +3720,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED se
     {
         fprintf(stderr, "ERROR: Incorrect PIN. Tries left: %d\n", tries);
         ykpiv_done(state);
+        if (pin) dogecoin_mem_zero(pin, strlen(pin));
         dogecoin_free(pin);
         return false;
     }
 
+    // The PIN is dead after ykpiv_verify; scrub it before releasing the
+    // getpass() buffer back to the allocator (CWE-226).
+    if (pin) dogecoin_mem_zero(pin, strlen(pin));
     dogecoin_free(pin);
 
     // Retrieve the encrypted blob from the YubiKey
@@ -3789,6 +3797,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
     {
         fprintf(stderr, "ERROR: Failed to decode management key.\n");
         dogecoin_mem_zero(mgm_key, strlen(mgm_key));
+        dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
         dogecoin_free(mgm_key);
         ykpiv_done(state);
         return false;
@@ -3807,6 +3816,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
 
     dogecoin_mem_zero(mgm_key, strlen(mgm_key));
     dogecoin_free(mgm_key);
+    // The decoded management key is dead after ykpiv_authenticate; scrub it so
+    // it does not linger on the stack through the save/return paths (CWE-226).
+    dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
 
     // Write the encrypted blob directly to the YubiKey using the defined tag
     if (ykpiv_save_object(state, HDNODE_DATA_TAG(file_num), encrypted_blob, encrypted_blob_size) != YKPIV_OK)
@@ -3857,10 +3869,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogec
     {
         fprintf(stderr, "ERROR: Incorrect PIN. Tries left: %d\n", tries);
         ykpiv_done(state);
+        if (pin) dogecoin_mem_zero(pin, strlen(pin));
         dogecoin_free(pin);
         return false;
     }
 
+    // The PIN is dead after ykpiv_verify; scrub it before releasing the
+    // getpass() buffer back to the allocator (CWE-226).
+    if (pin) dogecoin_mem_zero(pin, strlen(pin));
     dogecoin_free(pin);
 
     // Retrieve the encrypted blob from the YubiKey
@@ -3933,6 +3949,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
     {
         fprintf(stderr, "ERROR: Failed to decode management key.\n");
         dogecoin_mem_zero(mgm_key, strlen(mgm_key));
+        dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
         dogecoin_free(mgm_key);
         ykpiv_done(state);
         return false;
@@ -3951,6 +3968,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
 
     dogecoin_mem_zero(mgm_key, strlen(mgm_key));
     dogecoin_free(mgm_key);
+    // The decoded management key is dead after ykpiv_authenticate; scrub it so
+    // it does not linger on the stack through the save/return paths (CWE-226).
+    dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
 
     // Write the encrypted blob directly to the YubiKey using the defined tag
     if (ykpiv_save_object(state, MNEMONIC_DATA_TAG(file_num), encrypted_blob, encrypted_blob_size) != YKPIV_OK)
@@ -4001,10 +4021,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNE
     {
         fprintf(stderr, "ERROR: Incorrect PIN. Tries left: %d\n", tries);
         ykpiv_done(state);
+        if (pin) dogecoin_mem_zero(pin, strlen(pin));
         dogecoin_free(pin);
         return false;
     }
 
+    // The PIN is dead after ykpiv_verify; scrub it before releasing the
+    // getpass() buffer back to the allocator (CWE-226).
+    if (pin) dogecoin_mem_zero(pin, strlen(pin));
     dogecoin_free(pin);
 
     // Retrieve the encrypted blob from the YubiKey
