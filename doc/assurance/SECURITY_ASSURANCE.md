@@ -77,7 +77,7 @@ produces. Status reflects the current state, not the plan.
 | Sanitizer CI gate | `make check` under ASan+UBSan | as above, continuous | Gating CI job | Open, draft (PR #328) |
 | Fuzzing | libFuzzer harnesses (tx, block, wtx, logdb, protocol, PSBT, BIP38) | 119/125/787, 400, parser-state confusion | Corpora, crash triage | Infra open (PR #351); PSBT integrated (#357); BIP38 harness pending #351+#277 |
 | Coverage measurement | llvm-cov over fuzz targets | validates fuzzing reach | Reachability report | Open (PR #360) |
-| Constant-time verification | (planned) dudect / binary-level | 208, 385 | Per-function CT verdict | Not yet started |
+| Constant-time verification | dudect / Welch t-test, `-O2` | 208, 385 | Per-function CT verdict | Established (#365); 2 primitives verified |
 | Hand audit | Line-by-line of high-stakes paths | logic flaws tools miss (131, 640-class) | Signed-off review notes | Ongoing (BIP38/sweep, PSBT, key paths) |
 
 Two methods are worth calling out. **Coverage measurement** (PR #360) is what
@@ -85,10 +85,15 @@ turns "the fuzzers ran" into "here is the attack surface they exercise": the
 BIP38 harness, for example, was shown by replay to reach base58 decode but not
 the scrypt/AES stages until a valid-key seed corpus was added, after which
 `ctaes.c` reached ~84% and the EC-multiplied decrypt branch went from zero
-coverage to reached. **Constant-time verification** is declared but not yet
-started — source-level review can flag likely secret-dependent branches, but
-confirming the compiled binary is constant-time under the release toolchain is
-outstanding work, and this document does not claim it.
+coverage to reached. **Constant-time verification** is now established (#365):
+a dudect harness measures the compiled binary at `-O2` via a Welch t-test over
+fixed-vs-random secret input classes. Two primitives are verified constant-time
+— `dogecoin_mem_cmp_ct` (the real exported comparison primitive, linked not
+copied; max |t| = 2.2 over 38M measurements) and BIP38's `bip38_mem_eq` (|t| =
+1.8 over 72M). A positive control that branches on the secret is flagged at
+|t| = 691, confirming the harness can detect a leak and the passes are real.
+Remaining secret-dependent paths beyond these two primitives are not yet
+covered.
 
 ## 4. Findings and disposition
 
@@ -153,6 +158,38 @@ eliminated and the residual four (owned by #325/#326/#327) untouched. See
 *Reconciled against `gh pr list` (authoritative). All PR numbers above are
 confirmed against branch names and titles as of this revision.*
 
+### Key-material lifetime (Tier 1) — CWE-226 audit
+
+A dedicated pass audited every path that handles private keys, seeds, or
+passphrase-derived key material for correct zeroization — checking that secret
+temporaries are scrubbed on *all* exit paths (not only the success path) and
+that the scrub covers the full buffer (not `sizeof` a pointer). The pass found
+a systematic class of leaks spanning the whole key lifecycle: generation,
+derivation, encoding, and at-rest encryption. It also verified the negative
+space (Windows NCrypt path materialises no plaintext; no PKCS11 backend
+exists) and rejected false positives (stack *arrays* where `sizeof` is correct
+in `bip32.c`/`seal.c`).
+
+| Finding | Location | PR | Notes |
+|---|---|---|---|
+| WIF decode zeroed `sizeof(pointer)` (8 B) not the buffer | `src/key.c` | #362 | ~30 B of the decoded private key left in freed heap |
+| eckey constructors never scrubbed the WIF temp | `src/eckey.c` | #362 | Both `new_eckey` paths; all exits |
+| CKD left the retained private-key copy `p` unscrubbed | `src/bip32.c` | #362 | `z` beside it was scrubbed; plain omission |
+| Software seal derived AES keys never scrubbed | `src/seal.c` | #363 | encrypt + decrypt; password was scrubbed but the keys derived from it were not |
+| TPM path returned decrypted **plaintext** to the allocator in the clear | `src/seal.c` | #363 | `Esys_Free` does not zero; the seed/mnemonic itself leaked |
+| YubiKey path: PIN freed without zeroing, mgmt key unscrubbed | `src/seal.c` | #363 | validated against a physical YubiKey 5 (PIV) |
+| Master seed + master hdnode left on the stack in wallet init | `src/wallet.c` | (pending) | **Highest severity** — the HD root; reconstructs every derived key |
+
+Verification: `dogecoin_mem_zero` was confirmed to be a `volatile` byte-wise
+write (`mem.c` → `memset_safe`) that survives `-O2` and is not elidable, so all
+scrubs in this class are effective rather than optimised away. The seal fixes
+were validated against the software path, a Linux TPM (swtpm) simulator, and a
+physical YubiKey; byte-for-byte seed round-trips confirmed. Two incidental
+error-path bugs (an `encrypted_seed` double-free and an `fclose(NULL)`) were
+fixed by the seal-path cleanup consolidation. The `#324`-`#348` series double-
+free work in `#343` overlaps the seal double-free; disposition tracked in #363.
+
+
 ### Tooling and infrastructure
 
 | Item | PR | Status |
@@ -164,6 +201,10 @@ confirmed against branch names and titles as of this revision.*
 | ASAN+UBSAN CI gate | #328 | Open, draft |
 | Function-pointer type-mismatch UB fix (typed trampolines) | #361 | Open — found by this sweep; verified UBSan-clean |
 | PQC test assertions / cmake liboqs / raccoon-g build | #346, #347, #348 | Open |
+| Key-material zeroization (key/eckey/bip32) | #362 | Draft — CWE-226 series |
+| Key-material zeroization (seal: sw/TPM/YubiKey) | #363 | Draft — hardware-validated; overlaps #343 |
+| Constant-time verification tests (dudect) | #365 | Draft — 2 primitives verified |
+| Security assurance case + audit artifacts | #366 | Draft — this document |
 
 ## 5. Independent corroboration
 
@@ -214,15 +255,19 @@ against the BIP38 decrypt harness completed **crash-clean**:
 
 This establishes a crash-clean baseline for the reachable BIP38 decrypt
 surface at the exercised coverage. It is a baseline, not a completeness claim:
-the intermediate-passphrase-code parser is not exercised by this harness (a
-separate harness would be required), and coverage of `bip38.c` remains partial
-per the #360 reachability report.
+coverage of `bip38.c` remains partial per the #360 reachability report. The
+intermediate-passphrase-code and confirmation-code parsers — a distinct
+untrusted-input surface the decrypt harness does not reach — now have their own
+harness and seed generator (reaching `bip38_parse_intermediate_code` and
+`confirm_passphrase_ex`, ~30% of `bip38.c` from the code-parser side), pending
+the same `#351`+`#277` base as the decrypt harness.
 
 ## 7. Declared limits (what this assurance case does NOT establish)
 
-- **No constant-time guarantee.** CT verification is not yet done; timing side
-  channels in key handling are in-scope (Tier 1) but currently only
-  source-reviewed, not binary-verified.
+- **Constant-time verification is partial.** Two core comparison primitives
+  are binary-verified constant-time at `-O2` (#365); other secret-dependent
+  paths (e.g. HMAC comparisons, base58/WIF handling of key bytes) are so far
+  only source-reviewed, not binary-verified.
 - **No Tier 3 coverage.** Microarchitectural, fault-injection, physical, and
   toolchain-compromise attacks are out of scope by declaration.
 - **Bindings audited at the boundary only.** The Python/other bindings are
@@ -258,6 +303,13 @@ appended to Section 5/6.
   — **done: #361**, verified UBSan-clean for that class.
 - Merge the sanitizer sweep as a checked-in assurance artifact
   (`contrib/assurance/sanitizer_sweep.sh` + report); decide on #328.
-- Land #351 → rebase #360 → open the BIP38 harness PR once #277 also lands.
-- Begin constant-time verification (dudect in CI + a one-time binary-level
-  pass on the release toolchain).
+- Land #351 → rebase #360 → open the BIP38 harness PR once #277 also lands
+  (both decrypt and code-parser harnesses + seed generators are staged).
+- Constant-time verification: **established (#365)** for two primitives; extend
+  to remaining secret-dependent paths (HMAC compares, WIF/base58 key handling)
+  and wire the bounded CT gate into CI.
+- Key-material zeroization (CWE-226): key/eckey/bip32 (#362) and seal (#363)
+  drafted; **wallet-init master-seed leak fix pending** (highest severity).
+  Resolve the #343/#363 double-free overlap.
+- Reconcile #366 (this document) against merged PR numbers before un-drafting;
+  it is a living record and should track the series rather than lead it.
