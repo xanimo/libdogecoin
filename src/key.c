@@ -116,7 +116,7 @@ dogecoin_bool dogecoin_privkey_decode_wif(const char* privkey_wif, const dogecoi
         return false;
     }
     memcpy_safe(privkey->privkey, &privkey_data[1], DOGECOIN_ECKEY_PKEY_LENGTH);
-    dogecoin_mem_zero(privkey_data, sizeof(privkey_data));
+    dogecoin_mem_zero(privkey_data, privkey_len);
     dogecoin_free(privkey_data);
     return true;
 }
