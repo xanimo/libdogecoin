@@ -432,18 +432,17 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
         // create a new key
         dogecoin_hdnode node;
         SEED seed;
+        MNEMONIC mnemonic = {0}; // hoisted so the cleanup label can scrub it
 
         if (mnemonic_in) {
             // generate seed from mnemonic
             if (dogecoin_seed_from_mnemonic(mnemonic_in, pass, seed) == -1) {
                 showError("Invalid mnemonic\n");
-                dogecoin_wallet_free(wallet);
-                return NULL;
+                goto created_fail;
             }
         } else if (encrypted && !master_key) {
 
             dogecoin_bool tpmSuccess = false;
-            MNEMONIC mnemonic = {0};
 
             if (tpm) {
                 // decrypt encrypted mnemonic with TPM
@@ -457,16 +456,14 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
             if (!tpmSuccess) {
                 if (!dogecoin_decrypt_mnemonic_with_sw(mnemonic, file_num, NULL, NULL)) {
                     showError("Decrypting mnemonic from software failed\n");
-                    dogecoin_wallet_free(wallet);
-                    return NULL;
+                    goto created_fail;
                 }
             }
 
             // generate seed from mnemonic
             if (dogecoin_seed_from_mnemonic(mnemonic, pass, seed) == -1) {
                 showError("Invalid mnemonic\n");
-                dogecoin_wallet_free(wallet);
-                return NULL;
+                goto created_fail;
             }
         } else if (encrypted && master_key) {
 
@@ -484,8 +481,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
             if (!tpmSuccess) {
                 if (!dogecoin_decrypt_hdnode_with_sw(&node, file_num, NULL, NULL)) {
                     showError("Decrypting master key from software failed\n");
-                    dogecoin_wallet_free(wallet);
-                    return NULL;
+                    goto created_fail;
                 }
             }
         } else {
@@ -493,8 +489,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
             res = dogecoin_random_bytes(seed, sizeof(seed), true);
             if (!res) {
                 showError("Generating random bytes failed\n");
-                dogecoin_wallet_free(wallet);
-                return NULL;
+                goto created_fail;
             }
             if (prompt_ok) {
                 printf("No mnemonic/key, store random seed in encrypted file? (Y/n): ");
@@ -515,8 +510,7 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
                             bool overwrite = (buffer[0] == 'Y' || buffer[0] == 'y');
                             // encrypt seed for storage with software
                             if (dogecoin_encrypt_seed_with_sw(seed, sizeof(seed), file_id, overwrite, NULL, NULL, NULL) == false) {
-                                dogecoin_wallet_free(wallet);
-                                return NULL;
+                                goto created_fail;
                             }
                         }
                     }
@@ -528,6 +522,24 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
             dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
         }
         dogecoin_wallet_set_master_key_copy(wallet, &node);
+
+        goto created_cleanup; // success: skip the failure handler below
+    created_fail:
+        dogecoin_wallet_free(wallet);
+        wallet = NULL;
+    created_cleanup:
+        /* Scrub the master seed, master hdnode, and decrypted mnemonic before
+         * leaving this block (CWE-226). dogecoin_wallet_set_master_key_copy()
+         * deep-copies the key into the wallet, so these stack temporaries are
+         * pure residue afterward; on the failure paths they may hold a
+         * partially-derived secret. dogecoin_mem_zero is a volatile,
+         * non-elidable write. */
+        dogecoin_mem_zero(seed, sizeof(seed));
+        dogecoin_mem_zero(&node, sizeof(node));
+        dogecoin_mem_zero(mnemonic, sizeof(mnemonic));
+        if (!wallet) {
+            return NULL;
+        }
     } else {
         // ensure we have a key/address
         if (wallet->masterkey == NULL && address == NULL) {
