@@ -780,6 +780,7 @@ static struct option long_options[] =
         {"address_index", required_argument, NULL, 'i'},
         {"encrypted_file", required_argument, NULL, 'y'},
         {"use_tpm", no_argument, NULL, 'j'},
+        {"yubikey", no_argument, NULL, 'u'},
         {"command", required_argument, NULL, 'c'},
         {"silent", no_argument, NULL, 'b'},
         {"overwrite", no_argument, NULL, 'w'},
@@ -799,19 +800,19 @@ static void print_usage()
     printf("Usage: such -c <cmd> (-m|-derived_path <bip_derived_path>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-h|-sighash <sighash type>) \
 (-s|-script <script pubkey>) (-i|-input_index <input index>) (-x|-raw_tx <raw hex tx>) (-o|-account_int <account_int>) (-g|-change_level <change_level>) \
 (-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase) (-y|-encrypted_file <file_num 0-999>) (-w[--overwrite]) (-b[--silent]) \
-(-z|-entropy_size <bit_size>) (-j[--use_tpm]) (-t[--testnet]) (-r[--regtest])\n");
+(-z|-entropy_size <bit_size>) (-j[--use_tpm]) (-u[--yubikey]) (-t[--testnet]) (-r[--regtest])\n");
     printf("Available commands:\n");
     printf("generate_public_key (requires -p <wif>),\n");
     printf("p2pkh (requires -k <public key hex>),\n");
     printf("generate_private_key,\n");
-    printf("bip32_extended_master_key (-y <file_num>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
-    printf("generate_mnemonic (-e <hex_entropy> or -y <file_num>, -z <bit_size>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
+    printf("bip32_extended_master_key (-y <file_num>, -j (use_tpm) or -u (yubikey), -w (overwrite) and -b (silent), all optional),\n");
+    printf("generate_mnemonic (-e <hex_entropy> or -y <file_num>, -z <bit_size>, -j (use_tpm) or -u (yubikey), -w (overwrite) and -b (silent), all optional),\n");
     printf("list_encryption_keys_in_tpm,\n");
-    printf("decrypt_master_key (requires -y <file_num>, -j (use_tpm) optional),\n");
-    printf("decrypt_mnemonic (requires -y <file_num>, -j (use_tpm) optional),\n");
-    printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
-    printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
-    printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("decrypt_master_key (requires -y <file_num>, -j (use_tpm) or -u (yubikey) optional),\n");
+    printf("decrypt_mnemonic (requires -y <file_num>, -j (use_tpm) or -u (yubikey) optional),\n");
+    printf("seed_to_master_key (-y <file_num>, -j (use_tpm) or -u (yubikey) optional),\n");
+    printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm) or -u (yubikey), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm) or -u (yubikey), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("slip39_split (requires -x <secret_hex 16..32 bytes>, -o <threshold>, -i <share_count>),\n");
     printf("slip39_recover (requires -x <\"share1 mnemonic\",\"share2 mnemonic\",...>),\n");
     printf("print_keys (requires -p <private key hex>),\n");
@@ -1214,6 +1215,7 @@ int main(int argc, char* argv[])
     MNEMONIC mnemonic = {0};
     SEED seed = {0};
     dogecoin_bool tpm = false;
+    dogecoin_bool yubikey = false;
     dogecoin_bool encrypted = false;
     dogecoin_bool overwrite = false;
     dogecoin_bool silent = false;
@@ -1227,7 +1229,7 @@ int main(int argc, char* argv[])
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwj", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwju", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'p':
                     pkey = optarg;
@@ -1297,7 +1299,20 @@ int main(int argc, char* argv[])
                 case 'j':
                     if (!encrypted)
                         return showError("TPM can only be used with encrypted files");
+                    if (yubikey)
+                        return showError("TPM cannot be combined with YubiKey");
                     tpm = true;
+                    break;
+                case 'u':
+#ifdef USE_YUBIKEY
+                    if (!encrypted)
+                        return showError("YubiKey can only be used with encrypted files");
+                    if (tpm)
+                        return showError("YubiKey cannot be combined with TPM");
+                    yubikey = true;
+#else
+                    return showError("YubiKey support not compiled in (rebuild with --enable-yubikey)");
+#endif
                     break;
                 case 'x':
                     txhex = optarg;
@@ -1444,6 +1459,16 @@ int main(int argc, char* argv[])
                     return showError("Failed to generate/encrypt master key in TPM\n");
                     }
                 }
+
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* generate and encrypt a new hd master key to a YubiKey */
+                if (!dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(&node, file_num, overwrite, NULL)) {
+                    printf("bip32_extended_master_key (-y <file_num>, -u (yubikey) and -w (overwrite), all optional),\n");
+                    return showError("Failed to generate/encrypt master key to YubiKey\n");
+                    }
+                }
+#endif
 
             else {
                 /* generate and encrypt a new hd master key with software */
@@ -2023,6 +2048,16 @@ int main(int argc, char* argv[])
                     }
                 }
 
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* generate mnemonic and encrypt it to a YubiKey */
+                if (!dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(mnemonic, file_num, overwrite, "eng", " ", NULL, NULL)) {
+                    printf("generate_mnemonic -y <file_num>, -u (yubikey), -w (overwrite), -b (silent),\n");
+                    return showError("Failed to generate/encrypt mnemonic to YubiKey\n");
+                    }
+                }
+#endif
+
             else {
                 /* generate mnemonic with software */
                 if (generateRandomEnglishMnemonicSW(mnemonic, file_num, overwrite, NULL, NULL) == false) {
@@ -2090,6 +2125,16 @@ int main(int argc, char* argv[])
                     }
                 }
 
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* decrypt master key from a YubiKey */
+                if (!dogecoin_decrypt_hdnode_with_sw_from_yubikey (&node, file_num, NULL)) {
+                    printf("decrypt_master_key (requires -y <file_num>, -u (yubikey) optional),\n");
+                    return showError("Failed to decrypt master key from YubiKey\n");
+                    }
+                }
+#endif
+
             else {
                 /* decrypt master key from software */
                 if (dogecoin_decrypt_hdnode_with_sw (&node, file_num, NULL, NULL) == false) {
@@ -2138,6 +2183,16 @@ int main(int argc, char* argv[])
                     }
                 }
 
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* decrypt mnemonic from a YubiKey */
+                if (!dogecoin_decrypt_mnemonic_with_sw_from_yubikey (mnemonic, file_num, NULL)) {
+                    printf("decrypt_mnemonic (requires -y <file_num>, -u (yubikey) optional),\n");
+                    return showError("failed to decrypt mnemonic from YubiKey\n");
+                    }
+                }
+#endif
+
             else {
                 /* decrypt mnemonic from software */
                 if (dogecoin_decrypt_mnemonic_with_sw (mnemonic, file_num, NULL, NULL) == false) {
@@ -2181,6 +2236,16 @@ int main(int argc, char* argv[])
                     }
                 }
 
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* get seed from a YubiKey */
+                if (!dogecoin_decrypt_seed_with_sw_from_yubikey (seed, file_num, NULL)) {
+                    printf("seed_to_master_key (requires -y <file_num>, -u (yubikey) optional),\n");
+                    return showError("failed to decrypt seed from YubiKey\n");
+                    }
+                }
+#endif
+
             else {
                 /* get seed from software */
                 if (dogecoin_decrypt_seed_with_sw (seed, file_num, NULL, NULL) == false) {
@@ -2222,6 +2287,16 @@ int main(int argc, char* argv[])
                     return showError("failed to decrypt mnemonic with tpm\n");
                     }
                 }
+
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* get mnemonic from a YubiKey */
+                if (!dogecoin_decrypt_mnemonic_with_sw_from_yubikey (mnemonic, file_num, NULL)) {
+                    printf("mnemonic_to_key (requires -y <file_num>, -u (yubikey) optional),\n");
+                    return showError("failed to decrypt mnemonic from YubiKey\n");
+                    }
+                }
+#endif
 
             else {
                 /* get mnemonic from software */
@@ -2301,6 +2376,16 @@ int main(int argc, char* argv[])
                     return showError("failed to decrypt mnemonic with tpm\n");
                     }
                 }
+
+#ifdef USE_YUBIKEY
+            else if (yubikey) {
+                /* get mnemonic from a YubiKey */
+                if (!dogecoin_decrypt_mnemonic_with_sw_from_yubikey (mnemonic, file_num, NULL)) {
+                    printf("mnemonic_to_addresses (requires -y <file_num>, -u (yubikey), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+                    return showError("failed to decrypt mnemonic from YubiKey\n");
+                    }
+                }
+#endif
 
             else {
                 /* get mnemonic from software */
