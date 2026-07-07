@@ -75,7 +75,7 @@ produces. Status reflects the current state, not the plan.
 | Static analysis (semantic) | clang-tidy `cert-*`,`bugprone-*`,`clang-analyzer-*` | 190, 197, 758, 476, 686 | Advisory report artifact | Landing (PR #359) |
 | Dynamic (sanitizers) | ASan/UBSan over full test suite | 119/125/787, 190, 758, 457 | Clean-run logs per branch | In progress; sweep reproduces #324/#325 on `0.1.5-dev` |
 | Sanitizer CI gate | `make check` under ASan+UBSan | as above, continuous | Gating CI job | Open, draft (PR #328) |
-| Fuzzing | libFuzzer harnesses (tx, block, wtx, logdb, protocol, PSBT, BIP38) | 119/125/787, 400, parser-state confusion | Corpora, crash triage | Infra open (PR #351); PSBT integrated (#357); BIP38 harness pending #351+#277 |
+| Fuzzing | libFuzzer harnesses (tx, block, wtx, logdb, protocol, PSBT, BIP38 decrypt + code parser, wallet records) | 119/125/787, 400, parser-state confusion | Corpora, crash triage | Infra open (#351); PSBT integrated (#357); BIP38 + wallet harnesses staged, pending #351(+#277). **Surface complete** — every untrusted-input parser has a harness |
 | Coverage measurement | llvm-cov over fuzz targets | validates fuzzing reach | Reachability report | Open (PR #360) |
 | Constant-time verification | dudect / Welch t-test, `-O2` | 208, 385 | Per-function CT verdict | Established (#365); 2 primitives verified |
 | Hand audit | Line-by-line of high-stakes paths | logic flaws tools miss (131, 640-class) | Signed-off review notes | Ongoing (BIP38/sweep, PSBT, key paths) |
@@ -223,6 +223,7 @@ free work in `#343` overlaps the seal double-free; disposition tracked in #363.
 | libFuzzer harness infrastructure | #351 | Approved, open |
 | Coverage reachability tooling | #360 | Open, stacked on #351 |
 | PSBT (BIP174) fuzz harness + fixes | #357 | Open |
+| BIP38 + wallet fuzz harnesses (staged on #351) | (pending) | Built + verified; open when #351 lands |
 | ASAN+UBSAN CI gate | #328 | Open, draft |
 | Function-pointer type-mismatch UB fix (typed trampolines) | #361 | Open — found by this sweep; verified UBSan-clean |
 | PQC test assertions / cmake liboqs / raccoon-g build | #346, #347, #348 | Open |
@@ -251,11 +252,21 @@ static build, full `tests` suite).
 
 ## 6. Fuzzing reachability summary
 
+Every untrusted-input parser in the library now has a libFuzzer harness. The
+surface is comprehensive: network messages, transactions, blocks, PSBTs,
+wallet-transaction and logdb records, encrypted BIP38 keys and BIP38
+code-strings, and wallet-file records all have coverage.
+
 | Harness | Surface | Notable result |
 |---|---|---|
-| PSBT (BIP174) | serialized PSBT parsing | reproduced a heap overflow on pre-fix tree (200-byte write into 33-byte pubkey buffer) |
+| tx | transaction deserialize + serialize round-trip | baseline parser coverage |
+| block | block/auxpow-block deserialize | baseline parser coverage |
+| wtx / logdb | wallet-tx and logdb record deserialize | baseline parser coverage |
 | protocol | p2p message deserialization | surfaced the getheaders unbounded allocation (#339), bounded in CI via `-malloc_limit_mb` |
-| BIP38 (pending) | encrypted-key decrypt | seed corpus reaches scrypt (~53%) and AES/ctaes (~84%); EC-multiplied branch reached only after EC-key seed enrichment |
+| PSBT (BIP174) | serialized PSBT parsing | reproduced a heap overflow on pre-fix tree (200-byte write into 33-byte pubkey buffer) |
+| BIP38 decrypt (pending #351+#277) | encrypted-key decrypt | seed corpus reaches scrypt (~53%) and AES/ctaes (~84%); EC branch reached only after EC-key seed enrichment; 4h campaign crash-clean (see below) |
+| BIP38 code parser (pending #351+#277) | intermediate/confirmation code parsing | reaches `bip38_parse_intermediate_code`, `confirm_passphrase_ex`; ~30% of `bip38.c` from the parser side |
+| wallet (pending #351) | wallet-file record deserialize (`wtx_deserialize` + `addr_deserialize`, chaining into `tx_deserialize`) | 11.8M-exec ASan+UBSan run crash-clean, cov 158 / ft 571 / corp 116 — resilient to malformed wallet records |
 
 The coverage tooling (#360) is what makes these numbers assurance evidence
 rather than anecdote: it reports which first-party source the harnesses
@@ -286,6 +297,17 @@ untrusted-input surface the decrypt harness does not reach — now have their ow
 harness and seed generator (reaching `bip38_parse_intermediate_code` and
 `confirm_passphrase_ex`, ~30% of `bip38.c` from the code-parser side), pending
 the same `#351`+`#277` base as the decrypt harness.
+
+### Surface completeness
+
+As of this revision, every untrusted-input parser identified in the threat
+model has a harness. The remaining fuzzing work is depth (longer campaigns,
+richer seed corpora, higher per-file coverage) and CI integration (running the
+harnesses on a cadence, tracking coverage regressions), not breadth — there is
+no known parser reachable from untrusted input that lacks a harness. "Complete"
+here means the *breadth* of the input surface is covered; it does not claim the
+absence of bugs in the covered parsers, only that each has been exercised and
+the reachable-but-crash-clean results are recorded above.
 
 ## 7. Declared limits (what this assurance case does NOT establish)
 
@@ -332,8 +354,11 @@ appended to Section 5/6.
   — **done: #361**, verified UBSan-clean for that class.
 - Merge the sanitizer sweep as a checked-in assurance artifact
   (`contrib/assurance/sanitizer_sweep.sh` + report); decide on #328.
-- Land #351 → rebase #360 → open the BIP38 harness PR once #277 also lands
-  (both decrypt and code-parser harnesses + seed generators are staged).
+- Land #351 → rebase #360 → open the staged fuzz-harness PRs once #351 (and
+  #277 for BIP38) land. Harness *breadth* is complete (BIP38 decrypt + code
+  parser, wallet records, plus the base tx/block/wtx/logdb/protocol/PSBT set);
+  remaining fuzzing work is depth — longer campaigns, richer corpora, CI cadence
+  — not new parsers.
 - Constant-time verification: **established (#365)** for two primitives, and
   the comparison surface is covered (secret-gated compares route through them
   or secp256k1). Remaining CT work is *method*, not more comparison harnesses:
