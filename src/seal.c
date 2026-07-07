@@ -630,6 +630,9 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
                               &scheme,
                               NULL,
                               &cipher);
+    // Scrub the plaintext copy: Esys_RSA_Encrypt has consumed it and `plain`
+    // is not referenced on any subsequent path (success or error) (CWE-226).
+    dogecoin_mem_zero(&plain, sizeof(plain));
     if (result != TSS2_RC_SUCCESS) {
         dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
         Esys_FlushContext(context, keyHandle);
@@ -837,6 +840,12 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
 
     result = Esys_RSA_Decrypt(context, keyHandle, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, &cipher, &scheme, &label, &plain);
     if (result != TSS2_RC_SUCCESS || plain == NULL || plain->size > out_size) {
+        // On the size-overflow branch the decrypt succeeded, so `plain` holds
+        // recovered plaintext; scrub it before Esys_Free returns it to the heap
+        // allocator (CWE-226). tpm_cleanup/Esys_Free do not zero.
+        if (plain != NULL) {
+            dogecoin_mem_zero(plain->buffer, sizeof(plain->buffer));
+        }
         tpm_cleanup(NULL, plain, TPM_CLEANUP_SENTINEL);
         Esys_TR_Close(context, &keyHandle);
         tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
@@ -847,6 +856,8 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     if (actual_size) {
         *actual_size = plain->size;
     }
+    // Scrub the recovered plaintext before freeing the ESAPI buffer (CWE-226).
+    dogecoin_mem_zero(plain->buffer, sizeof(plain->buffer));
     tpm_cleanup(NULL, plain, TPM_CLEANUP_SENTINEL);
     Esys_TR_Close(context, &keyHandle);
     tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
