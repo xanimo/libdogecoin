@@ -92,7 +92,32 @@ fixed-vs-random secret input classes. Two primitives are verified constant-time
 copied; max |t| = 2.2 over 38M measurements) and BIP38's `bip38_mem_eq` (|t| =
 1.8 over 72M). A positive control that branches on the secret is flagged at
 |t| = 691, confirming the harness can detect a leak and the passes are real.
-Remaining secret-dependent paths beyond these two primitives are not yet
+
+A survey of the remaining secret-dependent comparison surface found that the
+library's CT coverage is **structurally more complete than two primitives
+suggests**, because the secret-gated comparisons in the codebase route through
+those verified primitives rather than through ad-hoc `memcmp`:
+
+- The seal verification-hash checks (`seal.c`, three sites) use
+  `dogecoin_mem_cmp_ct` — the verified primitive.
+- The BIP38 address-hash checks (`bip38.c`) use `bip38_mem_eq` — the verified
+  primitive.
+- Private-key validity checking delegates to `secp256k1_ec_seckey_verify`,
+  which is constant-time by upstream design.
+- The residual `memcmp` sites (base58 checksum compare, BIP38 magic-prefix
+  compare) operate on **public** values, not secrets, so they are not
+  CT-relevant even though `memcmp` is not itself constant-time.
+
+One path was examined and found **not cleanly verifiable by this method**:
+`dogecoin_base58_decode` has legitimate input-length- and magnitude-dependent
+loop counts, so a fixed-vs-random-*value* dudect comparison cannot isolate a
+value-dependent signal — a large deliberately-injected leak failed to move the
+t-statistic (the positive control did not fire), so no trustworthy verdict can
+be given by dudect here. Its threat-model exposure is low regardless (WIF
+decode is a local one-shot import, not an attacker-repeatable oracle), so it is
+recorded as a declared limitation rather than a verified pass or a known leak.
+Extending CT verification therefore means new *methods* for non-fixed-time
+operations, not more dudect comparison harnesses — the comparison surface is
 covered.
 
 ## 4. Findings and disposition
@@ -264,10 +289,14 @@ the same `#351`+`#277` base as the decrypt harness.
 
 ## 7. Declared limits (what this assurance case does NOT establish)
 
-- **Constant-time verification is partial.** Two core comparison primitives
-  are binary-verified constant-time at `-O2` (#365); other secret-dependent
-  paths (e.g. HMAC comparisons, base58/WIF handling of key bytes) are so far
-  only source-reviewed, not binary-verified.
+- **Constant-time verification is scoped, not absent.** Two core comparison
+  primitives are binary-verified constant-time at `-O2` (#365), and the
+  library's secret-gated comparisons route through them (seal and BIP38 hash
+  checks) or through secp256k1; the remaining `memcmp` sites compare public
+  values. What is *not* established: CT of non-fixed-time operations that
+  process secret bytes (e.g. base58 decode of a WIF), which are not cleanly
+  measurable by fixed-vs-random-value dudect and would need a different method.
+  Their threat-model exposure is low (local import, not an attacker oracle).
 - **No Tier 3 coverage.** Microarchitectural, fault-injection, physical, and
   toolchain-compromise attacks are out of scope by declaration.
 - **Bindings audited at the boundary only.** The Python/other bindings are
@@ -305,9 +334,11 @@ appended to Section 5/6.
   (`contrib/assurance/sanitizer_sweep.sh` + report); decide on #328.
 - Land #351 → rebase #360 → open the BIP38 harness PR once #277 also lands
   (both decrypt and code-parser harnesses + seed generators are staged).
-- Constant-time verification: **established (#365)** for two primitives; extend
-  to remaining secret-dependent paths (HMAC compares, WIF/base58 key handling)
-  and wire the bounded CT gate into CI.
+- Constant-time verification: **established (#365)** for two primitives, and
+  the comparison surface is covered (secret-gated compares route through them
+  or secp256k1). Remaining CT work is *method*, not more comparison harnesses:
+  a technique for non-fixed-time operations (base58/bignum) if their exposure
+  is ever reclassified upward, and wiring the bounded CT gate into CI.
 - Key-material zeroization (CWE-226): key/eckey/bip32 (#362) and seal (#363)
   drafted; **wallet-init master-seed leak fix pending** (highest severity).
   Resolve the #343/#363 double-free overlap.
