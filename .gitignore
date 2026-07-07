@@ -177,6 +177,7 @@ fuzz/fuzz_tx
 fuzz/fuzz_block
 fuzz/fuzz_protocol
 fuzz/fuzz_psbt
+fuzz/fuzz_wallet
 fuzz/*.bin
 crash-*
 oom-*
