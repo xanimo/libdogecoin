@@ -107,15 +107,34 @@ static working_transaction* new_transaction_locked(dogecoin_transaction_context*
     return working_tx;
 }
 
+/* Dispose of an entry that is already unlinked from the registry. Frees it now
+   when unreferenced; otherwise marks it so the last release_transaction_locked()
+   performs the free. Caller MUST hold ctx->lock. */
+static void dispose_unlinked_transaction_locked(working_transaction *working_tx) {
+    if (working_tx->refcount > 0) {
+        /* A holder from find_transaction_ts() is still using it; defer the free
+           to the last release. The entry is already out of the registry. */
+        working_tx->pending_delete = 1;
+        return;
+    }
+    dogecoin_tx_free(working_tx->transaction);
+    dogecoin_free(working_tx);
+}
+
 static void add_transaction_locked(dogecoin_transaction_context* ctx, working_transaction *working_tx) {
     working_transaction *tx;
     HASH_FIND_INT(ctx->transactions, &working_tx->idx, tx);
     if (tx == NULL) {
         HASH_ADD_INT(ctx->transactions, idx, working_tx);
-    } else {
-        HASH_REPLACE_INT(ctx->transactions, idx, working_tx, tx);
+        return;
     }
-    dogecoin_free(tx);
+    /* Idx collision: HASH_REPLACE_INT unlinks the displaced entry. It may still
+       be retained by a find_transaction_ts() holder, so it goes through the same
+       deferred-delete path as an explicit removal rather than a bare free --
+       which would both strand tx->transaction and free memory out from under
+       that holder. */
+    HASH_REPLACE_INT(ctx->transactions, idx, working_tx, tx);
+    dispose_unlinked_transaction_locked(tx);
 }
 
 static working_transaction* find_transaction_locked(dogecoin_transaction_context* ctx, int idx) {
@@ -126,14 +145,7 @@ static working_transaction* find_transaction_locked(dogecoin_transaction_context
 
 static void remove_transaction_locked(dogecoin_transaction_context* ctx, working_transaction *working_tx) {
     HASH_DEL(ctx->transactions, working_tx); /* unlink so no new finder can reach it */
-    if (working_tx->refcount > 0) {
-        /* A holder from find_transaction_ts() is still using it; defer the free
-           to the last release. The entry is already out of the registry. */
-        working_tx->pending_delete = 1;
-        return;
-    }
-    dogecoin_tx_free(working_tx->transaction);
-    dogecoin_free(working_tx);
+    dispose_unlinked_transaction_locked(working_tx);
 }
 
 /* Drop a reference taken by find_transaction_ts(). Caller MUST hold ctx->lock.
