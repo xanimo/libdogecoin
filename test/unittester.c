@@ -72,6 +72,7 @@ extern void test_smpv();
 extern void test_signmsg_ext();
 extern void test_signmsg_ts_contexts();
 extern void test_eckey_ts_retain_release();
+extern void test_eckey_ts_replace_retained();
 extern void test_tpm();
 extern void test_psbt();
 extern void test_transaction();
@@ -196,6 +197,7 @@ int main()
     u_run_test(test_signmsg_ext);
     u_run_test(test_signmsg_ts_contexts);
     u_run_test(test_eckey_ts_retain_release);
+    u_run_test(test_eckey_ts_replace_retained);
     u_run_test(test_smpv);
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);

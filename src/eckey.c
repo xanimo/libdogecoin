@@ -42,15 +42,26 @@ static dogecoin_eckey_context* default_eckey_context(void) {
  * Raw uthash operations with no locking, so the public _ts entry points and the
  * composed start/free paths take the lock once and stay deadlock-free on the
  * non-recursive mutex. */
+
+/* Dispose of a key already unlinked from the registry: defer if a find_eckey_ts()
+   holder still references it, otherwise cleanse and free now. Defined below with
+   the lifetime helpers it depends on. Caller MUST hold ctx->lock. */
+static void dispose_unlinked_eckey_locked(dogecoin_eckey_context* ctx, eckey* key);
+
 static void add_eckey_locked(dogecoin_eckey_context* ctx, eckey *key) {
     eckey* key_old;
     HASH_FIND_INT(ctx->keys, &key->idx, key_old);
     if (key_old == NULL) {
         HASH_ADD_INT(ctx->keys, idx, key);
-    } else {
-        HASH_REPLACE_INT(ctx->keys, idx, key, key_old);
+        return;
     }
-    dogecoin_free(key_old);
+    /* Idx collision: HASH_REPLACE_INT unlinks the displaced key. It may still be
+       retained by a find_eckey_ts() holder, so dispose of it through the same
+       deferred-delete path as an explicit removal rather than a bare free --
+       which would free it out from under that holder AND skip
+       destroy_eckey_locked()'s cleanse, leaving private-key bytes in freed heap. */
+    HASH_REPLACE_INT(ctx->keys, idx, key, key_old);
+    dispose_unlinked_eckey_locked(ctx, key_old);
 }
 
 static eckey* find_eckey_locked(dogecoin_eckey_context* ctx, int idx) {
@@ -94,8 +105,10 @@ static void destroy_eckey_locked(eckey* key) {
     dogecoin_key_free(key);
 }
 
-static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
-    HASH_DEL(ctx->keys, key); /* unlink so no new finder can reach it */
+/* Dispose of a key that is already unlinked from ctx->keys. If a find_eckey_ts()
+   holder still references it, mark its lifetime pending_delete so the last
+   release_eckey_locked() performs the cleanse+free; otherwise do it now. */
+static void dispose_unlinked_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
     eckey_lifetime* lt = find_lifetime_locked(ctx, key);
     if (lt && lt->refcount > 0) {
         /* A holder from find_eckey_ts() is still using it; defer the free to the
@@ -105,6 +118,11 @@ static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
     }
     drop_lifetime_locked(ctx, lt);
     destroy_eckey_locked(key);
+}
+
+static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    HASH_DEL(ctx->keys, key); /* unlink so no new finder can reach it */
+    dispose_unlinked_eckey_locked(ctx, key);
 }
 
 /* Drop a reference taken by find_eckey_ts(). Caller MUST hold ctx->lock. Frees
