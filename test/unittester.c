@@ -76,6 +76,7 @@ extern void test_tpm();
 extern void test_psbt();
 extern void test_transaction();
 extern void test_transaction_ts_contexts();
+extern void test_transaction_ts_replace_retained();
 extern void test_transaction_ts_wrappers();
 #if !defined(_WIN32)
 extern void test_transaction_ts_multithread_stress();
@@ -202,6 +203,7 @@ int main()
     u_run_test(test_psbt);
     u_run_test(test_transaction);
     u_run_test(test_transaction_ts_contexts);
+    u_run_test(test_transaction_ts_replace_retained);
 #ifndef USE_OPTEE
     u_run_test(test_transaction_ts_wrappers);
 #if !defined(_WIN32)

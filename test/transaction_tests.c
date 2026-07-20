@@ -847,6 +847,45 @@ void test_transaction_ts_contexts() {
     dogecoin_transaction_context_free(ctx2);
 }
 
+/* Regression: an idx collision inside add_transaction_locked() must not free an
+   entry that a find_transaction_ts() holder still references. new ids are minted
+   as HASH_COUNT()+1, so ids recycle after a removal and a fresh start can collide
+   with a retained-but-lower entry. Before the fix the collision path raw-freed
+   the displaced entry (bypassing pending_delete), leaving the holder with a
+   dangling pointer and stranding tx->transaction. Deterministic; ASan/TSan trap
+   the use-after-free directly. */
+void test_transaction_ts_replace_retained() {
+    dogecoin_transaction_context* ctx = dogecoin_transaction_context_new();
+    u_assert_true(ctx != NULL);
+
+    int a = start_transaction_ts(ctx);          /* idx 1 */
+    int b = start_transaction_ts(ctx);          /* idx 2 */
+    u_assert_int_eq(a, 1);
+    u_assert_int_eq(b, 2);
+
+    /* Drop the lower id so the next mint recomputes idx = HASH_COUNT+1 = 2 == b. */
+    clear_transaction_ts(ctx, a);
+    u_assert_int_eq(get_transaction_count_ts(ctx), 1);
+
+    /* Legitimately retain entry b per the find/release contract. */
+    working_transaction* held = find_transaction_ts(ctx, b);
+    u_assert_true(held != NULL);
+
+    /* Collides with the retained entry b -> HASH_REPLACE displaces it. */
+    int c = start_transaction_ts(ctx);
+    u_assert_int_eq(c, b);
+
+    /* Touch the still-retained entry: must remain valid (deferred delete). */
+    u_assert_int_eq(held->idx, b);
+
+    /* Contract-mandated release now completes the deferred free without a
+       double free. */
+    release_transaction_ts(ctx, held);
+
+    remove_all_ts(ctx);
+    dogecoin_transaction_context_free(ctx);
+}
+
 void test_transaction_ts_wrappers() {
     dogecoin_tx* tx = dogecoin_tx_new_ts();
     u_assert_not_null(tx);
