@@ -578,3 +578,58 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t 
         dogecoin_btree_tsearch(db->chainbottom, &db->tree_root, dogecoin_header_compare);
     }
 }
+
+/* ---------------------------------------------------------------------------
+ * Interface trampolines
+ *
+ * dogecoin_headers_db_interface stores its members with generic (void*)
+ * signatures. The concrete functions above take a typed (dogecoin_headers_db*)
+ * first argument. Assigning them into the interface by casting the *function
+ * pointer* is undefined behaviour (C §6.3.2.3/8): calling a function through a
+ * pointer of an incompatible type. UBSan (-fsanitize=function) flags this at
+ * every call through the interface.
+ *
+ * These trampolines carry the exact generic signature the interface declares,
+ * cast only the *data pointer* (which is well defined), and forward to the
+ * typed function. This removes the undefined behaviour without changing the
+ * interface shape or the typed functions themselves.
+ * ------------------------------------------------------------------------- */
+static void* headers_db_if_init(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only) {
+    return dogecoin_headers_db_new(chainparams, inmem_only);
+}
+static void headers_db_if_free(void* db) {
+    dogecoin_headers_db_free((dogecoin_headers_db*)db);
+}
+static dogecoin_bool headers_db_if_load(void* db, const char* filename, dogecoin_bool prompt) {
+    return dogecoin_headers_db_load((dogecoin_headers_db*)db, filename, prompt);
+}
+static void headers_db_if_fill_blocklocator_tip(void* db, vector_t* blocklocators) {
+    dogecoin_headers_db_fill_block_locator((dogecoin_headers_db*)db, blocklocators);
+}
+static dogecoin_blockindex* headers_db_if_connect_hdr(void* db, struct const_buffer* buf, dogecoin_bool load_process, dogecoin_bool* connected) {
+    return dogecoin_headers_db_connect_hdr((dogecoin_headers_db*)db, buf, load_process, connected);
+}
+static dogecoin_blockindex* headers_db_if_getchaintip(void* db) {
+    return dogecoin_headersdb_getchaintip((dogecoin_headers_db*)db);
+}
+static dogecoin_bool headers_db_if_disconnect_tip(void* db) {
+    return dogecoin_headersdb_disconnect_tip((dogecoin_headers_db*)db);
+}
+static dogecoin_bool headers_db_if_has_checkpoint_start(void* db) {
+    return dogecoin_headersdb_has_checkpoint_start((dogecoin_headers_db*)db);
+}
+static void headers_db_if_set_checkpoint_start(void* db, uint256_t hash, uint32_t height, arith_uint256 chainwork) {
+    dogecoin_headersdb_set_checkpoint_start((dogecoin_headers_db*)db, hash, height, chainwork);
+}
+
+const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = {
+    headers_db_if_init,
+    headers_db_if_free,
+    headers_db_if_load,
+    headers_db_if_fill_blocklocator_tip,
+    headers_db_if_connect_hdr,
+    headers_db_if_getchaintip,
+    headers_db_if_disconnect_tip,
+    headers_db_if_has_checkpoint_start,
+    headers_db_if_set_checkpoint_start
+};

@@ -366,6 +366,16 @@ void set_wallet_filename(dogecoin_wallet* wallet, const dogecoin_chainparams *pa
     memcpy_safe((char*)wallet->filename + path_size + delim_size + chain_size, file_suffix, file_size);
 }
 
+/* Trampolines carrying vector's generic void(*)(void*) free signature; casting
+ * the typed *_free function pointers directly would be UB (flagged by
+ * -fsanitize=function). These cast only the data pointer. */
+static void dogecoin_wallet_wtx_free_tramp(void* p) {
+    dogecoin_wallet_wtx_free((dogecoin_wtx*)p);
+}
+static void dogecoin_wallet_addr_free_tramp(void* p) {
+    dogecoin_wallet_addr_free((dogecoin_wallet_addr*)p);
+}
+
 dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
 {
     dogecoin_wallet* wallet = dogecoin_calloc(1, sizeof(*wallet));
@@ -376,9 +386,9 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     wallet->utxos = 0;
     wallet->unspent_rbtree = 0;
     wallet->spends_rbtree = 0;
-    wallet->vec_wtxes = vector_new(10, (void (*)(void *)) dogecoin_wallet_wtx_free);
+    wallet->vec_wtxes = vector_new(10, dogecoin_wallet_wtx_free_tramp);
     wallet->wtxes_rbtree = 0;
-    wallet->waddr_vector = vector_new(10, (void (*)(void *)) dogecoin_wallet_addr_free);
+    wallet->waddr_vector = vector_new(10, dogecoin_wallet_addr_free_tramp);
     wallet->waddr_rbtree = 0;
     return wallet;
 }
