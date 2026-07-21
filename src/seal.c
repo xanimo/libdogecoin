@@ -1592,7 +1592,6 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
     if (decrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES decryption failed.\n");
-        dogecoin_free(encrypted_seed);
         return false;
     }
 
