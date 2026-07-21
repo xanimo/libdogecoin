@@ -22,18 +22,35 @@
 static int cstr_alloc_min_sz(cstring* s, size_t sz)
 {
     unsigned int shift;
-    unsigned int al_sz;
+    size_t al_sz;
     char* new_s;
 
+    /* Reject a size that would overflow when the NUL-overhead byte is added.
+       Without this, sz++ wraps to 0 and the rounding loop below would pick an
+       allocation far smaller than the caller asked for. */
+    if (sz == (size_t)-1) {
+        return 0;
+    }
     sz++; /* NULL overhead */
 
     if (s->alloc && (s->alloc >= sz)) {
         return 1;
     }
 
+    /* Round up to the next power of two. al_sz and the shift are computed in
+       size_t: the previous code used a 32-bit unsigned int and shifted a
+       signed int literal (1 << shift), which is undefined once shift reaches
+       31 and, for sizes above 2^31, either looped without terminating or
+       produced an allocation smaller than sz -- a heap overflow when the
+       caller (e.g. logdb record deserialization) then wrote sz bytes into it. */
     shift = 3;
-    while ((al_sz = (1 << shift)) < sz) {
+    while (shift < sizeof(size_t) * 8 && ((al_sz = ((size_t)1 << shift)) < sz)) {
         shift++;
+    }
+    /* If sz exceeds the largest representable power of two, fail rather than
+       wrap. */
+    if (shift >= sizeof(size_t) * 8) {
+        return 0;
     }
 
     new_s = dogecoin_realloc(s->str, al_sz);
