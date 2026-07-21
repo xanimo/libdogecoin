@@ -39,6 +39,12 @@
 
 /* reduce sha256 hash to 8 bytes for checksum */
 #define kLOGDB_DEFAULT_HASH_LEN 16
+
+/* Upper bound on a single record's key or value length read from a logdb file.
+   A logdb record carries serialized wallet/chain data; 64 MiB is far above any
+   legitimate record while rejecting corrupt or hostile lengths (up to the 4 GiB
+   a uint32 varint can encode) before they reach the allocator. */
+#define LOGDB_MAX_RECORD_LEN (64u * 1024u * 1024u)
 #define kLOGDB_DEFAULT_VERSION 1
 
 static const unsigned char file_hdr_magic[4] = {0xF9, 0xAA, 0x03, 0xBA}; /* header magic */
@@ -563,8 +569,13 @@ logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enu
     unsigned char check[SHA256_DIGEST_LENGTH];
 
     /* prepate a buffer for the varint data (max 4 bytes) */
-    size_t buflen = sizeof(uint32_t);
-    uint8_t readbuf[sizeof(uint32_t)];
+    /* deser_varlen_file() writes the length prefix byte followed by up to a
+       uint32 of length data, so the buffer must hold sizeof(uint32_t) + 1
+       bytes. The previous sizeof(uint32_t) buffer was one byte too small and
+       overflowed by one byte on the wire (a stack buffer overflow driven by
+       untrusted record lengths). */
+    size_t buflen = sizeof(uint32_t) + 1;
+    uint8_t readbuf[sizeof(uint32_t) + 1];
 
     *error = LOGDB_SUCCESS;
 
@@ -600,9 +611,18 @@ logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enu
         return false;
     }
 
+    /* len is read straight from the file. Reject absurd lengths before resizing
+       so a corrupt or hostile record cannot drive a multi-gigabyte allocation
+       (memory-exhaustion DoS), and check the resize result rather than writing
+       into a buffer that may not have been grown. */
+    if (len > LOGDB_MAX_RECORD_LEN || !cstr_resize(rec->key, len))
+    {
+        *error = LOGDB_ERROR_DATASTREAM_ERROR;
+        return false;
+    }
+
     sha256_write(&ctx, readbuf, buflen);
 
-    cstr_resize(rec->key, len);
     if (fread(rec->key->str, 1, len, db->file) != len)
     {
         *error = LOGDB_ERROR_DATASTREAM_ERROR;
@@ -614,8 +634,14 @@ logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enu
     if (rec->mode == RECORD_TYPE_WRITE)
     {
         /* read value (not for delete mode) */
-        buflen = sizeof(uint32_t);
+        buflen = sizeof(uint32_t) + 1;
         if (!deser_varlen_file(&len, db->file, readbuf, &buflen))
+        {
+            *error = LOGDB_ERROR_DATASTREAM_ERROR;
+            return false;
+        }
+
+        if (len > LOGDB_MAX_RECORD_LEN || !cstr_resize(rec->value, len))
         {
             *error = LOGDB_ERROR_DATASTREAM_ERROR;
             return false;
@@ -623,7 +649,6 @@ logdb_bool logdb_record_deser_from_file(logdb_record* rec, logdb_log_db *db, enu
 
         sha256_write(&ctx, readbuf, buflen);
 
-        cstr_resize(rec->value, len);
         if (fread(rec->value->str, 1, len, db->file) != len)
         {
             *error = LOGDB_ERROR_DATASTREAM_ERROR;
