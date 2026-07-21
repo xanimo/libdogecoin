@@ -185,7 +185,7 @@ dogecoin_bool dogecoin_hdnode_public_ckd(dogecoin_hdnode* inout, uint32_t i)
 
     sha256_raw(inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH, fingerprint);
     rmd160(fingerprint, 32, fingerprint);
-    inout->fingerprint = (fingerprint[0] << 24) + (fingerprint[1] << 16) + (fingerprint[2] << 8) + fingerprint[3];
+    inout->fingerprint = ((uint32_t)fingerprint[0] << 24) | ((uint32_t)fingerprint[1] << 16) | ((uint32_t)fingerprint[2] << 8) | (uint32_t)fingerprint[3];
 
     dogecoin_mem_zero(inout->private_key, 32);
 
@@ -237,8 +237,8 @@ dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i)
 
     sha256_raw(inout->public_key, DOGECOIN_ECKEY_COMPRESSED_LENGTH, fingerprint);
     rmd160(fingerprint, 32, fingerprint);
-    inout->fingerprint = (fingerprint[0] << 24) + (fingerprint[1] << 16) +
-                         (fingerprint[2] << 8) + fingerprint[3];
+    inout->fingerprint = ((uint32_t)fingerprint[0] << 24) | ((uint32_t)fingerprint[1] << 16) |
+                         ((uint32_t)fingerprint[2] << 8) | (uint32_t)fingerprint[3];
 
     dogecoin_mem_zero(fingerprint, sizeof(fingerprint));
     memcpy_safe(p, inout->private_key, DOGECOIN_ECKEY_PKEY_LENGTH);
