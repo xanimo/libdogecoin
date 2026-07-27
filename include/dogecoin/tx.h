@@ -67,6 +67,8 @@ typedef struct dogecoin_tx_ {
     vector_t* vin;
     vector_t* vout;
     uint32_t locktime;
+    dogecoin_bool thread_safe;
+    dogecoin_mutex_t lock;
 } dogecoin_tx;
 
 //!p2pkh utilities
@@ -90,7 +92,7 @@ LIBDOGECOIN_API void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_out_deserialize(dogecoin_tx_out* tx_out, struct const_buffer* buf);
 LIBDOGECOIN_API void dogecoin_tx_out_serialize(cstring* s, const dogecoin_tx_out* tx_out);
 
-//!create a new tx input
+/* NOT THREAD-SAFE - use dogecoin_tx_new_ts() for shared transaction mutation */
 LIBDOGECOIN_API dogecoin_tx* dogecoin_tx_new();
 LIBDOGECOIN_API void dogecoin_tx_free(dogecoin_tx* tx);
 LIBDOGECOIN_API void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src);

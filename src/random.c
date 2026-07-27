@@ -85,12 +85,22 @@ extern NTSTATUS WINAPI BCryptGenRandom(BCRYPT_ALG_HANDLE, UCHAR*, ULONG, ULONG);
 /* BCryptGenRandom with the BCRYPT_USE_SYSTEM_PREFERRED_RNG flag works only
    starting with Windows 7.  */
 typedef NTSTATUS(WINAPI* BCryptGenRandomFuncType) (BCRYPT_ALG_HANDLE, UCHAR*, ULONG, ULONG);
-static BCryptGenRandomFuncType BCryptGenRandomFunc = NULL;
-static BOOL initialized = FALSE;
 
-static void
-initialize(void)
+/* These are published exactly once by rng_initialize_once() under
+   InitOnceExecuteOnce(), so concurrent first use can neither double-initialize
+   nor observe a half-initialized loader. After the one-time init completes they
+   are immutable and may be read locklessly. */
+static BCryptGenRandomFuncType BCryptGenRandomFunc = NULL;
+static HCRYPTPROV crypt_provider = 0;
+static int crypt_provider_ok = 0;
+static INIT_ONCE rng_init_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK
+rng_initialize_once(PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context)
     {
+    (void)InitOnce;
+    (void)Parameter;
+    (void)Context;
     HMODULE bcrypt = LoadLibrary("bcrypt.dll");
     if (bcrypt != NULL)
         {
@@ -100,7 +110,11 @@ initialize(void)
             (BCryptGenRandomFuncType)GetProcAddress(bcrypt, "BCryptGenRandom"); // TODO: find specific type to cast to when building mingw32
         #pragma GCC diagnostic pop
         }
-    initialized = TRUE;
+    /* Acquire the deprecated CryptGenRandom provider as a fallback for systems
+       where BCryptGenRandom is unavailable. */
+    if (CryptAcquireContextA(&crypt_provider, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFY_CONTEXT))
+        crypt_provider_ok = 1;
+    return TRUE;
     }
 
 # else
@@ -112,7 +126,7 @@ void dogecoin_random_init_internal(void);
 dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const uint8_t update_seed);
 
 static const dogecoin_rnd_mapper default_rnd_mapper = { dogecoin_random_init_internal, dogecoin_random_bytes_internal };
-static dogecoin_rnd_mapper current_rnd_mapper = { dogecoin_random_init_internal, dogecoin_random_bytes_internal };
+static DOGECOIN_THREAD_LOCAL dogecoin_rnd_mapper current_rnd_mapper = { dogecoin_random_init_internal, dogecoin_random_bytes_internal };
 
 void dogecoin_rnd_set_mapper_default()
     {
@@ -149,7 +163,7 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     }
 #else
 /* Define a function pointer for random */
-int (*rng_ptr) (void*, size_t) = NULL;
+DOGECOIN_THREAD_LOCAL int (*rng_ptr) (void*, size_t) = NULL;
 void set_rng(int (*ptr)(void *, size_t))
     {
     rng_ptr = ptr;
@@ -165,40 +179,28 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
          <https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom>
          with the BCRYPT_USE_SYSTEM_PREFERRED_RNG flag
          works in Windows 7 and newer.  */
-    static int bcrypt_not_working /* = 0 */;
-    if (!bcrypt_not_working) {
 #if !HAVE_LIB_BCRYPT
-        if (!initialized)
-            initialize();
-#endif
-        if (BCryptGenRandomFunc != NULL
-            && BCryptGenRandomFunc(NULL, buf, len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0 /*STATUS_SUCCESS*/)
-            return 1;
-        bcrypt_not_working = 1;
-        }
-#if !HAVE_LIB_BCRYPT
+    /* One-time, race-free loader: resolves BCryptGenRandom and acquires the
+       legacy CryptGenRandom provider exactly once across all threads. */
+    InitOnceExecuteOnce(&rng_init_once, rng_initialize_once, NULL, NULL);
+    if (BCryptGenRandomFunc != NULL
+        && BCryptGenRandomFunc(NULL, buf, len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0 /*STATUS_SUCCESS*/)
+        return 1;
     /* CryptGenRandom, defined in <wincrypt.h>
        <https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenrandom>
        works in older releases as well, but is now deprecated.
        CryptAcquireContext, defined in <wincrypt.h>
        <https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptacquirecontexta>  */
-    {
-    static int crypt_initialized /* = 0 */;
-    static HCRYPTPROV provider;
-    if (!crypt_initialized) {
-        if (CryptAcquireContextA(&provider, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFY_CONTEXT))
-            crypt_initialized = 1;
-        else
-            crypt_initialized = -1;
-        }
-    if (crypt_initialized >= 0) {
-        if (!CryptGenRandom(provider, len, buf)) {
+    if (crypt_provider_ok) {
+        if (!CryptGenRandom(crypt_provider, len, buf)) {
             errno = EIO;
             return -1;
             }
         return 1;
         }
-    }
+# else
+    if (BCryptGenRandomFunc(NULL, buf, len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0 /*STATUS_SUCCESS*/)
+        return 1;
 # endif
     errno = ENOSYS;
     return -1;

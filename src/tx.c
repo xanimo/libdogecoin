@@ -175,6 +175,10 @@ dogecoin_tx_out* dogecoin_tx_out_new()
  */
 void dogecoin_tx_free(dogecoin_tx* tx)
 {
+    if (!tx) return;
+    if (tx->lock.initialized) {
+        dogecoin_mutex_destroy(&tx->lock);
+    }
     if (tx->vin) {
         vector_free(tx->vin, true);
         tx->vin = NULL;
@@ -403,6 +407,8 @@ dogecoin_tx* dogecoin_tx_new()
     tx->vout = vector_new(8, dogecoin_tx_out_free_cb);
     tx->version = 1;
     tx->locktime = 0;
+    tx->thread_safe = false;
+    tx->lock.initialized = false;
     return tx;
 }
 

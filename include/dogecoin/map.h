@@ -75,7 +75,7 @@ typedef struct hash {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static hash *hashes = NULL;
+static DOGECOIN_THREAD_LOCAL hash *hashes = NULL;
 #pragma GCC diagnostic pop
 
 // instantiates a new hash
@@ -99,7 +99,7 @@ typedef struct map {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static map *maps = NULL;
+static DOGECOIN_THREAD_LOCAL map *maps = NULL;
 #pragma GCC diagnostic pop
 
 // instantiates a new map

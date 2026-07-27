@@ -58,6 +58,7 @@
 #include <dogecoin/tool.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/threadsafe.h>
 
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
@@ -148,8 +149,12 @@ int main(int argc, char* argv[]) {
     if (data == NULL) {
         return showError("Transaction is invalid or too large.\n");
         }
+
+    dogecoin_ctx* ts_ctx = cli_ts_context_start("sendtx", chain == &dogecoin_chainparams_test);
+
     size_t data_hex_len = strspn(data, VALID_HEX_CHARS);
     if (data_hex_len == 0 || (data_hex_len % 2) != 0 || data[data_hex_len] != '\0' || data_hex_len > DOGECOIN_MAX_TX_HEX_LEN - 1) {
+        cli_ts_context_finish(ts_ctx);
         return showError("Transaction is invalid or too large.\n");
         }
     uint8_t* data_bin = dogecoin_malloc(data_hex_len / 2 + 1);
@@ -169,5 +174,6 @@ int main(int argc, char* argv[]) {
     dogecoin_free(data_bin);
     dogecoin_tx_free(tx);
 
+    cli_ts_context_finish(ts_ctx);
     return ret;
     }

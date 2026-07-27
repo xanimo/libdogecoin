@@ -47,6 +47,8 @@
 #include <dogecoin/wallet.h>
 #include <dogecoin/seal.h>
 
+const dogecoin_chainparams* dogecoin_context_get_chainparams(const struct dogecoin_context_* ctx);
+
 #define COINBASE_MATURITY 100
 
 uint8_t WALLET_DB_REC_TYPE_MASTERPUBKEY = 0;
@@ -57,6 +59,20 @@ uint8_t WALLET_DB_REC_TYPE_TX = 2;
 static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* header magic */
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
 static const uint32_t current_version = 1;
+
+static void wallet_lock(dogecoin_wallet* wallet)
+{
+    if (!wallet) return;
+    if (!wallet->thread_safe) return;
+    dogecoin_mutex_lock(&wallet->lock);
+}
+
+static void wallet_unlock(dogecoin_wallet* wallet)
+{
+    if (!wallet) return;
+    if (!wallet->thread_safe) return;
+    dogecoin_mutex_unlock(&wallet->lock);
+}
 
 /**
  * Prints an error message to the screen
@@ -390,6 +406,50 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     wallet->wtxes_rbtree = 0;
     wallet->waddr_vector = vector_new(10, dogecoin_wallet_addr_free_tramp);
     wallet->waddr_rbtree = 0;
+    wallet->ctx = NULL;
+    wallet->thread_safe = false;
+    wallet->lock.initialized = false;
+    return wallet;
+}
+
+/* Promote an already-constructed wallet to thread-safe by attaching a context
+ * (whose refcount is retained) and initializing the per-object mutex. The
+ * wallet keeps the chain parameters it was created with, so this is safe to use
+ * for wallets whose chain (e.g. regtest) cannot be represented by a context.
+ * Idempotent; returns true on success. */
+int dogecoin_wallet_enable_thread_safe(dogecoin_wallet* wallet, dogecoin_ctx* ctx)
+{
+    if (!wallet) return false;
+    if (wallet->thread_safe) return true;
+    wallet->ctx = ctx;
+    if (wallet->ctx) {
+        dogecoin_ctx_acquire(wallet->ctx);
+    }
+    if (!dogecoin_mutex_init(&wallet->lock)) {
+        if (wallet->ctx) {
+            dogecoin_ctx_release(wallet->ctx);
+            wallet->ctx = NULL;
+        }
+        return false;
+    }
+    wallet->thread_safe = true;
+    return true;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx)
+{
+    const dogecoin_chainparams* params = &dogecoin_chainparams_main;
+    if (ctx) {
+        const dogecoin_chainparams* from_ctx = dogecoin_context_get_chainparams((const struct dogecoin_context_*)ctx);
+        if (from_ctx) params = from_ctx;
+    }
+    dogecoin_wallet* wallet = dogecoin_wallet_new(params);
+    if (!wallet) return NULL;
+    if (!dogecoin_wallet_enable_thread_safe(wallet, ctx)) {
+        dogecoin_wallet_free(wallet);
+        return NULL;
+    }
     return wallet;
 }
 
@@ -574,6 +634,18 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
     return wallet;
 }
 
+/* THREAD-SAFE variant of dogecoin_wallet_init - keeps the explicit chain and
+ * promotes the resulting wallet to thread-safe (attaches ctx, inits mutex). */
+dogecoin_wallet* dogecoin_wallet_init_ts(dogecoin_ctx* ctx, const dogecoin_chainparams* chain, const char* address, const char* name, const dogecoin_wallet_opts* opts) {
+    dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, name, opts);
+    if (!wallet) return NULL;
+    if (!dogecoin_wallet_enable_thread_safe(wallet, ctx)) {
+        dogecoin_wallet_free(wallet);
+        return NULL;
+    }
+    return wallet;
+}
+
 void print_utxos(dogecoin_wallet* wallet) {
     /* Creating a vector_t of addresses and storing them in the wallet. */
     vector_t* addrs = vector_new(1, free);
@@ -668,7 +740,41 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     dogecoin_btree_tdestroy(wallet->waddr_rbtree, NULL);
 
     remove_all_utxos();
+    if (wallet->lock.initialized) {
+        dogecoin_mutex_destroy(&wallet->lock);
+    }
+    if (wallet->ctx) {
+        dogecoin_ctx_release(wallet->ctx);
+        wallet->ctx = NULL;
+    }
     dogecoin_free(wallet);
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, const char* file)
+{
+    int error = 0;
+    dogecoin_bool created = false;
+    dogecoin_wallet* wallet = dogecoin_wallet_new_ts(ctx);
+    if (!wallet) return NULL;
+    const char* target_file = file;
+    if (!target_file || target_file[0] == '\0') {
+        target_file = wallet->filename[0] ? wallet->filename : "wallet.db";
+    }
+    wallet_lock(wallet);
+    dogecoin_bool ok = dogecoin_wallet_load(wallet, target_file, &error, &created, false);
+    wallet_unlock(wallet);
+    if (!ok) {
+        dogecoin_wallet_free_ts(wallet);
+        return NULL;
+    }
+    return wallet;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+void dogecoin_wallet_free_ts(dogecoin_wallet* wallet)
+{
+    dogecoin_wallet_free(wallet);
 }
 
 void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
@@ -1091,6 +1197,16 @@ dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet)
     return true;
 }
 
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_wallet_save_ts(dogecoin_wallet* wallet)
+{
+    if (!wallet) return false;
+    wallet_lock(wallet);
+    dogecoin_bool ok = dogecoin_wallet_flush(wallet);
+    wallet_unlock(wallet);
+    return ok ? true : false;
+}
+
 dogecoin_bool wallet_write_record(dogecoin_wallet *wallet, const cstring* record, uint8_t record_type) {
     // write record magic
     if (fwrite(file_rec_magic, 4, 1, wallet->dbfile) != 1) return false;
@@ -1218,6 +1334,69 @@ dogecoin_wallet_addr* dogecoin_wallet_next_bip44_addr(dogecoin_wallet* wallet)
     wallet->next_childindex++;
 
     return waddr;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_wallet_get_address_ts(dogecoin_wallet* wallet, char* address, size_t len, uint32_t account, uint32_t index, dogecoin_bool change)
+{
+    if (!wallet || !wallet->masterkey || !address || len < P2PKHLEN) return false;
+    dogecoin_hdnode* hdnode = NULL;
+    dogecoin_hdnode* bip44_key = NULL;
+    int ret = false;
+    wallet_lock(wallet);
+    hdnode = dogecoin_hdnode_copy(wallet->masterkey);
+    bip44_key = dogecoin_hdnode_new();
+    if (hdnode && bip44_key) {
+        char keypath[BIP44_KEY_PATH_MAX_LENGTH + 1] = "";
+        char* change_level = change ? BIP44_CHANGE_INTERNAL : BIP44_CHANGE_EXTERNAL;
+        if (derive_bip44_extended_key(hdnode, &account, &index, change_level, NULL, false, keypath, bip44_key) == 0) {
+            dogecoin_hdnode_get_p2pkh_address(bip44_key, wallet->chain, address, len);
+            ret = true;
+        }
+    }
+    if (bip44_key) dogecoin_hdnode_free(bip44_key);
+    if (hdnode) dogecoin_hdnode_free(hdnode);
+    wallet_unlock(wallet);
+    return ret;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_wallet_add_hd_account_ts(dogecoin_wallet* wallet, uint32_t account)
+{
+    if (!wallet || !wallet->masterkey) return false;
+    wallet_lock(wallet);
+    dogecoin_wallet_addr* waddr = dogecoin_wallet_addr_new();
+    dogecoin_hdnode* hdnode = dogecoin_hdnode_copy(wallet->masterkey);
+    dogecoin_hdnode* bip44_key = dogecoin_hdnode_new();
+    uint32_t index = wallet->next_childindex;
+    int ret = false;
+    dogecoin_bool added_to_wallet = false;
+    if (waddr && hdnode && bip44_key) {
+        char keypath[BIP44_KEY_PATH_MAX_LENGTH + 1] = "";
+        char* change_level = BIP44_CHANGE_EXTERNAL;
+        if (derive_bip44_extended_key(hdnode, &account, &index, change_level, NULL, false, keypath, bip44_key) == 0) {
+            dogecoin_hdnode_get_hash160(bip44_key, waddr->pubkeyhash);
+            waddr->childindex = wallet->next_childindex;
+            void* tree_pos = dogecoin_btree_tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
+            if (tree_pos) {
+                vector_add(wallet->waddr_vector, waddr);
+                added_to_wallet = true;
+                cstring* record = cstr_new_sz(256);
+                dogecoin_wallet_addr_serialize(record, wallet->chain, waddr);
+                if (wallet_write_record(wallet, record, WALLET_DB_REC_TYPE_ADDR)) {
+                    dogecoin_file_commit(wallet->dbfile);
+                    wallet->next_childindex++;
+                    ret = true;
+                }
+                cstr_free(record, true);
+            }
+        }
+    }
+    if (!ret && waddr && !added_to_wallet) dogecoin_wallet_addr_free(waddr);
+    if (bip44_key) dogecoin_hdnode_free(bip44_key);
+    if (hdnode) dogecoin_hdnode_free(hdnode);
+    wallet_unlock(wallet);
+    return ret;
 }
 
 dogecoin_bool dogecoin_p2pkh_address_to_wallet_pubkeyhash(const char* address_in, dogecoin_wallet_addr* addr, dogecoin_wallet* wallet) {
