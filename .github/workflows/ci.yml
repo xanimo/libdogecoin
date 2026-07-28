@@ -610,15 +610,16 @@ jobs:
                 docker run -v $PWD:/src -w /src ubuntu:20.04 bash -c "\
                   # Install dependencies
                   export DEBIAN_FRONTEND=noninteractive && \
+                  printf 'Acquire::ForceIPv4 \"true\";\n' > /etc/apt/apt.conf.d/99force-ipv4 && \
                   apt-get update && \
                   apt-get install -y wget gnupg2 cmake && \
                   cd /src/src/openenclave && \
                   echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
-                  wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - && \
+                  wget -4 -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - && \
                   echo 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main' | tee /etc/apt/sources.list.d/llvm-toolchain-focal-11.list && \
-                  wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
+                  wget -4 -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
                   echo 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main' | tee /etc/apt/sources.list.d/msprod.list && \
-                  wget -qO - https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
+                  wget -4 -qO - https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
                   apt update && \
                   apt -y install clang-11 libssl-dev gdb libsgx-enclave-common libsgx-quote-ex libprotobuf17 libsgx-dcap-ql libsgx-dcap-ql-dev az-dcap-client open-enclave && \
                   apt -y install dkms && \
