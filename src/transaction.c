@@ -103,7 +103,9 @@ static working_transaction* new_transaction_locked(dogecoin_transaction_context*
         dogecoin_free(working_tx);
         return NULL;
     }
-    working_tx->idx = HASH_COUNT(ctx->transactions) + 1;
+    /* Mint a never-reused id under the registry lock. HASH_COUNT()+1 recycled
+       ids after removals, letting a later entry collide with a live one. */
+    working_tx->idx = (int)++ctx->next_idx;
     return working_tx;
 }
 
@@ -128,13 +130,19 @@ static void add_transaction_locked(dogecoin_transaction_context* ctx, working_tr
         HASH_ADD_INT(ctx->transactions, idx, working_tx);
         return;
     }
-    /* Idx collision: HASH_REPLACE_INT unlinks the displaced entry. It may still
-       be retained by a find_transaction_ts() holder, so it goes through the same
-       deferred-delete path as an explicit removal rather than a bare free --
-       which would both strand tx->transaction and free memory out from under
-       that holder. */
-    HASH_REPLACE_INT(ctx->transactions, idx, working_tx, tx);
-    dispose_unlinked_transaction_locked(tx);
+    /* With monotonic, never-reused ids (see new_transaction_locked) an id
+       collision is impossible for entries minted by the registry. Reaching here
+       means a caller supplied a colliding idx via the legacy add_transaction(_ts)
+       path. The previous code HASH_REPLACE'd and freed the existing entry, which
+       (a) silently destroyed a live transaction and (b) freed it with no regard
+       for refcount, producing a use-after-free for any outstanding
+       find_transaction_ts() holder. Do neither: keep the existing entry and
+       decline the colliding insert. The caller retains ownership of working_tx
+       (matching the legacy contract where the object is caller-allocated), so we
+       must not free it here either. (Real removals still go through
+       remove_transaction_locked -> dispose_unlinked_transaction_locked, which
+       preserves the refcount-safe deferred delete.) */
+    (void)tx;
 }
 
 static working_transaction* find_transaction_locked(dogecoin_transaction_context* ctx, int idx) {
@@ -175,7 +183,9 @@ working_transaction* new_transaction() {
         dogecoin_free(working_tx);
         return NULL;
     }
-    working_tx->idx = HASH_COUNT(ctx->transactions) + 1;
+    /* Match new_transaction_locked(): never-reused id from the context counter.
+       The legacy default context is thread-local, so this is single-threaded. */
+    working_tx->idx = (int)++ctx->next_idx;
     return working_tx;
 }
 

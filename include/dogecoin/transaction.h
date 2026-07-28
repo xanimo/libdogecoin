@@ -26,6 +26,7 @@
 
 #include <stdlib.h>    /* malloc       */
 #include <stddef.h>    /* offsetof     */
+#include <stdint.h>    /* uint32_t     */
 #include <stdio.h>     /* printf       */
 #include <string.h>    /* memset       */
 #include <dogecoin/uthash.h>
@@ -57,6 +58,11 @@ typedef struct dogecoin_transaction_context {
     working_transaction* transactions;
     dogecoin_mutex_t lock; /* guards the registry root above; no-op for the
                               zero-initialized per-thread default context */
+    uint32_t next_idx;     /* monotonic id source, guarded by lock. Never reused:
+                              deriving ids from HASH_COUNT()+1 recycled an id after
+                              any removal, so a later start_transaction could mint
+                              the id of a still-live entry and evict it via
+                              HASH_REPLACE. Zero-initialized; first minted id is 1. */
 } dogecoin_transaction_context;
 
 struct dogecoin_wallet_;
