@@ -68,6 +68,12 @@ typedef struct dogecoin_utxo_ {
 DISABLE_WARNING_PUSH
 DISABLE_WARNING(-Wunused-variable)
 static DOGECOIN_THREAD_LOCAL dogecoin_utxo* utxos = NULL;
+/* Monotonic id source for the utxos hash above. Never reused: deriving ids from
+   HASH_COUNT(utxos)+1 recycled an id after any removal, so a later
+   start_dogecoin_utxo() could mint the id of a still-live utxo and evict it via
+   HASH_REPLACE (silently dropping a spendable output). Zero-initialized; first
+   minted id is 1. */
+static DOGECOIN_THREAD_LOCAL uint32_t utxo_next_idx = 0;
 DISABLE_WARNING_POP
 
 /** wallet init options */

@@ -328,6 +328,35 @@ void test_wallet_reorg_utxo_update() {
     remove_all_utxos();
 }
 
+/* Regression: utxo ids must never be reused. Under the old HASH_COUNT(utxos)+1
+   scheme, removing a utxo let the next start_dogecoin_utxo() mint the id of a
+   still-live utxo, which add_dogecoin_utxo() then evicted via HASH_REPLACE --
+   silently dropping a tracked, spendable output (and freeing it). With a
+   monotonic id source the third utxo gets a fresh id and the second survives. */
+void test_wallet_utxo_idx_not_reused() {
+    remove_all_utxos();
+
+    int a = start_dogecoin_utxo();
+    int b = start_dogecoin_utxo();
+    u_assert_true(a > 0 && b > 0 && a != b);
+
+    dogecoin_utxo* ua = find_dogecoin_utxo(a);
+    u_assert_not_null(ua);
+    remove_dogecoin_utxo(ua);
+
+    int c = start_dogecoin_utxo();
+    u_assert_true(c != b);                       /* must not recycle b's id */
+    u_assert_not_null(find_dogecoin_utxo(b));    /* b survived (not evicted) */
+    u_assert_not_null(find_dogecoin_utxo(c));
+
+    /* exactly b and c remain */
+    int present = 0;
+    for (int i = 1; i <= 16; i++) if (find_dogecoin_utxo(i)) present++;
+    u_assert_int_eq(present, 2);
+
+    remove_all_utxos();
+}
+
 void test_wallet_ts_wrappers()
 {
     unlink(wallettmpfile);

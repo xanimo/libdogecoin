@@ -128,6 +128,7 @@ extern void test_examples();
 extern void test_wallet_basics();
 extern void test_wallet();
 extern void test_wallet_reorg_utxo_update();
+extern void test_wallet_utxo_idx_not_reused();
 extern void test_wallet_ts_wrappers();
 #if !defined(_WIN32)
 extern void test_wallet_ts_multithread_stress();
@@ -257,6 +258,7 @@ int main()
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
     u_run_test(test_wallet_reorg_utxo_update);
+    u_run_test(test_wallet_utxo_idx_not_reused);
 #ifndef USE_OPTEE
     u_run_test(test_wallet_ts_wrappers);
 #if !defined(_WIN32)
