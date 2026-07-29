@@ -76,6 +76,11 @@ typedef struct hash {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 static DOGECOIN_THREAD_LOCAL hash *hashes = NULL;
+/* Monotonic id source for the hashes table above. Never reused: HASH_COUNT()+1
+   recycled an id after any removal, so a later start_hash() could mint the id of
+   a still-live hash and evict it via HASH_REPLACE. Zero-initialized; first
+   minted id is 1. */
+static DOGECOIN_THREAD_LOCAL uint32_t hash_next_idx = 0;
 #pragma GCC diagnostic pop
 
 // instantiates a new hash
@@ -100,6 +105,10 @@ typedef struct map {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 static DOGECOIN_THREAD_LOCAL map *maps = NULL;
+/* Monotonic id source for the maps table above; see hash_next_idx. Never reused
+   so a removal can't free an id that a later start_map() re-mints onto a live
+   map (which add_map() would then evict via HASH_REPLACE). First minted id 1. */
+static DOGECOIN_THREAD_LOCAL uint32_t map_next_idx = 0;
 #pragma GCC diagnostic pop
 
 // instantiates a new map

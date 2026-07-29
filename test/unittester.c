@@ -55,6 +55,7 @@ extern void test_key();
 extern void test_context_keypair_ex();
 extern void test_context_ts_refcount();
 extern void test_koinu();
+extern void test_map_idx_not_reused();
 extern void test_memory();
 extern void test_moon();
 extern void test_op_return();
@@ -181,6 +182,7 @@ int main()
     u_run_test(test_context_keypair_ex);
     u_run_test(test_context_ts_refcount);
     u_run_test(test_koinu);
+    u_run_test(test_map_idx_not_reused);
     u_run_test(test_memory);
     u_run_test(test_moon);
     u_run_test(test_op_return);
