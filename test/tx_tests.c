@@ -1072,6 +1072,28 @@ void test_script_parse()
     cstr_free(txser, true);
     free(hexbuf4);
 
+    /* Regression: dogecoin_tx_add_address_out must report whether an output was
+     * actually added. It previously returned true unconditionally, so an
+     * undecodable or wrong-prefix address reported success while adding nothing.
+     * A valid regtest P2PKH must add an output and return true; a bech32 address
+     * (not P2PKH/P2SH) and clearly invalid strings must add nothing and return
+     * false. */
+    {
+        dogecoin_tx* rtx = dogecoin_tx_new();
+        size_t vout_before = rtx->vout->len;
+        u_assert_int_eq(dogecoin_tx_add_address_out(rtx, &dogecoin_chainparams_regtest, 1000, "n1e4M744gKSL269jozPwc8edjxxdwn6THc"), true);
+        u_assert_uint32_eq(rtx->vout->len, vout_before + 1);
+        /* bech32 is neither P2PKH nor P2SH here: no output, false */
+        u_assert_int_eq(dogecoin_tx_add_address_out(rtx, &dogecoin_chainparams_regtest, 1000, "dcrt1qfupfj4yx83dz8vhcpcahhxyg4sfqr8pvx8l6l2"), false);
+        u_assert_uint32_eq(rtx->vout->len, vout_before + 1);
+        /* clearly invalid / short / bad-checksum: no output, false */
+        u_assert_int_eq(dogecoin_tx_add_address_out(rtx, &dogecoin_chainparams_regtest, 1000, "D"), false);
+        u_assert_int_eq(dogecoin_tx_add_address_out(rtx, &dogecoin_chainparams_regtest, 1000, "notanaddress"), false);
+        u_assert_int_eq(dogecoin_tx_add_address_out(rtx, &dogecoin_chainparams_regtest, 1000, ""), false);
+        u_assert_uint32_eq(rtx->vout->len, vout_before + 1);
+        dogecoin_tx_free(rtx);
+    }
+
 
     vector_free(pubkeys, true);
     dogecoin_tx_free(tx);

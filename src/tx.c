@@ -1035,17 +1035,26 @@ dogecoin_bool dogecoin_tx_add_puzzle_out(dogecoin_tx* tx, const int64_t amount, 
  */
 dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainparams* chain, int64_t amount, const char* address)
 {
-    const size_t buflen = sizeof(uint8_t) * strlen(address) * 2;
-    uint8_t* buf = dogecoin_calloc(1, buflen);
-    size_t r = dogecoin_base58_decode_check(address, buf, buflen);
+    if (!tx || !chain || !address) {
+        return false;
+    }
+    /* A base58check P2PKH/P2SH payload is ~25 bytes; use a fixed, generously-
+     * sized buffer. The previous strlen(address)*2 sizing under-allocated for
+     * short/empty addresses (0 bytes for "", 2 for "D"), leaving the decode
+     * buffer too small for the 21-byte hash160 read. dogecoin_base58_decode_check
+     * rejects inputs longer than 128 chars, so 256 bytes always suffices. */
+    uint8_t buf[256] = {0};
+    size_t r = dogecoin_base58_decode_check(address, buf, sizeof(buf));
+    dogecoin_bool added = false;
     if (r > 0 && buf[0] == chain->b58prefix_pubkey_address) {
         dogecoin_tx_add_p2pkh_hash160_out(tx, amount, &buf[1]);
+        added = true;
     } else if (r > 0 && buf[0] == chain->b58prefix_script_address) {
         dogecoin_tx_add_p2sh_hash160_out(tx, amount, &buf[1]);
+        added = true;
     }
 
-    dogecoin_free(buf);
-    return true;
+    return added;
 }
 
 
