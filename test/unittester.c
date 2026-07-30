@@ -128,6 +128,7 @@ extern void test_examples();
 #ifdef WITH_WALLET
 extern void test_wallet_basics();
 extern void test_wallet();
+extern void test_wallet_malformed_reclen();
 extern void test_wallet_reorg_utxo_update();
 extern void test_wallet_utxo_idx_not_reused();
 extern void test_wallet_ts_wrappers();
@@ -259,6 +260,7 @@ int main()
 #ifdef WITH_WALLET
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
+    u_run_test(test_wallet_malformed_reclen);
     u_run_test(test_wallet_reorg_utxo_update);
     u_run_test(test_wallet_utxo_idx_not_reused);
 #ifndef USE_OPTEE
