@@ -381,6 +381,15 @@ dogecoin_bool dogecoin_p2p_deser_msg_getheaders(vector_t* blocklocators, uint256
         return false;
     if (!deser_varlen(&vsize, buf))
         return false;
+    /* vsize is an attacker-controlled count read straight off the wire (up to
+       0xFFFFFFFF). Each locator that follows is a 32-byte hash, so a message can
+       legitimately declare at most buf->len / 32 of them. Without this check
+       vector_resize() below reallocates blocklocators to vsize * sizeof(void*)
+       (up to ~32 GB for vsize 0xFFFFFFFF) and NULL-fills it before a single hash
+       is read -- a memory-exhaustion DoS triggerable by a ~9-byte getheaders
+       message. Reject counts that cannot fit the remaining buffer. */
+    if (vsize > buf->len / DOGECOIN_HASH_LENGTH)
+        return false;
     vector_resize(blocklocators, vsize);
     for (unsigned int i = 0; i < vsize; i++) {
         uint256_t *hash = dogecoin_malloc(DOGECOIN_HASH_LENGTH);

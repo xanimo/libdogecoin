@@ -128,4 +128,21 @@ void test_protocol()
     vector_free(blocklocators, true);
     vector_free(blocklocators_check, true);
     cstr_free(p2p_msg, true);
+
+    /* Regression: a getheaders message whose locator count is larger than the
+       remaining buffer could possibly hold must be rejected before allocating.
+       Previously the unvalidated count was passed straight to vector_resize(),
+       so a ~9-byte message declaring 0xFFFFFFFF locators triggered a multi-
+       gigabyte allocation (memory-exhaustion DoS) before any hash was read. */
+    {
+        /* int32 version=1, then varint 0xFFFFFFFF, then nothing */
+        uint8_t bad[] = { 0x01,0x00,0x00,0x00, 0xfe, 0xff,0xff,0xff,0xff };
+        struct const_buffer bad_buf = { bad, sizeof(bad) };
+        vector_t *bad_locs = vector_new(1, free);
+        uint256_t bad_stop;
+        dogecoin_bool r = dogecoin_p2p_deser_msg_getheaders(bad_locs, bad_stop, &bad_buf);
+        u_assert_int_eq(r, false);
+        u_assert_uint32_eq((uint32_t)bad_locs->len, 0);
+        vector_free(bad_locs, true);
+    }
 }
