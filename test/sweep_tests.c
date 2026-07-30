@@ -1010,8 +1010,19 @@ static void test_sweep_error_handling(void)
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     u_assert_int_eq((int)dogecoin_paper_wallet_set_wif(NULL, "test", chain), 0);
-    u_assert_int_eq((int)dogecoin_paper_wallet_set_wif(dogecoin_paper_wallet_new(), NULL, chain), 0);
-    u_assert_int_eq((int)dogecoin_paper_wallet_set_wif(dogecoin_paper_wallet_new(), "test", NULL), 0);
+
+    {
+        dogecoin_paper_wallet* tmp = dogecoin_paper_wallet_new();
+        u_assert_not_null(tmp);
+        u_assert_int_eq((int)dogecoin_paper_wallet_set_wif(tmp, NULL, chain), 0);
+        dogecoin_paper_wallet_free(tmp);
+    }
+    {
+        dogecoin_paper_wallet* tmp = dogecoin_paper_wallet_new();
+        u_assert_not_null(tmp);
+        u_assert_int_eq((int)dogecoin_paper_wallet_set_wif(tmp, "test", NULL), 0);
+        dogecoin_paper_wallet_free(tmp);
+    }
 
     dogecoin_paper_wallet* wallet = dogecoin_paper_wallet_new();
     u_assert_not_null(wallet);
