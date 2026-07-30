@@ -267,6 +267,7 @@ dogecoin_bool dogecoin_hdnode_private_ckd(dogecoin_hdnode* inout, uint32_t i)
 
     dogecoin_mem_zero(data, sizeof(data));
     dogecoin_mem_zero(I, sizeof(I));
+    dogecoin_mem_zero(p, sizeof(p));
     dogecoin_mem_zero(z, sizeof(z));
     return true;
 }
