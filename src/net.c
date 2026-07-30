@@ -192,7 +192,13 @@ void read_cb(struct bufferevent* bev, void* ctx)
             break;
         }
         if (buf.len >= hdr.data_len) {
-            struct const_buffer cmd_data_buf = {buf.p, buf.len};
+            /* Hand the command handler exactly this message's payload, not the
+               entire remaining receive buffer. Using buf.len here let a command
+               deserializer read past its own hdr.data_len boundary into the
+               bytes of the next pipelined message -- the per-message length
+               carried in the header was not enforced at dispatch (only the
+               buffer advance below used hdr.data_len). */
+            struct const_buffer cmd_data_buf = {buf.p, hdr.data_len};
             if ((node->state & NODE_CONNECTED) != NODE_CONNECTED) {
                 return;
             }
