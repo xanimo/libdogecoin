@@ -88,7 +88,19 @@ dogecoin_bool dogecoin_script_copy_without_op_codeseperator(const cstring* scrip
             continue;
 
         if (data_len > 0) {
-            assert(data_len < 16777215); //limit max push to 0xFFFFFF
+            /* Reject a push that runs past the end of the script before
+               allocating, mirroring dogecoin_script_get_ops(). Previously this
+               relied on assert(data_len < 0xFFFFFF): in a debug build a crafted
+               OP_PUSHDATA4 length aborts the process (a DoS reachable via
+               dogecoin_tx_sighash() on an attacker-influenced fromPubKey), and
+               in an NDEBUG build the assert is compiled out, so a multi-gigabyte
+               data_len reaches dogecoin_calloc() and triggers a huge allocation
+               attempt before deser_bytes() finally fails -- a memory-exhaustion
+               DoS. Checking against the remaining buffer makes both paths fail
+               cleanly. */
+            if (data_len > buf.len) {
+                goto err_out;
+            }
             unsigned char* bufpush = (unsigned char*)dogecoin_calloc(1, data_len);
             if (!deser_bytes(bufpush, &buf, data_len)) {
                 dogecoin_free(bufpush);
