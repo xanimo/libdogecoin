@@ -940,7 +940,7 @@ void clear_transaction_ts(dogecoin_transaction_context* ctx, int txindex) {
  * @return 1 if the raw transaction was signed successfully, 0 otherwise.
  */
 int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, int sighashtype, char* privkey) {
-    if(!incomingrawtx || !scripthex) return false;
+    if(!incomingrawtx || !scripthex || !privkey) return false;
 
     size_t tx_hex_len = strspn(incomingrawtx, VALID_HEX_CHARS);
     if (tx_hex_len == 0 || (tx_hex_len % 2) != 0 || incomingrawtx[tx_hex_len] != '\0' || tx_hex_len > TXHEXMAXLEN) {
@@ -1009,15 +1009,12 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
     if (dogecoin_privkey_decode_wif(privkey, chain, &key)) {
         sign = true;
     } else {
-        if (privkey) {
-            if (strlen(privkey) > 50) {
-                dogecoin_tx_free(txtmp);
-                cstr_free(script, true);
-                return false;
-            }
-        } else {
-            return false;
-        }
+        // WIF decode failed: the key is unusable. Previously this leaked txtmp
+        // and script and fell through to `return true` (claiming success on a
+        // bad key) whenever strlen(privkey) <= 50. Always clean up and fail.
+        dogecoin_tx_free(txtmp);
+        cstr_free(script, true);
+        return false;
     }
     if (sign) {
         uint8_t sigcompact[64] = {0};
@@ -1026,7 +1023,10 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
         enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(txtmp, script, &key, inputindex, sighashtype, sigcompact, sigder_plus_hashtype, &sigderlen);
         cstr_free(script, true);
 
-        if (res != DOGECOIN_SIGN_OK) return false;
+        if (res != DOGECOIN_SIGN_OK) {
+            dogecoin_tx_free(txtmp);
+            return false;
+        }
 
         char sigcompacthex[64*2+1] = {0};
         utils_bin_to_hex((unsigned char *)sigcompact, 64, sigcompacthex);
