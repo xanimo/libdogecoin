@@ -3781,11 +3781,25 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 memset(gfh_zeros, 0, 32);
                 dogecoin_bool genesis_valid =
                     (memcmp(cfstate->genesis_filter_header, gfh_zeros, 32) != 0);
+                /* base_height <= cfh_start matters: the loaded range has to start at or
+                 * below where we want filters from, because the resume path can only
+                 * append forward and cannot fill a gap *below* the loaded base.
+                 *
+                 * A gap *above* the loaded tip is not a reason to discard anything --
+                 * that is precisely what resuming is for. Requiring
+                 * cfheaders_tip_height >= cfh_start - 1 here meant that whenever the
+                 * on-disk cfheaders stopped short of cfh_start, the whole cache was
+                 * declared unusable and the fresh-start branch below wiped it, along
+                 * with genesis_filter_header -- after which every subsequent cfilter
+                 * failed validation. That is the normal case with -p/--checkpoint,
+                 * where cfh_start comes from chainbottom near the chain tip while the
+                 * cfheaders file legitimately ends wherever the last sync stopped:
+                 * headers 1..6269574 on disk against a cfh_start of 6311582 threw away
+                 * 6.27M valid headers to re-download a 42k-block gap. */
                 dogecoin_bool have_loaded =
                     (cfstate->filter_headers->len > 0 &&
                      cfstate->cfheaders_base_height > 0 &&
-                     cfstate->cfheaders_base_height <= cfh_start &&
-                     cfstate->cfheaders_tip_height >= (cfh_start > 0 ? cfh_start - 1 : 0));
+                     cfstate->cfheaders_base_height <= cfh_start);
 
                 if (have_loaded && genesis_valid) {
                     uint32_t cfh_resume = cfstate->cfheaders_tip_height + 1;
