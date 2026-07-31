@@ -155,6 +155,30 @@ static dogecoin_bool parse_url(const char *url,
 }
 
 /**
+ * Locale-independent ASCII case-insensitive compare.
+ *
+ * strncasecmp() is POSIX and does not exist in the MSVC runtime, which spells
+ * it _strnicmp -- linking the Windows build failed with an unresolved external
+ * once this file started being compiled there.  Rather than add a platform
+ * #ifdef, do the comparison directly: it is only used on HTTP header names,
+ * where the locale sensitivity of strncasecmp() is unwanted anyway (a Turkish
+ * locale maps 'I' to a dotless lowercase and would mis-compare "Content-Length").
+ */
+static int bootstrap_ascii_strncasecmp(const char *a, const char *b, size_t n)
+{
+    size_t i;
+    for (i = 0; i < n; i++) {
+        unsigned char ca = (unsigned char)a[i];
+        unsigned char cb = (unsigned char)b[i];
+        if (ca >= 'A' && ca <= 'Z') ca = (unsigned char)(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = (unsigned char)(cb - 'A' + 'a');
+        if (ca != cb) return (int)ca - (int)cb;
+        if (ca == '\0') return 0;
+    }
+    return 0;
+}
+
+/**
  * Blocking HTTP/1.0 GET → stream body to dest_path and compute SHA256.
  * Returns false on network or non-200 HTTP response.
  */
@@ -242,7 +266,7 @@ static dogecoin_bool http_get_to_file(const char *host, uint16_t port,
     /* Parse Content-Length (case-insensitive search). */
     int64_t content_len = -1;
     for (char *lp = hdrbuf; *lp; ) {
-        if (strncasecmp(lp, "content-length:", 15) == 0) {
+        if (bootstrap_ascii_strncasecmp(lp, "content-length:", 15) == 0) {
             content_len = (int64_t)strtoull(lp + 15, NULL, 10);
             break;
         }
