@@ -757,7 +757,10 @@ static void spv_cf_request_matched_blocks(dogecoin_spv_client *client)
         return;
 
     /* Collect all connected peers (prefer CF-capable, then any) */
-    const unsigned int MAX_PEERS = 8;
+    /* enum, not `const unsigned int`: in C a const object is not a constant
+     * expression, so `peers[MAX_PEERS]` was a variable-length array. MSVC does
+     * not implement VLAs and rejected it outright (C2057 / C2133 / C2466). */
+    enum { MAX_PEERS = 8 };
     dogecoin_node *peers[MAX_PEERS];
     unsigned int num_peers = 0;
     unsigned int ni;

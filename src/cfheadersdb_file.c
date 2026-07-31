@@ -241,11 +241,14 @@ dogecoin_bool dogecoin_cfheaders_db_load(
 
     /* Create fresh v2 file */
     db->file = fopen(path, "w+b");
-    if (path_obj) cstr_free(path_obj, true);
     if (!db->file) {
+        /* `path` aliases path_obj->str, so it must outlive this message --
+         * freeing path_obj before the fprintf was a heap-use-after-free. */
         fprintf(stderr, "cfheadersdb: cannot open %s: %s\n", path, strerror(errno));
+        if (path_obj) cstr_free(path_obj, true);
         return false;
     }
+    if (path_obj) cstr_free(path_obj, true);
     if (!write_file_header(db->file, cfhdr_magic)) {
         fprintf(stderr, "cfheadersdb: failed to write file header\n");
         fclose(db->file);
@@ -362,12 +365,15 @@ dogecoin_bool dogecoin_cfilters_db_load(
     dogecoin_bool create = (stat(path, &sb) != 0) || (sb.st_size < 8);
 
     db->file = fopen(path, create ? "w+b" : "r+b");
-    if (path_obj) cstr_free(path_obj, true);
 
     if (!db->file) {
+        /* Same aliasing rule as the cfheaders path above: `path` points into
+         * path_obj, so it cannot be freed before this message is formatted. */
         fprintf(stderr, "cfiltersdb: cannot open %s: %s\n", path, strerror(errno));
+        if (path_obj) cstr_free(path_obj, true);
         return false;
     }
+    if (path_obj) cstr_free(path_obj, true);
 
     if (create) {
         if (!write_file_header(db->file, cfdata_magic)) {
