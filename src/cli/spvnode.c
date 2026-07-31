@@ -799,7 +799,20 @@ int main(int argc, char* argv[]) {
         }
 
         /* Optional BIP37 filter setup using filterload with fixed-size bloom. */
-        if (spv_enable_filtered_blocks && (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0)) {
+        if (spv_enable_filtered_blocks && client->compact_filters_enabled) {
+            /* BIP37 and BIP157 are mutually exclusive here, for privacy: a bloom
+             * filter hands the watched scripts to every peer, which is exactly what
+             * compact filters avoid.  Compact filters are on by default, so -g on
+             * its own is a contradiction; dogecoin_spv_client_filterload() fails
+             * closed in that state.  Say why here -- its explanation goes through
+             * the nodegroup logger, which is not printing this early, so the user
+             * would otherwise see only an unexplained "Failed to send filterload". */
+            printf("-g/--filtered_blocks (BIP37) needs -e/--no_cfilters.\n"
+                   "A BIP37 bloom filter would leak the watched addresses to peers, which is\n"
+                   "what compact filters (BIP157, enabled by default) exist to prevent, so the\n"
+                   "two are mutually exclusive. Re-run with -e to use BIP37, or drop -g to use\n"
+                   "compact filters.\n");
+        } else if (spv_enable_filtered_blocks && (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0)) {
             dogecoin_bip37_filter* filter = dogecoin_bip37_filter_new(0, 1); /* random tweak, UPDATE_ALL */
             if (!filter) {
                 printf("Failed to initialize BIP37 bloom filter\n");
