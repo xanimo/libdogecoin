@@ -1,7 +1,5 @@
 # this ci pipeline will build, test and publish (can but currently does not) artifacts for linux, win, macosx
 
-# this ci pipeline will build, test and publish (can but currently does not) artifacts for linux, win, macosx
-
 name: CI
 
 on:

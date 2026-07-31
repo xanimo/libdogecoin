@@ -535,18 +535,12 @@ static dogecoin_bool bip38_encrypt_ec_core(
     }
 
     if (!bip38_pubkey_to_address(pubkey_buf, pubkey_len, compressed, chain, generated_address)) {
-        dogecoin_mem_zero(factorb, sizeof(factorb));
-        dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
-        dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
-        return false;
+        goto fail;
     }
     bip38_address_hash(generated_address, addresshash);
 
     if (!bip38_ec_derived_key(passpoint, addresshash, ownerentropy, derived)) {
-        dogecoin_mem_zero(factorb, sizeof(factorb));
-        dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
-        dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
-        return false;
+        goto fail;
     }
 
     bip38_aes256_encrypt_block(derived, seedb, 0, encryptedpart1);
@@ -572,28 +566,14 @@ static dogecoin_bool bip38_encrypt_ec_core(
 
     written = dogecoin_base58_encode_check(payload, BIP38_PAYLOAD_LEN, encrypted_key_out, *encrypted_key_size);
     if (written == 0) {
-        dogecoin_mem_zero(derived, sizeof(derived));
-        dogecoin_mem_zero(factorb, sizeof(factorb));
-        dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
-        dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
-        dogecoin_mem_zero(block2, sizeof(block2));
-        dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
-        dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
-        return false;
+        goto fail;
     }
     *encrypted_key_size = written;
 
     if (confirmation_code_out && confirmation_code_size) {
         if (!bip38_confirmation_encode(flagbyte, addresshash, ownerentropy, factorb, derived,
                 confirmation_code_out, confirmation_code_size)) {
-            dogecoin_mem_zero(derived, sizeof(derived));
-            dogecoin_mem_zero(factorb, sizeof(factorb));
-            dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
-            dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
-            dogecoin_mem_zero(block2, sizeof(block2));
-            dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
-            dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
-            return false;
+            goto fail;
         }
     }
 
@@ -605,6 +585,20 @@ static dogecoin_bool bip38_encrypt_ec_core(
     dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
     dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
     return true;
+
+fail:
+    /* Caller got false; do not leave a live private key in their output buffer. */
+    if (private_key_out) {
+        dogecoin_mem_zero(private_key_out, 32);
+    }
+    dogecoin_mem_zero(derived, sizeof(derived));
+    dogecoin_mem_zero(factorb, sizeof(factorb));
+    dogecoin_mem_zero(passpoint_work, sizeof(passpoint_work));
+    dogecoin_mem_zero(pubkey_buf, sizeof(pubkey_buf));
+    dogecoin_mem_zero(block2, sizeof(block2));
+    dogecoin_mem_zero(encryptedpart1, sizeof(encryptedpart1));
+    dogecoin_mem_zero(encryptedpart2, sizeof(encryptedpart2));
+    return false;
 }
 
 static dogecoin_bool bip38_derive_passfactor_buf(

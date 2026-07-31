@@ -755,6 +755,36 @@ static void test_bip38_negative_cases(void)
         u_assert_true(sequence <= 4095U);
     }
 
+    /* Undersized confirmation buffer must fail and scrub private_key_out. */
+    {
+        char enc[BIP38_ENCRYPTED_KEY_LENGTH + 1];
+        size_t enc_sz = sizeof(enc);
+        char confirm_too_small[8];
+        size_t confirm_sz = sizeof(confirm_too_small);
+        uint8_t priv_out[DOGECOIN_ECKEY_PKEY_LENGTH];
+        memset(priv_out, 0xA5, sizeof(priv_out));
+
+        u_assert_int_eq(
+            (int)dogecoin_bip38_encrypt_ec_multiplied(
+                "TestingOneTwoThree",
+                true,
+                false,
+                0,
+                0,
+                "D",
+                priv_out,
+                enc,
+                &enc_sz,
+                confirm_too_small,
+                &confirm_sz),
+            0);
+        {
+            uint8_t zero[DOGECOIN_ECKEY_PKEY_LENGTH];
+            dogecoin_mem_zero(zero, sizeof(zero));
+            u_assert_mem_eq(priv_out, zero, sizeof(priv_out));
+        }
+    }
+
     printf("  BIP38 negative tests passed\n");
 }
 
