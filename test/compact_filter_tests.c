@@ -454,11 +454,70 @@ static void test_cfilter_indexing_with_base_height(void)
 }
 
 /* ================================================================ */
+/*  Unbounded-allocation regressions (CWE-400)                      */
+/* ================================================================ */
+
+/* A cfheaders/cfcheckpt message declares a hash count as a compact_size read
+ * straight off the wire. The count fed vector_new() directly, which reserves a
+ * power-of-two number of pointers -- 0xFFFFFFFF became a ~34 GB calloc before a
+ * single hash was read, so a ~10-byte message from any peer was a memory
+ * exhaustion DoS. Same class as the getheaders locator-count fix. Each entry is
+ * a 32-byte hash, so a count the remaining buffer cannot hold must be rejected. */
+static void test_cfheaders_deser_unbounded_count(void)
+{
+    /* filter_type(1) + stop_hash(32) + prev_filter_header(32), then
+     * varint 0xFFFFFFFF claiming 429496729 hashes, then nothing. */
+    uint8_t bad[1 + 32 + 32 + 5];
+    memset(bad, 0, sizeof(bad));
+    bad[65] = 0xfe;                       /* compact_size: uint32 follows */
+    bad[66] = 0xff; bad[67] = 0xff;
+    bad[68] = 0xff; bad[69] = 0xff;       /* 0xFFFFFFFF */
+
+    struct const_buffer buf = { bad, sizeof(bad) };
+    dogecoin_cfheaders_msg msg;
+    dogecoin_cfheaders_msg_init(&msg);
+    u_assert_true(!dogecoin_p2p_msg_cfheaders_deser(&msg, &buf));
+    dogecoin_cfheaders_msg_free(&msg);
+
+    /* A count above BIP157's 2000-hash cap must also be refused even when the
+     * buffer is large enough to make it look plausible. */
+    size_t big_len = 1 + 32 + 32 + 3 + (size_t)2001 * 32;
+    uint8_t *big = dogecoin_calloc(1, big_len);
+    big[65] = 0xfd;                       /* compact_size: uint16 follows */
+    big[66] = (uint8_t)(2001 & 0xff);
+    big[67] = (uint8_t)((2001 >> 8) & 0xff);
+    struct const_buffer bigbuf = { big, big_len };
+    dogecoin_cfheaders_msg msg2;
+    dogecoin_cfheaders_msg_init(&msg2);
+    u_assert_true(!dogecoin_p2p_msg_cfheaders_deser(&msg2, &bigbuf));
+    dogecoin_cfheaders_msg_free(&msg2);
+    dogecoin_free(big);
+}
+
+static void test_cfcheckpt_deser_unbounded_count(void)
+{
+    /* filter_type(1) + stop_hash(32), then varint 0xFFFFFFFF, then nothing. */
+    uint8_t bad[1 + 32 + 5];
+    memset(bad, 0, sizeof(bad));
+    bad[33] = 0xfe;
+    bad[34] = 0xff; bad[35] = 0xff;
+    bad[36] = 0xff; bad[37] = 0xff;
+
+    struct const_buffer buf = { bad, sizeof(bad) };
+    dogecoin_cfcheckpt_msg msg;
+    dogecoin_cfcheckpt_msg_init(&msg);
+    u_assert_true(!dogecoin_p2p_msg_cfcheckpt_deser(&msg, &buf));
+    dogecoin_cfcheckpt_msg_free(&msg);
+}
+
+/* ================================================================ */
 /*  Public test entry point                                         */
 /* ================================================================ */
 
 void test_compact_filter(void)
 {
+    test_cfheaders_deser_unbounded_count();
+    test_cfcheckpt_deser_unbounded_count();
     test_compact_filter_state_lifecycle();
     test_getcfilters_ser();
     test_getcfheaders_ser();

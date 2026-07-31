@@ -293,6 +293,13 @@ dogecoin_bool dogecoin_compact_block_deserialize(
         return false;
 
     if (cmpctblk->prefilled_count > 0) {
+        /* prefilled_count is attacker-controlled. Each prefilled entry costs at
+           least a varint index plus a minimal transaction on the wire, so a count
+           exceeding the remaining buffer length cannot be honest; without this the
+           calloc below reserves prefilled_count * sizeof(dogecoin_prefilled_tx)
+           (~68 GB at 0xFFFFFFFF) before anything is parsed. The short_ids branch
+           above already bounds itself this way. */
+        if (cmpctblk->prefilled_count > buf->len) return false;
         cmpctblk->prefilled_txs = dogecoin_calloc(cmpctblk->prefilled_count,
                                                     sizeof(dogecoin_prefilled_tx));
         if (!cmpctblk->prefilled_txs)
@@ -359,6 +366,11 @@ dogecoin_bool dogecoin_getblocktxn_deserialize(
         return false;
 
     if (req->indices_count > 0) {
+        /* Each index is a differentially-encoded varint, so it occupies at least one
+           byte on the wire: a count larger than the remaining buffer is impossible.
+           Unbounded, the calloc below reserves indices_count * 4 bytes (~17 GB at
+           0xFFFFFFFF) from a request message only 33 bytes long. */
+        if (req->indices_count > buf->len) return false;
         req->indices = dogecoin_calloc(req->indices_count, sizeof(uint32_t));
         if (!req->indices)
             return false;
@@ -408,6 +420,11 @@ dogecoin_bool dogecoin_blocktxn_deserialize(
         return false;
 
     if (resp->txs_count > 0) {
+        /* Each transaction that follows is several bytes minimum, so a count beyond
+           the remaining buffer cannot be satisfied. Unbounded, the calloc below
+           reserves txs_count pointers (~34 GB at 0xFFFFFFFF) before the first
+           transaction is deserialized. */
+        if (resp->txs_count > buf->len) return false;
         resp->txs = dogecoin_calloc(resp->txs_count, sizeof(dogecoin_tx *));
         if (!resp->txs)
             return false;

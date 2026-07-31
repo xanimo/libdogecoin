@@ -116,11 +116,22 @@ dogecoin_bool dogecoin_p2p_msg_cfheaders_deser(dogecoin_cfheaders_msg *msg, stru
     uint32_t n_hashes;
     if (!deser_varlen(&n_hashes, buf)) return false;
 
+    /* n_hashes is an attacker-controlled count read straight off the wire (up to
+       0xFFFFFFFF). Each hash that follows is 32 bytes, so a message can declare at
+       most buf->len / 32 of them. Without this check vector_new() below allocates
+       n_hashes pointers -- and it rounds the reservation *up* to a power of two, so
+       0xFFFFFFFF becomes a 2^32 * sizeof(void*) (~34 GB) calloc -- before a single
+       hash is read: a memory-exhaustion DoS from a ~10-byte cfheaders message.
+       BIP157 also caps a getcfheaders span at 2000 blocks, so bound by that too. */
+    if (n_hashes > buf->len / DOGECOIN_HASH_LENGTH) return false;
+    if (n_hashes > MAX_GETCFHEADERS_SIZE) return false;
+
     /* Deserialize each 32-byte filter hash */
     if (msg->filter_hashes) {
         vector_free(msg->filter_hashes, true);
     }
     msg->filter_hashes = vector_new(n_hashes, dogecoin_free);
+    if (!msg->filter_hashes) return false;
 
     uint32_t i;
     for (i = 0; i < n_hashes; i++) {
@@ -149,11 +160,19 @@ dogecoin_bool dogecoin_p2p_msg_cfcheckpt_deser(dogecoin_cfcheckpt_msg *msg, stru
     uint32_t n_headers;
     if (!deser_varlen(&n_headers, buf)) return false;
 
+    /* Same unbounded-allocation hazard as cfheaders above: n_headers comes off the
+       wire and feeds vector_new(), which reserves a power-of-two number of pointers
+       (~34 GB at 0xFFFFFFFF) before any header is read. Each checkpoint is a 32-byte
+       hash, so reject any count the remaining buffer cannot possibly hold. Checkpoints
+       are one per 1000 blocks, so the buffer bound is the meaningful limit here. */
+    if (n_headers > buf->len / DOGECOIN_HASH_LENGTH) return false;
+
     /* Deserialize each 32-byte filter header checkpoint */
     if (msg->filter_headers) {
         vector_free(msg->filter_headers, true);
     }
     msg->filter_headers = vector_new(n_headers, dogecoin_free);
+    if (!msg->filter_headers) return false;
 
     uint32_t i;
     for (i = 0; i < n_headers; i++) {
