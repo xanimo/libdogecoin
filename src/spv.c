@@ -2896,15 +2896,24 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             } else {
                 client->nodegroup->log_write_cb("[bip157] headers at tip (height=%d) but no NODE_COMPACT_FILTERS peer connected\n",
                                                 chaintip->height);
-                /* No CF peer: if startup rescan already found matches, fetch those blocks
-                 * immediately via any connected peer rather than stalling indefinitely. */
-                if (client->cfilter_state->rescan_done &&
-                    client->cfilter_state->matched_block_hashes &&
-                    client->cfilter_state->matched_block_hashes->len > 0 &&
-                    !client->cfilter_state->cf_block_fetch_active) {
-                    spv_cf_request_matched_blocks(client);
-                }
             }
+        }
+
+        /* Blocks matched by the startup rescan of already-cached cfilters have to be
+         * requested independently of the cfheaders/cfilters network sync above.  That
+         * sync only covers heights not already on disk, so when the cache already spans
+         * the chain its completion hook (spv_cf_par_try_flush) never fires and the
+         * matched blocks would never be fetched -- the scan reported matches but the
+         * wallet stayed empty.  Trigger here once headers are at tip, whichever CF
+         * branch above was taken; cf_block_fetch_active keeps it to one dispatch. */
+        if (client->compact_filters_enabled && client->cfilter_state &&
+            client->cfilter_state->rescan_done &&
+            client->cfilter_state->matched_block_hashes &&
+            client->cfilter_state->matched_block_hashes->len > 0 &&
+            !client->cfilter_state->cf_block_fetch_active &&
+            chaintip->height > 0 &&
+            chaintip->height >= node->bestknownheight - 5) {
+            spv_cf_request_matched_blocks(client);
         }
     }
 
