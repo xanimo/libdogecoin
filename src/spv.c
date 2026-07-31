@@ -4238,6 +4238,25 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
 {
     if (!client || !filter || filter_len == 0) return false;
 
+    /* BIP37 and BIP157 are mutually exclusive, and this is a privacy control,
+     * not an optimisation: a FILTERLOAD hands the peer a bloom filter of the
+     * exact scripts being watched, which is the fingerprint compact filters
+     * exist to avoid.  Compact filters are enabled by default, so silently
+     * honouring a filterload here would leak the wallet to every connected
+     * peer of a client that chose BIP157 precisely to prevent that.  Fail
+     * closed and send nothing; callers wanting BIP37 must first disable
+     * compact filters via dogecoin_spv_enable_compact_filters(client, false).
+     * dogecoin_spv_client_filteradd() applies the same rule. */
+    if (client->compact_filters_enabled) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[spv] refusing filterload: compact filters (BIP157) are enabled; "
+                "a BIP37 bloom filter would leak the watched scripts to peers. "
+                "To use BIP37 anyway, call dogecoin_spv_enable_compact_filters(client, false) "
+                "first (spvnode: -e/--no_cfilters).\n");
+        return false;
+    }
+
     if (client->bloom_filter) {
         dogecoin_free(client->bloom_filter);
         client->bloom_filter = NULL;
