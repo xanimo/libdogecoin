@@ -266,11 +266,11 @@ jobs:
         run: ${{ matrix.postinstall }}
 
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: mac sdk cache
         if: ${{ matrix.mac-sdk }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: sdk
         with:
@@ -291,7 +291,7 @@ jobs:
 
       - name: android ndk cache
         if: ${{ matrix.android-ndk }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: android-ndk
         with:
@@ -311,7 +311,7 @@ jobs:
           unzip depends/sdk-sources/${{ env.ndk-filename }} -d depends/SDKs
 
       - name: dependency cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: depends
         with:
@@ -324,7 +324,7 @@ jobs:
         if: matrix.host != 'x86_64-pc-windows-msvc'
 
       - name: ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: ccache
         with:
@@ -632,14 +632,14 @@ jobs:
             esac
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-${{ matrix.name }}
           path: ${{ github.workspace }}/build/libdogecoin-${{ github.sha }}-${{ matrix.name }}
 
       - name: Upload OP-TEE artifacts
         if: matrix.name == 'aarch64-linux-optee'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-optee-artifacts
           path: |
@@ -658,7 +658,7 @@ jobs:
 
       - name: Upload OpenEnclave artifacts
         if: matrix.name == 'x86_64-linux-openenclave'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-openenclave-artifacts
           path: |
@@ -694,10 +694,10 @@ jobs:
             autoconf automake libtool-bin build-essential curl python3 python3-dev libgmp-dev
 
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: dependency cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: depends-asan
         with:
@@ -735,7 +735,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win
 
@@ -778,7 +778,7 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (x86_64-win)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-signed
           path: |
@@ -796,7 +796,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native
 
@@ -837,7 +837,7 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (x86_64-win-native)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-signed
           path: |
@@ -850,7 +850,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-rel
 
@@ -891,7 +891,7 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (x86_64-win-native-rel)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-rel-signed
           path: |
@@ -904,7 +904,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-notpm
 
@@ -944,7 +944,7 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (x86_64-win-native-notpm)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-notpm-signed
           path: |
@@ -957,7 +957,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-i686-win
 
@@ -998,7 +998,7 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (i686-win)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-i686-win-signed
           path: |
@@ -1016,7 +1016,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-macos
 
@@ -1054,7 +1054,7 @@ jobs:
           /usr/bin/codesign --force --keychain ~/Library/Keychains/build.keychain -s $MACOS_CODE_CERT_TEAM_ID --deep --options=runtime --verbose "$MACOS_EXECUTABLE_PATH"
 
       - name: Upload artifacts (x86_64-macos)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-macos-signed
           path: |
@@ -1073,7 +1073,7 @@ jobs:
       contents: write
     steps:
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: install packages
         run: |
@@ -1169,7 +1169,7 @@ jobs:
           ./contrib/gitian-build.sh "${gitian_args[@]}"
 
       - name: Upload Gitian artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-gitian
           path: |
@@ -1187,10 +1187,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download Gitian artifacts
-        uses: actions/download-artifact@v4.1.3
+        uses: actions/download-artifact@v7
         with:
           name: libdogecoin-${{ github.sha }}-gitian
           path: gitian/builds/${{ github.ref_name }}
@@ -1234,7 +1234,7 @@ jobs:
             --commit=${{ github.ref_name }}
 
       - name: Upload signed Gitian artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: libdogecoin-${{ github.sha }}-gitian
           path: |
