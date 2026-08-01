@@ -28,6 +28,11 @@ on:
     branches: [ "*" ]
 ```
 
+Both workflows also cancel a superseded in-flight run for the same branch or
+pull request, so pushing again replaces the previous run rather than queueing a
+second 20-job matrix beside it. Pushes to `main` and tag builds are exempt and
+always run to completion. Documentation-only changes are skipped entirely.
+
 `ql.yml` (CodeQL):
 
 ```yaml
