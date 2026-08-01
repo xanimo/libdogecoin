@@ -27,6 +27,7 @@
 */
 
 #include <dogecoin/common.h>
+#include <dogecoin/mem.h>
 #include <dogecoin/random.h>
 
 #include <assert.h>
@@ -213,12 +214,23 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
 #endif
 
     (void)update_seed; //unused
-    FILE* frand = fopen("/dev/urandom", "r"); // figure out why RANDOM_DEVICE is undeclared here
+    FILE* frand = fopen("/dev/urandom", "rb"); // figure out why RANDOM_DEVICE is undeclared here
     if (!frand)
         return false;
     size_t len_read = fread(buf, 1, len, frand);
-    assert(len_read == len);
     fclose(frand);
+    /* A short read must fail the call, not just trip an assert: assert() is
+       compiled out under NDEBUG, which CMake's Release configuration sets by
+       default (-O3 -DNDEBUG). In that build a partial read left the tail of buf
+       holding whatever was already in that memory and still returned true, so a
+       caller would use uninitialised bytes as key material.
+       Zero the buffer as well as returning false, so that a caller which ignores
+       the return value gets an obviously-unusable all-zero key rather than
+       something that looks random enough to spend to. */
+    if (len_read != len) {
+        dogecoin_mem_zero(buf, len);
+        return false;
+    }
     return true;
 #endif
     }
