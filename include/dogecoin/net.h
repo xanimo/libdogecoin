@@ -101,6 +101,14 @@ typedef struct dogecoin_node_ {
 
     unsigned int bestknownheight;
 
+    /* BIP152 compact block relay, negotiated per peer via sendcmpct.
+     * cmpct_version is only ever set to a version this build can honour --
+     * Dogecoin is pre-SegWit, so that is version 1 (txid short ids) and a peer
+     * announcing version 2 leaves cmpct_enabled false. */
+    dogecoin_bool cmpct_enabled;      /* peer announced a version we support */
+    dogecoin_bool cmpct_high_bandwidth; /* peer's fAnnounce: wants unsolicited cmpctblocks */
+    uint64_t cmpct_version;           /* negotiated version, 0 when unsupported */
+
     uint32_t hints; /* can be use for user defined state */
 } dogecoin_node;
 

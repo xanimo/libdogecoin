@@ -65,6 +65,7 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/hash.h>
 #include <dogecoin/net.h>
+#include <dogecoin/compact_block.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/utils.h>
@@ -775,8 +776,44 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
         } else if (strcmp(hdr->command, DOGECOIN_MSG_VERACK) == 0) {
             /* complete handshake if verack has been received */
             node->version_handshake = true;
+
+            /* BIP152: announce compact block support once the handshake is up.
+               fAnnounce is false -- we ask peers not to push unsolicited
+               cmpctblocks and instead fetch them ourselves, which suits a client
+               that drives its own block requests. Version 1 is the only version
+               that can be honoured here: version 2 computes short ids over the
+               wtxid, and Dogecoin has no witness serialization. */
+            cstring* sendcmpct = dogecoin_p2p_msg_sendcmpct(
+                node->nodegroup->chainparams->netmagic, false, CMPCTBLOCK_VERSION);
+            if (sendcmpct) {
+                dogecoin_node_send(node, sendcmpct);
+                cstr_free(sendcmpct, true);
+            }
+
             if (node->nodegroup->handshake_done_cb)
                 node->nodegroup->handshake_done_cb(node);
+        } else if (strcmp(hdr->command, DOGECOIN_MSG_SENDCMPCT) == 0) {
+            dogecoin_bool hb = false;
+            uint64_t cmpct_version = 0;
+            if (!dogecoin_p2p_msg_sendcmpct_deser(&hb, &cmpct_version, buf)) {
+                return dogecoin_node_misbehave(node);
+            }
+            /* Record only what we can act on. A peer is free to announce version
+               2; we simply do not enable compact blocks for it rather than
+               treating it as misbehaviour, since the announcement is legitimate
+               on a witness chain. */
+            node->cmpct_high_bandwidth = hb;
+            if (cmpct_version == CMPCTBLOCK_VERSION) {
+                node->cmpct_enabled = true;
+                node->cmpct_version = cmpct_version;
+            } else {
+                node->cmpct_enabled = false;
+                node->cmpct_version = 0;
+                node->nodegroup->log_write_cb(
+                    "node %d announced compact block version %llu; only version %d "
+                    "is supported on a pre-segwit chain\n",
+                    node->nodeid, (unsigned long long)cmpct_version, CMPCTBLOCK_VERSION);
+            }
         } else if (strcmp(hdr->command, DOGECOIN_MSG_PING) == 0) {
             uint64_t nonce = 0;
             if (!deser_u64(&nonce, buf)) {

@@ -310,6 +310,23 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_blocktxn_deserialize(
  * @param version          Compact block version (1 for BIP152 v1).
  * @return P2P message cstring, or NULL on failure. Caller frees.
  */
+/**
+ * @brief Parse a sendcmpct payload: fAnnounce(1) | nCmpctVersion(8 LE).
+ *
+ * Both outputs are only written on success.  Dogecoin is pre-SegWit, so the
+ * caller is expected to ignore any version other than CMPCTBLOCK_VERSION:
+ * version 2 short ids are computed over the wtxid, which does not exist here.
+ *
+ * @param high_bandwidth_out  Receives the peer's fAnnounce preference.
+ * @param version_out         Receives the announced compact block version.
+ * @param buf                 Message payload.
+ * @return true if the payload was well formed.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_p2p_msg_sendcmpct_deser(
+    dogecoin_bool *high_bandwidth_out,
+    uint64_t *version_out,
+    struct const_buffer *buf);
+
 LIBDOGECOIN_API cstring *dogecoin_p2p_msg_sendcmpct(
     const unsigned char netmagic[4],
     dogecoin_bool high_bandwidth,

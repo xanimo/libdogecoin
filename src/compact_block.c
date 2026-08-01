@@ -451,6 +451,29 @@ dogecoin_bool dogecoin_blocktxn_deserialize(
 
 #ifdef WITH_NET
 
+dogecoin_bool dogecoin_p2p_msg_sendcmpct_deser(
+    dogecoin_bool *high_bandwidth_out,
+    uint64_t *version_out,
+    struct const_buffer *buf)
+{
+    if (!buf) return false;
+
+    uint8_t announce;
+    if (!deser_bytes(&announce, buf, 1)) return false;
+    /* fAnnounce is a serialized bool. Core deserializes it straight into a C++
+       bool and does not reject non-canonical encodings, so treat any non-zero
+       byte as true rather than rejecting the message: the field only selects a
+       relay preference, so being stricter than the reference implementation
+       would risk penalising peers without protecting anything. */
+
+    uint64_t version;
+    if (!deser_u64(&version, buf)) return false;
+
+    if (high_bandwidth_out) *high_bandwidth_out = (announce == 1);
+    if (version_out) *version_out = version;
+    return true;
+}
+
 cstring *dogecoin_p2p_msg_sendcmpct(
     const unsigned char netmagic[4],
     dogecoin_bool high_bandwidth,
