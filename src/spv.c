@@ -1905,6 +1905,27 @@ void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogeco
  *
  * @return dogecoin_bool
  */
+/* True while compact-filter sync can still make progress: a peer advertising
+ * NODE_COMPACT_FILTERS is connected, or matched blocks from a rescan are still
+ * being fetched.  Sync completion is deferred to the filter path only in that
+ * case.  When filters are enabled (the default) but no peer serves them, nothing
+ * would ever advance the CF state machine, and gating completion purely on
+ * compact_filters_enabled left the client waiting forever -- `spvnode scan`
+ * never printed "Sync completed" and never exited. */
+static dogecoin_bool spv_cf_sync_pending(dogecoin_spv_client *client)
+{
+    if (!client->compact_filters_enabled || !client->cfilter_state) return false;
+    if (client->cfilter_state->cf_block_fetch_active) return true;
+    if (!client->nodegroup || !client->nodegroup->nodes) return false;
+    unsigned int i;
+    for (i = 0; i < client->nodegroup->nodes->len; i++) {
+        dogecoin_node *n = (dogecoin_node *)vector_idx(client->nodegroup->nodes, i);
+        if (n && (n->state & NODE_CONNECTED) && (n->services & DOGECOIN_NODE_COMPACT_FILTERS))
+            return true;
+    }
+    return false;
+}
+
 dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
 {
     /* Parallel genesis headers in progress — don't interfere. */
@@ -1979,7 +2000,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     }
 
     if (nodes_at_same_height >= COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT && !client->called_sync_completed && client->sync_completed
-        && !client->compact_filters_enabled)
+        && !spv_cf_sync_pending(client))
     {
         client->sync_completed(client);
         client->called_sync_completed = true;
@@ -2783,7 +2804,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
                 // last requested block reached, consider stop syncing
                 if (!client->called_sync_completed && client->sync_completed
-                    && !client->compact_filters_enabled) { /* BIP157: defer to cfilter completion */
+                    && !spv_cf_sync_pending(client)) { /* BIP157: defer only while filter sync can progress */
                     // enable mempool requests if smpv is enabled
                     if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
                     client->sync_completed(client);
@@ -2899,26 +2920,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             } else {
                 client->nodegroup->log_write_cb("[bip157] headers at tip (height=%d) but no NODE_COMPACT_FILTERS peer connected\n",
                                                 chaintip->height);
-                /* No peer serves compact filters, so nothing will ever advance the CF
-                 * state machine.  The classic headers-synced completion in
-                 * dogecoin_net_spv_check_every_node() is gated off whenever
-                 * compact_filters_enabled, so without a fallback here the client waits
-                 * forever -- `spvnode scan` never prints "Sync completed" and never
-                 * exits.  Complete on the headers path instead.  If the startup rescan
-                 * matched blocks they are still worth fetching, and the matched-block
-                 * dispatch below owns completion in that case, so only finish here when
-                 * nothing is pending. */
-                dogecoin_bool cf_blocks_pending =
-                    client->cfilter_state &&
-                    client->cfilter_state->matched_block_hashes &&
-                    client->cfilter_state->matched_block_hashes->len > 0;
-                if (!cf_blocks_pending && !client->called_sync_completed && client->sync_completed) {
-                    client->nodegroup->log_write_cb(
-                        "[bip157] no compact-filter peer available; completing sync without filters\n");
-                    if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
-                    client->sync_completed(client);
-                    client->called_sync_completed = true;
-                }
+                /* Completion is not handled here on purpose.  Headers reaching the tip
+                 * is not the end of the sync -- the last few blocks still arrive over
+                 * BLOCKSYNC afterwards -- so finishing at this point reports a height
+                 * short of the real tip.  spv_cf_sync_pending() lets the normal
+                 * headers/blocks completion run instead, at the right moment. */
             }
         }
 
@@ -3191,7 +3197,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (dogecoin_hash_equal((uint8_t *)node->last_requested_inv, (uint8_t *)pindex->hash)) {
             if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
                 if (!client->called_sync_completed && client->sync_completed
-                    && !client->compact_filters_enabled) { /* BIP157: defer to cfilter completion */
+                    && !spv_cf_sync_pending(client)) { /* BIP157: defer only while filter sync can progress */
                     if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
                     client->sync_completed(client);
                     client->called_sync_completed = true;
