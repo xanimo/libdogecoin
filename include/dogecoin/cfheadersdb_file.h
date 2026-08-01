@@ -45,6 +45,7 @@
 
 #include <stdio.h>
 
+#include <dogecoin/chainparams.h>
 #include <dogecoin/compact_filter.h>
 #include <dogecoin/dogecoin.h>
 
@@ -87,6 +88,7 @@ typedef struct dogecoin_cfheaders_db_ {
     dogecoin_bool read_write;   /**< Whether file I/O is enabled */
     uint32_t      tip_height;   /**< Height of the last written filter header */
     uint256_t     tip_header;   /**< Filter header hash at tip_height */
+    const dogecoin_chainparams *params; /**< Chain, selects the on-disk directory */
 } dogecoin_cfheaders_db;
 
 /**
@@ -100,6 +102,7 @@ typedef struct dogecoin_cfilters_db_ {
     FILE         *file;         /**< Open file handle (NULL when inmem_only) */
     dogecoin_bool read_write;   /**< Whether file I/O is enabled */
     uint32_t      tip_height;   /**< Height of the last written cfilter */
+    const dogecoin_chainparams *params; /**< Chain, selects the on-disk directory */
 } dogecoin_cfilters_db;
 
 /* ================================================================ */
@@ -111,7 +114,7 @@ typedef struct dogecoin_cfilters_db_ {
  * @param inmem_only  If true, no file I/O is performed (RAM-only mode).
  * @return New database object, or NULL on allocation failure.
  */
-LIBDOGECOIN_API dogecoin_cfheaders_db* dogecoin_cfheaders_db_new(dogecoin_bool inmem_only);
+LIBDOGECOIN_API dogecoin_cfheaders_db* dogecoin_cfheaders_db_new(const dogecoin_chainparams *params, dogecoin_bool inmem_only);
 
 /**
  * @brief Free a compact filter headers database and close its file.
@@ -196,7 +199,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_cfheaders_db_reset(dogecoin_cfheaders_db 
  * @param inmem_only  If true, no file I/O is performed.
  * @return New database object, or NULL on allocation failure.
  */
-LIBDOGECOIN_API dogecoin_cfilters_db* dogecoin_cfilters_db_new(dogecoin_bool inmem_only);
+LIBDOGECOIN_API dogecoin_cfilters_db* dogecoin_cfilters_db_new(const dogecoin_chainparams *params, dogecoin_bool inmem_only);
 
 /**
  * @brief Free a compact filter data database and close its file.

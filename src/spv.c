@@ -1586,14 +1586,14 @@ dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client *client, const char *
     if (client->compact_filters_enabled && client->cfilter_state) {
         dogecoin_bool inmem = (file_path && strcmp(file_path, ":memory:") == 0);
 
-        client->cfheaders_db = dogecoin_cfheaders_db_new(inmem);
+        client->cfheaders_db = dogecoin_cfheaders_db_new(client->chainparams, inmem);
         if (!dogecoin_cfheaders_db_load(client->cfheaders_db, client->cfheaders_path, client->cfilter_state)) {
             fprintf(stderr, "spv: failed to open cfheaders.dat; continuing without persistence\n");
             dogecoin_cfheaders_db_free(client->cfheaders_db);
             client->cfheaders_db = NULL;
         }
 
-        client->cfilters_db = dogecoin_cfilters_db_new(inmem);
+        client->cfilters_db = dogecoin_cfilters_db_new(client->chainparams, inmem);
         if (!dogecoin_cfilters_db_load(client->cfilters_db, client->cfilters_path)) {
             fprintf(stderr, "spv: failed to open cfilters.dat; continuing without persistence\n");
             dogecoin_cfilters_db_free(client->cfilters_db);
@@ -2899,6 +2899,26 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             } else {
                 client->nodegroup->log_write_cb("[bip157] headers at tip (height=%d) but no NODE_COMPACT_FILTERS peer connected\n",
                                                 chaintip->height);
+                /* No peer serves compact filters, so nothing will ever advance the CF
+                 * state machine.  The classic headers-synced completion in
+                 * dogecoin_net_spv_check_every_node() is gated off whenever
+                 * compact_filters_enabled, so without a fallback here the client waits
+                 * forever -- `spvnode scan` never prints "Sync completed" and never
+                 * exits.  Complete on the headers path instead.  If the startup rescan
+                 * matched blocks they are still worth fetching, and the matched-block
+                 * dispatch below owns completion in that case, so only finish here when
+                 * nothing is pending. */
+                dogecoin_bool cf_blocks_pending =
+                    client->cfilter_state &&
+                    client->cfilter_state->matched_block_hashes &&
+                    client->cfilter_state->matched_block_hashes->len > 0;
+                if (!cf_blocks_pending && !client->called_sync_completed && client->sync_completed) {
+                    client->nodegroup->log_write_cb(
+                        "[bip157] no compact-filter peer available; completing sync without filters\n");
+                    if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
+                    client->sync_completed(client);
+                    client->called_sync_completed = true;
+                }
             }
         }
 
@@ -4790,7 +4810,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_enable_genesis_headers(
         dogecoin_cfheaders_db_reset(client->cfheaders_db);
     if (client->cfilters_db) {
         dogecoin_cfilters_db_free(client->cfilters_db);
-        client->cfilters_db = dogecoin_cfilters_db_new(false);
+        client->cfilters_db = dogecoin_cfilters_db_new(client->chainparams, false);
         dogecoin_cfilters_db_load(client->cfilters_db, client->cfilters_path);
     }
     if (client->cfilter_state) {

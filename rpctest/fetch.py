@@ -102,7 +102,27 @@ for f in deps_path:
         dst_path = os.path.join('/usr/local/bin', f)
         shutil.move(src_path, dst_path)
 
-subprocess.run([os.path.join(os.getcwd(), "rpctest/spvtool.py")])
+# Bound the SPV test. It drives a real spvnode against a regtest dogecoind, so a
+# client-side stall (waiting on a peer for data it will never send) would
+# otherwise hang here until the CI job hits its own hour-long limit and is
+# killed with no useful output. Fail fast and loudly instead.
+SPVTOOL_TIMEOUT = int(os.environ.get("SPVTOOL_TIMEOUT", "900"))
+try:
+    completed = subprocess.run(
+        [os.path.join(os.getcwd(), "rpctest/spvtool.py")],
+        timeout=SPVTOOL_TIMEOUT,
+    )
+except subprocess.TimeoutExpired:
+    print("\033[31m> spvtool.py exceeded %ds and was killed - treating as failure.\033[0m"
+          % SPVTOOL_TIMEOUT, file=sys.stderr)
+    print("\033[31m> This usually means spvnode never reached 'Sync completed' "
+          "and is waiting on a peer.\033[0m", file=sys.stderr)
+    sys.exit(1)
+
+if completed.returncode != 0:
+    print("\033[31m> spvtool.py failed with exit code %d\033[0m" % completed.returncode,
+          file=sys.stderr)
+    sys.exit(completed.returncode)
 
 rmlist = ['./dogecoin-*', '*.dmg', '*.tar.gz', '*.zip', '*.asc']
 for path in rmlist:

@@ -679,6 +679,26 @@ void dogecoin_bootstrap_manifest_free(dogecoin_bootstrap_manifest *m)
 /*  Public: export                                                  */
 /* ================================================================ */
 
+/* Resolve <datadir>/filter/basic/<chainname>/<filename>.
+ *
+ * Must match cfheadersdb_file.c's default_filter_path(): the cache is
+ * segregated per network so a regtest or testnet run cannot read -- or
+ * overwrite -- the mainnet filters. */
+static void bootstrap_default_filter_path(cstring **out,
+                                          const dogecoin_chainparams *params,
+                                          const char *filename)
+{
+    const char *chain = (params && params->chainname[0]) ? params->chainname : "main";
+    *out = cstr_new_sz(512);
+    dogecoin_get_default_datadir(*out);
+    while ((*out)->len > 0 && (*out)->str[(*out)->len - 1] == '\0') (*out)->len--;
+    cstr_append_buf(*out, "/filter/basic/", 14);
+    cstr_append_buf(*out, chain, strlen(chain));
+    cstr_append_c(*out, '/');
+    cstr_append_buf(*out, filename, strlen(filename));
+    cstr_append_c(*out, '\0');
+}
+
 dogecoin_bool dogecoin_bootstrap_export(
     const char *cfheaders_src,
     const char *cfilters_src,
@@ -691,19 +711,11 @@ dogecoin_bool dogecoin_bootstrap_export(
     /* Resolve default source paths */
     cstring *cfh_obj = NULL, *cfd_obj = NULL;
     if (!cfheaders_src) {
-        cfh_obj = cstr_new_sz(512);
-        dogecoin_get_default_datadir(cfh_obj);
-        while (cfh_obj->len > 0 && cfh_obj->str[cfh_obj->len-1] == '\0') cfh_obj->len--;
-        cstr_append_buf(cfh_obj, "/filter/basic/cfheaders.dat", 27);
-        cstr_append_c(cfh_obj, '\0');
+        bootstrap_default_filter_path(&cfh_obj, params, "cfheaders.dat");
         cfheaders_src = cfh_obj->str;
     }
     if (!cfilters_src) {
-        cfd_obj = cstr_new_sz(512);
-        dogecoin_get_default_datadir(cfd_obj);
-        while (cfd_obj->len > 0 && cfd_obj->str[cfd_obj->len-1] == '\0') cfd_obj->len--;
-        cstr_append_buf(cfd_obj, "/filter/basic/cfilters.dat", 26);
-        cstr_append_c(cfd_obj, '\0');
+        bootstrap_default_filter_path(&cfd_obj, params, "cfilters.dat");
         cfilters_src = cfd_obj->str;
     }
 
@@ -961,19 +973,11 @@ dogecoin_bool dogecoin_bootstrap_import(
     /* Resolve destination paths */
     cstring *cfh_obj = NULL, *cfd_obj = NULL;
     if (!cfheaders_dst) {
-        cfh_obj = cstr_new_sz(512);
-        dogecoin_get_default_datadir(cfh_obj);
-        while (cfh_obj->len > 0 && cfh_obj->str[cfh_obj->len-1] == '\0') cfh_obj->len--;
-        cstr_append_buf(cfh_obj, "/filter/basic/cfheaders.dat", 27);
-        cstr_append_c(cfh_obj, '\0');
+        bootstrap_default_filter_path(&cfh_obj, params, "cfheaders.dat");
         cfheaders_dst = cfh_obj->str;
     }
     if (!cfilters_dst) {
-        cfd_obj = cstr_new_sz(512);
-        dogecoin_get_default_datadir(cfd_obj);
-        while (cfd_obj->len > 0 && cfd_obj->str[cfd_obj->len-1] == '\0') cfd_obj->len--;
-        cstr_append_buf(cfd_obj, "/filter/basic/cfilters.dat", 26);
-        cstr_append_c(cfd_obj, '\0');
+        bootstrap_default_filter_path(&cfd_obj, params, "cfilters.dat");
         cfilters_dst = cfd_obj->str;
     }
 

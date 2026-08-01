@@ -78,17 +78,28 @@ static dogecoin_bool mkdir_one(const char *path)
  * Ensure <base>/filter/basic/ exists, creating subdirectories as needed.
  * @p base must be a NUL-terminated path with no trailing slash.
  */
-static dogecoin_bool ensure_filter_dir(const char *base)
+/* Build <base>/filter/basic/<chainname>, creating each level.
+ *
+ * The chain component is not cosmetic.  Without it every network shares one
+ * cache: a regtest or testnet client loads the *mainnet* cfheaders/cfilters at
+ * startup, rescans them, and matches mainnet blocks its peer has never heard of
+ * -- then blocks forever waiting for them.  It also writes its own filters back
+ * into the mainnet files, corrupting them for the next mainnet run. */
+static dogecoin_bool ensure_filter_dir(const char *base, const dogecoin_chainparams *params)
 {
-    /* Build <base>/filter */
+    const char *chain = (params && params->chainname[0]) ? params->chainname : "main";
     size_t blen = strlen(base);
-    char *dir = dogecoin_calloc(blen + 20, 1);
+    char *dir = dogecoin_calloc(blen + 32 + strlen(chain), 1);
+    if (!dir) return false;
     memcpy(dir, base, blen);
 
     strcpy(dir + blen, "/filter");
     if (!mkdir_one(dir)) { dogecoin_free(dir); return false; }
 
     strcpy(dir + blen, "/filter/basic");
+    if (!mkdir_one(dir)) { dogecoin_free(dir); return false; }
+
+    sprintf(dir + blen, "/filter/basic/%s", chain);
     dogecoin_bool ok = mkdir_one(dir);
     dogecoin_free(dir);
     return ok;
@@ -98,8 +109,13 @@ static dogecoin_bool ensure_filter_dir(const char *base)
  * Build the default path for a filter file and store it in @p path_out.
  * Caller must call cstr_free(path_out, true) when done.
  */
-static void default_filter_path(cstring **path_out, const char *filename)
+/* <datadir>/filter/basic/<chainname>/<filename> -- see ensure_filter_dir() for
+ * why the chain component matters. */
+static void default_filter_path(cstring **path_out,
+                                const dogecoin_chainparams *params,
+                                const char *filename)
 {
+    const char *chain = (params && params->chainname[0]) ? params->chainname : "main";
     *path_out = cstr_new_sz(512);
     dogecoin_get_default_datadir(*path_out);
     /* Strip trailing NUL that dogecoin_get_default_datadir may append */
@@ -107,8 +123,52 @@ static void default_filter_path(cstring **path_out, const char *filename)
            (*path_out)->str[(*path_out)->len - 1] == '\0')
         (*path_out)->len--;
     cstr_append_buf(*path_out, "/filter/basic/", 14);
+    cstr_append_buf(*path_out, chain, strlen(chain));
+    cstr_append_c(*path_out, '/');
     cstr_append_buf(*path_out, filename, strlen(filename));
     cstr_append_c(*path_out, '\0');
+}
+
+/* Legacy chain-agnostic location, <datadir>/filter/basic/<filename>, used
+ * before the layout was segregated per network.  Any such file was written by
+ * whichever network happened to run last; only mainnet is migrated (below),
+ * because only mainnet data is meaningful to keep. */
+static void legacy_filter_path(cstring **path_out, const char *filename)
+{
+    *path_out = cstr_new_sz(512);
+    dogecoin_get_default_datadir(*path_out);
+    while ((*path_out)->len > 0 &&
+           (*path_out)->str[(*path_out)->len - 1] == '\0')
+        (*path_out)->len--;
+    cstr_append_buf(*path_out, "/filter/basic/", 14);
+    cstr_append_buf(*path_out, filename, strlen(filename));
+    cstr_append_c(*path_out, '\0');
+}
+
+/* One-time migration of the pre-segregation cache into the mainnet directory.
+ * Only runs for mainnet, only when the new path is absent and the legacy file
+ * exists, and only via rename() -- so it is a no-op on a fresh install and
+ * never silently discards data. */
+static void migrate_legacy_filter_file(const dogecoin_chainparams *params,
+                                       const char *filename,
+                                       const char *new_path)
+{
+    struct stat sb;
+    if (!params || strcmp(params->chainname, "main") != 0) return;
+    if (stat(new_path, &sb) == 0) return;            /* already migrated */
+
+    cstring *old_obj = NULL;
+    legacy_filter_path(&old_obj, filename);
+    if (stat(old_obj->str, &sb) == 0 && sb.st_size > 0) {
+        if (rename(old_obj->str, new_path) == 0) {
+            printf("cfdb: migrated %s to per-chain location %s\n",
+                   old_obj->str, new_path);
+        } else {
+            fprintf(stderr, "cfdb: could not migrate %s to %s: %s\n",
+                    old_obj->str, new_path, strerror(errno));
+        }
+    }
+    cstr_free(old_obj, true);
 }
 
 /**
@@ -143,9 +203,10 @@ static uint32_t read_file_version(FILE *f, const uint8_t *expected_magic)
 /*  cfheaders DB                                                    */
 /* ================================================================ */
 
-dogecoin_cfheaders_db* dogecoin_cfheaders_db_new(dogecoin_bool inmem_only)
+dogecoin_cfheaders_db* dogecoin_cfheaders_db_new(const dogecoin_chainparams *params, dogecoin_bool inmem_only)
 {
     dogecoin_cfheaders_db *db = dogecoin_calloc(1, sizeof(*db));
+    db->params      = params;
     db->read_write  = !inmem_only;
     db->tip_height  = 0;
     memset(db->tip_header, 0, 32);
@@ -180,11 +241,12 @@ dogecoin_bool dogecoin_cfheaders_db_load(
         while (datadir->len > 0 && datadir->str[datadir->len - 1] == '\0')
             datadir->len--;
         cstr_append_c(datadir, '\0');
-        ensure_filter_dir(datadir->str);
+        ensure_filter_dir(datadir->str, db->params);
         cstr_free(datadir, true);
 
-        default_filter_path(&path_obj, "cfheaders.dat");
+        default_filter_path(&path_obj, db->params, "cfheaders.dat");
         path = path_obj->str;
+        migrate_legacy_filter_file(db->params, "cfheaders.dat", path);
     }
 
     struct stat sb;
@@ -320,9 +382,10 @@ dogecoin_bool dogecoin_cfheaders_db_reset(dogecoin_cfheaders_db *db)
 /*  cfilters DB                                                     */
 /* ================================================================ */
 
-dogecoin_cfilters_db* dogecoin_cfilters_db_new(dogecoin_bool inmem_only)
+dogecoin_cfilters_db* dogecoin_cfilters_db_new(const dogecoin_chainparams *params, dogecoin_bool inmem_only)
 {
     dogecoin_cfilters_db *db = dogecoin_calloc(1, sizeof(*db));
+    db->params     = params;
     db->read_write = !inmem_only;
     db->tip_height = 0;
     return db;
@@ -354,11 +417,12 @@ dogecoin_bool dogecoin_cfilters_db_load(
         while (datadir->len > 0 && datadir->str[datadir->len - 1] == '\0')
             datadir->len--;
         cstr_append_c(datadir, '\0');
-        ensure_filter_dir(datadir->str);
+        ensure_filter_dir(datadir->str, db->params);
         cstr_free(datadir, true);
 
-        default_filter_path(&path_obj, "cfilters.dat");
+        default_filter_path(&path_obj, db->params, "cfilters.dat");
         path = path_obj->str;
+        migrate_legacy_filter_file(db->params, "cfilters.dat", path);
     }
 
     struct stat sb;
