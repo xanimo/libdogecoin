@@ -46,6 +46,8 @@ noinst_HEADERS = \
     include/dogecoin/byteswap.h \
     include/dogecoin/chacha20.h \
     include/dogecoin/chainparams.h \
+    include/dogecoin/cf_checkpoints.h \
+    include/dogecoin/compact_filter.h \
     include/dogecoin/common.h \
     include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
@@ -110,6 +112,8 @@ libdogecoin_la_SOURCES = \
     src/chacha20.c \
     src/context.c \
     src/chainparams.c \
+    src/cf_checkpoints.c \
+    src/compact_filter.c \
     src/cstr.c \
     src/ctaes.c \
     src/ecc.c \
@@ -287,6 +291,7 @@ tests_SOURCES = \
     test/checkpoints_tests.c \
     test/context_tests.c \
     test/cstr_tests.c \
+    test/compact_filter_tests.c \
     test/golomb_tests.c \
     test/ecc_tests.c \
     test/hash_tests.c \
