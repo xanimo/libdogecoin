@@ -7,9 +7,12 @@ on:
       - '*-dev*'
       - 'main'
   pull_request:
-    # The branches below must be a subset of the branches above
+    # Deliberately wider than the push filter above: a pull request must be
+    # analysed whichever branch it targets. Restricting this to '*-dev-*' meant
+    # 0.1.5-dev itself never matched (no trailing dash) and neither did main, so
+    # CodeQL ran on 1 pull request against CI's 42. Matches ci.yml's filter.
     branches:
-      - '*-dev*'
+      - '*'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'

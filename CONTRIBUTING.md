@@ -38,7 +38,7 @@ on:
       - 'main'
   pull_request:
     branches:
-      - '*-dev-*'
+      - '*'
 ```
 
 Two consequences catch people out:
@@ -54,12 +54,10 @@ Two consequences catch people out:
    name. Slash-prefixed branches are silently excluded from push-triggered CI.
 
 Note that `pull_request` filters match the **base** branch, not your branch. Once
-a PR is open against any branch, `ci.yml` runs regardless of what your branch is
-called — so a badly named branch looks fine the moment you open a PR, which is
-usually *after* you wanted the feedback. CodeQL is stricter still: its
-`pull_request` filter is `*-dev-*`, which `0.1.5-dev` itself does not match, so
-for a PR targeting `0.1.5-dev` CodeQL effectively only runs from the push
-trigger — i.e. only if your branch is named correctly.
+a PR is open, both workflows run regardless of what your branch is called — so a
+badly named branch looks fine the moment you open a PR, which is usually *after*
+you wanted the feedback. Naming the branch correctly is what gets you a build on
+every push, before review.
 
 ### Checking before you push
 
