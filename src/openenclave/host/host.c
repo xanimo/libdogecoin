@@ -412,7 +412,12 @@ int main(int argc, char* argv[])
                 printf("Shared secret not provided, generating one...\n");
                 // Generate random 20 bytes (40 hex characters)
                 unsigned char random_bytes[TOTP_SECRET_HEX_SIZE / 2];
-                dogecoin_random_bytes(random_bytes, sizeof(random_bytes), 0);
+                /* This becomes a TOTP shared secret; a silent entropy failure
+                   would yield a predictable second factor. */
+                if (!dogecoin_random_bytes(random_bytes, sizeof(random_bytes), 0)) {
+                    fprintf(stderr, "Failed to generate shared secret: no entropy available\n");
+                    goto exit;
+                }
 
                 shared_secret = malloc(TOTP_SECRET_HEX_SIZE + 1);
                 if (!shared_secret) {

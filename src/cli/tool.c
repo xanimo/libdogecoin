@@ -141,7 +141,15 @@ dogecoin_bool hd_gen_master(const dogecoin_chainparams* chain, char* masterkeyhe
 {
     dogecoin_hdnode node;
     uint8_t seed[32];
-    dogecoin_random_bytes(seed, 32, true);
+    /* Propagate an entropy failure instead of deriving a master key from
+       whatever is in seed[]. Every key in the resulting wallet descends from
+       these 32 bytes, so a silent failure here is unrecoverable and invisible:
+       the wallet works, and the keys are guessable. address.c already tests
+       this return value -- it just could never be false. */
+    if (!dogecoin_random_bytes(seed, 32, true)) {
+        dogecoin_mem_zero(seed, 32);
+        return false;
+    }
     dogecoin_hdnode_from_seed(seed, 32, &node);
     dogecoin_mem_zero(seed, 32);
     dogecoin_hdnode_serialize_private(&node, chain, masterkeyhex, strsize);
