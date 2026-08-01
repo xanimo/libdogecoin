@@ -63,10 +63,10 @@
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
-        {"ips", no_argument, NULL, 'i'},
+        {"ips", required_argument, NULL, 'i'},
         {"debug", no_argument, NULL, 'd'},
-        {"timeout", no_argument, NULL, 's'},
-        {"maxnodes", no_argument, NULL, 'm'},
+        {"timeout", required_argument, NULL, 's'},
+        {"maxnodes", required_argument, NULL, 'm'},
         {NULL, 0, NULL, 0} };
 
 static void print_version() {
