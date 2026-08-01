@@ -52,6 +52,7 @@ extern void test_chacha20();
 extern void test_checkpoints();
 extern void test_cstr();
 extern void test_ecc();
+extern void test_golomb();
 extern void test_hash();
 extern void test_key();
 extern void test_context_keypair_ex();
@@ -185,6 +186,7 @@ int main()
     u_run_test(test_checkpoints);
     u_run_test(test_cstr);
     u_run_test(test_ecc);
+    u_run_test(test_golomb);
     u_run_test(test_hash);
     u_run_test(test_key);
     u_run_test(test_context_keypair_ex);

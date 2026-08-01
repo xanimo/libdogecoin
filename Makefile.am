@@ -51,6 +51,7 @@ noinst_HEADERS = \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \
     include/dogecoin/eckey.h \
+    include/dogecoin/golomb.h \
     include/dogecoin/hash.h \
     include/dogecoin/key.h \
     include/dogecoin/koinu.h \
@@ -113,6 +114,7 @@ libdogecoin_la_SOURCES = \
     src/ctaes.c \
     src/ecc.c \
     src/eckey.c \
+    src/golomb.c \
     src/key.c \
     src/koinu.c \
     src/map.c \
@@ -285,6 +287,7 @@ tests_SOURCES = \
     test/checkpoints_tests.c \
     test/context_tests.c \
     test/cstr_tests.c \
+    test/golomb_tests.c \
     test/ecc_tests.c \
     test/hash_tests.c \
     test/key_tests.c \
