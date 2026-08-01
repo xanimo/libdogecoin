@@ -560,7 +560,24 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
 {
     if (!cmpctblk || !state) return false;
 
-    /* Total transaction count = short_ids + prefilled */
+    /* Reset any layout left by a previous compact block on this peer's state,
+       otherwise a second cmpctblock leaks the earlier arrays. */
+    if (state->available_txs) {
+        dogecoin_free(state->available_txs);
+        state->available_txs = NULL;
+    }
+    state->available_txs_count = 0;
+    if (state->missing_indices) {
+        dogecoin_free(state->missing_indices);
+        state->missing_indices = NULL;
+    }
+    state->missing_count = 0;
+
+    /* Total transaction count = short_ids + prefilled.
+       Both are attacker-supplied counts, already bounded against the message
+       length at deserialization; guard the sum against overflow before it is
+       used as an allocation size. */
+    if (cmpctblk->short_ids_count > UINT32_MAX - cmpctblk->prefilled_count) return false;
     uint32_t total_txs = cmpctblk->short_ids_count + cmpctblk->prefilled_count;
     if (total_txs == 0) return false;
 
@@ -569,24 +586,27 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
     if (!state->available_txs) return false;
     state->available_txs_count = total_txs;
 
+    uint32_t *shortid_to_txpos = NULL;
+
     /* Place prefilled transactions at their correct indices */
     uint32_t i;
     for (i = 0; i < cmpctblk->prefilled_count; i++) {
         uint32_t idx = cmpctblk->prefilled_txs[i].index;
-        if (idx >= total_txs) {
-            /* Invalid index */
-            dogecoin_free(state->available_txs);
-            state->available_txs = NULL;
-            return false;
-        }
+        if (idx >= total_txs) goto fail;
+        /* Two prefilled entries claiming the same slot would silently overwrite
+           and desynchronise the short-id mapping built below, leaving a slot
+           that no short id can ever fill. Reject rather than mis-assemble. */
+        if (state->available_txs[idx] != NULL) goto fail;
         state->available_txs[idx] = cmpctblk->prefilled_txs[i].tx;
     }
 
     /* Build a mapping from short_ids positions to available_txs positions.
      * short_ids[j] corresponds to the j-th non-prefilled slot. */
     uint32_t short_idx = 0;
-    uint32_t *shortid_to_txpos = dogecoin_calloc(cmpctblk->short_ids_count, sizeof(uint32_t));
-    if (!shortid_to_txpos && cmpctblk->short_ids_count > 0) return false;
+    if (cmpctblk->short_ids_count > 0) {
+        shortid_to_txpos = dogecoin_calloc(cmpctblk->short_ids_count, sizeof(uint32_t));
+        if (!shortid_to_txpos) goto fail;
+    }
 
     for (i = 0; i < total_txs && short_idx < cmpctblk->short_ids_count; i++) {
         if (state->available_txs[i] == NULL) {
@@ -630,10 +650,7 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
     /* Build the missing indices list */
     if (missing_count > 0) {
         state->missing_indices = dogecoin_calloc(missing_count, sizeof(uint32_t));
-        if (!state->missing_indices) {
-            dogecoin_free(shortid_to_txpos);
-            return false;
-        }
+        if (!state->missing_indices) goto fail;
         state->missing_count = missing_count;
 
         uint32_t mi = 0;
@@ -650,6 +667,16 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
     dogecoin_free(shortid_to_txpos);
 
     return (missing_count == 0);
+
+fail:
+    /* Leave the state empty rather than half-built: available_txs_count must
+       never outlive the array it describes, or fill_missing() below indexes a
+       NULL pointer through a still-positive count. */
+    dogecoin_free(shortid_to_txpos);
+    dogecoin_free(state->available_txs);
+    state->available_txs = NULL;
+    state->available_txs_count = 0;
+    return false;
 }
 
 dogecoin_bool dogecoin_compact_block_fill_missing(
@@ -657,6 +684,7 @@ dogecoin_bool dogecoin_compact_block_fill_missing(
     const dogecoin_blocktxn *resp)
 {
     if (!state || !resp) return false;
+    if (!state->available_txs || !state->missing_indices) return false;
 
     if (resp->txs_count != state->missing_count) {
         /* Mismatch between requested and received transaction count */
