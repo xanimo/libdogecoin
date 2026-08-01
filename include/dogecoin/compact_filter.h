@@ -52,6 +52,7 @@
 #define __LIBDOGECOIN_COMPACT_FILTER_H__
 
 #include <dogecoin/buffer.h>
+#include <dogecoin/cf_checkpoints.h>
 #include <dogecoin/chainparams.h>
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>

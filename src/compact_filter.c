@@ -33,6 +33,7 @@
 
 #include <string.h>
 
+#include <dogecoin/cf_checkpoints.h>
 #include <dogecoin/chainparams.h>
 #include <dogecoin/compact_filter.h>
 #include <dogecoin/hash.h>

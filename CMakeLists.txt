@@ -382,6 +382,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/ecc.c
     src/eckey.c
     src/golomb.c
+    src/cf_checkpoints.c
     src/key.c
     src/koinu.c
     src/map.c
@@ -541,6 +542,7 @@ IF(USE_TESTS)
         test/chacha20_tests.c
         test/context_tests.c
         test/cstr_tests.c
+        test/compact_filter_tests.c
         test/golomb_tests.c
         test/ecc_tests.c
         test/hash_tests.c
@@ -648,6 +650,7 @@ IF(WITH_NET)
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
         src/bip37.c
+        src/compact_filter.c
         src/headersdb_file.c
         src/net.c
         src/protocol.c

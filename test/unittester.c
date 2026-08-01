@@ -47,6 +47,7 @@ extern void test_bip39();
 extern void test_bip44();
 extern void test_block_header();
 extern void test_golomb();
+extern void test_compact_filter();
 extern void test_buffer();
 extern void test_chacha20();
 extern void test_cstr();
@@ -176,6 +177,7 @@ int main()
     u_run_test(test_bip44);
     u_run_test(test_block_header);
     u_run_test(test_golomb);
+    u_run_test(test_compact_filter);
     u_run_test(test_buffer);
     u_run_test(test_chacha20);
     u_run_test(test_cstr);
