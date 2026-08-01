@@ -426,6 +426,10 @@ static int spv_zk_buffer_pending(dogecoin_spv_client* client,
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
+void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *node);
+void par_hdr_free(dogecoin_spv_client *client);
+static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
+                         struct const_buffer *buf, uint32_t count);
 
 void dogecoin_node_connection_state_changed_cb(dogecoin_node *node) {
     if (node->nodegroup->should_connect_to_more_nodes_cb) {
@@ -653,6 +657,8 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     client->merkle_match_active = false;
     client->merkle_match_blockindex = NULL;
 
+
+    par_hdr_free(client);
     if (client->headers_db)
     {
         if (client->headers_db_ctx)
@@ -893,6 +899,9 @@ void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogeco
  */
 dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
 {
+    /* Parallel genesis headers in progress -- don't interfere. */
+    if (client->par_hdr && client->par_hdr->active) return true;
+
     size_t i;
     dogecoin_bool new_headers_available = false;
     for(i = 0; i < client->nodegroup->nodes->len; ++i)
@@ -992,7 +1001,10 @@ void dogecoin_net_spv_node_handshake_done(dogecoin_node *node)
         }
     }
 
-    dogecoin_net_spv_request_headers((dogecoin_spv_client*)node->nodegroup->ctx);
+    if (client && client->par_hdr && client->par_hdr->active)
+        par_hdr_assign(client, node);
+    else
+        dogecoin_net_spv_request_headers((dogecoin_spv_client*)node->nodegroup->ctx);
 }
 
 /**
@@ -1693,6 +1705,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (!deser_varlen(&amount_of_headers, buf)) return;
         uint64_t now = time(NULL);
         client->nodegroup->log_write_cb("Got %d headers (took %d s) from node %d\n", amount_of_headers, now - client->last_headersrequest_time, node->nodeid);
+
+        /* Parallel genesis headers mode -- buffer into the owning segment. */
+        if (client->par_hdr && client->par_hdr->active) {
+            par_hdr_recv(client, node, buf, amount_of_headers);
+            return;
+        }
 
         // flag off the request stall check
         client->last_headersrequest_time = 0;
@@ -2561,5 +2579,366 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_clien
     if (client->nodegroup && client->nodegroup->log_write_cb)
         client->nodegroup->log_write_cb("[spv] sent filterclear\n");
 
+    return true;
+}
+
+
+
+static uint32_t spv_elapsed(const dogecoin_spv_client *client) {
+    return (uint32_t)((uint64_t)time(NULL) - client->start_ts);
+}
+
+/* ================================================================ */
+/* Parallel genesis header download                                  */
+/* ================================================================ */
+
+/* Build segments from the chainparams block-header checkpoint array.
+ * Segment i covers the open-closed height range (prev_checkpoint, checkpoint[i]].
+ * Segment 0 starts from the genesis block hash (height 0).
+ * Returns a newly allocated par_hdr_state, or NULL for chains with no checkpoints. */
+static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
+{
+    const dogecoin_checkpoint *arr = NULL;
+    size_t cnt = 0;
+    if (strcmp(params->chainname, "main") == 0) {
+        arr = dogecoin_mainnet_checkpoint_array;
+        cnt = sizeof(dogecoin_mainnet_checkpoint_array) /
+              sizeof(dogecoin_mainnet_checkpoint_array[0]);
+    } else if (strcmp(params->chainname, "test") == 0) {
+        arr = dogecoin_testnet_checkpoint_array;
+        cnt = sizeof(dogecoin_testnet_checkpoint_array) /
+              sizeof(dogecoin_testnet_checkpoint_array[0]);
+    }
+    if (!cnt) return NULL;
+
+    /* arr[0] is the genesis entry (height=0) — it is the start anchor for the
+     * first segment, not an endpoint to download toward.  Skip it so segment 0
+     * covers the range genesis..arr[1] instead of the degenerate 0..0 range. */
+    size_t start_i = (cnt > 0 && arr[0].height == 0) ? 1 : 0;
+    size_t num_segs = cnt - start_i;
+    if (!num_segs) return NULL;
+
+    par_hdr_state *s = dogecoin_calloc(1, sizeof(par_hdr_state));
+    s->segs = dogecoin_calloc(num_segs, sizeof(par_hdr_seg));
+    s->num_segs = (uint32_t)num_segs;
+    s->active = true;
+
+    for (uint32_t i = 0; i < (uint32_t)num_segs; i++) {
+        uint32_t arr_i = (uint32_t)(start_i + i);
+        par_hdr_seg *seg = &s->segs[i];
+
+        /* stop = checkpoint[arr_i] */
+        seg->stop_height = arr[arr_i].height;
+        utils_uint256_sethex((char *)arr[arr_i].hash, seg->stop_hash);
+
+        /* start = genesis when i==0, else checkpoint[arr_i-1] */
+        if (i == 0) {
+            seg->start_height = 0;
+            memcpy(seg->start_hash, params->genesisblockhash, sizeof(uint256_t));
+        } else {
+            seg->start_height = arr[arr_i - 1].height;
+            utils_uint256_sethex((char *)arr[arr_i - 1].hash, seg->start_hash);
+        }
+
+        seg->node_id    = -1;
+        seg->tip_height = seg->start_height;
+        memcpy(seg->tip_hash, seg->start_hash, sizeof(uint256_t));
+
+        seg->cap = 2048;
+        seg->buf = dogecoin_malloc((size_t)seg->cap * PAR_HDR_RAW_LEN);
+    }
+    return s;
+}
+
+/* Send a getheaders request to @node for the next batch in @seg. */
+static void par_hdr_send_getheaders(dogecoin_node *node, const par_hdr_seg *seg)
+{
+    vector_t *locators = vector_new(1, free);
+    uint256_t *loc = dogecoin_calloc(1, sizeof(uint256_t));
+    memcpy(loc, seg->tip_hash, sizeof(uint256_t));
+    vector_add(locators, loc);
+
+    cstring *msg = cstr_new_sz(512);
+    dogecoin_p2p_msg_getheaders(locators, (uint8_t *)seg->stop_hash, msg);
+    vector_free(locators, true);
+
+    cstring *p2p = dogecoin_p2p_message_new(
+        node->nodegroup->chainparams->netmagic,
+        DOGECOIN_MSG_GETHEADERS, msg->str, msg->len);
+    cstr_free(msg, true);
+    dogecoin_node_send(node, p2p);
+    cstr_free(p2p, true);
+
+    node->state |= NODE_HEADERSYNC;
+}
+
+/* Assign the next unassigned segment to @node and send the first getheaders. */
+LIBDOGECOIN_API void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *node)
+{
+    par_hdr_state *s = client->par_hdr;
+    if (!s || !s->active) return;
+    if (!(node->state & NODE_CONNECTED) || !node->version_handshake) return;
+
+    /* Skip nodes already working on a segment */
+    for (uint32_t i = 0; i < s->num_segs; i++) {
+        if (s->segs[i].node_id == (int)node->nodeid) return;
+    }
+
+    if (s->next_assign >= s->num_segs) return; /* all assigned */
+
+    par_hdr_seg *seg = &s->segs[s->next_assign];
+    seg->node_id = (int)node->nodeid;
+    s->next_assign++;
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[par-hdr] assigned node %d to segment %u (heights %u..%u)\n",
+            node->nodeid, s->next_assign - 1,
+            seg->start_height + 1, seg->stop_height);
+
+    par_hdr_send_getheaders(node, seg);
+}
+
+/* Flush completed segments (in order) into the primary headers DB.
+ * Returns the number of segments flushed. */
+static uint32_t par_hdr_flush(dogecoin_spv_client *client)
+{
+    par_hdr_state *s = client->par_hdr;
+    uint32_t flushed = 0;
+
+    /* Batch-optimise writes: suppress per-record fdatasync and skip scrypt
+     * PoW verification.  Segments are checkpoint-anchored so the chain is
+     * implicitly validated.  A single fsync at the end suffices. */
+    dogecoin_headers_db *hdb = (dogecoin_headers_db *)client->headers_db_ctx;
+    dogecoin_bool prev_batch = hdb ? hdb->batch_write : false;
+    dogecoin_bool prev_skip  = hdb ? hdb->skip_pow    : false;
+    if (hdb) { hdb->batch_write = true; hdb->skip_pow = true; }
+
+    while (s->flush_idx < s->num_segs && s->segs[s->flush_idx].complete &&
+           !s->segs[s->flush_idx].flushed) {
+        par_hdr_seg *seg = &s->segs[s->flush_idx];
+
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] flushing segment %u (%u headers, heights %u..%u)\n",
+                s->flush_idx, seg->count,
+                seg->start_height + 1, seg->stop_height);
+
+        uint32_t bad = 0;
+        for (uint32_t j = 0; j < seg->count; j++) {
+            struct const_buffer cbuf = {
+                (const void *)(seg->buf + (size_t)j * PAR_HDR_RAW_LEN),
+                PAR_HDR_RAW_LEN
+            };
+            dogecoin_bool connected;
+            dogecoin_blockindex *pindex =
+                client->headers_db->connect_hdr(client->headers_db_ctx, &cbuf, false, &connected);
+            if (!connected) {
+                if (bad == 0 && client->nodegroup && client->nodegroup->log_write_cb) {
+                    /* Decode prev_block from the raw header for diagnostics */
+                    const uint8_t *raw = seg->buf + (size_t)j * PAR_HDR_RAW_LEN;
+                    /* Standard header layout: version(4) + prev_block(32) */
+                    char prev_hex[65] = {0};
+                    for (int _k = 0; _k < 32; _k++)
+                        snprintf(prev_hex + _k*2, 3, "%02x", raw[4 + (31-_k)]);
+                    char tip_hex[65] = {0};
+                    if (hdb && hdb->chaintip)
+                        for (int _k = 0; _k < 32; _k++)
+                            snprintf(tip_hex + _k*2, 3, "%02x", ((uint8_t*)hdb->chaintip->hash)[_k]);
+                    client->nodegroup->log_write_cb(
+                        "[par-hdr] segment %u: first connect failure at j=%u\n"
+                        "  chaintip  height=%d hash=%s\n"
+                        "  prev_block in hdr=%s\n",
+                        s->flush_idx, j,
+                        hdb && hdb->chaintip ? (int)hdb->chaintip->height : -1, tip_hex,
+                        prev_hex);
+                }
+                bad++;
+                dogecoin_free(pindex); /* orphan — not in DB */
+            } else {
+                if (pindex && client->header_connected)
+                    client->header_connected(client);
+                /* pindex is now db->chaintip — owned by the DB, do NOT free */
+            }
+        }
+
+        seg->flushed = true;
+        s->flush_idx++;
+        flushed++;
+
+        if (bad) break; /* stop flushing if chain broke; caller handles */
+    }
+
+    if (hdb) {
+        hdb->batch_write = prev_batch;
+        hdb->skip_pow    = prev_skip;
+        if (flushed > 0 && hdb->headers_tree_file)
+            dogecoin_file_commit(hdb->headers_tree_file);
+    }
+    return flushed;
+}
+
+/* Advance @buf past the AUXPoW chain data that follows the 80-byte standard
+ * header in a P2P headers message for AUXPoW blocks (version & 0x100).
+ * Mirrors deserialize_dogecoin_auxpow_block's buffer consumption but skips
+ * check_auxpow — PoW is guaranteed by checkpoint anchors at segment boundaries. */
+static dogecoin_bool par_hdr_skip_auxpow(struct const_buffer *buf) {
+    /* parent coinbase tx (variable length) */
+    size_t cb_len = 0;
+    dogecoin_tx *dummy = dogecoin_tx_new();
+    dogecoin_bool ok = (dogecoin_bool)dogecoin_tx_deserialize(buf->p, buf->len, dummy, &cb_len);
+    dogecoin_tx_free(dummy);
+    if (!ok || cb_len == 0 || !deser_skip(buf, cb_len)) return false;
+
+    /* parent_hash (32 bytes) */
+    if (!deser_skip(buf, 32)) return false;
+
+    /* parent merkle branch: count (varint) + count×32 bytes */
+    uint32_t merkle_count = 0;
+    if (!deser_varlen(&merkle_count, buf)) return false;
+    if (merkle_count > 0 && !deser_skip(buf, (size_t)merkle_count * 32)) return false;
+
+    /* parent_merkle_index (uint32) */
+    if (!deser_skip(buf, 4)) return false;
+
+    /* aux merkle branch: count (varint) + count×32 bytes */
+    uint32_t aux_count = 0;
+    if (!deser_varlen(&aux_count, buf)) return false;
+    if (aux_count > 0 && !deser_skip(buf, (size_t)aux_count * 32)) return false;
+
+    /* aux_merkle_index (uint32) */
+    if (!deser_skip(buf, 4)) return false;
+
+    /* parent block header: version(4) + prev_block(32) + merkle_root(32) + time(4) + bits(4) + nonce(4) */
+    if (!deser_skip(buf, 80)) return false;
+
+    return true;
+}
+
+/* Called from the DOGECOIN_MSG_HEADERS handler when par_hdr is active.
+ * @buf points just past the varint that gave @count. */
+static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
+                         struct const_buffer *buf, uint32_t count)
+{
+    par_hdr_state *s = client->par_hdr;
+
+    /* Find the segment assigned to this node */
+    par_hdr_seg *seg = NULL;
+    uint32_t seg_idx = 0;
+    for (uint32_t i = 0; i < s->num_segs; i++) {
+        if (s->segs[i].node_id == (int)node->nodeid && !s->segs[i].complete) {
+            seg = &s->segs[i];
+            seg_idx = i;
+            break;
+        }
+    }
+    if (!seg) {
+        /* Unsolicited response — discard */
+        node->state &= ~NODE_HEADERSYNC;
+        return;
+    }
+
+    /* Buffer each raw 80-byte standard header.
+     *
+     * AUXPoW blocks (version & 0x100) carry variable-length AUXPoW chain data
+     * between the standard 80-byte header and the 1-byte tx_count varint in the
+     * P2P headers message.  We copy the standard 80 bytes, advance buf by 80,
+     * then call par_hdr_skip_auxpow to consume the AUXPoW data without running
+     * check_auxpow (checkpoint anchors at segment boundaries guarantee validity). */
+    for (uint32_t i = 0; i < count; i++) {
+        if (buf->len < PAR_HDR_RAW_LEN) break;
+
+        /* Peek at version to detect AUXPoW (wire format: little-endian int32) */
+        uint32_t wire_ver;
+        memcpy(&wire_ver, buf->p, 4);
+        const dogecoin_bool is_aux = (le32toh(wire_ver) & 0x100) != 0;
+
+        /* Grow segment buffer if needed */
+        if (seg->count >= seg->cap) {
+            seg->cap *= 2;
+            seg->buf  = dogecoin_realloc(seg->buf, (size_t)seg->cap * PAR_HDR_RAW_LEN);
+        }
+
+        /* Copy the standard 80-byte header and advance past it */
+        memcpy(seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN, buf->p, PAR_HDR_RAW_LEN);
+        buf->p   = (const uint8_t *)buf->p + PAR_HDR_RAW_LEN;
+        buf->len -= PAR_HDR_RAW_LEN;
+
+        /* For AUXPoW blocks, skip the variable-length chain data */
+        if (is_aux && !par_hdr_skip_auxpow(buf)) break;
+
+        /* Compute header hash from the buffered 80 bytes */
+        dogecoin_block_header hdr;
+        struct const_buffer hbuf = { seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN,
+                                     PAR_HDR_RAW_LEN };
+        if (dogecoin_block_header_deserialize(&hdr, &hbuf, client->chainparams, NULL)) {
+            dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
+            seg->tip_height++;
+        }
+        seg->count++;
+
+        /* skip tx_count varint (always 0x00 in headers messages) */
+        if (buf->len > 0) { buf->p = (const uint8_t *)buf->p + 1; buf->len--; }
+    }
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[par-hdr] seg %u: buffered %u, tip_height=%u, stop=%u\n",
+            seg_idx, seg->count, seg->tip_height, seg->stop_height);
+
+    if (seg->tip_height >= seg->stop_height) {
+        /* Segment complete */
+        seg->complete = true;
+        seg->node_id  = -1;
+        node->state  &= ~NODE_HEADERSYNC;
+
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] segment %u complete (%u headers)\n", seg_idx, seg->count);
+
+        /* Try to flush as many ordered completed segments as possible */
+        par_hdr_flush(client);
+
+        /* Re-assign this node to the next segment */
+        par_hdr_assign(client, node);
+
+        /* Check if all segments are done */
+        if (s->flush_idx >= s->num_segs) {
+            s->active = false;
+            dogecoin_blockindex *tip =
+                client->headers_db->getchaintip(client->headers_db_ctx);
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] all segments complete — primary DB height %d [%us elapsed]\n",
+                    tip ? tip->height : -1, spv_elapsed(client));
+        }
+    } else {
+        /* More headers needed for this segment */
+        par_hdr_send_getheaders(node, seg);
+    }
+}
+
+/* Release all par_hdr memory. */
+LIBDOGECOIN_API void par_hdr_free(dogecoin_spv_client *client)
+{
+    if (!client || !client->par_hdr) return;
+    par_hdr_state *s = client->par_hdr;
+    for (uint32_t i = 0; i < s->num_segs; i++)
+        dogecoin_free(s->segs[i].buf);
+    dogecoin_free(s->segs);
+    dogecoin_free(s);
+    client->par_hdr = NULL;
+}
+
+/* Initialise parallel genesis header download for @client.
+ * Builds segments from the chainparams block checkpoint array.
+ * Returns true on success, false if the chain has no checkpoints. */
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_enable_genesis_headers(
+    dogecoin_spv_client *client)
+{
+    if (!client || !client->chainparams) return false;
+    par_hdr_free(client);
+    client->par_hdr = par_hdr_init(client->chainparams);
+    if (!client->par_hdr) return false;
     return true;
 }

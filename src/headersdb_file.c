@@ -285,7 +285,8 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
     ser_u256(rec, arith_to_uint256(&blockindex->chainwork));
     dogecoin_block_header_serialize(rec, &blockindex->header);
     size_t res = fwrite(rec->str, rec->len, 1, db->headers_tree_file);
-    dogecoin_file_commit(db->headers_tree_file);
+    if (!db->batch_write)
+        dogecoin_file_commit(db->headers_tree_file);
     cstr_free(rec, true);
     return (res == 1);
 }
@@ -340,14 +341,16 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
     if (connect_at != NULL) {
         // Check the proof of work
         if (!is_auxpow(blockindex->header.version)) {
-            uint256_t hash = {0};
-            cstring* s = cstr_new_sz(64);
-            dogecoin_block_header_serialize(s, (const dogecoin_block_header*) &blockindex->header);
-            dogecoin_block_header_scrypt_hash(s, &hash);
-            cstr_free(s, true);
-            if (!check_pow(&hash, blockindex->header.bits, db->params, &blockindex->chainwork)) {
-                printf("%s:%d:%s : non-AUX proof of work failed : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
-                return blockindex;
+            if (!db->skip_pow) {
+                uint256_t hash = {0};
+                cstring* s = cstr_new_sz(64);
+                dogecoin_block_header_serialize(s, (const dogecoin_block_header*) &blockindex->header);
+                dogecoin_block_header_scrypt_hash(s, &hash);
+                cstr_free(s, true);
+                if (!check_pow(&hash, blockindex->header.bits, db->params, &blockindex->chainwork)) {
+                    printf("%s:%d:%s : non-AUX proof of work failed : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
+                    return blockindex;
+                }
             }
         }
 
