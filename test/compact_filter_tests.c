@@ -291,6 +291,31 @@ static void test_filter_header_compute(void)
     /* NULL filter_data returns false */
     u_assert_true(!dogecoin_compact_filter_validate(NULL, prev, header));
 
+    /* The attack this function exists to stop: a peer that serves altered
+     * filter bytes for a block whose filter header is already committed to by
+     * the cfheaders chain. Flipping any single bit of the payload must fail
+     * validation against the header computed from the original -- otherwise a
+     * peer could strip a transaction out of a filter and the client would
+     * silently skip the block that pays it. */
+    {
+        size_t probe;
+        for (probe = 0; probe < filter_data->len; probe++) {
+            cstring *tampered = cstr_new_buf(filter_data->str, filter_data->len);
+            tampered->str[probe] ^= 0x01;
+            u_assert_true(!dogecoin_compact_filter_validate(tampered, prev, header));
+            cstr_free(tampered, true);
+        }
+        /* Truncation and extension must be rejected on the same grounds. */
+        cstring *shorter = cstr_new_buf(filter_data->str, filter_data->len - 1);
+        u_assert_true(!dogecoin_compact_filter_validate(shorter, prev, header));
+        cstr_free(shorter, true);
+
+        cstring *longer = cstr_new_buf(filter_data->str, filter_data->len);
+        cstr_append_c(longer, 0x00);
+        u_assert_true(!dogecoin_compact_filter_validate(longer, prev, header));
+        cstr_free(longer, true);
+    }
+
     /* Chaining: header2 = SHA256d(filter_hash2 || header1) */
     cstring *filter_data2 = cstr_new("next block filter");
     uint8_t header2[32];
