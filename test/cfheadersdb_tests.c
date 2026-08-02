@@ -40,8 +40,9 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
 
-#define CFDB_TEST_HEADERS "/tmp/libdogecoin_cfheaders_test.dat"
-#define CFDB_TEST_FILTERS "/tmp/libdogecoin_cfilters_test.dat"
+/* Relative to the working directory: Windows and Android have no /tmp. */
+#define CFDB_TEST_HEADERS "test_cfheaders.dat"
+#define CFDB_TEST_FILTERS "test_cfilters.dat"
 
 /* Fill a uint256_t with a deterministic, height-dependent pattern so that a
    record read back at the wrong offset is detectable rather than plausible. */
