@@ -260,14 +260,13 @@ AC_CHECK_DECLS([readpassphrase], [AC_DEFINE([HAVE_READPASSPHRASE], [1], [Define 
 
 m4_include(m4/macros/with.m4)
 ARG_WITH_SET([random-device], [/dev/urandom], [set the device to read random data from])
-if test "x$random_device" = x"/dev/urandom"; then
-  AC_DEFINE_UNQUOTED([FILE_RANDOM],[1],[Define to 1 to enable random retrieving over filehandle])
-  AC_DEFINE([RANDOM_DEVICE],["/dev/urandom"],[Define to set random file handle])
-fi
-if test "x$random_device" = x"/dev/random"; then
-  AC_DEFINE_UNQUOTED([FILE_RANDOM],[1],[Define to 1 to enable /dev/random as random device])
-  AC_DEFINE([RANDOM_DEVICE],["/dev/random"],[Define to set random file handle])
-fi
+# Define RANDOM_DEVICE for whatever device was configured, not just for the two
+# values that used to be enumerated here. Matching on exact strings meant
+# --with-random-device=/dev/hwrng left RANDOM_DEVICE undefined, which is what
+# pushed src/random.c into hardcoding a path and ignoring this option entirely.
+AS_IF([test "x$random_device" = x],[random_device="/dev/urandom"])
+AC_DEFINE_UNQUOTED([FILE_RANDOM],[1],[Define to 1 to enable random retrieving over filehandle])
+AC_DEFINE_UNQUOTED([RANDOM_DEVICE],["$random_device"],[Device the POSIX entropy fallback reads from])
 
 # Configure Intel AVX2
 if test x$use_intel_avx2 = xyes; then

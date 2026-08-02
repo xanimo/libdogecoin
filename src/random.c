@@ -39,6 +39,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+/* The device the POSIX fallback reads entropy from. Normally set by the build:
+   -DRANDOM_DEVICE=... from CMake, or libdogecoin-config.h under autotools.
+   The guard is a backstop for configurations that define neither -- it must
+   never be reached silently in a shipped build, which is why the value it
+   picks is the conservative one rather than a blocking device. */
+#ifndef RANDOM_DEVICE
+#define RANDOM_DEVICE "/dev/urandom"
+#endif
 #if defined _WIN32
 #ifdef _MSC_VER
 #include <win/winunistd.h>
@@ -214,7 +223,7 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
 #endif
 
     (void)update_seed; //unused
-    FILE* frand = fopen("/dev/urandom", "rb"); // figure out why RANDOM_DEVICE is undeclared here
+    FILE* frand = fopen(RANDOM_DEVICE, "rb");
     if (!frand)
         return false;
     size_t len_read = fread(buf, 1, len, frand);
