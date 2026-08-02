@@ -633,6 +633,14 @@ void test_bip37_filter_state()
     dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_main, false, true, false, false, 1, NULL);
     u_assert_true(client != NULL);
 
+    /* BIP37 and BIP157 are mutually exclusive for privacy reasons: a bloom
+     * filter leaks the watched scripts to peers, which is what compact filters
+     * avoid.  Compact filters are on by default, and filterload fails closed
+     * while they are, so a BIP37 consumer must opt out explicitly first. */
+    u_assert_true(!dogecoin_spv_client_filterload(client, (const uint8_t[]){0xaa}, 1, 1, 0, 0));
+    dogecoin_spv_enable_compact_filters(client, false);
+    u_assert_true(!client->compact_filters_enabled);
+
     uint8_t filter[3] = {0xaa, 0xbb, 0xcc};
     u_assert_true(dogecoin_spv_client_filterload(client, filter, sizeof(filter), 2, 123, 1));
     u_assert_true(client->bloom_filter != NULL);
