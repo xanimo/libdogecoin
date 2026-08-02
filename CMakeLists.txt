@@ -392,6 +392,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/buffer.c
     src/chacha20.c
     src/context.c
+    src/compact_block.c
     src/cstr.c
     src/ctaes.c
     src/ecc.c
@@ -564,6 +565,7 @@ IF(USE_TESTS)
         test/buffer_tests.c
         test/chacha20_tests.c
         test/checkpoints_tests.c
+        test/compact_block_tests.c
         test/context_tests.c
         test/cstr_tests.c
         test/ecc_tests.c
@@ -696,7 +698,6 @@ IF(WITH_NET)
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
         src/bip37.c
-        src/compact_block.c
         src/headersdb_file.c
         src/net.c
         src/protocol.c
