@@ -710,6 +710,7 @@ IF(WITH_NET)
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
         src/bip37.c
+        src/cfheadersdb_file.c
         src/headersdb_file.c
         src/net.c
         src/protocol.c
@@ -726,6 +727,7 @@ IF(WITH_NET)
     ENDIF()
     IF(USE_TESTS)
         TARGET_SOURCES(tests ${visibility}
+            test/cfheadersdb_tests.c
             test/net_tests.c
             test/protocol_tests.c
             test/spv_tests.c
