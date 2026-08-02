@@ -11,6 +11,11 @@ on:
 
 jobs:
   build:
+    # A leg that runs this long has hung, not progressed: the slowest legitimate
+    # leg (aarch64-linux-optee) takes ~42 min and every other leg is under 8.
+    # Without a bound a hung job holds a runner until GitHub's 6-hour default --
+    # observed with aarch64-android sitting at 92 min against a 4-minute norm.
+    timeout-minutes: 90
     name: ${{ matrix.name }}
 
     env:
@@ -680,6 +685,7 @@ jobs:
   # ---------------------------------------------------------------------------
   sanitizers:
     name: x86_64-linux-asan-ubsan
+    timeout-minutes: 60
     runs-on: ubuntu-22.04
     env:
       HOST: x86_64-pc-linux-gnu
@@ -731,6 +737,7 @@ jobs:
 
   sign-x86_64-win:
     needs: build
+    timeout-minutes: 30
     runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -792,6 +799,7 @@ jobs:
 
   sign-x86_64-win-native:
     needs: build
+    timeout-minutes: 30
     runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -846,6 +854,7 @@ jobs:
 
   sign-x86_64-win-native-rel:
     needs: build
+    timeout-minutes: 30
     runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -900,6 +909,7 @@ jobs:
 
   sign-x86_64-win-native-notpm:
     needs: build
+    timeout-minutes: 30
     runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -953,6 +963,7 @@ jobs:
 
   sign-i686-win:
     needs: build
+    timeout-minutes: 30
     runs-on: windows-2022
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -1012,6 +1023,7 @@ jobs:
 
   sign-x86_64-macos:
     needs: build
+    timeout-minutes: 30
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -1067,6 +1079,7 @@ jobs:
             LICENSE
 
   gitian-build:
+    timeout-minutes: 240
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
@@ -1181,6 +1194,7 @@ jobs:
 
   sign-gitian-macos:
     needs: gitian-build
+    timeout-minutes: 60
     runs-on: macos-latest
     if: github.event_name == 'push'
     permissions:
