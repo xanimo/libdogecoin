@@ -508,6 +508,13 @@ fuzz_fuzz_tx_LDADD = libdogecoin.la $(ASM_LIB_FILES)
 fuzz_fuzz_tx_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
 fuzz_fuzz_tx_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
 
+noinst_PROGRAMS += fuzz/fuzz_compact_block
+fuzz_fuzz_compact_block_SOURCES = fuzz/fuzz_compact_block.c
+fuzz_fuzz_compact_block_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_compact_block_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_compact_block_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_compact_block_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
 noinst_PROGRAMS += fuzz/fuzz_block
 fuzz_fuzz_block_SOURCES = fuzz/fuzz_block.c
 fuzz_fuzz_block_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
@@ -564,7 +571,7 @@ fuzz-corpus: fuzz/seed_logdb_corpus
 	./fuzz/seed_logdb_corpus $(CORPUS)
 
 
-FUZZ_TARGETS = fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_wtx fuzz/fuzz_logdb fuzz/fuzz_psbt
+FUZZ_TARGETS = fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_wtx fuzz/fuzz_logdb fuzz/fuzz_psbt fuzz/fuzz_compact_block
 if WITH_NET
 FUZZ_TARGETS += fuzz/fuzz_protocol
 endif
