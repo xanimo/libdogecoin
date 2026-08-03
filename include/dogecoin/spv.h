@@ -185,6 +185,10 @@ typedef struct dogecoin_spv_client_
      * chainbottom for checkpoint-based sync, 1 for genesis sync). */
     uint32_t cf_start_height;
 
+    /* Number of parallel getcfilters workers (independent TCP connections).
+     * 0 or 1 means sequential (default); >1 activates parallel mode. */
+    uint8_t cf_num_workers;
+
     /* BIP157: compact filter sync state */
     dogecoin_bool compact_filters_enabled; /**< Whether compact filter sync is active */
     dogecoin_compact_filter_state *cfilter_state; /**< BIP157 per-client compact filter state */

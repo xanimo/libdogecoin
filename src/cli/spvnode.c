@@ -218,6 +218,7 @@ static struct option long_options[] = {
         {"no_cfilters", no_argument, NULL, 'e'},
         {"export_cfcheckpts", no_argument, NULL, 'o'},
         {"logfile", required_argument, NULL, 'L'},
+        {"cf_workers",       required_argument, NULL, 'W'},
         {"cfheaders_path",   required_argument, NULL, 257},
         {"cfilters_path",    required_argument, NULL, 258},
         {"cf_start_height",  required_argument, NULL, 259},
@@ -541,6 +542,7 @@ int main(int argc, char* argv[]) {
     dogecoin_bool export_cfcheckpts = false;
     int selected_checkpoint_index = -1;
     char* logfile = NULL;
+    int   cf_workers          = 0;
     char* cfheaders_path      = NULL;
     char* cfilters_path       = NULL;
     uint32_t cf_start_height  = 0;
@@ -552,7 +554,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkjxgqHeoL:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkjxgqHeoL:W:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -642,6 +644,9 @@ int main(int argc, char* argv[]) {
                 case 'o':
                     export_cfcheckpts = true;
                     break;
+                case 'W':
+                    cf_workers = atoi(optarg);
+                    break;
                 case 'L':
                     logfile = optarg;
                     break;
@@ -707,6 +712,14 @@ int main(int argc, char* argv[]) {
            transactions predate that floor is simply never looked at. */
         if (cf_start_height)
             client->cf_start_height = cf_start_height;
+
+        if (cf_workers > 1) {
+            /* Cap at 8: each worker is a separate TCP connection to the same
+               peer, and past a handful the bottleneck is the peer, not us. */
+            client->cf_num_workers = (uint8_t)(cf_workers > 8 ? 8 : cf_workers);
+            printf("[bip157-par] parallel cfilter workers: %u\n",
+                   (unsigned int)client->cf_num_workers);
+        }
 
         if (no_cfilters || full_sync) {
             /* Disable BIP157 compact filter sync when:
@@ -1058,7 +1071,26 @@ int main(int argc, char* argv[]) {
 
             printf("Discover peers...\n");
 
-            dogecoin_spv_client_discover_peers(client, ips);
+            /* Each parallel worker is one TCP connection, so the peer list is
+               repeated N times: the nodegroup opens one connection per entry. */
+            char *par_ips = NULL;
+            if (client->cf_num_workers > 1 && ips) {
+                size_t par_n = client->cf_num_workers;
+                size_t host_len = strlen(ips);
+                par_ips = (char *)dogecoin_calloc(par_n * (host_len + 1) + 1, 1);
+                if (par_ips) {
+                    size_t wi;
+                    for (wi = 0; wi < par_n; wi++) {
+                        if (wi > 0) strcat(par_ips, ",");
+                        strcat(par_ips, ips);
+                    }
+                    client->nodegroup->desired_amount_connected_nodes = (int)par_n;
+                    printf("[bip157-par] connecting %u workers to %s\n",
+                           (unsigned int)par_n, ips);
+                }
+            }
+            dogecoin_spv_client_discover_peers(client, par_ips ? par_ips : ips);
+            dogecoin_free(par_ips);
 
             /* A DNS seed lookup that returns nothing is usually transient, so
                try again before giving up. Announce each attempt: a silent retry
