@@ -57,8 +57,6 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/golomb.h>
-#include <dogecoin/blockchain.h>
-#include <dogecoin/headersdb.h>
 #include <dogecoin/vector.h>
 
 LIBDOGECOIN_BEGIN_DECL
