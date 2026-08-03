@@ -41,6 +41,7 @@
 #include <dogecoin/sha2.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/portable_endian.h>
+#include <dogecoin/protocol.h>
 
 /* ================================================================ */
 /*  Constructor / Destructor                                        */
@@ -56,6 +57,12 @@ dogecoin_compact_block *dogecoin_compact_block_new(void)
 void dogecoin_compact_block_free(dogecoin_compact_block *cmpctblk)
 {
     if (!cmpctblk) return;
+
+    if (cmpctblk->header_raw) {
+        dogecoin_free(cmpctblk->header_raw);
+        cmpctblk->header_raw = NULL;
+        cmpctblk->header_raw_len = 0;
+    }
 
     if (cmpctblk->short_ids) {
         dogecoin_free(cmpctblk->short_ids);
@@ -156,30 +163,64 @@ void dogecoin_compact_block_state_free(dogecoin_compact_block_state *state)
 /* ================================================================ */
 
 /**
- * Per BIP152: The SipHash keys are derived from the SHA256 of
- * the serialized block header (80 bytes) concatenated with the
- * compact block nonce (8 bytes little-endian).
+ * @brief Attach the wire bytes of the header to a compact block.
+ *
+ * The parsed header cannot reproduce them: dogecoin_block_header_deserialize
+ * parses AuxPoW into a local dogecoin_auxpow_block and frees it at cleanup,
+ * and dogecoin_block_header_copy carries only the auxpow check/ctx/is flags,
+ * not the payload. Retaining the span is what lets the SipHash keys and the
+ * re-serialized message match what Core produced.
+ */
+dogecoin_bool dogecoin_compact_block_set_header_raw(
+    dogecoin_compact_block *cmpctblk,
+    const void *bytes,
+    size_t len)
+{
+    if (!cmpctblk || !bytes) return false;
+    if (len < CMPCTBLOCK_HEADER_BASE_SIZE) return false;
+    if (len > DOGECOIN_MAX_P2P_MSG_SIZE) return false;
+
+    uint8_t *copy = dogecoin_malloc(len);
+    if (!copy) return false;
+    memcpy(copy, bytes, len);
+
+    if (cmpctblk->header_raw) dogecoin_free(cmpctblk->header_raw);
+    cmpctblk->header_raw = copy;
+    cmpctblk->header_raw_len = len;
+    return true;
+}
+
+/**
+ * Per BIP152: The SipHash keys are derived from the SHA256 of the serialized
+ * block header concatenated with the compact block nonce (8 bytes LE).
+ *
+ * "Serialized block header" is whatever the sender streamed, which for
+ * Dogecoin includes AuxPoW when the version bit is set -- Core's
+ * FillShortTxIDSelector does `stream << header << nonce` through
+ * CBlockHeader's serializer, not CPureBlockHeader's.
  *
  * k0 = first 8 bytes of SHA256 result (little-endian uint64)
  * k1 = next 8 bytes of SHA256 result (little-endian uint64)
  */
-void dogecoin_compact_block_derive_sipkeys(
-    const dogecoin_block_header *header,
+void dogecoin_compact_block_derive_sipkeys_raw(
+    const uint8_t *header_ser,
+    size_t header_ser_len,
     uint64_t nonce,
     uint64_t *k0_out,
     uint64_t *k1_out)
 {
-    /* Serialize the 80-byte block header */
-    cstring *hdr_ser = cstr_new_sz(88);
-    dogecoin_block_header_serialize(hdr_ser, header);
+    if (!header_ser || !k0_out || !k1_out) return;
+
+    cstring *preimage = cstr_new_sz(header_ser_len + 8);
+    ser_bytes(preimage, header_ser, header_ser_len);
 
     /* Append the 8-byte nonce in little-endian */
-    ser_u64(hdr_ser, nonce);
+    ser_u64(preimage, nonce);
 
-    /* SHA256(header || nonce) – single SHA256 per BIP152 */
+    /* SHA256(header || nonce) - single SHA256 per BIP152 */
     uint256_t hash;
-    sha256_raw((const uint8_t *)hdr_ser->str, hdr_ser->len, hash);
-    cstr_free(hdr_ser, true);
+    sha256_raw((const uint8_t *)preimage->str, preimage->len, hash);
+    cstr_free(preimage, true);
 
     /* Extract k0, k1 as little-endian uint64 from the hash */
     const uint8_t *p = hash;
@@ -192,6 +233,26 @@ void dogecoin_compact_block_derive_sipkeys(
               ((uint64_t)p[10] << 16) | ((uint64_t)p[11] << 24) |
               ((uint64_t)p[12] << 32) | ((uint64_t)p[13] << 40) |
               ((uint64_t)p[14] << 48) | ((uint64_t)p[15] << 56);
+}
+
+/**
+ * Wrapper over the 80 base bytes. Only correct for a header with no AuxPoW;
+ * see the header file.
+ */
+void dogecoin_compact_block_derive_sipkeys(
+    const dogecoin_block_header *header,
+    uint64_t nonce,
+    uint64_t *k0_out,
+    uint64_t *k1_out)
+{
+    if (!header || !k0_out || !k1_out) return;
+
+    cstring *hdr_ser = cstr_new_sz(CMPCTBLOCK_HEADER_BASE_SIZE);
+    dogecoin_block_header_serialize(hdr_ser, header);
+    dogecoin_compact_block_derive_sipkeys_raw((const uint8_t *)hdr_ser->str,
+                                              hdr_ser->len, nonce,
+                                              k0_out, k1_out);
+    cstr_free(hdr_ser, true);
 }
 
 /**
@@ -219,12 +280,27 @@ void dogecoin_compact_block_compute_short_id(
 /*  Serialization                                                   */
 /* ================================================================ */
 
-void dogecoin_compact_block_serialize(cstring *s, const dogecoin_compact_block *cmpctblk)
+dogecoin_bool dogecoin_compact_block_serialize(cstring *s, const dogecoin_compact_block *cmpctblk)
 {
-    if (!s || !cmpctblk) return;
+    if (!s || !cmpctblk) return false;
 
-    /* Block header (80 bytes) */
-    dogecoin_block_header_serialize(s, &cmpctblk->header);
+    /* Block header: the bytes we received, if we have them. Core streams the
+       CBlockHeader it holds, AuxPoW included; replaying the retained span is
+       the same thing by other means, and it is the only way to reproduce a
+       merge-mined header -- the tree has no AuxPoW serializer, and the parsed
+       header keeps only the auxpow flags. */
+    if (cmpctblk->header_raw && cmpctblk->header_raw_len >= CMPCTBLOCK_HEADER_BASE_SIZE) {
+        ser_bytes(s, cmpctblk->header_raw, cmpctblk->header_raw_len);
+    } else if ((cmpctblk->header.version & 0x100) == 0) {
+        /* No AuxPoW to lose: the 80 base bytes are the whole header. */
+        dogecoin_block_header_serialize(s, &cmpctblk->header);
+    } else {
+        /* Merge-mined header with no retained span. Emitting 80 bytes here
+           would produce a message Core rejects, silently, so refuse instead.
+           Callers assembling such a block must supply the wire header via
+           dogecoin_compact_block_set_header_raw. */
+        return false;
+    }
 
     /* Nonce (8 bytes LE) */
     ser_u64(s, cmpctblk->nonce);
@@ -249,6 +325,8 @@ void dogecoin_compact_block_serialize(cstring *s, const dogecoin_compact_block *
         dogecoin_tx_serialize(s, ptx->tx);
         last_index = ptx->index;
     }
+
+    return true;
 }
 
 dogecoin_bool dogecoin_compact_block_deserialize(
@@ -258,17 +336,36 @@ dogecoin_bool dogecoin_compact_block_deserialize(
 {
     if (!cmpctblk || !buf) return false;
 
-    /* Deserialize block header (80 bytes, no auxpow for compact blocks) */
+    /* Deserialize block header. The field is a CBlockHeader in Core
+       (blockencodings.h), so it is 80 bytes plus a full CAuxPow whenever
+       version bit 0x100 is set -- which is every merge-mined block. Let
+       dogecoin_block_header_deserialize dispatch on that bit exactly as
+       CBlockHeader::SerializationOp does, and take the span it consumed.
+
+       A peer that sets 0x100 without supplying AuxPoW fails here, in the
+       AuxPoW sub-parsers, which is what Core does too: the stream read throws
+       and the message is rejected. */
+    const uint8_t *hdr_start = (const uint8_t *)buf->p;
+    if (buf->len < CMPCTBLOCK_HEADER_BASE_SIZE) return false;
     if (!dogecoin_block_header_deserialize(&cmpctblk->header, buf, params, NULL))
+        return false;
+
+    /* Retain the wire header. The SipHash keys are SHA256 over these bytes,
+       and the parsed header cannot regenerate the AuxPoW half of them. */
+    size_t hdr_len = (size_t)((const uint8_t *)buf->p - hdr_start);
+    if (!dogecoin_compact_block_set_header_raw(cmpctblk, hdr_start, hdr_len))
         return false;
 
     /* Nonce */
     if (!deser_u64(&cmpctblk->nonce, buf))
         return false;
 
-    /* Derive SipHash keys */
-    dogecoin_compact_block_derive_sipkeys(&cmpctblk->header, cmpctblk->nonce,
-                                          &cmpctblk->sipkey_k0, &cmpctblk->sipkey_k1);
+    /* Derive SipHash keys over the header as it arrived, AuxPoW included */
+    dogecoin_compact_block_derive_sipkeys_raw(cmpctblk->header_raw,
+                                              cmpctblk->header_raw_len,
+                                              cmpctblk->nonce,
+                                              &cmpctblk->sipkey_k0,
+                                              &cmpctblk->sipkey_k1);
 
     /* Short IDs */
     if (!deser_varlen(&cmpctblk->short_ids_count, buf))
@@ -499,7 +596,10 @@ cstring *dogecoin_p2p_msg_cmpctblock(
     if (!cmpctblk) return NULL;
 
     cstring *payload = cstr_new_sz(512);
-    dogecoin_compact_block_serialize(payload, cmpctblk);
+    if (!dogecoin_compact_block_serialize(payload, cmpctblk)) {
+        cstr_free(payload, true);
+        return NULL;
+    }
 
     cstring *msg = dogecoin_p2p_message_new(netmagic, DOGECOIN_MSG_CMPCTBLOCK,
                                              payload->str, payload->len);

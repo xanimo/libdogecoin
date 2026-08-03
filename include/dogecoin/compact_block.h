@@ -64,6 +64,15 @@ LIBDOGECOIN_BEGIN_DECL
 /** BIP152 compact block version (low-bandwidth relaying) */
 #define CMPCTBLOCK_VERSION 1
 
+/* Base block header: version, prev_block, merkle_root, timestamp, bits, nonce.
+   This is the *minimum* size of the header field in a cmpctblock, not its size.
+   Dogecoin Core serializes CBlockHeader here (blockencodings.h), and
+   CBlockHeader::SerializationOp appends a full CAuxPow whenever
+   nVersion & VERSION_AUXPOW is set -- which is every merge-mined block, i.e.
+   effectively every block since height 371337. A cmpctblock header is therefore
+   80 bytes for a non-merge-mined block and 80 + auxpow for everything else. */
+#define CMPCTBLOCK_HEADER_BASE_SIZE 80
+
 /** Short transaction ID length in bytes (6 bytes = 48 bits) */
 #define SHORTTXID_LENGTH 6
 
@@ -93,7 +102,17 @@ typedef struct dogecoin_prefilled_tx_ {
  * the coinbase).
  */
 typedef struct dogecoin_compact_block_ {
-    dogecoin_block_header header;    /**< Block header (80 bytes, no auxpow serialized) */
+    dogecoin_block_header header;    /**< Parsed block header */
+    /** Header exactly as it appears on the wire: the 80 base bytes, followed by
+        the AuxPoW blob when version bit 0x100 is set. Retained because the
+        parsed form cannot reproduce it -- dogecoin_block_header_deserialize
+        parses AuxPoW into a local dogecoin_auxpow_block and frees it, and
+        dogecoin_block_header_copy carries only the auxpow check/ctx/is flags,
+        not the payload. BIP152 derives the SipHash keys from these bytes, so
+        they must survive the parse or every short ID will differ from Core's.
+        NULL for a compact block assembled locally rather than parsed. */
+    uint8_t *header_raw;
+    size_t header_raw_len;           /**< Length of header_raw, 0 when unset */
     uint64_t nonce;                  /**< Random nonce for SipHash key derivation */
     uint64_t sipkey_k0;              /**< SipHash key 0 (derived from header + nonce) */
     uint64_t sipkey_k1;              /**< SipHash key 1 (derived from header + nonce) */
@@ -203,12 +222,57 @@ LIBDOGECOIN_API void dogecoin_compact_block_state_free(dogecoin_compact_block_st
 /* ================================================================ */
 
 /**
- * @brief Derive the SipHash keys from a block header and nonce.
+ * @brief Attach the wire bytes of the header to a compact block.
  *
- * Per BIP152: SHA256(block_header || nonce) produces k0 and k1 as
- * the first two little-endian 64-bit integers of the hash.
+ * Copies len bytes; the compact block takes ownership of the copy and frees
+ * it. Any previously attached span is released. Required before serializing a
+ * compact block whose header carries AuxPoW, since the tree has no AuxPoW
+ * serializer to regenerate those bytes from the parsed form.
  *
- * @param header     Serialized block header (80 bytes).
+ * @param cmpctblk  The compact block.
+ * @param bytes     Header bytes: 80 base bytes plus AuxPoW when present.
+ * @param len       Length of bytes, at least CMPCTBLOCK_HEADER_BASE_SIZE.
+ * @return true on success, false on bad arguments or allocation failure.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_compact_block_set_header_raw(
+    dogecoin_compact_block *cmpctblk,
+    const void *bytes,
+    size_t len);
+
+/**
+ * @brief Derive the SipHash keys from the serialized header and nonce.
+ *
+ * Per BIP152: SHA256(block_header || nonce) produces k0 and k1 as the first
+ * two little-endian 64-bit integers of the hash. Core computes this over the
+ * header as it streams it -- CBlockHeaderAndShortTxIDs::FillShortTxIDSelector
+ * does `stream << header << nonce` through the AuxPoW-bearing serializer -- so
+ * for a merge-mined block the AuxPoW bytes are part of the preimage.
+ *
+ * @param header_ser      Serialized header: 80 base bytes plus AuxPoW when present.
+ * @param header_ser_len  Length of header_ser.
+ * @param nonce           The compact block nonce.
+ * @param k0_out          Output: SipHash key 0.
+ * @param k1_out          Output: SipHash key 1.
+ */
+LIBDOGECOIN_API void dogecoin_compact_block_derive_sipkeys_raw(
+    const uint8_t *header_ser,
+    size_t header_ser_len,
+    uint64_t nonce,
+    uint64_t *k0_out,
+    uint64_t *k1_out);
+
+/**
+ * @brief Derive the SipHash keys from a parsed block header and nonce.
+ *
+ * Convenience wrapper that serializes the 80 base bytes and calls
+ * dogecoin_compact_block_derive_sipkeys_raw.
+ *
+ * Correct only when the header carries no AuxPoW, i.e. !(version & 0x100).
+ * For a merge-mined header the parsed form is missing the AuxPoW payload and
+ * the keys produced here will not match Core's. Use
+ * dogecoin_compact_block_derive_sipkeys_raw with the retained wire bytes.
+ *
+ * @param header     The parsed block header.
  * @param nonce      The compact block nonce.
  * @param k0_out     Output: SipHash key 0.
  * @param k1_out     Output: SipHash key 1.
@@ -241,10 +305,17 @@ LIBDOGECOIN_API void dogecoin_compact_block_compute_short_id(
 
 /**
  * @brief Serialize a compact block to a cstring.
+ *
+ * Emits the retained wire header when one is attached. Without one, falls back
+ * to the 80 base bytes, which is only valid for a header carrying no AuxPoW;
+ * for a merge-mined header with no retained span this fails rather than emit a
+ * truncated header that Core would reject.
+ *
  * @param s         Output cstring.
  * @param cmpctblk  The compact block to serialize.
+ * @return true on success, false if the header cannot be represented.
  */
-LIBDOGECOIN_API void dogecoin_compact_block_serialize(cstring *s, const dogecoin_compact_block *cmpctblk);
+LIBDOGECOIN_API dogecoin_bool dogecoin_compact_block_serialize(cstring *s, const dogecoin_compact_block *cmpctblk);
 
 /**
  * @brief Deserialize a compact block from a buffer.
