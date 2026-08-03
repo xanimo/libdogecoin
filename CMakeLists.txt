@@ -106,8 +106,18 @@ IF(WITH_NET)
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/include/event2" DESTINATION "${PROJECT_SOURCE_DIR}/include")
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
-        FIND_LIBRARY(LIBEVENT NAMES event HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
-        FIND_LIBRARY(LIBEVENT_PTHREADS NAMES event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
+        # Multi-config generators (MSVC) put the library under lib/<CONFIG>;
+        # single-config ones (Makefiles, Ninja) put it in lib/ directly. Search
+        # both, or the Linux build cannot find the libevent it just built and
+        # silently depends on a system copy being installed instead.
+        FIND_LIBRARY(LIBEVENT NAMES event
+            HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}"
+                  "${PROJECT_SOURCE_DIR}/src/libevent/build/lib"
+            REQUIRED)
+        FIND_LIBRARY(LIBEVENT_PTHREADS NAMES event_pthreads
+            HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}"
+                  "${PROJECT_SOURCE_DIR}/src/libevent/build/lib"
+            REQUIRED)
     ENDIF()
 ENDIF()
 
