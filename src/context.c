@@ -24,7 +24,9 @@
 
 */
 
-#include <dogecoin/libdogecoin.h>
+#include <dogecoin/address.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/context.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/random.h>
 

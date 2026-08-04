@@ -44,6 +44,7 @@ noinst_HEADERS = \
     include/dogecoin/chacha20.h \
     include/dogecoin/chainparams.h \
     include/dogecoin/common.h \
+    include/dogecoin/context.h \
     include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \

@@ -254,9 +254,7 @@ int getDecodedPrivKeyWif(const char privkey_wif[PRIVKEYWIFLEN], const dogecoin_b
 /* bip32 utilities */
 #define DOGECOIN_BIP32_CHAINCODE_SIZE 32
 
-/* BIP 32 512-bit seed */
-#define MAX_SEED_SIZE 64
-typedef uint8_t SEED [MAX_SEED_SIZE];
+/* BIP 32 512-bit seed; MAX_SEED_SIZE and SEED come from dogecoin.h */
 
 typedef struct
 {
@@ -1049,7 +1047,7 @@ dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
     size_t sig_len,
     uint8_t out_sighash[32]);
 
-/* Falcon-512 (requires USE_LIBOQS).  Caller must free *pk/*sk/*sig with dogecoin_free(). */
+/* Falcon-512 (requires USE_LIBOQS).  Caller must free pk, sk and sig with dogecoin_free(). */
 dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
 dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
 dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
@@ -1057,7 +1055,7 @@ dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len, 
 dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
 dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
 
-/* Dilithium2 (requires USE_LIBOQS).  Caller must free *pk/*sk/*sig with dogecoin_free(). */
+/* Dilithium2 (requires USE_LIBOQS).  Caller must free pk, sk and sig with dogecoin_free(). */
 dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
 dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
 dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
@@ -1065,7 +1063,7 @@ dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len,
 dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
 dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
 
-/* Raccoon-G-44 (requires USE_RACCOON_G).  Caller must free *pk/*sk/*sig/*child_* with dogecoin_free(). */
+/* Raccoon-G-44 (requires USE_RACCOON_G).  Caller must free pk, sk, sig and child outputs with dogecoin_free(). */
 dogecoin_bool dogecoin_raccoong44_is_available(void);
 dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
 dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
