@@ -288,6 +288,34 @@ void test_auxpow_deserialize_real_vector() {
     u_assert_not_null(dup->auxpow_payload);
     u_assert_not_null(dup->auxpow_payload->parent_header);
     dogecoin_block_header_free(dup);
+
+    /* The parse/check split: dogecoin_block_header_parse must produce the same
+       header and the same retained proof, without running check_auxpow. */
+    dogecoin_block_header* parsed = dogecoin_block_header_new();
+    struct const_buffer cb2 = { buf, blen };
+    u_assert_int_eq(dogecoin_block_header_parse(parsed, &cb2, &dogecoin_chainparams_main), 1);
+    u_assert_uint32_eq((uint32_t)parsed->version, 0x00620102);
+    u_assert_uint32_eq(parsed->timestamp, 1410464609);
+    u_assert_not_null(parsed->auxpow_payload);
+    u_assert_not_null(parsed->auxpow_payload->parent_header);
+
+    /* Validation deferred to a separate call, and it agrees with what the
+       parse-and-validate path computed. */
+    arith_uint256 deferred_chainwork;
+    u_assert_int_eq(dogecoin_block_header_validate(parsed, &dogecoin_chainparams_main,
+                                                   &deferred_chainwork), 1);
+    u_assert_mem_eq(utils_uint8_to_hex(arith_to_uint256(&deferred_chainwork), DOGECOIN_HASH_LENGTH),
+                    utils_uint8_to_hex(arith_to_uint256(&chainwork), DOGECOIN_HASH_LENGTH), 64);
+    dogecoin_block_header_free(parsed);
+
+    /* A header with no AuxPoW validates trivially: its proof of work is over
+       the 80 base bytes and belongs to the caller, which is why
+       headersdb_file.c runs check_pow itself for that case. */
+    dogecoin_block_header* plain = dogecoin_block_header_new();
+    plain->version = 1;
+    u_assert_int_eq(dogecoin_block_header_validate(plain, &dogecoin_chainparams_main, NULL), 1);
+    dogecoin_block_header_free(plain);
+
     dogecoin_free(buf);
 }
 

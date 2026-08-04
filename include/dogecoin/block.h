@@ -125,6 +125,35 @@ LIBDOGECOIN_API void dogecoin_block_header_destroy(dogecoin_block_header* header
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 LIBDOGECOIN_API dogecoin_auxpow_block* dogecoin_auxpow_block_new();
 LIBDOGECOIN_API void dogecoin_auxpow_block_free(dogecoin_auxpow_block* block);
+/** Parse a block header off the wire without validating it.
+ *
+ * Reads the 80 base fields and, when version bit 0x100 is set, the AuxPoW
+ * proof, which is retained on the header. Runs no proof-of-work check.
+ *
+ * check_auxpow is scrypt work over the parent chain. Doing it during parsing
+ * means every caller pays for it whether or not it wants the answer yet, and
+ * before any peer-level gating has happened. Callers that want the fields and
+ * will decide about validation later use this; callers that want the existing
+ * parse-and-validate behaviour keep using dogecoin_block_header_deserialize.
+ */
+LIBDOGECOIN_API int dogecoin_block_header_parse(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params);
+
+/** Validate a parsed header's AuxPoW and fill @p chainwork.
+ *
+ * Returns true immediately for a header with no AuxPoW: its proof of work is
+ * over the 80 base bytes and is the caller's to verify. Requires the header to
+ * still own its proof, so it must have come from dogecoin_block_header_parse
+ * or dogecoin_block_header_deserialize.
+ */
+LIBDOGECOIN_API int dogecoin_block_header_validate(dogecoin_block_header* header, const dogecoin_chainparams *params, arith_uint256* chainwork);
+
+/** Parse and validate. Unchanged in behaviour and signature: this is
+ *  dogecoin_block_header_parse followed by dogecoin_block_header_validate.
+ *
+ *  Deliberately kept as the name that validates. Making this the pure parse and
+ *  adding a checked variant would silently stop verifying proof of work for any
+ *  caller of the existing name, with no compile error to catch it.
+ */
 LIBDOGECOIN_API int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, arith_uint256* chainwork);
 LIBDOGECOIN_API int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, arith_uint256* chainwork);
 LIBDOGECOIN_API void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header);
