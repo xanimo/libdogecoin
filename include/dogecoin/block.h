@@ -156,7 +156,22 @@ LIBDOGECOIN_API int dogecoin_block_header_validate(dogecoin_block_header* header
  */
 LIBDOGECOIN_API int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, arith_uint256* chainwork);
 LIBDOGECOIN_API int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, arith_uint256* chainwork);
+/** Serialize the 80 base header fields. This is the pure header: it never
+ *  emits AuxPoW, because its output is what the block hash, the scrypt proof of
+ *  work and the fixed-width headers.db record are computed over. */
 LIBDOGECOIN_API void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header);
+
+/** Serialize an AuxPoW proof in wire order. */
+LIBDOGECOIN_API void dogecoin_auxpow_payload_serialize(cstring* s, const dogecoin_auxpow_payload* payload);
+
+/** Serialize a header as it appears on the wire: the 80 base bytes, followed by
+ *  the AuxPoW proof when the header carries one.
+ *
+ *  This is Core's CBlockHeader to dogecoin_block_header_serialize's
+ *  CPureBlockHeader. Messages that carry a whole header -- headers, block,
+ *  cmpctblock -- want this one; anything hashing the header wants the pure form.
+ */
+LIBDOGECOIN_API void dogecoin_block_header_serialize_full(cstring* s, const dogecoin_block_header* header);
 LIBDOGECOIN_API void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_block_header* src);
 LIBDOGECOIN_API dogecoin_bool dogecoin_block_header_hash(dogecoin_block_header* header, uint256_t hash);
 

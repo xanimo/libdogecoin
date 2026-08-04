@@ -619,6 +619,36 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
  *
  * @return Nothing.
  */
+void dogecoin_auxpow_payload_serialize(cstring* s, const dogecoin_auxpow_payload* payload) {
+    if (!s || !payload) return;
+    /* Wire order mirrors parse_dogecoin_auxpow_fields exactly. */
+    dogecoin_tx_serialize(s, payload->parent_coinbase);
+    ser_u256(s, payload->parent_hash);
+    ser_varlen(s, payload->parent_merkle_count);
+    uint8_t i;
+    for (i = 0; i < payload->parent_merkle_count; i++)
+        ser_u256(s, payload->parent_coinbase_merkle[i]);
+    ser_u32(s, payload->parent_merkle_index);
+    ser_varlen(s, payload->aux_merkle_count);
+    for (i = 0; i < payload->aux_merkle_count; i++)
+        ser_u256(s, payload->aux_merkle_branch[i]);
+    ser_u32(s, payload->aux_merkle_index);
+    /* Parent header is a pure 80-byte header: it carries no AuxPoW of its own. */
+    dogecoin_block_header_serialize(s, payload->parent_header);
+    }
+
+void dogecoin_block_header_serialize_full(cstring* s, const dogecoin_block_header* header) {
+    if (!s || !header) return;
+    dogecoin_block_header_serialize(s, header);
+    /* Core's CBlockHeader::SerializationOp appends the AuxPoW whenever
+       nVersion & VERSION_AUXPOW is set. Mirror that, driven by whether the
+       proof is actually present rather than by the bit alone, so a header
+       carrying the bit but no proof serializes as the 80 bytes it really has
+       instead of emitting a truncated blob. */
+    if (header->auxpow_payload)
+        dogecoin_auxpow_payload_serialize(s, header->auxpow_payload);
+    }
+
 void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header) {
     ser_s32(s, header->version);
     ser_u256(s, header->prev_block);
