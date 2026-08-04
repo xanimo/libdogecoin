@@ -164,6 +164,19 @@ LIBDOGECOIN_API void dogecoin_block_header_serialize(cstring* s, const dogecoin_
 /** Serialize an AuxPoW proof in wire order. */
 LIBDOGECOIN_API void dogecoin_auxpow_payload_serialize(cstring* s, const dogecoin_auxpow_payload* payload);
 
+/** Serialize a whole block: the header in wire form, then the transaction
+ *  vector.
+ *
+ *  This is what a `block` message contains, and what code expecting a block off
+ *  the network parses. A compact block that has been reconstructed has a header
+ *  and a set of transactions but no wire bytes; this is how it becomes something
+ *  the rest of the client can consume.
+ *
+ *  Stops rather than emitting a short block if @p txs contains a NULL, since a
+ *  vector with a hole in it is a reconstruction that did not finish.
+ */
+LIBDOGECOIN_API void dogecoin_block_serialize(cstring* s, const dogecoin_block_header* header, dogecoin_tx** txs, uint32_t txs_count);
+
 /** Serialize a header as it appears on the wire: the 80 base bytes, followed by
  *  the AuxPoW proof when the header carries one.
  *
