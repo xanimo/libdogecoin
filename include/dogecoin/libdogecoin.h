@@ -45,6 +45,14 @@ typedef struct dogecoin_dns_seed_ {
     char domain[256];
 } dogecoin_dns_seed;
 
+/* Declared here and again in the internal chainparams.h, so that this header
+   stays self-contained. The objects are defined once, in chainparams.c, against
+   the internal copy and read through this one -- so the two must describe the
+   same layout, field for field and in order. A field added to one and not the
+   other shifts every field after it with no compile error and no warning; that
+   is what happened to genesisblockchainwork, which left consumers reading
+   default_port out of the middle of the chainwork. Change both, in step.
+   test/chainparams_abi_tests.c fails if they diverge again. */
 typedef struct dogecoin_chainparams_ {
     char chainname[32];
     uint8_t b58prefix_pubkey_address;
@@ -55,8 +63,13 @@ typedef struct dogecoin_chainparams_ {
     uint32_t b58prefix_bip32_pubkey;
     const unsigned char netmagic[4];
     uint256_t genesisblockhash;
+    uint256_t genesisblockchainwork;
     int default_port;
     dogecoin_dns_seed dnsseeds[8];
+    dogecoin_bool strict_id;
+    dogecoin_bool auxpow_id;
+    uint256_t pow_limit;
+    uint256_t minimumchainwork;
 } dogecoin_chainparams;
 
 typedef struct dogecoin_checkpoint_ {

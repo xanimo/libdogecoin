@@ -564,6 +564,7 @@ IF(USE_TESTS)
         test/block_tests.c
         test/buffer_tests.c
         test/chacha20_tests.c
+        test/chainparams_abi_tests.c
         test/checkpoints_tests.c
         test/compact_block_tests.c
         test/context_tests.c
