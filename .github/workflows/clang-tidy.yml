@@ -1,0 +1,64 @@
+# static analysis: clang-tidy (advisory)
+#
+# Phase 0 policy: this job never fails the build (continue-on-error). It
+# exists to generate the backlog and shake out config noise. It flips to
+# gating on new findings only after the baseline is triaged.
+#
+# Uses the CMake build solely to produce compile_commands.json; the
+# release build system remains autotools.
+
+name: clang-tidy
+
+on:
+  push:
+    branches:
+      - '*-dev-*'
+      - 'main'
+  pull_request:
+    branches:
+      - '*-dev-*'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'doc/**'
+
+jobs:
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: install toolchain
+        run: |
+          sudo apt-get update --yes
+          sudo apt-get install -y clang-tidy cmake build-essential libevent-dev
+
+      - name: generate compile commands
+        run: |
+          cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: run clang-tidy over first-party sources
+        run: |
+          clang-tidy --version
+          # first-party C sources only; vendored trees excluded.
+          # --line-filter drops findings inside vendored uthash.h (LLVM's
+          # HeaderFilterRegex cannot express a negative match).
+          find src -maxdepth 1 -name '*.c' \
+            ! -name 'utf8proc*.c' \
+            | xargs -P "$(nproc)" -n 4 \
+              clang-tidy -p build --quiet \
+                --line-filter='[{"name":"uthash.h","lines":[[9999999,9999999]]},{"name":".c"},{"name":".h"}]' \
+                2>/dev/null \
+            | tee clang-tidy-report.txt || true
+          echo "---"
+          grep -c "warning:" clang-tidy-report.txt || echo "0 warnings"
+
+      - name: upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-report.txt
