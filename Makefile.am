@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I build-aux/m4
 AUTOMAKE_OPTIONS = serial-tests
-.PHONY: gen
+.PHONY: gen fuzz
 .INTERMEDIATE: $(GENBIN)
 
 DIST_SUBDIRS = src/secp256k1
@@ -484,3 +484,75 @@ endif
 endif
 
 libdogecoin_la_LDFLAGS = -no-undefined -version-info $(LIB_VERSION_CURRENT):$(LIB_VERSION_REVISION):$(LIB_VERSION_AGE)
+
+if USE_FUZZ
+noinst_PROGRAMS += fuzz/fuzz_tx
+fuzz_fuzz_tx_SOURCES = fuzz/fuzz_tx.c
+fuzz_fuzz_tx_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_tx_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_tx_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_tx_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+noinst_PROGRAMS += fuzz/fuzz_block
+fuzz_fuzz_block_SOURCES = fuzz/fuzz_block.c
+fuzz_fuzz_block_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_block_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_block_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_block_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+# fuzz_protocol drives p2p message deserializers from protocol.c, which is
+# only compiled into the library under WITH_NET (and pulls in libevent).
+# Gate the harness on the same condition so `make fuzz` still builds the
+# net-independent targets when networking is disabled.
+if WITH_NET
+noinst_PROGRAMS += fuzz/fuzz_protocol
+fuzz_fuzz_protocol_SOURCES = fuzz/fuzz_protocol.c
+fuzz_fuzz_protocol_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_protocol_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_protocol_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_protocol_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+endif
+
+noinst_PROGRAMS += fuzz/fuzz_wtx
+fuzz_fuzz_wtx_SOURCES = fuzz/fuzz_wtx.c
+fuzz_fuzz_wtx_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_wtx_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_wtx_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_wtx_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+noinst_PROGRAMS += fuzz/fuzz_logdb
+fuzz_fuzz_logdb_SOURCES = fuzz/fuzz_logdb.c
+fuzz_fuzz_logdb_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
+fuzz_fuzz_logdb_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_logdb_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_logdb_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+noinst_PROGRAMS += fuzz/fuzz_psbt
+fuzz_fuzz_psbt_SOURCES = fuzz/fuzz_psbt.c
+fuzz_fuzz_psbt_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include
+fuzz_fuzz_psbt_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+fuzz_fuzz_psbt_CFLAGS = $(AM_CFLAGS) -fsanitize=fuzzer,address,undefined
+fuzz_fuzz_psbt_LDFLAGS = -fsanitize=fuzzer,address,undefined -static
+
+# Corpus seed generator for fuzz_logdb. NOT a libFuzzer target: it links
+# the plain (uninstrumented) library and emits checksum-valid single
+# records so the fuzzer can mutate past the per-record SHA256 gate.
+noinst_PROGRAMS += fuzz/seed_logdb_corpus
+fuzz_seed_logdb_corpus_SOURCES = fuzz/seed_logdb_corpus.c
+fuzz_seed_logdb_corpus_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include
+fuzz_seed_logdb_corpus_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+
+# Generate a starter corpus: make fuzz-corpus CORPUS=path (default ./corpus_logdb)
+CORPUS ?= corpus_logdb
+fuzz-corpus: fuzz/seed_logdb_corpus
+	$(MKDIR_P) $(CORPUS)
+	./fuzz/seed_logdb_corpus $(CORPUS)
+
+
+FUZZ_TARGETS = fuzz/fuzz_tx fuzz/fuzz_block fuzz/fuzz_wtx fuzz/fuzz_logdb fuzz/fuzz_psbt
+if WITH_NET
+FUZZ_TARGETS += fuzz/fuzz_protocol
+endif
+
+fuzz: $(FUZZ_TARGETS)
+endif

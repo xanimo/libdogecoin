@@ -1248,3 +1248,57 @@ jobs:
           files: |
             gitian/builds/${{ github.ref_name }}/**/*
           fail_on_unmatched_files: true
+
+  fuzz:
+    name: fuzz-libfuzzer
+    runs-on: ubuntu-22.04
+    steps:
+      - name: install packages
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            autoconf automake libtool-bin build-essential curl python3 \
+            clang llvm libevent-dev
+
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: configure libdogecoin (clang + libFuzzer)
+        run: |
+          ./autogen.sh
+          ./configure CC=clang \
+            CFLAGS="-fsanitize=fuzzer-no-link -g -O1" \
+            --enable-fuzz
+        shell: bash
+
+      - name: build fuzz harnesses
+        run: |
+          # The vendored secp256k1 convenience library must be built before
+          # the harnesses link against libdogecoin.la.
+          make -C src/secp256k1
+          make fuzz fuzz/seed_logdb_corpus
+        shell: bash
+
+      - name: smoke-run harnesses
+        run: |
+          # Short bounded runs: surface crashes/leaks without long fuzzing.
+          # rss/malloc limits keep known unbounded-allocation paths (e.g. the
+          # getheaders locator vector) from aborting CI as raw OOM.
+          RUNS=20000
+          COMMON="-runs=$RUNS -max_len=8192 -rss_limit_mb=2048 -malloc_limit_mb=1024"
+          for t in fuzz_tx fuzz_block fuzz_wtx fuzz_logdb fuzz_protocol; do
+            if [ -x "fuzz/$t" ]; then
+              echo "::group::$t"
+              ./fuzz/$t $COMMON
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: seed corpus + replay (logdb)
+        run: |
+          # Generate checksum-valid seeds and re-run logdb from them so the
+          # fuzzer exercises the post-checksum record-accepted path.
+          mkdir -p corpus_logdb
+          ./fuzz/seed_logdb_corpus corpus_logdb
+          ./fuzz/fuzz_logdb corpus_logdb -runs=20000 -max_len=8192 -rss_limit_mb=2048
+        shell: bash
