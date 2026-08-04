@@ -202,6 +202,18 @@ void read_cb(struct bufferevent* bev, void* ctx)
             if ((node->state & NODE_CONNECTED) != NODE_CONNECTED) {
                 return;
             }
+            /* Verify the payload checksum carried in the header (first 4 bytes of
+               the double-SHA256 of the payload) before handing the message to a
+               command handler. The receive path previously parsed hdr.hash but
+               never checked it, so a corrupted or forged payload would be parsed
+               as if intact. This mirrors the checksum dogecoin_p2p_message_new()
+               writes when sending. */
+            uint256_t msghash;
+            dogecoin_hash((const uint8_t*)cmd_data_buf.p, hdr.data_len, msghash);
+            if (memcmp(msghash, hdr.hash, 4) != 0) {
+                dogecoin_node_misbehave(node);
+                return;
+            }
             dogecoin_node_parse_message(node, &hdr, &cmd_data_buf);
 
             buf.p = (const unsigned char*)buf.p + hdr.data_len;
