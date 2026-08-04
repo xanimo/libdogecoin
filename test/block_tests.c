@@ -150,6 +150,57 @@ void test_block_merkle_root_edges()
     }
 }
 
+/* check_pow() must reject a target above the chain's pow_limit. This is the
+   fourth rejection condition in check_pow(), and it is the only one that
+   depends on the byte order of dogecoin_chainparams.pow_limit.
+
+   uint256_cmp() treats index 31 as most significant, i.e. it reads its operands
+   as internal (little-endian) byte arrays, and the target it is handed comes
+   from arith_uint256.pn[], which is little-endian. Every other uint256_t in
+   chainparams -- genesisblockhash, genesisblockchainwork, minimumchainwork --
+   is stored in that same internal order. pow_limit was stored in display order
+   instead, so the comparison read it as ~0xffff..ff0f0000, a value no real
+   target can exceed, and the bound never rejected anything.
+
+   nbits 0x1e100000 decodes to 0x0000100000..00, which is above the mainnet
+   pow_limit of 0x00000fffff..ff by one byte at index 2. The hash is all zeroes
+   so it clears the hash-vs-target comparison that follows; the pow_limit bound
+   is therefore the only thing in check_pow() that can reject this input, and a
+   true return means the bound is not being enforced. */
+void test_check_pow_limit_bound()
+{
+    uint256_t hash = {0};
+    arith_uint256 chainwork = {0};
+
+    /* above the limit: must be rejected */
+    u_assert_int_eq(check_pow(&hash, 0x1e100000, &dogecoin_chainparams_main, &chainwork), 0);
+
+    /* regtest carries a different limit (0x7fffff..ff); the same target is well
+       under it, so this must still be accepted -- the bound is chain-specific,
+       not a blanket rejection. */
+    memset(hash, 0, sizeof(hash));
+    u_assert_int_eq(check_pow(&hash, 0x1e100000, &dogecoin_chainparams_regtest, &chainwork), 1);
+
+    /* at the limit exactly: mainnet pow_limit is 0x00000fffff..ff, and nbits
+       0x1e0fffff decodes to 0x00000fffff00..00, the largest representable target
+       that does not exceed it. Must be accepted. */
+    memset(hash, 0, sizeof(hash));
+    u_assert_int_eq(check_pow(&hash, 0x1e0fffff, &dogecoin_chainparams_main, &chainwork), 1);
+
+    /* Negative control for the zero hash. The cases above all pass an all-zero
+       hash, which clears the hash-vs-target comparison so that the pow_limit
+       bound is the only rejection path left. That is what makes them a clean
+       test of the bound -- but on its own it does not show the hash comparison
+       is still live, so an "accepted" result could mean the zero hash bypassed
+       something rather than that the target was in range.
+
+       Same chain and same nbits as the accepted case above, with a hash above
+       the target: this must be rejected. If it is not, the acceptances above are
+       not evidence about pow_limit at all. */
+    memset(hash, 0xff, sizeof(hash));
+    u_assert_int_eq(check_pow(&hash, 0x1e0fffff, &dogecoin_chainparams_main, &chainwork), 0);
+}
+
 void test_block_header()
 {
     test_auxpow_oversized_input_is_rejected();
@@ -297,6 +348,7 @@ void test_block_header()
     test_auxpow_deserialize_real_vector();
     test_auxpow_deserialize_e2e();
     test_auxpow_deserialize_merkle_count_bounds();
+    test_check_pow_limit_bound();
 }
 
 /* Real mainnet auxpow block: height 371338, hash
