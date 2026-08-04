@@ -71,9 +71,9 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* p
        where the height is known.  */
     if (!is_legacy(block->header->version) && params->strict_id && get_chainid(block->header->version) != params->auxpow_id) {
         printf("%s:%d:%s : block does not have our chain ID"
-                " (got %d, expected %d, full nVersion %d) : %s\n",
+                " (got %d, expected %d, full nVersion %d)\n",
                 __FILE__, __LINE__, __func__, get_chainid(block->header->version),
-                params->auxpow_id, block->header->version, strerror(errno));
+                params->auxpow_id, block->header->version);
         return false;
     }
 
@@ -87,7 +87,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* p
         cstr_free(s, true);
 
         if (!check_pow(&hash, block->header->bits, params, chainwork)) {
-            printf("%s:%d:%s : non-AUX proof of work failed : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
+            printf("%s:%d:%s : non-AUX proof of work failed\n", __FILE__, __LINE__, __func__);
             return false;
         }
 
@@ -101,7 +101,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* p
     dogecoin_block_header_scrypt_hash(s2, &parent_hash);
     cstr_free(s2, true);
     if (!check_pow(&parent_hash, block->header->bits, params, chainwork)) {
-        printf("%s:%d:%s : AUX proof of work failed: %s\n", __FILE__, __LINE__, __func__, strerror(errno));
+        printf("%s:%d:%s : AUX proof of work failed\n", __FILE__, __LINE__, __func__);
         return false;
     }
 
@@ -109,7 +109,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* p
     dogecoin_block_header_hash(block->header, block_header_hash);
     uint32_t chainid = get_chainid(block->header->version);
     if (!block->header->auxpow->check(block, &block_header_hash, chainid, params)) {
-        printf("%s:%d:%s : AUX POW is not valid : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
+        printf("%s:%d:%s : AUX POW is not valid\n", __FILE__, __LINE__, __func__);
         return false;
     }
 

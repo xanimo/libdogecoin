@@ -45,9 +45,22 @@ dogecoin_bool check_pow(uint256_t* hash, unsigned int nbits, const dogecoin_chai
     arith_uint256* target = init_arith_uint256();
     target = set_compact(target, nbits, &f_negative, &f_overflow);
     const uint8_t* target_bytes = (const uint8_t*)target->pn;
-    if (f_negative || arith_uint256_is_zero(target) || f_overflow || uint256_cmp(target_bytes, params->pow_limit)) {
-        printf("%d:%s: f_negative: %d target == 0: %d f_overflow: %d\n",
-        __LINE__, __func__, f_negative, (const uint8_t*)target == 0, f_overflow);
+    /* Report which rejection condition actually fired. The previous printf passed
+       "(const uint8_t*)target == 0", a NULL test on the pointer just returned by
+       init_arith_uint256(), so the "target == 0" column read 0 unconditionally and
+       never reported arith_uint256_is_zero(). The above-pow-limit term was not
+       printed at all, so a rejection could show every printed field as 0. */
+    if (f_negative || arith_uint256_is_zero(target) || f_overflow
+        || uint256_cmp(target_bytes, params->pow_limit)) {
+        /* Evaluate the individual terms only here, on the failure path. Hoisting
+           them above the condition would report all four but destroy the
+           short-circuit, so uint256_cmp would run against a target that
+           set_compact had already flagged as overflowed. Defined behaviour, but
+           there is no reason to compare a target we have already rejected. */
+        dogecoin_bool target_is_zero  = arith_uint256_is_zero(target);
+        dogecoin_bool above_pow_limit = uint256_cmp(target_bytes, params->pow_limit);
+        printf("%d:%s: nbits: 0x%08x f_negative: %d target_is_zero: %d f_overflow: %d above_pow_limit: %d\n",
+        __LINE__, __func__, nbits, f_negative, target_is_zero, f_overflow, above_pow_limit);
         dogecoin_free(target);
         return false;
     }
