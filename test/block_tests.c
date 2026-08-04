@@ -396,6 +396,48 @@ void test_auxpow_deserialize_real_vector() {
     u_assert_int_eq(whole->len == blen, 1);
     u_assert_int_eq(memcmp(whole->str, buf, blen), 0);
 
+    /* The merkle root computed from this block's transactions must equal the
+       one in its own header. Ground truth from mainnet, not a fixture we chose. */
+    uint256_t computed_root;
+    dogecoin_bool mutated = true;
+    u_assert_int_eq(dogecoin_block_merkle_root(txs, tx_count, computed_root, &mutated), 1);
+    u_assert_mem_eq(computed_root, rt->merkle_root, DOGECOIN_HASH_LENGTH);
+    u_assert_int_eq(mutated, 0);
+
+    /* CVE-2012-2459. An odd number of leaves leaves the last one unpaired, and
+       the tree self-pairs it: hash(L,L). An attacker can append a copy of that
+       leaf, making the count even, so the pair (L,L) now forms explicitly --
+       producing the *same root* from a different transaction list. The root
+       alone cannot tell the two apart, so a caller that ignores the mutation
+       flag will accept the forged block.
+
+       This block has 6 transactions, so take 5 to get an odd count, then append
+       a duplicate of the fifth. Duplicating into an odd count instead would not
+       demonstrate anything: with 7 leaves the copy sits unpaired and is never
+       combined with its twin, which is why an earlier version of this test saw
+       no mutation and was wrong rather than reassuring. */
+    if (tx_count >= 5) {
+        uint256_t odd_root, forged_root;
+        dogecoin_bool odd_mutated = true, forged_mutated = false;
+
+        u_assert_int_eq(dogecoin_block_merkle_root(txs, 5, odd_root, &odd_mutated), 1);
+        u_assert_int_eq(odd_mutated, 0);          /* honest tree, no duplicate */
+
+        dogecoin_tx** forged = dogecoin_calloc(6, sizeof(*forged));
+        u_assert_not_null(forged);
+        for (ti = 0; ti < 5; ti++) forged[ti] = txs[ti];
+        forged[5] = txs[4];                        /* append a copy of the last */
+
+        u_assert_int_eq(dogecoin_block_merkle_root(forged, 6, forged_root, &forged_mutated), 1);
+
+        /* The attack works: same root from a different transaction list. */
+        u_assert_mem_eq(forged_root, odd_root, DOGECOIN_HASH_LENGTH);
+        /* And the flag is the only thing that distinguishes them. */
+        u_assert_int_eq(forged_mutated, 1);
+
+        dogecoin_free(forged);
+    }
+
     cstr_free(whole, true);
     for (ti = 0; ti < tx_count; ti++) dogecoin_tx_free(txs[ti]);
     dogecoin_free(txs);

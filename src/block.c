@@ -664,6 +664,96 @@ void dogecoin_block_serialize(cstring* s, const dogecoin_block_header* header,
     }
     }
 
+/* Port of Core's MerkleComputation (consensus/merkle.cpp). Deliberately a port
+   rather than the textbook algorithm.
+ *
+ * The naive version -- duplicate the last hash when a level has an odd count,
+ * hash pairwise, repeat -- produces the same root for two different transaction
+ * lists, because appending a copy of the final transaction is invisible in the
+ * root. That is CVE-2012-2459, and a block can be mutated into an invalid copy
+ * that still matches the header. Core detects it by noticing when a node is
+ * combined with a value equal to itself and reporting `mutated`; callers treat a
+ * mutated block as invalid rather than merely unusual.
+ *
+ * The eager `inner[]` formulation is Core's, kept so the two implementations can
+ * be compared line by line. Anything simpler risks agreeing with Core on the
+ * common case and diverging on exactly the case that matters. */
+void dogecoin_compute_merkle_root(const uint256_t* leaves, size_t leaf_count,
+                                  uint256_t root_out, dogecoin_bool* mutated_out) {
+    if (!root_out) return;
+    if (!leaves || leaf_count == 0) {
+        dogecoin_mem_zero(root_out, sizeof(uint256_t));
+        if (mutated_out) *mutated_out = false;
+        return;
+    }
+
+    dogecoin_bool mutated = false;
+    uint32_t count = 0;
+    uint256_t inner[32];
+    dogecoin_mem_zero(inner, sizeof(inner));
+
+    while (count < leaf_count) {
+        uint256_t h;
+        memcpy_safe(h, leaves[count], sizeof(uint256_t));
+        count++;
+        int level;
+        for (level = 0; !(count & (((uint32_t)1) << level)); level++) {
+            /* A node combined with a value equal to itself can only arise from a
+               duplicated subtree: the mutation this check exists to catch. */
+            if (memcmp(inner[level], h, sizeof(uint256_t)) == 0) mutated = true;
+            uint8_t cat[64];
+            memcpy_safe(cat, inner[level], 32);
+            memcpy_safe(cat + 32, h, 32);
+            dogecoin_hash(cat, 64, h);
+        }
+        memcpy_safe(inner[level], h, sizeof(uint256_t));
+    }
+
+    /* Sweep the rightmost branch, folding odd levels upward. */
+    int level = 0;
+    while (!(count & (((uint32_t)1) << level))) level++;
+    uint256_t h;
+    memcpy_safe(h, inner[level], sizeof(uint256_t));
+    while (count != (((uint32_t)1) << level)) {
+        /* Bitcoin's rule for an odd level: combine the node with itself. */
+        uint8_t cat[64];
+        memcpy_safe(cat, h, 32);
+        memcpy_safe(cat + 32, h, 32);
+        dogecoin_hash(cat, 64, h);
+        count += (((uint32_t)1) << level);
+        level++;
+        while (!(count & (((uint32_t)1) << level))) {
+            if (memcmp(inner[level], h, sizeof(uint256_t)) == 0) mutated = true;
+            uint8_t cat2[64];
+            memcpy_safe(cat2, inner[level], 32);
+            memcpy_safe(cat2 + 32, h, 32);
+            dogecoin_hash(cat2, 64, h);
+            level++;
+        }
+    }
+
+    memcpy_safe(root_out, h, sizeof(uint256_t));
+    if (mutated_out) *mutated_out = mutated;
+    }
+
+dogecoin_bool dogecoin_block_merkle_root(dogecoin_tx** txs, size_t txs_count,
+                                         uint256_t root_out, dogecoin_bool* mutated_out) {
+    if (!txs || txs_count == 0 || !root_out) return false;
+    uint256_t* leaves = dogecoin_calloc(txs_count, sizeof(uint256_t));
+    if (!leaves) return false;
+    size_t i;
+    for (i = 0; i < txs_count; i++) {
+        if (!txs[i]) {
+            dogecoin_free(leaves);
+            return false;
+        }
+        dogecoin_tx_hash(txs[i], leaves[i]);
+    }
+    dogecoin_compute_merkle_root(leaves, txs_count, root_out, mutated_out);
+    dogecoin_free(leaves);
+    return true;
+    }
+
 void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header) {
     ser_s32(s, header->version);
     ser_u256(s, header->prev_block);
