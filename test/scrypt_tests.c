@@ -68,9 +68,16 @@ void test_scrypt() {
                 pass, 4, salt, 4, 2, 1, 1, out, (size_t)((((uint64_t)1 << 32) - 1) * 32) + 1),
             0);
 #endif
-        /* N too large / not a power of two — rejected before allocation. */
+        /* N power-of-two but larger than SIZE_MAX/128/r — hits the size-overflow guard. */
         u_assert_int_eq(
-            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, (uint64_t)SIZE_MAX, 1, 1, out, sizeof(out)),
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, (uint64_t)1 << 63, 1, 1, out, sizeof(out)),
             0);
+#if SIZE_MAX <= 0xffffffffULL
+        /* r > SIZE_MAX/128/p is only reachable when size_t is 32-bit (r is uint32_t). */
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, 2, (uint32_t)(SIZE_MAX / 128) + 1u, 1, out, sizeof(out)),
+            0);
+#endif
+        /* malloc-failure returns (B0/XY0/V0) need an allocator hook; not covered here. */
     }
 }
