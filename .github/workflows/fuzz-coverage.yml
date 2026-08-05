@@ -1,0 +1,64 @@
+# fuzz coverage reporting (advisory / artifact-only)
+#
+# Runs the existing libFuzzer harnesses under coverage instrumentation and
+# publishes an HTML report plus a per-file uncovered-priority list. This is
+# a measurement job: it never gates. Its output answers the audit plan's
+# reachability question — what attack surface the fuzzers actually exercise.
+#
+# Scheduled weekly (corpora accumulate value over time) and runnable on
+# demand. It generates short mini-corpora from scratch on each run, so the
+# absolute numbers reflect "what a brief fuzz run reaches", not a ceiling.
+# When a persistent corpus store exists, point CORPUS_ROOT at it via the
+# workflow inputs for numbers that reflect accumulated coverage.
+
+name: fuzz-coverage
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed_runs:
+        description: 'inputs per target when generating a corpus'
+        required: false
+        default: '50000'
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 06:00 UTC
+
+jobs:
+  coverage:
+    name: fuzz-coverage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: install packages
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            autoconf automake libtool-bin build-essential curl python3 \
+            clang llvm libevent-dev
+
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: run coverage
+        run: |
+          SEED_RUNS="${{ github.event.inputs.seed_runs || '50000' }}" \
+            contrib/coverage/fuzz_coverage.sh fuzz-corpora
+        shell: bash
+
+      - name: coverage summary to job log
+        run: |
+          echo '### fuzz coverage (first-party sources)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -1 coverage-report/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'least-covered first-party files (next-harness priority):' >> "$GITHUB_STEP_SUMMARY"
+          head -12 coverage-report/uncovered.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-coverage-report
+          path: |
+            coverage-report/html/
+            coverage-report/summary.txt
+            coverage-report/uncovered.txt
