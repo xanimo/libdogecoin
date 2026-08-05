@@ -274,6 +274,7 @@ tests_SOURCES = \
     test/base58_tests.c \
     test/bip32_tests.c \
     test/bip39_tests.c \
+    test/bip38_coverage_tests.c \
     test/bip44_tests.c \
     test/block_tests.c \
     test/buffer_tests.c \
