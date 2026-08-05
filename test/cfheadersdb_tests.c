@@ -25,11 +25,35 @@
 
  */
 
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <test/utest.h>
+
+/*
+ * Create scratch files private to this user. plain cfdb_tmp_open(path, "wb") leaves
+ * the mode to the process umask, which can yield a world-writable file another
+ * local user could rewrite between creation and read.
+ */
+static FILE* cfdb_tmp_open(const char* path, const char* mode)
+{
+#ifdef _WIN32
+    return fopen(path, mode);
+#else
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return NULL;
+    }
+    return fdopen(fd, mode);
+#endif
+}
+
 
 #include <dogecoin/cfheadersdb_file.h>
 #include <dogecoin/chainparams.h>
@@ -191,7 +215,7 @@ void test_cfheadersdb()
         fclose(f);
         u_assert_int_eq(got == (size_t)size, 1);
 
-        f = fopen(CFDB_TEST_HEADERS, "wb");
+        f = cfdb_tmp_open(CFDB_TEST_HEADERS, "wb");
         u_assert_int_eq(f != NULL, 1);
         u_assert_int_eq(fwrite(buf, 1, (size_t)size - 10, f) == (size_t)size - 10, 1);
         fclose(f);
