@@ -190,6 +190,51 @@ int main() {
 	dogecoin_free(privkeywif);
 	// END ===========================================
 
+	// SLIP-0039 EXAMPLE
+	printf("\n\nSLIP-0039 EXAMPLE:\n\n");
+	const uint8_t slip39_secret[] = {
+		0xde, 0xad, 0xbe, 0xef, 0x01, 0x23, 0x45, 0x67,
+		0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98
+	};
+	const size_t slip39_secret_len = sizeof(slip39_secret);
+	const uint8_t slip39_threshold = 2;
+	const uint8_t slip39_share_count = 3;
+	SLIP0039_SHARE slip39_shares[SLIP0039_MAX_SHARES];
+	dogecoin_mem_zero(slip39_shares, sizeof(slip39_shares));
+	char slip39_secret_hex[(MAX_SEED_SIZE * 2) + 1];
+	dogecoin_mem_zero(slip39_secret_hex, sizeof(slip39_secret_hex));
+	utils_bin_to_hex((unsigned char*)slip39_secret, slip39_secret_len, slip39_secret_hex);
+	if (dogecoin_slip0039_generate_shares(slip39_secret, slip39_secret_len,
+	                                      slip39_threshold, slip39_share_count,
+	                                      slip39_shares) != 0) {
+		printf("SLIP-0039 share generation failed.\n");
+		return -1;
+	}
+	printf("SLIP-0039 secret (hex): %s\n", slip39_secret_hex);
+	for (uint8_t i = 0; i < slip39_share_count; ++i) {
+		printf("SLIP-0039 share %u: %s\n", (unsigned int)(i + 1), slip39_shares[i]);
+	}
+	const char* slip39_recovery_shares[] = { slip39_shares[0], slip39_shares[1] };
+	uint8_t slip39_recovered[MAX_SEED_SIZE];
+	dogecoin_mem_zero(slip39_recovered, sizeof(slip39_recovered));
+	size_t slip39_recovered_len = sizeof(slip39_recovered);
+	if (dogecoin_slip0039_recover_secret(slip39_recovery_shares, 2, NULL, 0,
+	                                     slip39_recovered, &slip39_recovered_len) != 0) {
+		printf("SLIP-0039 secret recovery failed.\n");
+		return -1;
+	}
+	char slip39_recovered_hex[(MAX_SEED_SIZE * 2) + 1];
+	dogecoin_mem_zero(slip39_recovered_hex, sizeof(slip39_recovered_hex));
+	utils_bin_to_hex(slip39_recovered, slip39_recovered_len, slip39_recovered_hex);
+	printf("SLIP-0039 recovered (hex): %s\n", slip39_recovered_hex);
+	if (slip39_recovered_len != slip39_secret_len ||
+	    memcmp(slip39_secret, slip39_recovered, slip39_secret_len) != 0) {
+		printf("SLIP-0039 recovered secret does not match original.\n");
+		return -1;
+	}
+	printf("SLIP-0039 round-trip OK.\n");
+	// END ===========================================
+
 	// BIP44 EXAMPLE
 	printf("\n\nBIP44 EXAMPLE:\n\n");
 
