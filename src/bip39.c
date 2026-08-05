@@ -465,6 +465,7 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
     int i = 0;
     FILE * fp;
     int c;
+    size_t wordlen;
     char word[BIP39_WORD_BUFSZ];
 
     /* Check that file path is valid */
@@ -503,13 +504,18 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
             fclose(fp);
             return -1;
         }
-        wordlist[i] = malloc(strlen(word) + 1);
+        /* Size and copy from one measured length rather than strcpy'ing a
+           string whose bound the compiler cannot see. Equivalent once the read
+           above is bounded, but it keeps the safety argument local to these
+           three lines instead of depending on the scanf width further up. */
+        wordlen = strlen(word);
+        wordlist[i] = malloc(wordlen + 1);
         if (wordlist[i] == NULL) {
             fprintf(stderr, "ERROR: cannot allocate memory\n");
             fclose(fp);
             return -1;
         }
-        strcpy(wordlist[i], word);
+        memcpy(wordlist[i], word, wordlen + 1);
         i++;
     }
 
