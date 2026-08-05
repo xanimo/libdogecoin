@@ -14,6 +14,11 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
 
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1375,6 +1380,24 @@ void test_bip39()
  * Without the fix this test does not merely fail -- it corrupts the stack, and
  * under ASan it aborts with a stack-buffer-overflow in get_custom_words.
  */
+/*
+ * Create the scratch wordlist private to this user. plain fopen(path, "w")
+ * leaves the mode to the process umask, which CodeQL flags and which would let
+ * another local user rewrite the file between creation and read.
+ */
+static FILE* wordlist_tmp_open(const char* path)
+{
+#ifdef _WIN32
+    return fopen(path, "w");
+#else
+    int fd = open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return NULL;
+    }
+    return fdopen(fd, "w");
+#endif
+}
+
 void test_bip39_custom_wordlist_bounds()
 {
 #ifdef USE_OPTEE
@@ -1398,7 +1421,7 @@ void test_bip39_custom_wordlist_bounds()
 
     /* A token far longer than the 1024-byte buffer, written first so the
        rejection happens before any word is allocated. */
-    fp = fopen(path, "w");
+    fp = wordlist_tmp_open(path);
     u_assert_true(fp != NULL);
     for (i = 0; i < 2000; i++) {
         fputc('a', fp);
@@ -1420,7 +1443,7 @@ void test_bip39_custom_wordlist_bounds()
     /* A token of exactly the maximum length is still refused, since no BIP39
        word is anywhere near it and accepting it would mean the next read
        silently began mid-token. */
-    fp = fopen(path, "w");
+    fp = wordlist_tmp_open(path);
     u_assert_true(fp != NULL);
     for (i = 0; i < BIP39_WORD_MAXLEN + 1; i++) {
         fputc('b', fp);
@@ -1432,7 +1455,7 @@ void test_bip39_custom_wordlist_bounds()
 
     /* Positive control: a well-formed 2048-word file still parses, so the
        bound did not break legitimate wordlists. */
-    fp = fopen(path, "w");
+    fp = wordlist_tmp_open(path);
     u_assert_true(fp != NULL);
     for (i = 0; i < LANG_WORD_CNT; i++) {
         fprintf(fp, "abandon\n");
@@ -1448,7 +1471,7 @@ void test_bip39_custom_wordlist_bounds()
     remove(path);
 
     /* A file with too few words is still refused. */
-    fp = fopen(path, "w");
+    fp = wordlist_tmp_open(path);
     u_assert_true(fp != NULL);
     fprintf(fp, "abandon\nability\n");
     fclose(fp);

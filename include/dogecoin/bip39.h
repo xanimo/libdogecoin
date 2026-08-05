@@ -27,18 +27,6 @@ LIBDOGECOIN_API
 /* number of words in the language wordlist used for mnemonics */
 #define LANG_WORD_CNT 2048
 
-/*
- * Longest token get_custom_words() will accept from a wordlist file, and the
- * buffer it reads into. BIP39 words are at most 8 characters; this is far
- * wider than any real wordlist and exists only to bound the conversion.
- * BIP39_STR() stringifies the length for the scanf field width so the width
- * and the buffer size cannot drift apart.
- */
-#define BIP39_WORD_MAXLEN 1023
-#define BIP39_WORD_BUFSZ (BIP39_WORD_MAXLEN + 1)
-#define BIP39_STR_(x) #x
-#define BIP39_STR(x) BIP39_STR_(x)
-
 /* Indicates the number of entropy bits supported */
 #define MAX_ENTROPY_BITS 256
 
@@ -62,6 +50,25 @@ LIBDOGECOIN_API
 
 /* Maximum size of a mnemonic phrase string in bytes */
 #define MAX_MNEMONIC_STRING_SIZE (MAX_WORDS_IN_MNEMONIC * MAX_CHARS_IN_MNEMONIC_WORD * HEX_CHARS_PER_BYTE) + 1
+
+/*
+ * Longest token get_custom_words() will accept from a wordlist file, and the
+ * buffer it reads into.
+ *
+ * This is MAX_CHARS_IN_MNEMONIC_WORD rather than merely "wide enough to read
+ * safely". get_mnemonic() concatenates wordlist entries into a caller-supplied
+ * MNEMONIC, which is sized from that same constant. A loader bound any looser
+ * would accept a word the read survives and the assembly downstream does not,
+ * so the loader enforces the invariant the rest of the file already assumes.
+ * Real BIP39 words are at most 8 characters.
+ *
+ * BIP39_STR() stringifies the length for the scanf field width, so the width
+ * and the buffer size cannot drift apart.
+ */
+#define BIP39_WORD_MAXLEN MAX_CHARS_IN_MNEMONIC_WORD
+#define BIP39_WORD_BUFSZ (BIP39_WORD_MAXLEN + 1)
+#define BIP39_STR_(x) #x
+#define BIP39_STR(x) BIP39_STR_(x)
 
 /* Maximum number of characters in a passphrase */
 #define MAX_CHARS_IN_PASSPHRASE 256
