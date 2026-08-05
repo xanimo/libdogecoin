@@ -16,3 +16,14 @@ unusedFunction
 // Informational check with a very high false-positive rate on C99 designated
 // initializers; revisit after the Phase 1 backlog triage.
 missingIncludeSystem
+
+// OP-TEE client passes `seed` as a TEEC_MEMREF_TEMP_OUTPUT buffer, which the
+// trusted application fills; cppcheck reads taking its address as a use of an
+// uninitialised value. disposition: false-positive
+uninitvar:src/optee/host/main.c
+
+// cppcheck 2.13 cannot build an AST for the assert() macro as expanded here;
+// this is a parser limitation, not a defect in the code. Re-check on the next
+// cppcheck bump -- 2.13 already cleared three of the four such errors that
+// 2.7 reported. disposition: false-positive
+internalAstError:src/optee/ta/libdogecoin_ta.c

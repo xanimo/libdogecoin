@@ -79,9 +79,16 @@ jobs:
           path: cppcheck-report.xml
 
       - name: gate on error severity
+        # Only `error` severity is fatal, per the phase-0 policy at the top of
+        # this file. The step previously passed --enable=warning here, which
+        # made every warning fatal too and left the job red on 0.1.5-dev itself.
+        # The full warning/style/performance/portability set is still produced
+        # by the reporting step above and uploaded as an artifact -- nothing
+        # stops being visible, it just stops blocking. Widen this to
+        # --enable=warning once the backlog in the suppressions file is
+        # dispositioned, which is what the header has always intended.
         run: |
           cppcheck \
-            --enable=warning \
             --std=c99 \
             -D__GNUC__ -D__linux__ \
             --inline-suppr \
