@@ -1377,6 +1377,18 @@ void test_bip39()
  */
 void test_bip39_custom_wordlist_bounds()
 {
+#ifdef USE_OPTEE
+    /*
+     * OP-TEE has no file I/O, so get_custom_words() is compiled to a stub that
+     * always fails. Assert that contract rather than skipping: a build where
+     * the stub started returning success would mean callers could believe a
+     * wordlist had been loaded when none was.
+     */
+    char* wordlist_stub[LANG_WORD_CNT];
+    dogecoin_mem_zero(wordlist_stub, sizeof(wordlist_stub));
+    u_assert_int_eq(get_custom_words("unused", wordlist_stub), -1);
+    u_assert_true(wordlist_stub[0] == NULL);
+#else
     const char* path = "bip39_overlong_wordlist.tmp";
     char* wordlist[LANG_WORD_CNT];
     FILE* fp;
@@ -1446,4 +1458,5 @@ void test_bip39_custom_wordlist_bounds()
         wordlist[i] = NULL;
     }
     remove(path);
+#endif /* USE_OPTEE */
 }
