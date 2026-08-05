@@ -270,6 +270,64 @@ static void test_bip38_ec_lot_sequence_vectors(void)
     printf("  BIP38 EC lot/sequence vector tests passed\n");
 }
 
+static void test_bip38_mainnet_wrappers(void)
+{
+    printf("Testing BIP38 mainnet confirm/decrypt_with_lot_sequence wrappers...\n");
+
+    /* Non-_ex wrappers use BIP38_ADDRESS_MATCH_MAINNET; generate Dogecoin keys. */
+    const char* passphrase = "TestingOneTwoThree";
+    char encrypted[BIP38_ENCRYPTED_KEY_LENGTH + 1];
+    size_t enc_sz = sizeof(encrypted);
+    char confirmation[BIP38_CONFIRMATION_CODE_MAXLEN];
+    size_t confirm_sz = sizeof(confirmation);
+    uint8_t priv[DOGECOIN_ECKEY_PKEY_LENGTH];
+    dogecoin_bool compressed = false;
+    uint32_t lot = 0;
+    uint32_t sequence = 0;
+    char address_out[P2PKHLEN];
+
+    u_assert_true(dogecoin_bip38_encrypt_ec_multiplied(
+        passphrase,
+        true,
+        true,
+        100U,
+        7U,
+        "D",
+        priv,
+        encrypted,
+        &enc_sz,
+        confirmation,
+        &confirm_sz));
+    u_assert_true(dogecoin_bip38_is_valid(encrypted));
+    u_assert_true(dogecoin_bip38_is_compressed(encrypted));
+    u_assert_true(dogecoin_bip38_has_lot_sequence(encrypted));
+
+    dogecoin_mem_zero(priv, sizeof(priv));
+    u_assert_true(dogecoin_bip38_decrypt_with_lot_sequence(
+        encrypted, passphrase, priv, &compressed, &lot, &sequence));
+    u_assert_true(compressed);
+    u_assert_uint32_eq(lot, 100U);
+    u_assert_uint32_eq(sequence, 7U);
+    u_assert_true(dogecoin_ecc_verify_privatekey(priv));
+
+    dogecoin_mem_zero(address_out, sizeof(address_out));
+    u_assert_true(dogecoin_bip38_confirm_passphrase(
+        passphrase,
+        confirmation,
+        address_out,
+        sizeof(address_out),
+        &compressed,
+        &lot,
+        &sequence));
+    u_assert_true(address_out[0] == 'D');
+    u_assert_true(compressed);
+    u_assert_uint32_eq(lot, 100U);
+    u_assert_uint32_eq(sequence, 7U);
+
+    dogecoin_mem_zero(priv, sizeof(priv));
+    printf("  BIP38 mainnet wrapper tests passed\n");
+}
+
 static void test_bip38_ec_lot_sequence_greek_vector(void)
 {
     printf("Testing BIP38 EC lot/sequence (Greek passphrase vector)...\n");
@@ -544,6 +602,16 @@ static void test_sweep_result(void)
     u_assert_uint64_eq(dogecoin_sweep_result_get_fee_paid(result), 0ULL);
     u_assert_is_null(dogecoin_sweep_result_get_destination_address(result));
 
+    /* Success-path accessors after a failed sweep still expose the error string. */
+    {
+        dogecoin_sweep_result* failed = dogecoin_sweep_paper_wallet(NULL, NULL);
+        u_assert_not_null(failed);
+        u_assert_int_eq((int)failed->success, 0);
+        u_assert_not_null(dogecoin_sweep_result_get_error(failed));
+        u_assert_true(strlen(dogecoin_sweep_result_get_error(failed)) > 0);
+        dogecoin_sweep_result_free(failed);
+    }
+
     dogecoin_sweep_result_free(result);
 
     printf("  Sweep result tests passed\n");
@@ -690,6 +758,28 @@ static void test_bip38_validation(void)
 
     u_assert_true(dogecoin_bip38_is_valid(
         "6PRVWUbkzzsbcVac2qwfssoUJAN1Xhrg6bNk8J7Nzm5H7kxEbn2Nh2ZoGg"));
+
+    {
+        const char* uncompressed =
+            "6PRVWUbkzzsbcVac2qwfssoUJAN1Xhrg6bNk8J7Nzm5H7kxEbn2Nh2ZoGg";
+        const char* compressed =
+            "6PYNKZ1EAgYgmQfmNVamxyXVWHzK5s6DGhwP4J5o44cvXdoY7sRzhtpUeo";
+        uint8_t hash_out[4];
+        uint8_t flag_out = 0;
+
+        u_assert_int_eq((int)dogecoin_bip38_is_compressed(uncompressed), 0);
+        u_assert_true(dogecoin_bip38_is_compressed(compressed));
+
+        u_assert_true(dogecoin_bip38_get_address_hash(uncompressed, hash_out));
+        u_assert_true(dogecoin_bip38_get_flag_byte(uncompressed, &flag_out));
+        u_assert_int_eq((int)(flag_out & BIP38_COMPRESSED_FLAG), 0);
+        u_assert_true(hash_out[0] | hash_out[1] | hash_out[2] | hash_out[3]);
+
+        u_assert_true(dogecoin_bip38_get_address_hash(compressed, hash_out));
+        u_assert_true(dogecoin_bip38_get_flag_byte(compressed, &flag_out));
+        u_assert_true((flag_out & BIP38_COMPRESSED_FLAG) != 0);
+        u_assert_true(hash_out[0] | hash_out[1] | hash_out[2] | hash_out[3]);
+    }
 
     {
         const char* valid = "6PRVWUbkzzsbcVac2qwfssoUJAN1Xhrg6bNk8J7Nzm5H7kxEbn2Nh2ZoGg";
@@ -854,6 +944,56 @@ static void test_sweep_functionality(void)
     u_assert_not_null(sweep->transaction_id);
     u_assert_true(strlen(sweep->transaction_hex) > 0);
     u_assert_true(strlen(sweep->transaction_id) == 64);
+
+    /* Success-path result accessors. */
+    u_assert_str_eq(dogecoin_sweep_result_get_transaction_hex(sweep), sweep->transaction_hex);
+    u_assert_str_eq(dogecoin_sweep_result_get_transaction_id(sweep), sweep->transaction_id);
+    u_assert_str_eq(dogecoin_sweep_result_get_destination_address(sweep), dest_address);
+    u_assert_uint64_eq(dogecoin_sweep_result_get_amount_swept(sweep), sweep->amount_swept);
+    u_assert_uint64_eq(dogecoin_sweep_result_get_fee_paid(sweep), sweep->fee_paid);
+    u_assert_is_null(dogecoin_sweep_result_get_error(sweep));
+    u_assert_true(dogecoin_sweep_result_get_amount_swept(sweep) > 0);
+    u_assert_true(dogecoin_sweep_result_get_fee_paid(sweep) > 0);
+
+    /* Fee estimate + unit-side broadcast / balance coverage. */
+    {
+        uint64_t est = dogecoin_sweep_estimate_fee(wallet, options);
+        u_assert_true(est > 0);
+        u_assert_uint64_eq(est, dogecoin_sweep_result_get_fee_paid(sweep));
+        u_assert_uint64_eq(dogecoin_sweep_estimate_fee(wallet, NULL), 0ULL);
+
+        char txid_out[65];
+        dogecoin_mem_zero(txid_out, sizeof(txid_out));
+        u_assert_int_eq((int)dogecoin_sweep_broadcast_transaction(NULL, chain, txid_out, sizeof(txid_out)), 0);
+        {
+            dogecoin_transaction* signed_tx = dogecoin_sweep_create_transaction(wallet, options);
+            u_assert_not_null(signed_tx);
+            u_assert_true(dogecoin_sweep_sign_transaction(signed_tx, wallet));
+            u_assert_int_eq(
+                (int)dogecoin_sweep_broadcast_transaction(signed_tx, NULL, txid_out, sizeof(txid_out)),
+                0);
+#ifndef WITH_NET
+            /* Offline unit builds: broadcast is a documented no-op failure. */
+            u_assert_int_eq(
+                (int)dogecoin_sweep_broadcast_transaction(signed_tx, chain, txid_out, sizeof(txid_out)),
+                0);
+#endif
+            dogecoin_tx_free(signed_tx);
+        }
+
+        {
+            uint64_t bal = 123;
+            u_assert_int_eq((int)dogecoin_sweep_get_balance(NULL, chain, &bal), 0);
+            u_assert_int_eq((int)dogecoin_sweep_get_balance(dest_address, chain, NULL), 0);
+#ifdef WITH_WALLET
+            u_assert_true(dogecoin_sweep_get_balance(dest_address, chain, &bal));
+#else
+            u_assert_int_eq((int)dogecoin_sweep_get_balance(dest_address, chain, &bal), 0);
+            u_assert_uint64_eq(bal, 0ULL);
+#endif
+        }
+    }
+
     dogecoin_sweep_result_free(sweep);
 
     dogecoin_sweep_options_free(options);
@@ -987,6 +1127,115 @@ static void test_multi_utxo_sweep(void)
     printf("  Multi-UTXO sweep tests passed\n");
 }
 
+static void test_multi_wallet_sweep(void)
+{
+    printf("Testing multi-wallet sweep...\n");
+    sweep_test_cleanup_transactions();
+
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+    dogecoin_paper_wallet* wallet0 = dogecoin_paper_wallet_new();
+    dogecoin_paper_wallet* wallet1 = dogecoin_paper_wallet_new();
+    dogecoin_paper_wallet wallets[2];
+    dogecoin_key key0;
+    dogecoin_key key1;
+    char wif0[PRIVKEYWIFLEN];
+    char wif1[PRIVKEYWIFLEN];
+    size_t wif_sz;
+
+    u_assert_not_null(wallet0);
+    u_assert_not_null(wallet1);
+
+    dogecoin_privkey_init(&key0);
+    dogecoin_privkey_init(&key1);
+    u_assert_true(dogecoin_privkey_gen(&key0));
+    u_assert_true(dogecoin_privkey_gen(&key1));
+    wif_sz = sizeof(wif0);
+    dogecoin_privkey_encode_wif(&key0, chain, wif0, &wif_sz);
+    wif_sz = sizeof(wif1);
+    dogecoin_privkey_encode_wif(&key1, chain, wif1, &wif_sz);
+    dogecoin_privkey_cleanse(&key0);
+    dogecoin_privkey_cleanse(&key1);
+
+    u_assert_true(dogecoin_paper_wallet_set_wif(wallet0, wif0, chain));
+    u_assert_true(dogecoin_paper_wallet_set_wif(wallet1, wif1, chain));
+    /* Contiguous array required by dogecoin_sweep_multiple_paper_wallets. */
+    wallets[0] = *wallet0;
+    wallets[1] = *wallet1;
+
+    dogecoin_sweep_options* options = dogecoin_sweep_options_new(chain);
+    u_assert_not_null(options);
+    u_assert_true(dogecoin_sweep_options_set_destination(options, "DHprgyNMcy3Ct9zVbJCrezYywxTBDWPL3v"));
+    u_assert_true(dogecoin_sweep_options_set_fee(options, 1000, 1000, 5000000));
+    u_assert_true(dogecoin_sweep_options_add_utxo(
+        options,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        0,
+        "25.0"));
+    u_assert_true(dogecoin_sweep_options_add_utxo(
+        options,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        1,
+        "25.0"));
+
+    /* Negative paths for the multi-wallet entry point. */
+    {
+        dogecoin_sweep_result* bad = dogecoin_sweep_multiple_paper_wallets(NULL, 2, options);
+        u_assert_not_null(bad);
+        u_assert_int_eq((int)bad->success, 0);
+        u_assert_not_null(dogecoin_sweep_result_get_error(bad));
+        dogecoin_sweep_result_free(bad);
+
+        bad = dogecoin_sweep_multiple_paper_wallets(wallets, 0, options);
+        u_assert_not_null(bad);
+        u_assert_int_eq((int)bad->success, 0);
+        dogecoin_sweep_result_free(bad);
+
+        /* wallet_count must match utxo_count when > 1 */
+        {
+            dogecoin_sweep_options* one_utxo = dogecoin_sweep_options_new(chain);
+            u_assert_not_null(one_utxo);
+            u_assert_true(dogecoin_sweep_options_set_destination(one_utxo, "DHprgyNMcy3Ct9zVbJCrezYywxTBDWPL3v"));
+            u_assert_true(dogecoin_sweep_options_set_fee(one_utxo, 1000, 1000, 5000000));
+            u_assert_true(dogecoin_sweep_options_add_utxo(
+                one_utxo,
+                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                0,
+                "25.0"));
+            bad = dogecoin_sweep_multiple_paper_wallets(wallets, 2, one_utxo);
+            u_assert_not_null(bad);
+            u_assert_int_eq((int)bad->success, 0);
+            u_assert_not_null(dogecoin_sweep_result_get_error(bad));
+            dogecoin_sweep_result_free(bad);
+            dogecoin_sweep_options_free(one_utxo);
+        }
+    }
+
+    dogecoin_sweep_result* sweep = dogecoin_sweep_multiple_paper_wallets(wallets, 2, options);
+    u_assert_not_null(sweep);
+    u_assert_true(sweep->success);
+    u_assert_not_null(dogecoin_sweep_result_get_transaction_hex(sweep));
+    u_assert_true(strlen(dogecoin_sweep_result_get_transaction_hex(sweep)) > 0);
+    u_assert_true(dogecoin_sweep_result_get_amount_swept(sweep) > 0);
+    dogecoin_sweep_result_free(sweep);
+
+    /* Single-wallet path through the multi API (one key, two UTXOs). */
+    sweep = dogecoin_sweep_multiple_paper_wallets(wallets, 1, options);
+    u_assert_not_null(sweep);
+    u_assert_true(sweep->success);
+    dogecoin_sweep_result_free(sweep);
+
+    dogecoin_sweep_options_free(options);
+
+    /* Free via originals; zero copies so we do not double-free string fields. */
+    dogecoin_mem_zero(&wallets[0], sizeof(wallets[0]));
+    dogecoin_mem_zero(&wallets[1], sizeof(wallets[1]));
+    dogecoin_paper_wallet_free(wallet0);
+    dogecoin_paper_wallet_free(wallet1);
+
+    sweep_test_cleanup_transactions();
+    printf("  Multi-wallet sweep tests passed\n");
+}
+
 /* Test error handling */
 static void test_rbf_locktime_sweep(void)
 {
@@ -1093,12 +1342,14 @@ void test_sweep(void)
     test_bip38_ec_reference_vectors();
     test_bip38_ec_intermediate_encrypt_roundtrip();
     test_bip38_ec_lot_sequence_vectors();
+    test_bip38_mainnet_wrappers();
     test_bip38_ec_lot_sequence_greek_vector();
     test_bip38_confirm_interop_testnet();
     test_bip38_nfc_passphrase_vector();
     test_sweep_functionality();
     test_bip38_generate_and_sweep();
     test_multi_utxo_sweep();
+    test_multi_wallet_sweep();
     test_rbf_locktime_sweep();
     test_sweep_error_handling();
 }

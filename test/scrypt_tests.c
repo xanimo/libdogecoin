@@ -1,6 +1,9 @@
 #include <test/utest.h>
 #include <dogecoin/scrypt.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/mem.h>
+#include <stdint.h>
+#include <string.h>
 
 void test_scrypt() {
     // Test Scrypt hash with known inputs against expected outputs
@@ -26,5 +29,48 @@ void test_scrypt() {
         // Test generic scrypt
         scrypt_1024_1_1_256_sp_generic((const char*)&inputbytes[0], BEGIN(scrypthash), scratchpad);
         u_assert_str_eq(utils_uint8_to_hex(scrypthash, 32), expected[i]);
+    }
+
+    /* RFC 7914 path used by BIP38: success + parameter-validation failures. */
+    {
+        uint8_t out[64];
+        const uint8_t pass[] = "pass";
+        const uint8_t salt[] = "salt";
+        dogecoin_mem_zero(out, sizeof(out));
+
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, sizeof(pass) - 1, salt, sizeof(salt) - 1, 2, 1, 1, out, sizeof(out)),
+            1);
+        u_assert_true(out[0] != 0 || out[1] != 0 || out[31] != 0);
+
+        /* N must be power of two and >= 2 */
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, 1, 1, 1, out, sizeof(out)),
+            0);
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, 3, 1, 1, out, sizeof(out)),
+            0);
+        /* r/p must be non-zero */
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, 2, 0, 1, out, sizeof(out)),
+            0);
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, 2, 1, 0, out, sizeof(out)),
+            0);
+        /* r*p must be < 2^30 */
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, 2, (1u << 16), (1u << 15), out, sizeof(out)),
+            0);
+#if SIZE_MAX > 0xffffffffULL
+        /* buflen overflow guard (only expressible when size_t is wide enough). */
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(
+                pass, 4, salt, 4, 2, 1, 1, out, (size_t)((((uint64_t)1 << 32) - 1) * 32) + 1),
+            0);
+#endif
+        /* N too large / not a power of two — rejected before allocation. */
+        u_assert_int_eq(
+            dogecoin_scrypt_rfc7914(pass, 4, salt, 4, (uint64_t)SIZE_MAX, 1, 1, out, sizeof(out)),
+            0);
     }
 }
