@@ -630,6 +630,9 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
                               &scheme,
                               NULL,
                               &cipher);
+    // Scrub the plaintext copy: Esys_RSA_Encrypt has consumed it and `plain`
+    // is not referenced on any subsequent path (success or error) (CWE-226).
+    dogecoin_mem_zero(&plain, sizeof(plain));
     if (result != TSS2_RC_SUCCESS) {
         dogecoin_mem_zero(&authValuePrimary, sizeof(authValuePrimary));
         Esys_FlushContext(context, keyHandle);
@@ -837,6 +840,12 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
 
     result = Esys_RSA_Decrypt(context, keyHandle, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, &cipher, &scheme, &label, &plain);
     if (result != TSS2_RC_SUCCESS || plain == NULL || plain->size > out_size) {
+        // On the size-overflow branch the decrypt succeeded, so `plain` holds
+        // recovered plaintext; scrub it before Esys_Free returns it to the heap
+        // allocator (CWE-226). tpm_cleanup/Esys_Free do not zero.
+        if (plain != NULL) {
+            dogecoin_mem_zero(plain->buffer, sizeof(plain->buffer));
+        }
         tpm_cleanup(NULL, plain, TPM_CLEANUP_SENTINEL);
         Esys_TR_Close(context, &keyHandle);
         tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
@@ -847,6 +856,8 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     if (actual_size) {
         *actual_size = plain->size;
     }
+    // Scrub the recovered plaintext before freeing the ESAPI buffer (CWE-226).
+    dogecoin_mem_zero(plain->buffer, sizeof(plain->buffer));
     tpm_cleanup(NULL, plain, TPM_CLEANUP_SENTINEL);
     Esys_TR_Close(context, &keyHandle);
     tpm_cleanup(&context, TPM_CLEANUP_SENTINEL);
@@ -1339,31 +1350,29 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
 
     // Generate a random IV for AES encryption
     uint8_t iv[AES_IV_SIZE];
+    uint8_t* encrypted_seed = NULL;
+    dogecoin_bool result = false;
     if (!dogecoin_random_bytes(iv, sizeof(iv), 1))
     {
         fprintf(stderr, "ERROR: Failed to generate random bytes.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     // Encrypt the seed using AES
     size_t encrypted_size = size;
     dogecoin_bool padding_used = false;
-    uint8_t* encrypted_seed = malloc(encrypted_size);
+    encrypted_seed = malloc(encrypted_size);
     if (!encrypted_seed)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     size_t encrypted_actual_size = aes256_cbc_encrypt(encryption_key, iv, seed, size, padding_used, encrypted_seed);
     if (encrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES encryption failed.\n");
-        dogecoin_free(encrypted_seed);
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     // Write the IV, salt, verification key hash, and encrypted seed to the file
@@ -1374,7 +1383,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
         fwrite(salt_verification, 1, SALT_SIZE, fp);
         fwrite(verification_key_hash, 1, sizeof(verification_key_hash), fp);
         fwrite(encrypted_seed, 1, encrypted_size, fp);
-        fp ? fclose(fp) : 0;
+        fclose(fp);
+        fp = NULL;
     }
     else if (encrypted_blob_out != NULL && encrypted_blob_size != NULL)
     {
@@ -1390,10 +1400,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
         *encrypted_blob_size = sizeof(iv) + SALT_SIZE + SALT_SIZE + sizeof(verification_key_hash) + encrypted_size;
     }
 
-    // Free the encrypted seed
-    dogecoin_free(encrypted_seed);
+    result = true;
 
-    return true;
+cleanup:
+    // Scrub the PBKDF2-derived key material before returning (CWE-226).
+    dogecoin_mem_zero(encryption_key, sizeof(encryption_key));
+    dogecoin_mem_zero(verification_key, sizeof(verification_key));
+    if (encrypted_seed)
+    {
+        dogecoin_free(encrypted_seed);
+    }
+    if (fp)
+    {
+        fclose(fp);
+    }
+    return result;
 #else
     (void) seed;
     (void) size;
@@ -1533,6 +1554,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
 
     // Derive the verification key from the password and verification salt using PBKDF2
     uint8_t derived_verification_key[AES_KEY_SIZE];
+    uint8_t encryption_key[AES_KEY_SIZE];
+    uint8_t* encrypted_seed = NULL;
+    dogecoin_bool result = false;
     pbkdf2_hmac_sha256((const uint8_t*)password, strlen(password), salt_verification, SALT_SIZE, PBKDF2_ITERATIONS, derived_verification_key, AES_KEY_SIZE);
 
     // Hash the derived verification key
@@ -1543,28 +1567,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
     if (dogecoin_mem_cmp_ct(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
     {
         fprintf(stderr, "ERROR: Incorrect password.\n");
-        fclose(fp);
-        dogecoin_mem_zero(password, strlen(password));
-        dogecoin_free(password);
-        return false;
+        goto cleanup;
     }
 
     // Derive the encryption key from the password and encryption salt using PBKDF2
-    uint8_t encryption_key[AES_KEY_SIZE];
     pbkdf2_hmac_sha256((const uint8_t*)password, strlen(password), salt_encryption, SALT_SIZE, PBKDF2_ITERATIONS, encryption_key, AES_KEY_SIZE);
-
-    // Clear the password
-    dogecoin_mem_zero(password, strlen(password));
-    dogecoin_free(password);
 
     // Read the encrypted seed from the file or blob
     size_t encrypted_size = ENCRYPTED_SEED_SIZE;
-    uint8_t* encrypted_seed = malloc(encrypted_size);
+    encrypted_seed = malloc(encrypted_size);
     if (!encrypted_seed)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
-        fclose(fp);
-        return false;
+        goto cleanup;
     }
 
     if (fp != NULL)
@@ -1572,12 +1587,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
         if (fread(encrypted_seed, 1, encrypted_size, fp) != encrypted_size)
         {
             fprintf(stderr, "ERROR: Failed to read encrypted seed from file.\n");
-            fclose(fp);
-            dogecoin_free(encrypted_seed);
-            return false;
+            goto cleanup;
         }
-
-        fclose(fp);
     }
     else
     {
@@ -1587,15 +1598,33 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
     // Decrypt the seed using AES
     dogecoin_bool padding_used = false;
     size_t decrypted_actual_size = aes256_cbc_decrypt(encryption_key, iv, encrypted_seed, encrypted_size, padding_used, seed);
-    dogecoin_free(encrypted_seed);
 
     if (decrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES decryption failed.\n");
-        return false;
+        goto cleanup;
     }
 
-    return true;
+    result = true;
+
+cleanup:
+    // Scrub the PBKDF2-derived key material before returning (CWE-226).
+    dogecoin_mem_zero(derived_verification_key, sizeof(derived_verification_key));
+    dogecoin_mem_zero(encryption_key, sizeof(encryption_key));
+    if (password)
+    {
+        dogecoin_mem_zero(password, strlen(password));
+        dogecoin_free(password);
+    }
+    if (encrypted_seed)
+    {
+        dogecoin_free(encrypted_seed);
+    }
+    if (fp)
+    {
+        fclose(fp);
+    }
+    return result;
 #else
     (void) seed;
     (void) file_num;
@@ -2177,41 +2206,38 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
 
     // Generate a random IV for AES encryption
     uint8_t iv[AES_IV_SIZE];
+    SEED seed = {0};
+    uint8_t* encrypted_data = NULL;
+    dogecoin_bool result = false;
     if (!dogecoin_random_bytes(iv, sizeof(iv), 1))
     {
         fprintf(stderr, "ERROR: Failed to generate random bytes.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     // Derive the HD node from the seed
-    SEED seed = {0};
     if (!dogecoin_random_bytes(seed, sizeof(seed), 1))
     {
         fprintf(stderr, "ERROR: Failed to generate random bytes.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
     dogecoin_hdnode_from_seed(seed, sizeof(seed), out);
 
     // Encrypt the HD node with AES
     size_t encrypted_size = sizeof(dogecoin_hdnode);
     dogecoin_bool padding_used = false;
-    uint8_t* encrypted_data = malloc(encrypted_size);
+    encrypted_data = malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     size_t encrypted_actual_size = aes256_cbc_encrypt(encryption_key, iv, (uint8_t*)out, encrypted_size, padding_used, encrypted_data);
     if (encrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES encryption failed.\n");
-        dogecoin_free(encrypted_data);
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     // Write the IV, salts, verification key hash, and encrypted HD node to the file
@@ -2223,6 +2249,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
         fwrite(verification_key_hash, 1, sizeof(verification_key_hash), fp);
         fwrite(encrypted_data, 1, encrypted_actual_size, fp);
         fclose(fp);
+        fp = NULL;
     }
     else if (encrypted_blob_out != NULL && encrypted_blob_size != NULL)
     {
@@ -2234,10 +2261,22 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
         *encrypted_blob_size = sizeof(iv) + SALT_SIZE + SALT_SIZE + sizeof(verification_key_hash) + encrypted_actual_size;
     }
 
-    // Free the encrypted data
-    dogecoin_free(encrypted_data);
+    result = true;
 
-    return true;
+cleanup:
+    // Scrub the PBKDF2-derived keys and the intermediate seed before returning (CWE-226).
+    dogecoin_mem_zero(encryption_key, sizeof(encryption_key));
+    dogecoin_mem_zero(verification_key, sizeof(verification_key));
+    dogecoin_mem_zero(seed, sizeof(seed));
+    if (encrypted_data)
+    {
+        dogecoin_free(encrypted_data);
+    }
+    if (fp)
+    {
+        fclose(fp);
+    }
+    return result;
 #else
     (void) out;
     (void) file_num;
@@ -2380,6 +2419,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
 
     // Derive the verification key from the password and verification salt using PBKDF2
     uint8_t derived_verification_key[AES_KEY_SIZE];
+    uint8_t encryption_key[AES_KEY_SIZE];
+    uint8_t* encrypted_data = NULL;
+    dogecoin_bool result = false;
     pbkdf2_hmac_sha256((const uint8_t*)password, strlen(password), salt_verification, SALT_SIZE, PBKDF2_ITERATIONS, derived_verification_key, AES_KEY_SIZE);
 
     // Hash the derived verification key
@@ -2390,28 +2432,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
     if (dogecoin_mem_cmp_ct(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
     {
         fprintf(stderr, "ERROR: Incorrect password.\n");
-        fclose(fp);
-        dogecoin_mem_zero(password, strlen(password));
-        dogecoin_free(password);
-        return false;
+        goto cleanup;
     }
 
     // Derive the encryption key from the password and encryption salt using PBKDF2
-    uint8_t encryption_key[AES_KEY_SIZE];
     pbkdf2_hmac_sha256((const uint8_t*)password, strlen(password), salt_encryption, SALT_SIZE, PBKDF2_ITERATIONS, encryption_key, AES_KEY_SIZE);
-
-    // Clear the password
-    dogecoin_mem_zero(password, strlen(password));
-    dogecoin_free(password);
 
     // Read the encrypted HD node from the file or blob
     size_t encrypted_size = sizeof(dogecoin_hdnode);
-    uint8_t* encrypted_data = malloc(encrypted_size);
+    encrypted_data = malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
-        fclose(fp);
-        return false;
+        goto cleanup;
     }
 
     if (fp != NULL)
@@ -2419,12 +2452,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
         if (fread(encrypted_data, 1, encrypted_size, fp) != encrypted_size)
         {
             fprintf(stderr, "ERROR: Failed to read encrypted HD node from file.\n");
-            fclose(fp);
-            dogecoin_free(encrypted_data);
-            return false;
+            goto cleanup;
         }
-
-        fclose(fp);
     }
     else
     {
@@ -2434,15 +2463,33 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
     // Decrypt the HD node with software decryption (AES)
     dogecoin_bool padding_used = false;
     size_t decrypted_actual_size = aes256_cbc_decrypt(encryption_key, iv, encrypted_data, encrypted_size, padding_used, (uint8_t*)out);
-    dogecoin_free(encrypted_data);
 
     if (decrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES decryption failed.\n");
-        return false;
+        goto cleanup;
     }
 
-    return true;
+    result = true;
+
+cleanup:
+    // Scrub the PBKDF2-derived key material before returning (CWE-226).
+    dogecoin_mem_zero(derived_verification_key, sizeof(derived_verification_key));
+    dogecoin_mem_zero(encryption_key, sizeof(encryption_key));
+    if (password)
+    {
+        dogecoin_mem_zero(password, strlen(password));
+        dogecoin_free(password);
+    }
+    if (encrypted_data)
+    {
+        dogecoin_free(encrypted_data);
+    }
+    if (fp)
+    {
+        fclose(fp);
+    }
+    return result;
 #else
     (void) out;
     (void) file_num;
@@ -3041,13 +3088,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
     dogecoin_free(password);
 
     // Generate the BIP-39 mnemonic
+    uint8_t* encrypted_data = NULL;
+    dogecoin_bool result = false;
     size_t mnemonicSize = 0;
     int mnemonicResult = dogecoin_generate_mnemonic("256", lang, space, NULL, words, NULL, &mnemonicSize, mnemonic);
     if (mnemonicResult == -1)
     {
         fprintf(stderr, "ERROR: Failed to generate mnemonic\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     // Encrypt the mnemonic with AES
@@ -3055,18 +3103,16 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
     if (!dogecoin_random_bytes(iv, sizeof(iv), 1))
     {
         fprintf(stderr, "ERROR: Failed to generate random bytes.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     size_t encrypted_size = ENCRYPTED_MNEMONIC_SIZE;
     dogecoin_bool padding_used = false;
-    uint8_t* encrypted_data = malloc(encrypted_size);
+    encrypted_data = malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
     memset(encrypted_data, 0, encrypted_size);
 
@@ -3074,9 +3120,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
     if (encrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES encryption failed.\n");
-        dogecoin_free(encrypted_data);
-        fp ? fclose(fp) : 0;
-        return false;
+        goto cleanup;
     }
 
     // Write the IV, salts, verification key hash, and encrypted mnemonic to the file
@@ -3088,6 +3132,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
         fwrite(verification_key_hash, 1, sizeof(verification_key_hash), fp);
         fwrite(encrypted_data, 1, encrypted_actual_size, fp);
         fclose(fp);
+        fp = NULL;
     }
     else if (encrypted_blob_out != NULL && encrypted_blob_size != NULL)
     {
@@ -3099,10 +3144,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
         *encrypted_blob_size = sizeof(iv) + SALT_SIZE + SALT_SIZE + sizeof(verification_key_hash) + encrypted_actual_size;
     }
 
-    // Free the encrypted data
-    dogecoin_free(encrypted_data);
+    result = true;
 
-    return true;
+cleanup:
+    // Scrub the PBKDF2-derived key material before returning (CWE-226).
+    dogecoin_mem_zero(encryption_key, sizeof(encryption_key));
+    dogecoin_mem_zero(verification_key, sizeof(verification_key));
+    if (encrypted_data)
+    {
+        dogecoin_free(encrypted_data);
+    }
+    if (fp)
+    {
+        fclose(fp);
+    }
+    return result;
 #else
     (void) mnemonic;
     (void) file_num;
@@ -3232,6 +3288,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
 
     // Derive the verification key from the password and verification salt using PBKDF2
     uint8_t derived_verification_key[AES_KEY_SIZE];
+    uint8_t encryption_key[AES_KEY_SIZE];
+    uint8_t* encrypted_data = NULL;
+    dogecoin_bool result = false;
     pbkdf2_hmac_sha256((const uint8_t*)password, strlen(password), salt_verification, SALT_SIZE, PBKDF2_ITERATIONS, derived_verification_key, AES_KEY_SIZE);
 
     // Hash the derived verification key
@@ -3242,28 +3301,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
     if (dogecoin_mem_cmp_ct(stored_verification_key_hash, derived_verification_key_hash, SHA512_DIGEST_LENGTH) != 0)
     {
         fprintf(stderr, "ERROR: Incorrect password.\n");
-        fclose(fp);
-        dogecoin_mem_zero(password, strlen(password));
-        dogecoin_free(password);
-        return false;
+        goto cleanup;
     }
 
     // Derive the encryption key from the password and encryption salt using PBKDF2
-    uint8_t encryption_key[AES_KEY_SIZE];
     pbkdf2_hmac_sha256((const uint8_t*)password, strlen(password), salt_encryption, SALT_SIZE, PBKDF2_ITERATIONS, encryption_key, AES_KEY_SIZE);
-
-    // Clear the password
-    dogecoin_mem_zero(password, strlen(password));
-    dogecoin_free(password);
 
     // Read the encrypted mnemonic from the file or blob
     size_t encrypted_size = ENCRYPTED_MNEMONIC_SIZE;
-    uint8_t* encrypted_data = malloc(encrypted_size);
+    encrypted_data = malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
-        fclose(fp);
-        return false;
+        goto cleanup;
     }
 
     if (fp != NULL)
@@ -3271,12 +3321,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
         if (fread(encrypted_data, 1, encrypted_size, fp) != encrypted_size)
         {
             fprintf(stderr, "ERROR: Failed to read encrypted mnemonic from file.\n");
-            fclose(fp);
-            dogecoin_free(encrypted_data);
-            return false;
+            goto cleanup;
         }
-
-        fclose(fp);
     }
     else
     {
@@ -3286,15 +3332,33 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
     // Decrypt the mnemonic with AES
     dogecoin_bool padding_used = false;
     size_t decrypted_actual_size = aes256_cbc_decrypt(encryption_key, iv, encrypted_data, encrypted_size, padding_used, (uint8_t*)mnemonic);
-    dogecoin_free(encrypted_data);
 
     if (decrypted_actual_size == 0)
     {
         fprintf(stderr, "ERROR: AES decryption failed.\n");
-        return false;
+        goto cleanup;
     }
 
-    return true;
+    result = true;
+
+cleanup:
+    // Scrub the PBKDF2-derived key material before returning (CWE-226).
+    dogecoin_mem_zero(derived_verification_key, sizeof(derived_verification_key));
+    dogecoin_mem_zero(encryption_key, sizeof(encryption_key));
+    if (password)
+    {
+        dogecoin_mem_zero(password, strlen(password));
+        dogecoin_free(password);
+    }
+    if (encrypted_data)
+    {
+        dogecoin_free(encrypted_data);
+    }
+    if (fp)
+    {
+        fclose(fp);
+    }
+    return result;
 #else
     (void) mnemonic;
     (void) file_num;
@@ -3584,6 +3648,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEE
     {
         fprintf(stderr, "ERROR: Failed to decode management key.\n");
         dogecoin_mem_zero(mgm_key, strlen(mgm_key));
+        dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
         dogecoin_free(mgm_key);
         ykpiv_done(state);
         return false;
@@ -3602,6 +3667,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEE
 
     dogecoin_mem_zero(mgm_key, strlen(mgm_key));
     dogecoin_free(mgm_key);
+    // The decoded management key is dead after ykpiv_authenticate; scrub it so
+    // it does not linger on the stack through the save/return paths (CWE-226).
+    dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
 
     // Write the encrypted blob directly to the YubiKey using the defined tag
     if (ykpiv_save_object(state, SEED_DATA_TAG(file_num), encrypted_blob, encrypted_blob_size) != YKPIV_OK)
@@ -3652,10 +3720,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED se
     {
         fprintf(stderr, "ERROR: Incorrect PIN. Tries left: %d\n", tries);
         ykpiv_done(state);
+        if (pin) dogecoin_mem_zero(pin, strlen(pin));
         dogecoin_free(pin);
         return false;
     }
 
+    // The PIN is dead after ykpiv_verify; scrub it before releasing the
+    // getpass() buffer back to the allocator (CWE-226).
+    if (pin) dogecoin_mem_zero(pin, strlen(pin));
     dogecoin_free(pin);
 
     // Retrieve the encrypted blob from the YubiKey
@@ -3725,6 +3797,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
     {
         fprintf(stderr, "ERROR: Failed to decode management key.\n");
         dogecoin_mem_zero(mgm_key, strlen(mgm_key));
+        dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
         dogecoin_free(mgm_key);
         ykpiv_done(state);
         return false;
@@ -3743,6 +3816,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
 
     dogecoin_mem_zero(mgm_key, strlen(mgm_key));
     dogecoin_free(mgm_key);
+    // The decoded management key is dead after ykpiv_authenticate; scrub it so
+    // it does not linger on the stack through the save/return paths (CWE-226).
+    dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
 
     // Write the encrypted blob directly to the YubiKey using the defined tag
     if (ykpiv_save_object(state, HDNODE_DATA_TAG(file_num), encrypted_blob, encrypted_blob_size) != YKPIV_OK)
@@ -3793,10 +3869,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogec
     {
         fprintf(stderr, "ERROR: Incorrect PIN. Tries left: %d\n", tries);
         ykpiv_done(state);
+        if (pin) dogecoin_mem_zero(pin, strlen(pin));
         dogecoin_free(pin);
         return false;
     }
 
+    // The PIN is dead after ykpiv_verify; scrub it before releasing the
+    // getpass() buffer back to the allocator (CWE-226).
+    if (pin) dogecoin_mem_zero(pin, strlen(pin));
     dogecoin_free(pin);
 
     // Retrieve the encrypted blob from the YubiKey
@@ -3869,6 +3949,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
     {
         fprintf(stderr, "ERROR: Failed to decode management key.\n");
         dogecoin_mem_zero(mgm_key, strlen(mgm_key));
+        dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
         dogecoin_free(mgm_key);
         ykpiv_done(state);
         return false;
@@ -3887,6 +3968,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
 
     dogecoin_mem_zero(mgm_key, strlen(mgm_key));
     dogecoin_free(mgm_key);
+    // The decoded management key is dead after ykpiv_authenticate; scrub it so
+    // it does not linger on the stack through the save/return paths (CWE-226).
+    dogecoin_mem_zero(binary_mgm_key, sizeof(binary_mgm_key));
 
     // Write the encrypted blob directly to the YubiKey using the defined tag
     if (ykpiv_save_object(state, MNEMONIC_DATA_TAG(file_num), encrypted_blob, encrypted_blob_size) != YKPIV_OK)
@@ -3937,10 +4021,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNE
     {
         fprintf(stderr, "ERROR: Incorrect PIN. Tries left: %d\n", tries);
         ykpiv_done(state);
+        if (pin) dogecoin_mem_zero(pin, strlen(pin));
         dogecoin_free(pin);
         return false;
     }
 
+    // The PIN is dead after ykpiv_verify; scrub it before releasing the
+    // getpass() buffer back to the allocator (CWE-226).
+    if (pin) dogecoin_mem_zero(pin, strlen(pin));
     dogecoin_free(pin);
 
     // Retrieve the encrypted blob from the YubiKey
