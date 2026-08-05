@@ -1359,3 +1359,91 @@ void test_bip39()
     u_assert_mem_eq(seed, seed_test, 64);
     debug_print("%s\n", utils_uint8_to_hex(seed, 64));
 }
+
+
+/*
+ * get_custom_words() read wordlist tokens with fscanf(fp, "%s", word) into a
+ * fixed 1024-byte stack buffer, with no field width. A wordlist file holding a
+ * whitespace-free token of 1024 bytes or more smashed the stack.
+ *
+ * The path is reachable through the public API: dogecoin_generate_mnemonic()
+ * takes an optional wordlist filename, and passing a non-NULL one lands here.
+ * Passing NULL uses the built-in lists and never reaches this code.
+ *
+ * Present in v0.1.2, v0.1.3, v0.1.4 and v0.1.5-pre.
+ *
+ * Without the fix this test does not merely fail -- it corrupts the stack, and
+ * under ASan it aborts with a stack-buffer-overflow in get_custom_words.
+ */
+void test_bip39_custom_wordlist_bounds()
+{
+    const char* path = "bip39_overlong_wordlist.tmp";
+    char* wordlist[LANG_WORD_CNT];
+    FILE* fp;
+    int i;
+
+    dogecoin_mem_zero(wordlist, sizeof(wordlist));
+
+    /* A token far longer than the 1024-byte buffer, written first so the
+       rejection happens before any word is allocated. */
+    fp = fopen(path, "w");
+    u_assert_true(fp != NULL);
+    for (i = 0; i < 2000; i++) {
+        fputc('a', fp);
+    }
+    fputc('\n', fp);
+    /* Enough well-formed words after it that a parser which skipped past the
+       long token would otherwise reach the 2048-word count. */
+    for (i = 0; i < LANG_WORD_CNT; i++) {
+        fprintf(fp, "abandon\n");
+    }
+    fclose(fp);
+
+    /* Must be refused, and must not write past word[]. */
+    u_assert_int_eq(get_custom_words(path, wordlist), -1);
+    /* Nothing was allocated before the rejection. */
+    u_assert_true(wordlist[0] == NULL);
+    remove(path);
+
+    /* A token of exactly the maximum length is still refused, since no BIP39
+       word is anywhere near it and accepting it would mean the next read
+       silently began mid-token. */
+    fp = fopen(path, "w");
+    u_assert_true(fp != NULL);
+    for (i = 0; i < BIP39_WORD_MAXLEN + 1; i++) {
+        fputc('b', fp);
+    }
+    fputc('\n', fp);
+    fclose(fp);
+    u_assert_int_eq(get_custom_words(path, wordlist), -1);
+    remove(path);
+
+    /* Positive control: a well-formed 2048-word file still parses, so the
+       bound did not break legitimate wordlists. */
+    fp = fopen(path, "w");
+    u_assert_true(fp != NULL);
+    for (i = 0; i < LANG_WORD_CNT; i++) {
+        fprintf(fp, "abandon\n");
+    }
+    fclose(fp);
+    u_assert_int_eq(get_custom_words(path, wordlist), 0);
+    u_assert_true(wordlist[0] != NULL);
+    u_assert_str_eq(wordlist[0], "abandon");
+    for (i = 0; i < LANG_WORD_CNT; i++) {
+        free(wordlist[i]);
+        wordlist[i] = NULL;
+    }
+    remove(path);
+
+    /* A file with too few words is still refused. */
+    fp = fopen(path, "w");
+    u_assert_true(fp != NULL);
+    fprintf(fp, "abandon\nability\n");
+    fclose(fp);
+    u_assert_int_eq(get_custom_words(path, wordlist), -1);
+    for (i = 0; i < LANG_WORD_CNT; i++) {
+        free(wordlist[i]);
+        wordlist[i] = NULL;
+    }
+    remove(path);
+}

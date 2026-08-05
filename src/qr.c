@@ -327,6 +327,12 @@ testable void addEccAndInterleave(uint8_t data[], int version, enum qrcodegen_Ec
 testable int getNumDataCodewords(int version, enum qrcodegen_Ecc ecl) {
 	int v = version, e = (int)ecl;
 	assert(0 <= e && e < 4);
+	// assert() is compiled out under NDEBUG, and both tables below are indexed
+	// with e directly, so a release build would read out of bounds on an
+	// out-of-range ecl rather than trapping. Same class as the /dev/urandom
+	// short read that only tripped an assert.
+	if (e < 0 || e >= 4)
+		return 0;
 	return getNumRawDataModules(v) / 8
 		- ECC_CODEWORDS_PER_BLOCK    [e][v]
 		* NUM_ERROR_CORRECTION_BLOCKS[e][v];

@@ -44,6 +44,7 @@ extern void test_base64();
 extern void test_dit();
 extern void test_bip32();
 extern void test_bip39();
+extern void test_bip39_custom_wordlist_bounds();
 extern void test_bip44();
 extern void test_block_header();
 extern void test_compact_block();
@@ -183,6 +184,7 @@ int main()
     u_run_test(test_dit);
     u_run_test(test_bip32);
     u_run_test(test_bip39);
+    u_run_test(test_bip39_custom_wordlist_bounds);
     u_run_test(test_bip44);
     u_run_test(test_block_header);
     u_run_test(test_compact_block);

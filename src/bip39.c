@@ -25,6 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <bip39/index.h>
 #include <dogecoin/bip39.h>
@@ -463,7 +464,8 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
 #ifndef USE_OPTEE /* OPTEE does not support file I/O */
     int i = 0;
     FILE * fp;
-    char word[1024];
+    int c;
+    char word[BIP39_WORD_BUFSZ];
 
     /* Check that file path is valid */
     if (filepath == NULL) {
@@ -477,7 +479,25 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
         return -1;
     }
 
-    while (fscanf(fp, "%s", word) == 1) {
+    while (fscanf(fp, "%" BIP39_STR(BIP39_WORD_MAXLEN) "s", word) == 1) {
+        /*
+         * The width above bounds the write, but on its own it would silently
+         * split an over-long token into several words rather than rejecting
+         * the file. Peek at the next byte: if the token filled the buffer and
+         * did not end at whitespace or EOF, it was longer than any BIP39 word
+         * can be and the file is malformed.
+         */
+        if (strlen(word) == BIP39_WORD_MAXLEN) {
+            c = fgetc(fp);
+            if (c != EOF && !isspace(c)) {
+                fprintf(stderr, "ERROR: word longer than %d characters\n", BIP39_WORD_MAXLEN);
+                fclose(fp);
+                return -1;
+            }
+            if (c != EOF) {
+                ungetc(c, fp);
+            }
+        }
         if (i >= LANG_WORD_CNT) {
             fprintf(stderr, "ERROR: too many words in file\n");
             fclose(fp);
