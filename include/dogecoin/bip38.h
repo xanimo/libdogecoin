@@ -71,8 +71,12 @@ LIBDOGECOIN_BEGIN_DECL
 #define BIP38_SCRYPT_SALTSIZE 4
 #define BIP38_SCRYPT_DERIVED_SIZE 64
 
-/* BIP38 encrypted key length */
+/* BIP38 encrypted key: 58 is the string length, MAXLEN is the buffer size a
+   caller must supply (the encoded key plus its terminator). Sizing a buffer
+   with BIP38_ENCRYPTED_KEY_LENGTH leaves no room for the NUL and the call
+   fails with no diagnostic. */
 #define BIP38_ENCRYPTED_KEY_LENGTH 58
+#define BIP38_ENCRYPTED_KEY_MAXLEN (BIP38_ENCRYPTED_KEY_LENGTH + 1)
 
 /* Intermediate passphrase code and confirmation code buffer sizes */
 #define BIP38_INTERMEDIATE_CODE_MAXLEN 73

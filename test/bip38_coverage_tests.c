@@ -211,11 +211,7 @@ static void test_bip38_non_ex_wrappers_roundtrip_dogecoin(void)
     const uint32_t seq_in = 7U;
 
     uint8_t generated[DOGECOIN_ECKEY_PKEY_LENGTH];
-    /* BIP38_ENCRYPTED_KEY_LENGTH is the 58-character string length, not a
-       buffer size: the call needs one more byte for the terminator. There is
-       no BIP38_ENCRYPTED_KEY_MAXLEN, so the obvious-looking declaration is
-       exactly one byte short and the call simply returns false. */
-    char encrypted[BIP38_ENCRYPTED_KEY_LENGTH + 1];
+    char encrypted[BIP38_ENCRYPTED_KEY_MAXLEN];
     char confirmation[BIP38_CONFIRMATION_CODE_MAXLEN];
     size_t enc_sz = sizeof(encrypted);
     size_t conf_sz = sizeof(confirmation);
@@ -226,6 +222,11 @@ static void test_bip38_non_ex_wrappers_roundtrip_dogecoin(void)
     u_assert_true(dogecoin_bip38_is_ec_multiplied(encrypted));
     u_assert_true(dogecoin_bip38_has_lot_sequence(encrypted));
     u_assert_true(dogecoin_bip38_is_confirmation_code(confirmation));
+
+    /* The buffer size the caller must supply is the string length plus the
+       terminator; enc_sz is the size actually written back. */
+    u_assert_uint64_eq((uint64_t)enc_sz, (uint64_t)BIP38_ENCRYPTED_KEY_MAXLEN);
+    u_assert_uint64_eq((uint64_t)strlen(encrypted), (uint64_t)BIP38_ENCRYPTED_KEY_LENGTH);
 
     /* dogecoin_bip38_decrypt_with_lot_sequence: recovers the key and the
        lot/sequence the owner chose, under the pinned MAINNET mode. */

@@ -1385,6 +1385,11 @@ static dogecoin_bool bip38_encrypt_ec_with_passphrase(
         confirmation_code_size);
 
     dogecoin_mem_zero(passfactor, sizeof(passfactor));
+    /* seedb derives factorb, and the private key is passfactor * factorb mod N,
+       so it is key material and not scratch. The two sibling functions that
+       hold a seedb local -- bip38_decrypt_ec_multiplied_bytes and
+       dogecoin_bip38_encrypt_from_intermediate -- already scrub theirs. */
+    dogecoin_mem_zero(seedb, sizeof(seedb));
     return ok;
 }
 
