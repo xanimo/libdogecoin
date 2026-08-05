@@ -297,6 +297,7 @@ IF(USE_YUBIKEY)
 ENDIF()
 IF(USE_LIBOQS)
     ADD_DEFINITIONS(-DUSE_LIBOQS=1)
+    FIND_LIBRARY(LIBOQS NAMES oqs REQUIRED)
 ENDIF()
 IF(USE_RACCOON_G)
     FIND_LIBRARY(LIBGMP NAMES gmp REQUIRED)
@@ -455,6 +456,14 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC
 
 IF(WIN32 AND USE_TPM2)
     TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} tbs ncrypt crypt32)
+ENDIF()
+
+# Link liboqs into the core library when enabled. pqc_dilithium.c / pqc_falcon.c
+# call OQS_SIG_* directly, so without this link any executable that pulls in the
+# PQC wrappers (the test runner, such, spvnode) fails to link. The autotools
+# build adds -loqs to LIBS in configure.ac; this mirrors that for CMake.
+IF(USE_LIBOQS)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBOQS})
 ENDIF()
 
 # Link the Linux TPM2 (TSS2) backend into the core library regardless of net,
