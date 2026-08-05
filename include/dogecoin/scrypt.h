@@ -27,6 +27,22 @@ extern void (*scrypt_1024_1_1_256_sp_detected)(const char *input, char *output, 
 #define scrypt_1024_1_1_256_sp(input, output, scratchpad) scrypt_1024_1_1_256_sp_generic((input), (output), (scratchpad))
 #endif
 
+/*
+ * RFC 7914 scrypt with caller-chosen N/r/p (BIP38 password KDF).
+ * Distinct from scrypt_1024_1_1_256 (fixed PoW parameters, 32-byte output).
+ * Returns 1 on success, 0 on failure.
+ */
+int dogecoin_scrypt_rfc7914(
+    const uint8_t* passwd,
+    size_t passwdlen,
+    const uint8_t* salt,
+    size_t saltlen,
+    uint64_t N,
+    uint32_t r,
+    uint32_t p,
+    uint8_t* buf,
+    size_t buflen);
+
 #ifdef __DragonFly__
 #include <sys/endian.h>
 #else

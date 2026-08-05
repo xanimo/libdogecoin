@@ -47,8 +47,22 @@ LIBDOGECOIN_API void dogecoin_ecc_get_pubkey(const uint8_t* private_key, uint8_t
 //!ec mul tweak on given private key
 LIBDOGECOIN_API dogecoin_bool dogecoin_ecc_private_key_tweak_add(uint8_t* private_key, const uint8_t* tweak);
 
+//!ec scalar multiply on private key (mod n); used by BIP-0038 EC-multiplied decrypt
+LIBDOGECOIN_API dogecoin_bool dogecoin_ecc_private_key_tweak_mul(uint8_t* private_key, const uint8_t* tweak);
+
 //!ec mul tweak on given public key
 LIBDOGECOIN_API dogecoin_bool dogecoin_ecc_public_key_tweak_add(uint8_t* public_key_inout, const uint8_t* tweak);
+
+//!ec scalar multiply on compressed public key (33 bytes in/out); BIP-0038 EC-multiplied keys
+LIBDOGECOIN_API dogecoin_bool dogecoin_ecc_public_key_tweak_mul(uint8_t* public_key_inout, const uint8_t* tweak);
+
+//!re-serialize point for BIP-0038 address-hash (compressed flag may differ from tweak_mul output)
+LIBDOGECOIN_API dogecoin_bool dogecoin_ecc_point_serialize(
+    const uint8_t* point,
+    size_t point_len,
+    uint8_t* pubkey_out,
+    size_t* pubkey_len,
+    dogecoin_bool compressed);
 
 //!verifies a given 32byte key
 LIBDOGECOIN_API dogecoin_bool dogecoin_ecc_verify_privatekey(const uint8_t* private_key);

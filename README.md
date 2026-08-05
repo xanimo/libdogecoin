@@ -48,6 +48,7 @@ It is intended that connecting the bits together into an engine be done at the l
 - Generate recoverable signatures (and recover pubkey from signatures)
 - BIP32 hierarchical deterministic key derivation
 - Transaction generation, manipulation, signing and ser-/deserialization including P2PKH, P2SH, multisig
+- BIP38 encrypted private keys and paper-wallet sweep (`doc/sweep.md`)
 - Address generation
 - Base58check encoding
 - Native implementation of SHA256, SHA512, SHA512_HMAC, RIPEMD-160 including NIST testvectors
@@ -109,6 +110,7 @@ The `/doc` folder has many helpful resources regarding setup and usage of Libdog
 - [`project_roadmap.md`](doc/project_roadmap.md) Our plan for the future of Libdogecoin (with pictures!).
 - [`tools.md`](doc/tools.md) Guidance on how to use provided helper scripts and tools like `such` and `sendtx`.
 - [`transaction.md`](doc/transaction.md) Full description of dogecoin transactions and the Libdogecoin Essential Transaction API.
+- [`sweep.md`](doc/sweep.md) BIP38 encryption and paper-wallet sweep API.
 - [`wallet.md`](doc/wallet.md) Wallet query API for address-scoped UTXO and balance access.
 
 ## Quick Start

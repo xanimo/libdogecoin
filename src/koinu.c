@@ -138,9 +138,21 @@ void string(uint64_t input, char output[]) {
     output[length] = '\0';
 }
 
-int koinu_to_coins_str(uint64_t koinu, char* str) {
+static size_t koinu_coins_str_required_size(uint64_t koinu)
+{
+    size_t length = (size_t)calc_length(koinu);
+    if (length < 9) {
+        return KOINU_COINS_STR_MIN_LEN;
+    }
+    return length + 2;
+}
+
+int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size) {
     enum conversion_type state = validate_conversion(koinu, NULL, NULL, NULL);
     if (state != CONVERSION_SUCCESS) return false;
+    if (!str || str_size < koinu_coins_str_required_size(koinu)) {
+        return false;
+    }
 
     uint64_t i = 0, j =0, length = calc_length(koinu),
     target = length < 9 ? 10 - length : length - 9;
@@ -157,9 +169,14 @@ int koinu_to_coins_str(uint64_t koinu, char* str) {
             } else str[i] = '0';
         }
         for (; i < 10; i++, j++) str[i] = swap[j];
+        /* length < 9 always writes 10 chars to str[0..9]; terminate here (the
+         * length >= 9 branch already null-terminates). Found during BIP38
+         * paper-wallet sweep work: small fee koinu hit this path and
+         * finalize_transaction failed without a proper C string. */
+        str[10] = '\0';
         free(swap);
     } else {
-        char tmp[21];
+        char tmp[KOINU_COINS_STR_MAX_LEN];
         string(koinu, tmp);
         for (; i < length; i++) {
             if (i < target) str[i] = tmp[i];

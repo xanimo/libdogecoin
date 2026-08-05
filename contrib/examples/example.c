@@ -983,7 +983,7 @@ int main() {
 	printf("\n\nBEGIN KOINU CONVERSION:\n\n");
 	{
 		char coins_str[32];
-		koinu_to_coins_str(1234567890ULL, coins_str);
+		koinu_to_coins_str(1234567890ULL, coins_str, sizeof(coins_str));
 		printf("1234567890 koinu = %s DOGE\n", coins_str);
 		uint64_t k = coins_to_koinu_str("42.5");
 		printf("42.5 DOGE = %llu koinu\n", (unsigned long long)k);
