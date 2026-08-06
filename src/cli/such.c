@@ -1210,6 +1210,11 @@ int main(int argc, char* argv[])
     char* mnemonic_in = 0;
     char* pass = 0;
     char* entropy = 0;
+    /* Points at a literal by default and is reassigned to optarg for -z, so it
+       must never be written through. The -e path needs somewhere writable to
+       derive a bit count into; this is it. 21 bytes holds any size_t in
+       decimal plus a terminator. */
+    char entropy_size_buf[21];
     char* entropy_size = "256";
     MNEMONIC mnemonic = {0};
     SEED seed = {0};
@@ -1252,7 +1257,13 @@ int main(int argc, char* argv[])
                         return showError("Parameter -e cannot be used with -y");
                     entropy = optarg;
                     if (entropy != NULL){
-                        sprintf(entropy_size, "%zu", strlen(entropy) / HEX_CHARS_PER_BYTE * 8);
+                        /* entropy_size still points at the "256" literal here.
+                           sprintf'ing through it wrote to read-only memory and
+                           crashed on every use of -e. Derive into the local
+                           buffer and repoint instead. */
+                        snprintf(entropy_size_buf, sizeof(entropy_size_buf), "%zu",
+                                 strlen(entropy) / HEX_CHARS_PER_BYTE * 8);
+                        entropy_size = entropy_size_buf;
                     }
 
                     break;
