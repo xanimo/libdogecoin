@@ -192,6 +192,10 @@ static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
 static const uint64_t PAR_HDR_SEG_TIMEOUT = 120;
 /* Seconds without the ordered flush advancing before we log loudly. */
 static const uint64_t PAR_HDR_STALL_WARN = 300;
+/* How far ahead of the flush point segments may be handed out.  Segments are
+   staged in memory until the ordered flush reaches them, so an unbounded lead
+   lets a single slow segment pin the rest of the chain in RAM. */
+static const uint32_t PAR_HDR_MAX_LEAD = 24;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
@@ -1714,7 +1718,15 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         uint32_t amount_of_headers;
         if (!deser_varlen(&amount_of_headers, buf)) return;
         uint64_t now = time(NULL);
-        client->nodegroup->log_write_cb("Got %d headers (took %d s) from node %d\n", amount_of_headers, now - client->last_headersrequest_time, node->nodeid);
+        /* last_headersrequest_time is only armed by the serial path; in
+           parallel mode it stays 0 and the subtraction printed a raw epoch.
+           Deliberately not armed here — it drives a per-node stall check that
+           would misbehave every peer at once if the whole sync went quiet. */
+        if (client->par_hdr && client->par_hdr->active)
+            client->nodegroup->log_write_cb("Got %d headers from node %d\n",
+                amount_of_headers, node->nodeid);
+        else
+            client->nodegroup->log_write_cb("Got %d headers (took %d s) from node %d\n", amount_of_headers, now - client->last_headersrequest_time, node->nodeid);
 
         /* Parallel genesis headers mode -- buffer into the owning segment. */
         if (client->par_hdr && client->par_hdr->active) {
@@ -2701,16 +2713,19 @@ LIBDOGECOIN_API void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *
     /* Lowest-index segment that is neither complete nor currently owned.  A
        released segment keeps its buffered headers and tip_hash, so a new owner
        resumes where the previous one stopped rather than restarting. */
+    uint32_t limit = s->flush_idx + PAR_HDR_MAX_LEAD;
+    if (limit > s->num_segs) limit = s->num_segs;
+
     par_hdr_seg *seg = NULL;
     uint32_t seg_idx = 0;
-    for (uint32_t i = 0; i < s->num_segs; i++) {
+    for (uint32_t i = s->flush_idx; i < limit; i++) {
         if (!s->segs[i].complete && s->segs[i].node_id == -1) {
             seg = &s->segs[i];
             seg_idx = i;
             break;
         }
     }
-    if (!seg) return; /* nothing outstanding */
+    if (!seg) return; /* nothing outstanding inside the window */
 
     seg->node_id = (int)node->nodeid;
 
@@ -2791,6 +2806,13 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         seg->flushed = true;
         s->flush_idx++;
         flushed++;
+
+        /* The headers are on disk now — release the staging buffer.  Without
+           this every flushed segment keeps its raw headers resident until
+           par_hdr_free at teardown, which on mainnet is the whole chain. */
+        dogecoin_free(seg->buf);
+        seg->buf = NULL;
+        seg->cap = 0;
 
         if (bad) break; /* stop flushing if chain broke; caller handles */
     }
@@ -2886,7 +2908,10 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
 
         /* Grow segment buffer if needed */
         if (seg->count >= seg->cap) {
-            seg->cap *= 2;
+            /* cap can be 0 if the buffer was released after a flush; a
+               flushed segment should never be written to again, but doubling
+               0 would silently never grow. */
+            seg->cap  = seg->cap ? seg->cap * 2 : 2048;
             seg->buf  = dogecoin_realloc(seg->buf, (size_t)seg->cap * PAR_HDR_RAW_LEN);
         }
 
