@@ -189,3 +189,55 @@ void test_utils_null_file_guards()
     /* NULL path was already guarded; assert it stays that way. */
     print_header(NULL);
 }
+
+/*
+ * slice() is LIBDOGECOIN_API and had no in-tree callers, which is why neither
+ * defect was noticed:
+ *
+ *   strncpy(result, str + start, end - start);
+ *
+ * strncpy writes no terminator when it copies its full count, and the count was
+ * always exactly the number of bytes copied -- so result came back unterminated
+ * for every input, and a caller printing it read past the buffer. Separately,
+ * `end - start` is size_t arithmetic, so end < start wrapped to a length near
+ * SIZE_MAX and strncpy ran until it hit the source NUL or a fault.
+ */
+void test_utils_slice()
+{
+    char buf[64];
+
+    /* Ordinary slice, and it must be terminated. */
+    memset(buf, 'X', sizeof(buf));
+    slice("abcdefghij", buf, 2, 5);
+    u_assert_str_eq(buf, "cde");
+    u_assert_int_eq((int)strlen(buf), 3);
+
+    /* Whole string. */
+    memset(buf, 'X', sizeof(buf));
+    slice("abcdef", buf, 0, 6);
+    u_assert_str_eq(buf, "abcdef");
+
+    /* end < start used to wrap to a huge count. Must yield an empty string. */
+    memset(buf, 'X', sizeof(buf));
+    slice("abcdefghij", buf, 5, 2);
+    u_assert_str_eq(buf, "");
+
+    /* end == start is an empty slice, not a one-byte read. */
+    memset(buf, 'X', sizeof(buf));
+    slice("abcdefghij", buf, 3, 3);
+    u_assert_str_eq(buf, "");
+
+    /* start past the end of the source must not read past it. */
+    memset(buf, 'X', sizeof(buf));
+    slice("abc", buf, 10, 20);
+    u_assert_str_eq(buf, "");
+
+    /* end past the end of the source clamps rather than over-reading. */
+    memset(buf, 'X', sizeof(buf));
+    slice("abc", buf, 1, 99);
+    u_assert_str_eq(buf, "bc");
+
+    /* NULL arguments are refused rather than dereferenced. */
+    slice(NULL, buf, 0, 1);
+    slice("abc", NULL, 0, 1);
+}

@@ -711,7 +711,32 @@ char* concat(char* prefix, char* suffix) {
 
 void slice(const char *str, char *result, size_t start, size_t end)
 {
-    strncpy(result, str + start, end - start);
+    size_t slen, len;
+
+    /*
+     * Two problems with the strncpy this replaces. It never terminated:
+     * strncpy writes no NUL when it copies its full count, and the count here
+     * was always exactly the number of bytes copied, so result was left
+     * unterminated for every input. And `end - start` is size_t arithmetic, so
+     * end < start wrapped to a length near SIZE_MAX.
+     *
+     * result must have room for (end - start) + 1 bytes. The function takes no
+     * size for it, so that is the contract; see the header.
+     */
+    if (!str || !result) {
+        return;
+    }
+    slen = strlen(str);
+    if (end <= start || start >= slen) {
+        result[0] = '\0';
+        return;
+    }
+    if (end > slen) {
+        end = slen;
+    }
+    len = end - start;
+    memcpy(result, str + start, len);
+    result[len] = '\0';
 }
 
 void remove_substr(char *string, char *sub) {
