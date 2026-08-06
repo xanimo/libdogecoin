@@ -91,7 +91,33 @@ if ext == ".zip":
     zipfile.extractall(os.getcwd())
 else:
     with tarfile.open(fileobj=BytesIO(req.content), mode='r:gz') as tar:
-        tar.extractall(os.getcwd())
+        # Filter members rather than trusting the archive. Without this a
+        # crafted tarball can write outside the destination via '../' members,
+        # absolute paths, or symlinks pointing out of the tree. The checksum
+        # check above narrows who can supply such an archive, but it does not
+        # make extraction safe on its own -- and zipfile.extractall (the branch
+        # above) already sanitises member paths, so only tar was exposed.
+        if hasattr(tarfile, 'data_filter'):
+            tar.extractall(os.getcwd(), filter='data')
+        else:
+            # PEP 706 filters land in 3.12 and were backported to security
+            # releases of 3.8+. Where they are unavailable, check by hand
+            # rather than silently extracting unfiltered.
+            dest = os.path.abspath(os.getcwd())
+            for member in tar.getmembers():
+                target = os.path.abspath(os.path.join(dest, member.name))
+                if not (target == dest or target.startswith(dest + os.sep)):
+                    print("\033[31m> refusing tar member outside destination: "
+                          + member.name + "\033[0m")
+                    exit(1)
+                if member.issym() or member.islnk():
+                    link = os.path.abspath(os.path.join(
+                        os.path.dirname(target), member.linkname))
+                    if not (link == dest or link.startswith(dest + os.sep)):
+                        print("\033[31m> refusing tar link outside destination: "
+                              + member.name + "\033[0m")
+                        exit(1)
+            tar.extractall(dest)
         tar.close()
 
 deps_path = ["dogecoind"]
