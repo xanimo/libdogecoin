@@ -1,0 +1,22 @@
+# CodeQL analysis scope.
+#
+# The exclusions below mirror the -i list in .github/workflows/cppcheck.yml,
+# deliberately rather than coincidentally: these are upstream dependencies we
+# track and update wholesale, not code we patch. A finding in them is fixed by
+# taking a newer release, not by editing our copy, so an alert here is noise
+# that dilutes the ones we can act on.
+#
+# Note what is NOT excluded. src/png.c (lodepng) and src/qr.c (qrcodegen) are
+# single-file libraries vendored into the tree and maintained here in practice
+# -- qr.c has already needed a local fix for table indexing guarded only by an
+# assert, which compiles out under NDEBUG. Excluding those would have hidden a
+# real bug, so they stay in scope.
+
+name: "libdogecoin CodeQL config"
+
+paths-ignore:
+  - src/secp256k1
+  - src/libevent
+  - src/intel
+  - src/utf8proc.c
+  - src/utf8proc_data.c

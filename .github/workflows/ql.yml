@@ -60,6 +60,7 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         queries: security-extended
+        config-file: ./.github/codeql/codeql-config.yml
 
     - name: build libdogecoin
       run: |
