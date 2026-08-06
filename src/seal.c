@@ -1256,7 +1256,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
             fprintf(stderr, "ERROR: File already exists. Use overwrite flag to replace it.\n");
             return false;
         }
-        fp = fopen(fullpath, overwrite ? "wb+" : "wb");
+        fp = dogecoin_fopen_private(fullpath, overwrite ? "wb+" : "wb");
     #endif
         if (!fp)
         {
@@ -2113,7 +2113,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
             fprintf(stderr, "ERROR: File already exists. Use overwrite flag to replace it.\n");
             return false;
         }
-        fp = fopen(fullpath, overwrite ? "wb+" : "wb");
+        fp = dogecoin_fopen_private(fullpath, overwrite ? "wb+" : "wb");
 #endif
         if (!fp)
         {
@@ -2996,7 +2996,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
             fprintf(stderr, "ERROR: File already exists. Use overwrite flag to replace it.\n");
             return false;
         }
-        fp = fopen(fullpath, overwrite ? "wb+" : "wb");
+        fp = dogecoin_fopen_private(fullpath, overwrite ? "wb+" : "wb");
 #endif
         if (!fp)
         {

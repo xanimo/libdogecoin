@@ -32,6 +32,11 @@
 #endif
 
 #include <ctype.h>
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -707,6 +712,41 @@ char* concat(char* prefix, char* suffix) {
     memcpy_safe(file, prefix, prefix_length + 1);
     memcpy_safe(file + prefix_length, suffix, suffix_length + 1);
     return file;
+}
+
+
+FILE* dogecoin_fopen_private(const char* path, const char* mode)
+{
+#ifdef _WIN32
+    /* No umask on Windows; a new file inherits the directory's ACL, so plain
+       fopen already gets whatever the parent grants. */
+    return fopen(path, mode);
+#else
+    int flags = O_RDWR | O_CREAT;
+    int fd;
+    FILE* fp;
+
+    if (!path || !mode) {
+        return NULL;
+    }
+    if (strchr(mode, 'a')) {
+        flags |= O_APPEND;
+    } else if (strchr(mode, 'w')) {
+        flags |= O_TRUNC;
+    }
+    /* 0600. The mode only applies when the file is created, so an existing
+       file keeps whatever permissions it already had -- this tightens new
+       files without silently changing anyone's existing ones. */
+    fd = open(path, flags, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return NULL;
+    }
+    fp = fdopen(fd, mode);
+    if (!fp) {
+        close(fd);
+    }
+    return fp;
+#endif
 }
 
 void slice(const char *str, char *result, size_t start, size_t end)

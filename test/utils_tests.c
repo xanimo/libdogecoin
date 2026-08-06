@@ -8,6 +8,10 @@
 #include <test/utest.h>
 
 #include <assert.h>
+#ifndef _WIN32
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 #include <dogecoin/utils.h>
 
   /* test a buffer overflow protection */
@@ -240,4 +244,49 @@ void test_utils_slice()
     /* NULL arguments are refused rather than dereferenced. */
     slice(NULL, buf, 0, 1);
     slice("abc", NULL, 0, 1);
+}
+
+/*
+ * The wallet database and the sealed seed files were created with plain
+ * fopen(), so their mode came from the process umask -- 0664 under the common
+ * 0002, i.e. readable by every local user and writable by the group.
+ *
+ * The wallet database holds the master public key, which is enough to derive
+ * every address and reconstruct the wallet's transaction history. The seal
+ * files hold encrypted seeds and mnemonics; encryption means a leak is not an
+ * immediate compromise, but handing out the ciphertext invites an offline
+ * attack on a password-derived key.
+ */
+void test_utils_fopen_private()
+{
+#ifndef _WIN32
+    const char* path = "dogecoin_fopen_private_test.tmp";
+    struct stat st;
+    FILE* fp;
+
+    remove(path);
+
+    fp = dogecoin_fopen_private(path, "wb");
+    u_assert_true(fp != NULL);
+    fputc('x', fp);
+    fclose(fp);
+
+    u_assert_int_eq(stat(path, &st), 0);
+    /* Owner read/write only: no group or other bits at all. */
+    u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+    u_assert_int_eq((int)(st.st_mode & (S_IRWXG | S_IRWXO)), 0);
+
+    /* Reopening must not widen the mode of a file that already exists. */
+    fp = dogecoin_fopen_private(path, "a+b");
+    u_assert_true(fp != NULL);
+    fclose(fp);
+    u_assert_int_eq(stat(path, &st), 0);
+    u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+
+    remove(path);
+
+    /* NULL arguments are refused rather than passed through. */
+    u_assert_true(dogecoin_fopen_private(NULL, "wb") == NULL);
+    u_assert_true(dogecoin_fopen_private(path, NULL) == NULL);
+#endif
 }

@@ -980,7 +980,7 @@ dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_p
 
     // open wallet file if not already open
     if (!wallet->dbfile) {
-        wallet->dbfile = fopen(file_path, "a+b");
+        wallet->dbfile = dogecoin_fopen_private(file_path, "a+b");
         if (wallet->dbfile) {
             snprintf((char*)wallet->filename, sizeof(wallet->filename), "%s", file_path);
         }
