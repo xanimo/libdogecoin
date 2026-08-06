@@ -27,6 +27,7 @@
 */
 
 #ifdef _WIN32
+#include <inttypes.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <conio.h>
@@ -1138,7 +1139,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             else s[0] = '\0';
             char *ctime_no_newline;
             ctime_no_newline = strtok(s, "\n");
-            printf("%s|%d|%s|%d\n", hash_to_string(pindex->hash), pindex->height, ctime_no_newline, hdr->data_len);
+            printf("%s|%" PRIu32 "|%s|%" PRIu32 "\n", hash_to_string(pindex->hash), pindex->height, ctime_no_newline, hdr->data_len);
             uint64_t start = time(NULL);
 
             uint32_t amount_of_txs;

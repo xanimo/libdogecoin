@@ -28,6 +28,7 @@
 
  */
 
+#include <inttypes.h>
 #include <dogecoin/validation.h>
 #include <dogecoin/block.h>
 
@@ -71,7 +72,7 @@ dogecoin_bool check_auxpow(dogecoin_auxpow_block* block, dogecoin_chainparams* p
        where the height is known.  */
     if (!is_legacy(block->header->version) && params->strict_id && get_chainid(block->header->version) != params->auxpow_id) {
         printf("%s:%d:%s : block does not have our chain ID"
-                " (got %d, expected %d, full nVersion %d)\n",
+                " (got %" PRIu32 ", expected %d, full nVersion %" PRId32 ")\n",
                 __FILE__, __LINE__, __func__, get_chainid(block->header->version),
                 params->auxpow_id, block->header->version);
         return false;

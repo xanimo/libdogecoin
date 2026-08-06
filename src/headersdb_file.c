@@ -26,6 +26,7 @@
 
 */
 
+#include <inttypes.h>
 #include <sys/stat.h>
 
 #include <dogecoin/headersdb_file.h>
@@ -255,7 +256,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     dogecoin_blockindex *pindex = dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
                     if (!connected)
                     {
-                        printf("\nConnecting header %s failed (at height: %d) read_write: %d\n", hash_to_string(hash), db->chaintip->height, db->read_write_file);
+                        printf("\nConnecting header %s failed (at height: %" PRIu32 ") read_write: %d\n", hash_to_string(hash), db->chaintip->height, db->read_write_file);
                         dogecoin_block_header_destroy(&pindex->header);
                         dogecoin_free(pindex);
                     }
@@ -267,7 +268,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
             }
         }
     }
-    printf("\nConnected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
+    printf("\nConnected %ld headers, now at height: %" PRIu32 "\n",  connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
 
@@ -416,7 +417,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
                 current_block = prev_block;
             }
 
-            printf("\nChain reorganization: %d blocks disconnected, %d blocks connected\n", blockindex->height - common_ancestor->height, blockindex->height - db->chaintip->height);
+            printf("\nChain reorganization: %" PRIu32 " blocks disconnected, %" PRIu32 " blocks connected\n", blockindex->height - common_ancestor->height, blockindex->height - db->chaintip->height);
 
             // Set the new block as the new chain tip
             db->chaintip = blockindex;
