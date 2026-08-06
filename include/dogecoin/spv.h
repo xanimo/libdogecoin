@@ -67,6 +67,8 @@ typedef struct par_hdr_seg_ {
     /* download progress */
     int       node_id;        /* assigned node (-1 = unassigned)               */
     uint64_t  requested_at;   /* time of the last getheaders sent for this seg */
+    uint64_t  assigned_at;    /* time the current owner took this segment      */
+    uint32_t  count_at_assign;/* headers already buffered when it took it      */
     uint32_t  tip_height;     /* highest header received so far in this segment */
     uint256_t tip_hash;       /* hash of that header (next-batch locator)       */
 
@@ -86,6 +88,7 @@ typedef struct par_hdr_state_ {
     uint32_t      flush_idx;        /* index of the next segment pending flush  */
     uint32_t      last_flush_idx;   /* flush_idx at the last observed progress  */
     uint64_t      last_progress_time; /* time of that progress                  */
+    uint64_t      buffered_bytes;   /* raw header bytes staged across segments  */
     dogecoin_bool active;           /* download in progress                     */
 } par_hdr_state;
 

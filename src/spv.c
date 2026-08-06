@@ -192,10 +192,17 @@ static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
 static const uint64_t PAR_HDR_SEG_TIMEOUT = 120;
 /* Seconds without the ordered flush advancing before we log loudly. */
 static const uint64_t PAR_HDR_STALL_WARN = 300;
-/* How far ahead of the flush point segments may be handed out.  Segments are
-   staged in memory until the ordered flush reaches them, so an unbounded lead
-   lets a single slow segment pin the rest of the chain in RAM. */
-static const uint32_t PAR_HDR_MAX_LEAD = 24;
+/* Ceiling on raw header bytes staged in memory ahead of the ordered flush.
+   Segment sizes are uneven (the checkpoint arrays were merged at different
+   intervals), so a fixed segment count bounds neither memory nor peer
+   utilisation well; budget the thing that actually grows. */
+static const uint64_t PAR_HDR_MAX_BUFFERED = 256ull * 1024 * 1024;
+/* A segment must have been owned this long before its download rate is judged;
+   below this the sample is noise. */
+static const uint64_t PAR_HDR_RATE_GRACE = 30;
+/* The flush-head owner is preempted when its rate falls below this fraction of
+   the median rate across the other active segments, expressed as a divisor. */
+static const uint32_t PAR_HDR_SLOW_FACTOR = 4;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
@@ -2713,21 +2720,24 @@ LIBDOGECOIN_API void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *
     /* Lowest-index segment that is neither complete nor currently owned.  A
        released segment keeps its buffered headers and tip_hash, so a new owner
        resumes where the previous one stopped rather than restarting. */
-    uint32_t limit = s->flush_idx + PAR_HDR_MAX_LEAD;
-    if (limit > s->num_segs) limit = s->num_segs;
-
     par_hdr_seg *seg = NULL;
     uint32_t seg_idx = 0;
-    for (uint32_t i = s->flush_idx; i < limit; i++) {
+    for (uint32_t i = s->flush_idx; i < s->num_segs; i++) {
         if (!s->segs[i].complete && s->segs[i].node_id == -1) {
+            /* The flush head is always allowed: refusing it would deadlock,
+               since nothing can drain while it is unowned. */
+            if (i != s->flush_idx && s->buffered_bytes >= PAR_HDR_MAX_BUFFERED)
+                return;
             seg = &s->segs[i];
             seg_idx = i;
             break;
         }
     }
-    if (!seg) return; /* nothing outstanding inside the window */
+    if (!seg) return; /* nothing outstanding */
 
-    seg->node_id = (int)node->nodeid;
+    seg->node_id         = (int)node->nodeid;
+    seg->assigned_at     = (uint64_t)time(NULL);
+    seg->count_at_assign = seg->count;
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
         client->nodegroup->log_write_cb(
@@ -2810,6 +2820,9 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         /* The headers are on disk now — release the staging buffer.  Without
            this every flushed segment keeps its raw headers resident until
            par_hdr_free at teardown, which on mainnet is the whole chain. */
+        uint64_t freed = (uint64_t)seg->count * PAR_HDR_RAW_LEN;
+        s->buffered_bytes = (s->buffered_bytes > freed)
+                          ? s->buffered_bytes - freed : 0;
         dogecoin_free(seg->buf);
         seg->buf = NULL;
         seg->cap = 0;
@@ -2916,6 +2929,7 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         }
 
         /* Copy the standard 80-byte header and advance past it */
+        s->buffered_bytes += PAR_HDR_RAW_LEN;
         memcpy(seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN, buf->p, PAR_HDR_RAW_LEN);
         buf->p   = (const uint8_t *)buf->p + PAR_HDR_RAW_LEN;
         buf->len -= PAR_HDR_RAW_LEN;
@@ -2985,6 +2999,92 @@ static dogecoin_node *par_hdr_node_by_id(dogecoin_spv_client *client, int nodeid
     return NULL;
 }
 
+/* Headers per second delivered by the current owner of @seg, or 0 if the
+ * segment has not been owned long enough for the sample to mean anything. */
+static uint32_t par_hdr_seg_rate(const par_hdr_seg *seg, uint64_t now)
+{
+    if (seg->node_id == -1 || seg->assigned_at == 0) return 0;
+    if (now <= seg->assigned_at) return 0;
+    uint64_t elapsed = now - seg->assigned_at;
+    if (elapsed < PAR_HDR_RATE_GRACE) return 0;
+    if (seg->count <= seg->count_at_assign) return 0;
+    return (uint32_t)((seg->count - seg->count_at_assign) / elapsed);
+}
+
+/* Release the flush-head segment when its owner is alive but far slower than
+ * its peers and someone else is free to take over.
+ *
+ * A dead owner is handled by the timeout in par_hdr_reclaim.  A merely slow
+ * one is not: it keeps answering inside the deadline while every segment above
+ * it finishes into memory and their owners go idle, because the ordered flush
+ * cannot advance past the head.  One slow peer therefore throttles the whole
+ * sync.  Resuming from tip_hash means preemption costs nothing already
+ * downloaded.
+ */
+static void par_hdr_preempt_head(dogecoin_spv_client *client, uint64_t now)
+{
+    par_hdr_state *s = client->par_hdr;
+    if (s->flush_idx >= s->num_segs) return;
+
+    par_hdr_seg *head = &s->segs[s->flush_idx];
+    if (head->complete || head->node_id == -1) return;
+
+    uint32_t head_rate = par_hdr_seg_rate(head, now);
+    if (head_rate == 0) return; /* still inside the grace window */
+
+    /* Median rate across the other segments currently being downloaded. */
+    uint32_t rates[64];
+    uint32_t n = 0;
+    for (uint32_t i = 0; i < s->num_segs && n < 64; i++) {
+        if (i == s->flush_idx) continue;
+        uint32_t r = par_hdr_seg_rate(&s->segs[i], now);
+        if (r > 0) rates[n++] = r;
+    }
+    if (n < 3) return; /* too few samples to call anything an outlier */
+
+    for (uint32_t i = 1; i < n; i++) { /* insertion sort, n <= 64 */
+        uint32_t v = rates[i], j = i;
+        while (j > 0 && rates[j - 1] > v) { rates[j] = rates[j - 1]; j--; }
+        rates[j] = v;
+    }
+    uint32_t median = rates[n / 2];
+
+    if (head_rate * PAR_HDR_SLOW_FACTOR >= median) return; /* not an outlier */
+
+    /* Only preempt if someone is actually free to pick it up. */
+    dogecoin_node *idle = NULL;
+    if (client->nodegroup && client->nodegroup->nodes) {
+        for (size_t i = 0; i < client->nodegroup->nodes->len && !idle; i++) {
+            dogecoin_node *cand = vector_idx(client->nodegroup->nodes, i);
+            if (!cand) continue;
+            if (!(cand->state & NODE_CONNECTED) || !cand->version_handshake) continue;
+            if ((int)cand->nodeid == head->node_id) continue;
+            dogecoin_bool busy = false;
+            for (uint32_t k = 0; k < s->num_segs; k++) {
+                if (s->segs[k].node_id == (int)cand->nodeid) { busy = true; break; }
+            }
+            if (!busy) idle = cand;
+        }
+    }
+    if (!idle) return;
+
+    dogecoin_node *owner = par_hdr_node_by_id(client, head->node_id);
+
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[par-hdr] preempting segment %u from node %d "
+            "(%u hdr/s vs median %u); %u headers kept, resuming at %u\n",
+            s->flush_idx, head->node_id, head_rate, median,
+            head->count, head->tip_height + 1);
+
+    if (owner) owner->state &= ~NODE_HEADERSYNC;
+    head->node_id      = -1;
+    head->requested_at = 0;
+    head->assigned_at  = 0;
+
+    par_hdr_assign(client, idle);
+}
+
 /* Periodic maintenance for a parallel header sync.
  *
  * Segments are handed out one per peer and are only cleared on completion, so
@@ -3038,7 +3138,10 @@ LIBDOGECOIN_API void par_hdr_reclaim(dogecoin_spv_client *client, uint64_t now)
         }
     }
 
-    /* 3. Warn if the ordered flush has stopped advancing. */
+    /* 3. A live but slow owner of the flush head throttles everything above it. */
+    par_hdr_preempt_head(client, now);
+
+    /* 4. Warn if the ordered flush has stopped advancing. */
     if (s->flush_idx != s->last_flush_idx) {
         s->last_flush_idx     = s->flush_idx;
         s->last_progress_time = now;
