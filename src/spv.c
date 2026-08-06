@@ -187,6 +187,11 @@ static dogecoin_bool spv_log_merkle_match(const uint8_t txid[32], uint32_t pos, 
 }
 
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
+/* Seconds a parallel header segment may sit without a getheaders response
+   before it is released back to the pool for another peer to pick up. */
+static const uint64_t PAR_HDR_SEG_TIMEOUT = 120;
+/* Seconds without the ordered flush advancing before we log loudly. */
+static const uint64_t PAR_HDR_STALL_WARN = 300;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
@@ -427,6 +432,7 @@ static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, u
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
 void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *node);
+void par_hdr_reclaim(dogecoin_spv_client *client, uint64_t now);
 void par_hdr_free(dogecoin_spv_client *client);
 static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
                          struct const_buffer *buf, uint32_t count);
@@ -776,6 +782,10 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
     // tick regardless of how much time had actually elapsed. They are updated
     // only when an actual request is sent (see dogecoin_net_spv_request_headers
     // and the getheaders/getdata send paths).
+    /* Parallel genesis header sync: reclaim segments from dead or silent
+       peers and top up idle peers before the normal request path runs. */
+    par_hdr_reclaim(client, *now);
+
     if ((client->stateflags & SPV_HEADER_SYNC_FLAG) == SPV_HEADER_SYNC_FLAG)
     {
         dogecoin_net_spv_request_headers(client);
@@ -2622,6 +2632,8 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
     s->segs = dogecoin_calloc(num_segs, sizeof(par_hdr_seg));
     s->num_segs = (uint32_t)num_segs;
     s->active = true;
+    s->last_flush_idx     = 0;
+    s->last_progress_time = (uint64_t)time(NULL);
 
     for (uint32_t i = 0; i < (uint32_t)num_segs; i++) {
         uint32_t arr_i = (uint32_t)(start_i + i);
@@ -2651,8 +2663,10 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
 }
 
 /* Send a getheaders request to @node for the next batch in @seg. */
-static void par_hdr_send_getheaders(dogecoin_node *node, const par_hdr_seg *seg)
+static void par_hdr_send_getheaders(dogecoin_node *node, par_hdr_seg *seg)
 {
+    seg->requested_at = (uint64_t)time(NULL);
+
     vector_t *locators = vector_new(1, free);
     uint256_t *loc = dogecoin_calloc(1, sizeof(uint256_t));
     memcpy(loc, seg->tip_hash, sizeof(uint256_t));
@@ -2684,17 +2698,27 @@ LIBDOGECOIN_API void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *
         if (s->segs[i].node_id == (int)node->nodeid) return;
     }
 
-    if (s->next_assign >= s->num_segs) return; /* all assigned */
+    /* Lowest-index segment that is neither complete nor currently owned.  A
+       released segment keeps its buffered headers and tip_hash, so a new owner
+       resumes where the previous one stopped rather than restarting. */
+    par_hdr_seg *seg = NULL;
+    uint32_t seg_idx = 0;
+    for (uint32_t i = 0; i < s->num_segs; i++) {
+        if (!s->segs[i].complete && s->segs[i].node_id == -1) {
+            seg = &s->segs[i];
+            seg_idx = i;
+            break;
+        }
+    }
+    if (!seg) return; /* nothing outstanding */
 
-    par_hdr_seg *seg = &s->segs[s->next_assign];
     seg->node_id = (int)node->nodeid;
-    s->next_assign++;
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
         client->nodegroup->log_write_cb(
             "[par-hdr] assigned node %d to segment %u (heights %u..%u)\n",
-            node->nodeid, s->next_assign - 1,
-            seg->start_height + 1, seg->stop_height);
+            node->nodeid, seg_idx,
+            seg->tip_height + 1, seg->stop_height);
 
     par_hdr_send_getheaders(node, seg);
 }
@@ -2713,6 +2737,8 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
     dogecoin_bool prev_batch = hdb ? hdb->batch_write : false;
     dogecoin_bool prev_skip  = hdb ? hdb->skip_pow    : false;
     if (hdb) { hdb->batch_write = true; hdb->skip_pow = true; }
+
+    uint32_t flush_idx_before = s->flush_idx;
 
     while (s->flush_idx < s->num_segs && s->segs[s->flush_idx].complete &&
            !s->segs[s->flush_idx].flushed) {
@@ -2775,6 +2801,11 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         if (flushed > 0 && hdb->headers_tree_file)
             dogecoin_file_commit(hdb->headers_tree_file);
     }
+    if (s->flush_idx != flush_idx_before) {
+        s->last_flush_idx     = s->flush_idx;
+        s->last_progress_time = (uint64_t)time(NULL);
+    }
+
     return flushed;
 }
 
@@ -2915,6 +2946,91 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
     } else {
         /* More headers needed for this segment */
         par_hdr_send_getheaders(node, seg);
+    }
+}
+
+/* Look up a connected node by its nodeid, or NULL if it is gone. */
+static dogecoin_node *par_hdr_node_by_id(dogecoin_spv_client *client, int nodeid)
+{
+    if (!client || !client->nodegroup || !client->nodegroup->nodes) return NULL;
+    for (size_t i = 0; i < client->nodegroup->nodes->len; i++) {
+        dogecoin_node *n = vector_idx(client->nodegroup->nodes, i);
+        if (n && (int)n->nodeid == nodeid) return n;
+    }
+    return NULL;
+}
+
+/* Periodic maintenance for a parallel header sync.
+ *
+ * Segments are handed out one per peer and are only cleared on completion, so
+ * a peer that disconnects or goes silent mid-segment would otherwise hold it
+ * forever.  Because par_hdr_flush only advances across contiguously complete
+ * segments, a single stuck segment blocks every finished segment above it and
+ * the sync parks with no getheaders on the wire.
+ *
+ * This reclaims those segments, hands free segments to idle peers, and warns
+ * if the ordered flush stops advancing.
+ */
+LIBDOGECOIN_API void par_hdr_reclaim(dogecoin_spv_client *client, uint64_t now)
+{
+    if (!client || !client->par_hdr || !client->par_hdr->active) return;
+    par_hdr_state *s = client->par_hdr;
+
+    /* 1. Release segments whose owner disconnected or stopped responding. */
+    for (uint32_t i = 0; i < s->num_segs; i++) {
+        par_hdr_seg *seg = &s->segs[i];
+        if (seg->complete || seg->node_id == -1) continue;
+
+        dogecoin_node *owner = par_hdr_node_by_id(client, seg->node_id);
+        dogecoin_bool gone = (owner == NULL) ||
+                             !(owner->state & NODE_CONNECTED) ||
+                             !owner->version_handshake;
+        dogecoin_bool stalled = !gone && seg->requested_at > 0 &&
+                                now > seg->requested_at &&
+                                (now - seg->requested_at) > PAR_HDR_SEG_TIMEOUT;
+
+        if (!gone && !stalled) continue;
+
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] releasing segment %u from node %d (%s); "
+                "%u headers kept, will resume at %u\n",
+                i, seg->node_id, gone ? "disconnected" : "timed out",
+                seg->count, seg->tip_height + 1);
+
+        if (owner) owner->state &= ~NODE_HEADERSYNC;
+        seg->node_id      = -1;
+        seg->requested_at = 0;
+    }
+
+    /* 2. Hand any free segment to a peer that is not already working one. */
+    if (client->nodegroup && client->nodegroup->nodes) {
+        for (size_t i = 0; i < client->nodegroup->nodes->len; i++) {
+            dogecoin_node *n = vector_idx(client->nodegroup->nodes, i);
+            if (!n) continue;
+            if (!(n->state & NODE_CONNECTED) || !n->version_handshake) continue;
+            par_hdr_assign(client, n); /* no-ops if n already owns a segment */
+        }
+    }
+
+    /* 3. Warn if the ordered flush has stopped advancing. */
+    if (s->flush_idx != s->last_flush_idx) {
+        s->last_flush_idx     = s->flush_idx;
+        s->last_progress_time = now;
+    } else if (s->last_progress_time > 0 && now > s->last_progress_time &&
+               (now - s->last_progress_time) > PAR_HDR_STALL_WARN) {
+        uint32_t assigned = 0, blocked = 0;
+        for (uint32_t i = 0; i < s->num_segs; i++) {
+            if (s->segs[i].node_id != -1) assigned++;
+            if (s->segs[i].complete && !s->segs[i].flushed) blocked++;
+        }
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] WARNING: no flush progress for %us — "
+                "flush_idx=%u/%u, %u segments assigned, %u complete but blocked\n",
+                (unsigned int)(now - s->last_progress_time),
+                s->flush_idx, s->num_segs, assigned, blocked);
+        s->last_progress_time = now; /* rate-limit the warning */
     }
 }
 
