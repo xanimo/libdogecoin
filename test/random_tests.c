@@ -14,6 +14,7 @@
 
 #include <test/utest.h>
 
+#include <dogecoin/bip38.h>
 #include <dogecoin/random.h>
 #include <dogecoin/utils.h>
 
@@ -93,6 +94,16 @@ static dogecoin_bool rnd_fail_false(uint8_t* buf, uint32_t len, const uint8_t up
     return false;
 }
 
+/* --- regression: a failing RNG must not yield key material --- */
+
+static void rng_prop_init(void) {}
+
+static dogecoin_bool rng_prop_fail(uint8_t* buf, uint32_t len, const uint8_t update_seed)
+{
+    (void)buf; (void)len; (void)update_seed;
+    return false;
+}
+
 /* Fails the way the WIN32 branch used to: `return -1` from a function whose
    return type is dogecoin_bool. */
 static dogecoin_bool rnd_fail_minus_one(uint8_t* buf, uint32_t len, const uint8_t update_seed)
@@ -145,4 +156,74 @@ void test_random_failure_is_false()
     /* And the real RNG still succeeds and writes the buffer. */
     memset(buf, 0, sizeof(buf));
     u_assert_true(dogecoin_random_bytes(buf, sizeof(buf), 0));
+}
+
+/*
+ * Eleven call sites discarded dogecoin_random_bytes' return value, six of them
+ * in BIP38 -- including seedb, which derives factorb and thence the private
+ * key. With the return ignored, an RNG failure produced a key from whatever was
+ * already in the buffer.
+ *
+ * Driving the real failure path is not possible from a test, so this installs a
+ * mapper that always fails and checks the callers behave: the encrypt paths
+ * must refuse rather than mint a key.
+ */
+void test_random_failure_propagates()
+{
+    dogecoin_rnd_mapper mapper;
+    uint8_t privkey[DOGECOIN_ECKEY_PKEY_LENGTH];
+    char encrypted[128];
+    char confirmation[128];
+    size_t enc_sz, conf_sz;
+    uint32_t lot = 12345, sequence = 42;
+
+    mapper.dogecoin_random_init = rng_prop_init;
+    mapper.dogecoin_random_bytes = rng_prop_fail;
+    dogecoin_rnd_set_mapper(mapper);
+
+    /* EC-multiplied encryption reaches seedb and the owner entropy. It must
+       fail rather than return a key derived from an unwritten buffer. */
+    enc_sz = sizeof(encrypted);
+    conf_sz = sizeof(confirmation);
+    u_assert_int_eq((int)dogecoin_bip38_encrypt_ec_multiplied(
+        "passphrase", true, false, 0, 0, "DGYrGxANmgjcoZ9xJWncHr6fuA6Y1ZQ56Y",
+        privkey, encrypted, &enc_sz, confirmation, &conf_sz), 0);
+
+    /* Same with lot/sequence, which additionally goes through the owner
+       entropy path. */
+    enc_sz = sizeof(encrypted);
+    conf_sz = sizeof(confirmation);
+    u_assert_int_eq((int)dogecoin_bip38_encrypt_ec_multiplied(
+        "passphrase", true, true, 100000, 7, "DGYrGxANmgjcoZ9xJWncHr6fuA6Y1ZQ56Y",
+        privkey, encrypted, &enc_sz, confirmation, &conf_sz), 0);
+
+    /*
+     * Isolate the seedb site. encrypt_from_intermediate takes a ready-made
+     * intermediate code -- the BIP38 spec vector -- so the owner entropy is
+     * already fixed and the RNG is reached for seedb alone. Without the check
+     * at that site this call still returns a key, because nothing upstream
+     * fails first.
+     */
+    enc_sz = sizeof(encrypted);
+    conf_sz = sizeof(confirmation);
+    u_assert_int_eq((int)dogecoin_bip38_encrypt_from_intermediate(
+        "passphrasepxFy57B9v8HtUsszJYKReoNDV6VHjUSGt8EVJmux9n1J3Ltf1gRxyDGXqnf9qm",
+        true, NULL, "DGYrGxANmgjcoZ9xJWncHr6fuA6Y1ZQ56Y",
+        encrypted, &enc_sz, confirmation, &conf_sz), 0);
+
+    /* dogecoin_bip38_generate_lot_sequence returns void and is public API, so
+       it signals failure with lot 0 -- a value every consumer of these already
+       rejects. */
+    dogecoin_bip38_generate_lot_sequence(&lot, &sequence);
+    u_assert_uint32_eq(lot, 0U);
+    u_assert_uint32_eq(sequence, 0U);
+
+    dogecoin_rnd_set_mapper_default();
+
+    /* And with the real RNG restored, the same call succeeds. */
+    enc_sz = sizeof(encrypted);
+    conf_sz = sizeof(confirmation);
+    u_assert_int_eq((int)dogecoin_bip38_encrypt_ec_multiplied(
+        "passphrase", true, false, 0, 0, "DGYrGxANmgjcoZ9xJWncHr6fuA6Y1ZQ56Y",
+        privkey, encrypted, &enc_sz, confirmation, &conf_sz), 1);
 }
