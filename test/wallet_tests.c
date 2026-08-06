@@ -26,6 +26,7 @@ static const char *wallettmpfile = "/tmp/dummy";
 #include <dogecoin/base58.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/tx.h>
 #include <dogecoin/wallet.h>
 #include <dogecoin/script.h>
 #if !defined(_WIN32)
@@ -558,4 +559,40 @@ void test_wallet_balance_accounts_for_spends() {
     dogecoin_wallet_flush(wallet);
     dogecoin_wallet_free(wallet);
     remove_all_utxos();
+}
+
+
+/*
+ * Null guards that sat below the dereference they were meant to guard.
+ *
+ * dogecoin_wallet_is_from_me() called dogecoin_wallet_get_debit_tx() first,
+ * and that function opens with `if (tx->vin)`. The `!wallet || !tx` check came
+ * four lines later, so a NULL tx crashed before reaching it. Both functions are
+ * LIBDOGECOIN_API, and rest.c passes wtx->tx to is_from_me without checking it
+ * (wallet.c:954 does check, which is why this survived).
+ *
+ * Without the fix these dereference NULL rather than failing an assertion.
+ */
+void test_wallet_null_tx_guards()
+{
+    dogecoin_wallet* wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
+    u_assert_true(wallet != NULL);
+
+    /* The call that used to crash. */
+    u_assert_int_eq((int)dogecoin_wallet_is_from_me(wallet, NULL), 0);
+
+    /* The function underneath it, reachable directly -- rest.c:184 calls it. */
+    u_assert_true(dogecoin_wallet_get_debit_tx(wallet, NULL) == 0);
+
+    /* A NULL wallet must be refused too, not just a NULL tx. */
+    u_assert_int_eq((int)dogecoin_wallet_is_from_me(NULL, NULL), 0);
+    u_assert_true(dogecoin_wallet_get_debit_tx(NULL, NULL) == 0);
+
+    /* A well-formed but empty tx still answers false rather than crashing. */
+    dogecoin_tx* tx = dogecoin_tx_new();
+    u_assert_true(tx != NULL);
+    u_assert_int_eq((int)dogecoin_wallet_is_from_me(wallet, tx), 0);
+    dogecoin_tx_free(tx);
+
+    dogecoin_wallet_free(wallet);
 }

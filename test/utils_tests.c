@@ -132,3 +132,23 @@ void test_dit()
         debug_print("%s", "DIT test: disabled (DIT not supported)\n");
     }
 }
+
+
+/*
+ * print_header() ignored a failed fopen: the error branch printed a message and
+ * fell through to print_image(), which ran fgets() on a NULL FILE*, and then to
+ * fclose(NULL). Opening a file that is not there is ordinary input, so this
+ * crashed on ordinary input. print_image() is LIBDOGECOIN_API, so it is
+ * reachable with NULL from outside this file as well.
+ */
+void test_utils_null_file_guards()
+{
+    /* Must return quietly rather than dereferencing the NULL FILE*. */
+    print_image(NULL);
+
+    /* A path that cannot be opened must not crash. */
+    print_header("this-path-does-not-exist-libdogecoin-test");
+
+    /* NULL path was already guarded; assert it stays that way. */
+    print_header(NULL);
+}

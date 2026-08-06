@@ -594,7 +594,11 @@ void print_header(char* filepath) {
 
     if ((fptr = fopen(filename, "r")) == NULL)
         {
+        /* The error branch used to fall through: print_image() then ran fgets()
+           on a NULL FILE*, and fclose(NULL) followed it. Opening a file that is
+           not there is ordinary, so this crashed on ordinary input. */
         fprintf(stderr, "error opening %s\n", filename);
+        return;
         }
 
     print_image(fptr);
@@ -609,6 +613,11 @@ void print_image(FILE* fptr)
     {
 #ifndef USE_OPTEE // OPTEE has no filesystem or console
     char read_string[MAX_LEN];
+
+    /* Exported, so a caller outside this file can reach it with NULL too. */
+    if (!fptr) {
+        return;
+    }
 
     while (fgets(read_string, sizeof(read_string), fptr) != NULL)
         printf("%s", read_string);

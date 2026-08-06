@@ -1722,6 +1722,9 @@ int64_t dogecoin_wallet_get_debit_txi(dogecoin_wallet *wallet, const dogecoin_tx
 int64_t dogecoin_wallet_get_debit_tx(dogecoin_wallet *wallet, const dogecoin_tx *tx) {
     unsigned int i;
     int64_t debit = 0;
+    if (!wallet || !tx) {
+        return 0;
+    }
     if (tx->vin) {
         for (i = 0; i < tx->vin->len; i++) {
             dogecoin_tx_in* tx_in= vector_idx(tx->vin, i);
@@ -1735,12 +1738,15 @@ int64_t dogecoin_wallet_get_debit_tx(dogecoin_wallet *wallet, const dogecoin_tx 
 
 dogecoin_bool dogecoin_wallet_is_from_me(dogecoin_wallet *wallet, const dogecoin_tx *tx)
 {
-    if (dogecoin_wallet_get_debit_tx(wallet, tx) > 0) {
-        return true;
-    }
-
+    /* This guard used to sit below the get_debit_tx() call, which dereferences
+       tx immediately, so a NULL tx crashed four lines before the check that
+       exists to catch it. */
     if (!wallet || !tx || !tx->vin) {
         return false;
+    }
+
+    if (dogecoin_wallet_get_debit_tx(wallet, tx) > 0) {
+        return true;
     }
 
     for (unsigned int i = 0; i < tx->vin->len; i++) {
