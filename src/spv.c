@@ -2937,6 +2937,33 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
      * P2P headers message.  We copy the standard 80 bytes, advance buf by 80,
      * then call par_hdr_skip_auxpow to consume the AUXPoW data without running
      * check_auxpow (checkpoint anchors at segment boundaries guarantee validity). */
+    /* A batch must continue from what this segment already holds.
+     *
+     * Two peers can be attached to one segment while a race is resolving, and
+     * a getheaders is answered relative to the locator sent at request time.
+     * The loser's reply can therefore arrive after the winner has advanced the
+     * segment, carrying headers that start below seg->tip_height. Appending
+     * those at seg->count leaves a discontinuity in the middle of the buffer
+     * that only surfaces at flush, as a connect failure.
+     *
+     * Compare the first header's prev_block against the hash this segment
+     * expects next and drop the whole batch if it does not match. Worth doing
+     * even without racing: it also rejects a peer that answers with something
+     * other than the continuation it was asked for. */
+    if (count > 0 && buf->len >= PAR_HDR_RAW_LEN) {
+        const uint8_t *first_prev = (const uint8_t *)buf->p + 4; /* version(4) */
+        const uint8_t *expected   = seg->count ? (const uint8_t *)seg->tip_hash
+                                               : (const uint8_t *)seg->start_hash;
+        if (memcmp(first_prev, expected, DOGECOIN_HASH_LENGTH) != 0) {
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] segment %u: dropping %u headers from node %d, "
+                    "does not continue from height %u\n",
+                    seg_idx, count, (int)node->nodeid, seg->tip_height);
+            return;
+        }
+    }
+
     for (uint32_t i = 0; i < count; i++) {
         if (buf->len < PAR_HDR_RAW_LEN) break;
 
