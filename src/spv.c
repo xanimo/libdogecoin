@@ -3112,12 +3112,42 @@ static void par_hdr_race_tail(dogecoin_spv_client *client, uint64_t now)
                 s->segs[k].shadow_id == (int)n->nodeid) busy = true;
         if (!busy) idle_count++;
     }
-    if (idle_count <= incomplete) return; /* no genuine spare capacity */
+    if (idle_count == 0) return; /* nobody free to help */
+
+    /* Racing used to require idle_count > incomplete, which meant it only
+     * engaged once nearly every segment was done. A full mainnet run showed
+     * that is far too late: the first race fired about three quarters of the
+     * way through the log, so every peer that finished early sat idle while
+     * mid-run segments crawled. Any idle peer is spare capacity; the question
+     * is only which segment is worth spending it on.
+     *
+     * Shadow a segment only when its owner is running below the reference
+     * rate. A peer keeping pace does not need help, and shadowing it would
+     * just duplicate bandwidth. Being merely below median is enough here --
+     * preemption already handles the clear outliers, and this is the cheaper
+     * intervention because the original owner keeps working. */
+    uint32_t ref = s->rate_ref;
+    if (ref == 0) {
+        /* No reference yet: sample the segments currently in flight. */
+        uint32_t sum = 0, n = 0;
+        for (uint32_t i = 0; i < s->num_segs; i++) {
+            uint32_t r = par_hdr_seg_rate(&s->segs[i], now);
+            if (r > 0) { sum += r; n++; }
+        }
+        if (n == 0) return;
+        ref = sum / n;
+    }
 
     /* Shadow the segments nearest the flush head first: those gate everything. */
     for (uint32_t i = s->flush_idx; i < s->num_segs && idle_count > 0; i++) {
         par_hdr_seg *seg = &s->segs[i];
         if (seg->complete || seg->node_id == -1 || seg->shadow_id != -1) continue;
+
+        /* Leave owners that are keeping up alone. A rate of 0 means the owner
+         * is still inside the grace window, which also counts as no evidence
+         * of trouble. */
+        uint32_t rate = par_hdr_seg_rate(seg, now);
+        if (rate == 0 || rate >= ref) continue;
 
         dogecoin_node *cand = NULL;
         for (size_t j = 0; j < client->nodegroup->nodes->len && !cand; j++) {
@@ -3139,7 +3169,8 @@ static void par_hdr_race_tail(dogecoin_spv_client *client, uint64_t now)
         if (client->nodegroup->log_write_cb)
             client->nodegroup->log_write_cb(
                 "[par-hdr] racing segment %u: node %d shadowing node %d "
-                "(resuming at %u)\n", i, seg->shadow_id, seg->node_id,
+                "(%u hdr/s vs ref %u, resuming at %u)\n",
+                i, seg->shadow_id, seg->node_id, rate, ref,
                 seg->tip_height + 1);
 
         par_hdr_send_getheaders(cand, seg);
