@@ -2993,10 +2993,24 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         dogecoin_block_header hdr;
         struct const_buffer hbuf = { seg->buf + (size_t)seg->count * PAR_HDR_RAW_LEN,
                                      PAR_HDR_RAW_LEN };
-        if (dogecoin_block_header_deserialize(&hdr, &hbuf, client->chainparams, NULL)) {
-            dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
-            seg->tip_height++;
+        if (!dogecoin_block_header_deserialize(&hdr, &hbuf, client->chainparams, NULL)) {
+            /* An 80-byte header that will not deserialize cannot advance the
+             * continuity anchor. Counting it anyway would leave tip_hash and
+             * tip_height describing header n-1 while seg->count moved to n, so
+             * the next batch's prev_block check would compare against the wrong
+             * hash and the discontinuity would only surface at flush, as a
+             * connect failure well away from its cause. Drop the remainder of
+             * the batch and let the segment be re-requested from tip_hash. */
+            s->buffered_bytes -= PAR_HDR_RAW_LEN;
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] segment %u: undeserializable header at index %u "
+                    "from node %d, dropping rest of batch\n",
+                    seg_idx, seg->count, (int)node->nodeid);
+            break;
         }
+        dogecoin_block_header_hash(&hdr, (uint8_t *)seg->tip_hash);
+        seg->tip_height++;
         seg->count++;
 
         /* skip tx_count varint (always 0x00 in headers messages) */
@@ -3187,10 +3201,18 @@ static void par_hdr_preempt_head(dogecoin_spv_client *client, uint64_t now)
     uint32_t head_rate = par_hdr_seg_rate(head, now);
     if (head_rate == 0) return; /* still inside the grace window */
 
-    /* Median rate across the other segments currently being downloaded. */
-    uint32_t rates[64];
+    /* Median rate across the other segments currently being downloaded.
+     *
+     * Sized to num_segs rather than a fixed 64. The old bound stopped sampling
+     * at 64 without saying so, and mainnet is already at 89 segments, so once
+     * more than 64 are in flight the median is drawn from an arbitrary prefix
+     * of the peer set -- and that median is the reference every preemption and
+     * racing decision keys off. Truncation here is invisible in the logs and
+     * would look like a tuning problem, not a sampling one. */
+    uint32_t *rates = dogecoin_malloc((size_t)s->num_segs * sizeof(*rates));
+    if (!rates) return;
     uint32_t n = 0;
-    for (uint32_t i = 0; i < s->num_segs && n < 64; i++) {
+    for (uint32_t i = 0; i < s->num_segs; i++) {
         if (i == s->flush_idx) continue;
         uint32_t r = par_hdr_seg_rate(&s->segs[i], now);
         if (r > 0) rates[n++] = r;
@@ -3212,8 +3234,10 @@ static void par_hdr_preempt_head(dogecoin_spv_client *client, uint64_t now)
     } else if (s->rate_ref > 0) {
         median = s->rate_ref;
     } else {
+        dogecoin_free(rates);
         return; /* never saw a crowd; nothing to call an outlier against */
     }
+    dogecoin_free(rates);
 
     if (head_rate * PAR_HDR_SLOW_FACTOR >= median) return; /* not an outlier */
 
