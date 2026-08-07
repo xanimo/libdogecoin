@@ -66,6 +66,8 @@ typedef struct par_hdr_seg_ {
 
     /* download progress */
     int       node_id;        /* assigned node (-1 = unassigned)               */
+    int       shadow_id;      /* second node racing this segment (-1 = none)   */
+    uint64_t  shadow_at;      /* time the shadow was attached                  */
     uint64_t  requested_at;   /* time of the last getheaders sent for this seg */
     uint64_t  assigned_at;    /* time the current owner took this segment      */
     uint32_t  count_at_assign;/* headers already buffered when it took it      */
@@ -89,6 +91,9 @@ typedef struct par_hdr_state_ {
     uint32_t      last_flush_idx;   /* flush_idx at the last observed progress  */
     uint64_t      last_progress_time; /* time of that progress                  */
     uint64_t      buffered_bytes;   /* raw header bytes staged across segments  */
+    uint32_t      rate_ref;         /* last median peer rate seen while >=3 segs
+                                     * were in flight; the tail has no crowd to
+                                     * compare against, so it compares to this */
     dogecoin_bool active;           /* download in progress                     */
 } par_hdr_state;
 

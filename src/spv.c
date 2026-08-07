@@ -2672,6 +2672,8 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
         }
 
         seg->node_id    = -1;
+        seg->shadow_id  = -1;
+        seg->shadow_at  = 0;
         seg->tip_height = seg->start_height;
         memcpy(seg->tip_hash, seg->start_hash, sizeof(uint256_t));
 
@@ -2682,6 +2684,8 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
 }
 
 /* Send a getheaders request to @node for the next batch in @seg. */
+static dogecoin_node *par_hdr_node_by_id(dogecoin_spv_client *client, int node_id);
+
 static void par_hdr_send_getheaders(dogecoin_node *node, par_hdr_seg *seg)
 {
     seg->requested_at = (uint64_t)time(NULL);
@@ -2714,7 +2718,8 @@ LIBDOGECOIN_API void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *
 
     /* Skip nodes already working on a segment */
     for (uint32_t i = 0; i < s->num_segs; i++) {
-        if (s->segs[i].node_id == (int)node->nodeid) return;
+        if (s->segs[i].node_id == (int)node->nodeid ||
+            s->segs[i].shadow_id == (int)node->nodeid) return;
     }
 
     /* Lowest-index segment that is neither complete nor currently owned.  A
@@ -2892,7 +2897,28 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
     par_hdr_seg *seg = NULL;
     uint32_t seg_idx = 0;
     for (uint32_t i = 0; i < s->num_segs; i++) {
-        if (s->segs[i].node_id == (int)node->nodeid && !s->segs[i].complete) {
+        if (s->segs[i].complete) continue;
+        if (s->segs[i].node_id == (int)node->nodeid) {
+            seg = &s->segs[i];
+            seg_idx = i;
+            break;
+        }
+        /* A racing shadow delivering before the owner takes the segment over.
+         * Whichever peer answers first is by definition the faster one on this
+         * range, and the buffered headers are shared, so the swap costs
+         * nothing already downloaded. */
+        if (s->segs[i].shadow_id == (int)node->nodeid) {
+            dogecoin_node *old_owner = par_hdr_node_by_id(client, s->segs[i].node_id);
+            if (old_owner) old_owner->state &= ~NODE_HEADERSYNC;
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] segment %u: shadow node %d won the race from node %d\n",
+                    i, (int)node->nodeid, s->segs[i].node_id);
+            s->segs[i].node_id         = (int)node->nodeid;
+            s->segs[i].shadow_id       = -1;
+            s->segs[i].shadow_at       = 0;
+            s->segs[i].assigned_at     = (uint64_t)time(NULL);
+            s->segs[i].count_at_assign = s->segs[i].count;
             seg = &s->segs[i];
             seg_idx = i;
             break;
@@ -2960,6 +2986,8 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         /* Segment complete */
         seg->complete = true;
         seg->node_id  = -1;
+        seg->shadow_id = -1;
+        seg->shadow_at = 0;
         node->state  &= ~NODE_HEADERSYNC;
 
         if (client->nodegroup && client->nodegroup->log_write_cb)
@@ -3021,6 +3049,76 @@ static uint32_t par_hdr_seg_rate(const par_hdr_seg *seg, uint64_t now)
  * sync.  Resuming from tip_hash means preemption costs nothing already
  * downloaded.
  */
+
+/* Attach a second peer to an already-owned segment.
+ *
+ * Segments are the unit of parallelism and cannot be subdivided in flight, so
+ * once fewer segments remain than there are peers, the extra peers idle and
+ * the sync runs at the speed of whoever holds the last one. Preemption helps
+ * only if the owner is a clear outlier; a merely mediocre peer keeps the
+ * segment while faster ones sit unused.
+ *
+ * When there is genuine spare capacity -- strictly more idle peers than
+ * incomplete segments -- hand the segment to a second peer as well and take
+ * whichever reaches the stop height first. The cost is duplicated bandwidth on
+ * the last few segments; the benefit is that tail latency stops depending on
+ * which peer happened to draw the final segment.
+ */
+static void par_hdr_race_tail(dogecoin_spv_client *client, uint64_t now)
+{
+    par_hdr_state *s = client->par_hdr;
+    if (!client->nodegroup || !client->nodegroup->nodes) return;
+
+    uint32_t incomplete = 0;
+    for (uint32_t i = 0; i < s->num_segs; i++)
+        if (!s->segs[i].complete) incomplete++;
+    if (incomplete == 0) return;
+
+    /* Count peers not currently owning or shadowing anything. */
+    uint32_t idle_count = 0;
+    for (size_t i = 0; i < client->nodegroup->nodes->len; i++) {
+        dogecoin_node *n = vector_idx(client->nodegroup->nodes, i);
+        if (!n || !(n->state & NODE_CONNECTED) || !n->version_handshake) continue;
+        dogecoin_bool busy = false;
+        for (uint32_t k = 0; k < s->num_segs && !busy; k++)
+            if (s->segs[k].node_id == (int)n->nodeid ||
+                s->segs[k].shadow_id == (int)n->nodeid) busy = true;
+        if (!busy) idle_count++;
+    }
+    if (idle_count <= incomplete) return; /* no genuine spare capacity */
+
+    /* Shadow the segments nearest the flush head first: those gate everything. */
+    for (uint32_t i = s->flush_idx; i < s->num_segs && idle_count > 0; i++) {
+        par_hdr_seg *seg = &s->segs[i];
+        if (seg->complete || seg->node_id == -1 || seg->shadow_id != -1) continue;
+
+        dogecoin_node *cand = NULL;
+        for (size_t j = 0; j < client->nodegroup->nodes->len && !cand; j++) {
+            dogecoin_node *n = vector_idx(client->nodegroup->nodes, j);
+            if (!n || !(n->state & NODE_CONNECTED) || !n->version_handshake) continue;
+            if ((int)n->nodeid == seg->node_id) continue;
+            dogecoin_bool busy = false;
+            for (uint32_t k = 0; k < s->num_segs && !busy; k++)
+                if (s->segs[k].node_id == (int)n->nodeid ||
+                    s->segs[k].shadow_id == (int)n->nodeid) busy = true;
+            if (!busy) cand = n;
+        }
+        if (!cand) return;
+
+        seg->shadow_id = (int)cand->nodeid;
+        seg->shadow_at = now;
+        idle_count--;
+
+        if (client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] racing segment %u: node %d shadowing node %d "
+                "(resuming at %u)\n", i, seg->shadow_id, seg->node_id,
+                seg->tip_height + 1);
+
+        par_hdr_send_getheaders(cand, seg);
+    }
+}
+
 static void par_hdr_preempt_head(dogecoin_spv_client *client, uint64_t now)
 {
     par_hdr_state *s = client->par_hdr;
@@ -3040,14 +3138,25 @@ static void par_hdr_preempt_head(dogecoin_spv_client *client, uint64_t now)
         uint32_t r = par_hdr_seg_rate(&s->segs[i], now);
         if (r > 0) rates[n++] = r;
     }
-    if (n < 3) return; /* too few samples to call anything an outlier */
-
-    for (uint32_t i = 1; i < n; i++) { /* insertion sort, n <= 64 */
-        uint32_t v = rates[i], j = i;
-        while (j > 0 && rates[j - 1] > v) { rates[j] = rates[j - 1]; j--; }
-        rates[j] = v;
+    /* Remember the median while a crowd exists, because the tail has none:
+     * once every other segment has completed their node_id is -1 and
+     * par_hdr_seg_rate() reports 0 for all of them, so n falls to 0 exactly
+     * when the head is the only thing left and preemption matters most.
+     * Fall back to the last crowd-derived median in that case. */
+    uint32_t median;
+    if (n >= 3) {
+        for (uint32_t i = 1; i < n; i++) {
+            uint32_t v = rates[i], j = i;
+            while (j > 0 && rates[j - 1] > v) { rates[j] = rates[j - 1]; j--; }
+            rates[j] = v;
+        }
+        median = rates[n / 2];
+        s->rate_ref = median;
+    } else if (s->rate_ref > 0) {
+        median = s->rate_ref;
+    } else {
+        return; /* never saw a crowd; nothing to call an outlier against */
     }
-    uint32_t median = rates[n / 2];
 
     if (head_rate * PAR_HDR_SLOW_FACTOR >= median) return; /* not an outlier */
 
@@ -3126,6 +3235,8 @@ LIBDOGECOIN_API void par_hdr_reclaim(dogecoin_spv_client *client, uint64_t now)
         if (owner) owner->state &= ~NODE_HEADERSYNC;
         seg->node_id      = -1;
         seg->requested_at = 0;
+        seg->shadow_id    = -1;
+        seg->shadow_at    = 0;
     }
 
     /* 2. Hand any free segment to a peer that is not already working one. */
@@ -3140,6 +3251,7 @@ LIBDOGECOIN_API void par_hdr_reclaim(dogecoin_spv_client *client, uint64_t now)
 
     /* 3. A live but slow owner of the flush head throttles everything above it. */
     par_hdr_preempt_head(client, now);
+    par_hdr_race_tail(client, now);
 
     /* 4. Warn if the ordered flush has stopped advancing. */
     if (s->flush_idx != s->last_flush_idx) {
