@@ -297,10 +297,10 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
 
     if (chain == &dogecoin_chainparams_main) {
         checkpoints = dogecoin_mainnet_checkpoint_array;
-        count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+        count = (int)(dogecoin_mainnet_checkpoint_count);
     } else if (chain == &dogecoin_chainparams_test) {
         checkpoints = dogecoin_testnet_checkpoint_array;
-        count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+        count = (int)(dogecoin_testnet_checkpoint_count);
     } else {
         return -1;
     }
@@ -405,10 +405,10 @@ void spv_sync_completed(dogecoin_spv_client* client) {
 
             if (client->chainparams == &dogecoin_chainparams_main) {
                 checkpoints = dogecoin_mainnet_checkpoint_array;
-                checkpoint_count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+                checkpoint_count = (int)(dogecoin_mainnet_checkpoint_count);
             } else if (client->chainparams == &dogecoin_chainparams_test) {
                 checkpoints = dogecoin_testnet_checkpoint_array;
-                checkpoint_count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+                checkpoint_count = (int)(dogecoin_testnet_checkpoint_count);
             }
             if (checkpoints && checkpoint_count > 0) {
                 suggested_checkpoint_height = (int)checkpoints[0].height;

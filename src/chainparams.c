@@ -178,6 +178,13 @@ const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[] = {
     {6275000, "63c89f44fe3ce35d6abaa297d32d75826ce4368027e098f816432f68c2bedbd6", 1783120876, 0x1979F333},
     {6300000, "e35560d7a6dda44da8fd5d3fea4025319ac5d6287dc3c1308cde650e51e12e58", 1784704739, 0x19671029}};
 
+/* Counts defined next to the arrays. sizeof() on the extern declarations
+   yields whatever bound the header states, not the real length: chainparams.h
+   said [87] and libdogecoin.h said [33] while this file defined 89, so callers
+   silently saw a truncated array. */
+const size_t dogecoin_mainnet_checkpoint_count =
+    sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
+
 const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[] = {
     {0, "bb0a78264637406b6360aad926284d544d7049f45189db5664f3c4d07350559e", 1391503289, 0x1e0ffff0},
     {483173, "a804201ca0aceb7e937ef7a3c613a9b7589245b10cc095148c4ce4965b0b73b5", 1427629321, 0x1e0fffff},
@@ -266,3 +273,6 @@ dogecoin_bool isMainnetFromB58Prefix(const char address[P2PKHLEN]) {
     /* Check if chainparams is mainnet */
     return (chainparams == &dogecoin_chainparams_main);
 }
+
+const size_t dogecoin_testnet_checkpoint_count =
+    sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);

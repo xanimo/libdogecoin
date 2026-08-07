@@ -850,8 +850,8 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector_t *
         if (client->use_checkpoints && client->oldest_item_of_interest > BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) {
             dogecoin_bool is_main = (client->chainparams && strcmp(client->chainparams->chainname, "main") == 0);
             const dogecoin_checkpoint *checkpoint = is_main ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
-            size_t mainnet_checkpoint_size = sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
-            size_t testnet_checkpoint_size = sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);
+            size_t mainnet_checkpoint_size = dogecoin_mainnet_checkpoint_count;
+            size_t testnet_checkpoint_size = dogecoin_testnet_checkpoint_count;
             size_t length = is_main ? mainnet_checkpoint_size : testnet_checkpoint_size;
             int i;
             for (i = (int)length - 1; i >= 0; i--) {
@@ -884,6 +884,7 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector_t *
  * @param node The node that is requesting headers or blocks.
  * @param blocks boolean, true if we want to request blocks, false if we want to request headers
  */
+
 void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogecoin_bool blocks)
 {
     // request next headers
@@ -2631,12 +2632,10 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
     size_t cnt = 0;
     if (strcmp(params->chainname, "main") == 0) {
         arr = dogecoin_mainnet_checkpoint_array;
-        cnt = sizeof(dogecoin_mainnet_checkpoint_array) /
-              sizeof(dogecoin_mainnet_checkpoint_array[0]);
+        cnt = dogecoin_mainnet_checkpoint_count;
     } else if (strcmp(params->chainname, "test") == 0) {
         arr = dogecoin_testnet_checkpoint_array;
-        cnt = sizeof(dogecoin_testnet_checkpoint_array) /
-              sizeof(dogecoin_testnet_checkpoint_array[0]);
+        cnt = dogecoin_testnet_checkpoint_count;
     }
     if (!cnt) return NULL;
 
