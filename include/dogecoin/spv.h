@@ -56,6 +56,12 @@ typedef struct spv_block_sample_
 
 #define PAR_HDR_RAW_LEN 80
 
+/* How many times a segment may fail to connect at flush before the parallel
+ * downloader gives up entirely and lets the sequential path take over. Each
+ * retry re-requests the segment from whatever the primary DB actually reached,
+ * usually from a different peer. */
+#define PAR_HDR_MAX_FLUSH_FAILS 3
+
 /* One parallel header-download segment.  Each segment spans the open-closed
  * height interval (start_height, stop_height] and is assigned to one node. */
 typedef struct par_hdr_seg_ {
@@ -81,6 +87,7 @@ typedef struct par_hdr_seg_ {
 
     dogecoin_bool complete;   /* all stop_height - start_height headers received */
     dogecoin_bool flushed;    /* segment has been flushed into the primary DB    */
+    uint32_t  flush_fails;    /* times this segment failed to connect at flush   */
 } par_hdr_seg;
 
 /* Top-level state for a parallel genesis header download. */

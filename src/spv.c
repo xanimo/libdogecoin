@@ -2810,11 +2810,91 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
                 }
                 bad++;
                 dogecoin_free(pindex); /* orphan — not in DB */
+                /* Stop at the first failure. Header j+1 chains off header j,
+                 * which is not in the DB, so nothing after this point can
+                 * connect either -- continuing would allocate and free an
+                 * orphan per remaining header and blur where the chain broke. */
+                break;
             } else {
                 if (pindex && client->header_connected)
                     client->header_connected(client);
                 /* pindex is now db->chaintip — owned by the DB, do NOT free */
             }
+        }
+
+        if (bad) {
+            /* Do NOT mark this segment flushed or advance flush_idx. The old
+             * code did both unconditionally and freed the staging buffer, so a
+             * mid-segment connect failure lost those headers permanently, left
+             * a hole in the chain, and let every later segment fail the same
+             * way until flush_idx ran off the end and the sync reported "all
+             * segments complete" over a broken chain.
+             *
+             * Instead, resume the segment from what the DB actually reached.
+             * Headers 0..j-1 did connect, so the chaintip is the correct
+             * locator; re-requesting from start_hash would replay those and
+             * fail immediately. The buffer is dropped and the segment is put
+             * back up for assignment, usually landing on a different peer. */
+            seg->flush_fails++;
+
+            uint64_t staged = (uint64_t)seg->count * PAR_HDR_RAW_LEN;
+            s->buffered_bytes = (s->buffered_bytes > staged)
+                              ? s->buffered_bytes - staged : 0;
+            dogecoin_free(seg->buf);
+            seg->buf   = NULL;
+            seg->cap   = 0;
+            seg->count = 0;
+
+            if (hdb && hdb->chaintip) {
+                memcpy(seg->tip_hash, hdb->chaintip->hash, DOGECOIN_HASH_LENGTH);
+                seg->tip_height = (uint32_t)hdb->chaintip->height;
+            } else {
+                memcpy(seg->tip_hash, seg->start_hash, DOGECOIN_HASH_LENGTH);
+                seg->tip_height = seg->start_height;
+            }
+
+            seg->complete        = false;
+            seg->node_id         = -1;
+            seg->shadow_id       = -1;
+            seg->shadow_at       = 0;
+            seg->count_at_assign = 0;
+
+            if (seg->flush_fails >= PAR_HDR_MAX_FLUSH_FAILS) {
+                /* Retrying has not helped, so the range is not merely a bad
+                 * peer. Hand the rest of the chain to the sequential path,
+                 * which verifies AUXPoW and can make progress from the real
+                 * chaintip without trusting segment boundaries. */
+                s->active = false;
+
+                /* Segments past flush_idx may be complete and still holding
+                 * their staging buffers. Nothing will flush them now, and on
+                 * mainnet that is most of the chain resident for the rest of
+                 * the run, so release them here rather than at teardown. */
+                for (uint32_t k = s->flush_idx + 1; k < s->num_segs; k++) {
+                    if (!s->segs[k].buf) continue;
+                    uint64_t held = (uint64_t)s->segs[k].count * PAR_HDR_RAW_LEN;
+                    s->buffered_bytes = (s->buffered_bytes > held)
+                                      ? s->buffered_bytes - held : 0;
+                    dogecoin_free(s->segs[k].buf);
+                    s->segs[k].buf   = NULL;
+                    s->segs[k].cap   = 0;
+                    s->segs[k].count = 0;
+                }
+
+                if (client->nodegroup && client->nodegroup->log_write_cb)
+                    client->nodegroup->log_write_cb(
+                        "[par-hdr] segment %u failed to connect %u times — "
+                        "disabling parallel download, falling back to "
+                        "sequential from height %u\n",
+                        s->flush_idx, seg->flush_fails, seg->tip_height);
+            } else if (client->nodegroup && client->nodegroup->log_write_cb) {
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] segment %u: connect failed, re-requesting from "
+                    "height %u (attempt %u of %u)\n",
+                    s->flush_idx, seg->tip_height,
+                    seg->flush_fails, (uint32_t)PAR_HDR_MAX_FLUSH_FAILS);
+            }
+            break;
         }
 
         seg->flushed = true;
@@ -2830,8 +2910,6 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         dogecoin_free(seg->buf);
         seg->buf = NULL;
         seg->cap = 0;
-
-        if (bad) break; /* stop flushing if chain broke; caller handles */
     }
 
     if (hdb) {
@@ -2951,8 +3029,14 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
      * other than the continuation it was asked for. */
     if (count > 0 && buf->len >= PAR_HDR_RAW_LEN) {
         const uint8_t *first_prev = (const uint8_t *)buf->p + 4; /* version(4) */
-        const uint8_t *expected   = seg->count ? (const uint8_t *)seg->tip_hash
-                                               : (const uint8_t *)seg->start_hash;
+        /* tip_hash is always the right anchor: it is seeded from start_hash when
+         * the segment is built, advanced per header received, and re-seeded from
+         * the primary DB chaintip when a flush fails. Selecting start_hash on
+         * count == 0 instead would be wrong in that last case -- the segment has
+         * no buffered headers but the DB is already past start_height, so every
+         * correctly-served batch would be rejected and the segment would be
+         * re-requested forever. */
+        const uint8_t *expected   = (const uint8_t *)seg->tip_hash;
         if (memcmp(first_prev, expected, DOGECOIN_HASH_LENGTH) != 0) {
             if (client->nodegroup && client->nodegroup->log_write_cb)
                 client->nodegroup->log_write_cb(
