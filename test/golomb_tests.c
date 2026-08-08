@@ -29,6 +29,8 @@
 
 #include <test/utest.h>
 
+#include "data/bip158_vectors.h"
+
 #include <dogecoin/golomb.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/serialize.h>
@@ -489,6 +491,69 @@ static void test_gcs_filter_deser_rejects_oversized_n(void)
     cstr_free(payload, true);
 }
 
+
+/* ================================================================ */
+/*  BIP158 known-answer vectors                                     */
+/* ================================================================ */
+
+static void bip158_hex_rev32(const char *hex, uint8_t out[32])
+{
+    uint8_t tmp[32];
+    size_t outlen = 0;
+    utils_hex_to_bin((char *)hex, tmp, 64, &outlen);
+    int i;
+    for (i = 0; i < 32; i++) out[i] = tmp[31 - i];
+}
+
+/* Everything else in this file is a round-trip or a property: it checks that
+   this implementation agrees with itself. That cannot detect a filter which is
+   internally consistent and incompatible with every other node, which is the
+   failure mode that matters for a consensus-visible format. These are the
+   published bytes. */
+static void test_gcs_bip158_vectors(void)
+{
+    int v;
+    for (v = 0; v < BIP158_VECTOR_COUNT; v++) {
+        const bip158_vector *t = &bip158_vectors[v];
+
+        vector_t *elements = vector_new(t->n_elements ? t->n_elements : 1, cstr_free_cb);
+        int k;
+        for (k = 0; k < t->n_elements; k++) {
+            vector_add(elements, cstr_new_buf(t->elements[k], t->element_len[k]));
+        }
+
+        uint256_t blockhash;
+        bip158_hex_rev32(t->blockhash, blockhash);
+
+        /* construction: the serialized filter must be byte-identical */
+        gcs_filter *f = gcs_filter_new();
+        u_assert_true(gcs_filter_build(f, GCS_BASIC_FILTER_TYPE, blockhash, elements));
+
+        cstring *ser = cstr_new_sz(64);
+        gcs_filter_serialize(f, ser);
+
+        size_t expect_len = strlen(t->filter) / 2;
+        u_assert_int_eq((int)ser->len, (int)expect_len);
+
+        uint8_t *expect = dogecoin_calloc(expect_len ? expect_len : 1, 1);
+        size_t got_len = 0;
+        utils_hex_to_bin((char *)t->filter, expect, strlen(t->filter), &got_len);
+        u_assert_int_eq(memcmp(ser->str, expect, expect_len), 0);
+        dogecoin_free(expect);
+
+        /* header chain: dbl_sha256(dbl_sha256(N||data) || prev_header) */
+        uint256_t prev_header, want_header, got_header;
+        bip158_hex_rev32(t->prev_header, prev_header);
+        bip158_hex_rev32(t->header, want_header);
+        u_assert_true(gcs_filter_compute_header(f, prev_header, got_header));
+        u_assert_int_eq(memcmp(got_header, want_header, 32), 0);
+
+        cstr_free(ser, true);
+        gcs_filter_free(f);
+        vector_free(elements, true);
+    }
+}
+
 /* ================================================================ */
 /*  Public test entry point                                         */
 /* ================================================================ */
@@ -510,4 +575,5 @@ void test_golomb(void)
     test_gcs_derive_key();
     test_gcs_filter_duplicate_elements();
     test_gcs_filter_deser_rejects_oversized_n();
+    test_gcs_bip158_vectors();
 }

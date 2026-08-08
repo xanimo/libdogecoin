@@ -377,6 +377,7 @@ tests_SOURCES += \
     test/raccoong_sign_tests.c \
     test/data/auxpow_block_371338.h \
     test/data/bip152_vectors.h \
+    test/data/bip158_vectors.h \
     test/data/raccoong_polyr_vectors.h \
     test/data/raccoong_ntt_vectors.h \
     test/data/raccoong_gaussian_vectors.h \
