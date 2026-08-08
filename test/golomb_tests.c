@@ -403,6 +403,92 @@ static void test_gcs_derive_key(void)
     u_assert_mem_eq(key, blockhash, GCS_SIPHASH_KEY_SIZE);
 }
 
+
+/* ================================================================ */
+/*  Canonicality: duplicates must not change the encoded filter     */
+/* ================================================================ */
+
+static void test_gcs_filter_duplicate_elements(void)
+{
+    uint256_t blockhash;
+    memset(blockhash, 0xAB, sizeof(blockhash));
+
+    static const char *raw[3] = { "script-alpha", "script-beta", "script-gamma" };
+
+    /* the distinct set */
+    vector_t *uniq = vector_new(3, cstr_free_cb);
+    int i;
+    for (i = 0; i < 3; i++) vector_add(uniq, cstr_new(raw[i]));
+    gcs_filter *fu = gcs_filter_new();
+    u_assert_true(gcs_filter_build(fu, GCS_BASIC_FILTER_TYPE, blockhash, uniq));
+
+    /* the same set with every element repeated, and out of order */
+    vector_t *dup = vector_new(6, cstr_free_cb);
+    for (i = 2; i >= 0; i--) vector_add(dup, cstr_new(raw[i]));
+    for (i = 0; i < 3; i++) vector_add(dup, cstr_new(raw[i]));
+    gcs_filter *fd = gcs_filter_new();
+    u_assert_true(gcs_filter_build(fd, GCS_BASIC_FILTER_TYPE, blockhash, dup));
+
+    /* N is the distinct count, not the input length. Leaving duplicates in
+       would emit a zero delta and inflate N, producing a filter that still
+       round-trips here but differs byte for byte from every other
+       implementation for the same block. */
+    u_assert_uint32_eq(fu->N, 3);
+    u_assert_uint32_eq(fd->N, 3);
+    u_assert_int_eq((int)fd->encoded->len, (int)fu->encoded->len);
+    u_assert_int_eq(memcmp(fd->encoded->str, fu->encoded->str, fu->encoded->len), 0);
+
+    /* and every element still matches through the deduplicated filter */
+    for (i = 0; i < 3; i++) {
+        u_assert_true(gcs_filter_match(fd, (const uint8_t *)raw[i], strlen(raw[i])));
+    }
+
+    gcs_filter_free(fu);
+    gcs_filter_free(fd);
+    vector_free(uniq, true);
+    vector_free(dup, true);
+}
+
+/* ================================================================ */
+/*  A peer-supplied N must be bounded by what the payload can hold  */
+/* ================================================================ */
+
+static void test_gcs_filter_deser_rejects_oversized_n(void)
+{
+    uint256_t blockhash;
+    memset(blockhash, 0x11, sizeof(blockhash));
+
+    /* claim 4 billion elements behind four bytes of payload */
+    cstring *payload = cstr_new_sz(16);
+    ser_varlen(payload, 0xFFFFFFFFu);
+    cstr_append_buf(payload, "\x01\x02\x03\x04", 4);
+
+    struct const_buffer buf = { payload->str, payload->len };
+    gcs_filter *f = gcs_filter_new();
+    u_assert_true(gcs_filter_deserialize(f, GCS_BASIC_FILTER_TYPE, blockhash, &buf) == false);
+    gcs_filter_free(f);
+
+    /* a filter whose N is consistent with its payload still deserializes */
+    vector_t *elements = vector_new(2, cstr_free_cb);
+    vector_add(elements, cstr_new("a"));
+    vector_add(elements, cstr_new("b"));
+    gcs_filter *src = gcs_filter_new();
+    u_assert_true(gcs_filter_build(src, GCS_BASIC_FILTER_TYPE, blockhash, elements));
+
+    cstring *ser = cstr_new_sz(64);
+    gcs_filter_serialize(src, ser);
+    struct const_buffer ok = { ser->str, ser->len };
+    gcs_filter *rt = gcs_filter_new();
+    u_assert_true(gcs_filter_deserialize(rt, GCS_BASIC_FILTER_TYPE, blockhash, &ok));
+    u_assert_uint32_eq(rt->N, src->N);
+
+    gcs_filter_free(src);
+    gcs_filter_free(rt);
+    vector_free(elements, true);
+    cstr_free(ser, true);
+    cstr_free(payload, true);
+}
+
 /* ================================================================ */
 /*  Public test entry point                                         */
 /* ================================================================ */
@@ -422,4 +508,6 @@ void test_golomb(void)
     test_gcs_filter_serialize_deser();
     test_gcs_filter_header();
     test_gcs_derive_key();
+    test_gcs_filter_duplicate_elements();
+    test_gcs_filter_deser_rejects_oversized_n();
 }

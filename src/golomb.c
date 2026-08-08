@@ -86,6 +86,20 @@ static int compare_uint64(const void *a, const void *b) {
     return 0;
 }
 
+/**
+ * @brief Order two filter elements by content, for duplicate collapsing.
+ *
+ * Shorter sorts first, then memcmp. The ordering itself is arbitrary and never
+ * reaches the wire -- only the grouping of equal elements matters, since the
+ * hashes are sorted separately afterwards.
+ */
+static int compare_element(const void *a, const void *b) {
+    const cstring *x = *(const cstring * const *)a;
+    const cstring *y = *(const cstring * const *)b;
+    if (x->len != y->len) return x->len < y->len ? -1 : 1;
+    return memcmp(x->str, y->str, x->len);
+}
+
 /* ================================================================ */
 /*  Bitwriter Implementation                                        */
 /* ================================================================ */
@@ -254,27 +268,68 @@ dogecoin_bool gcs_filter_build(gcs_filter *filter, uint8_t filter_type, const ui
     filter->filter_type = filter_type;
     filter->P = GCS_BASIC_FILTER_P;
     filter->M = GCS_BASIC_FILTER_M;
-    filter->N = (uint32_t)elements->len;
-    filter->F = (uint64_t)filter->N * (uint64_t)filter->M;
 
     /* Derive the SipHash key from the block hash */
     gcs_derive_key(blockhash, filter->key);
 
     /* Handle empty filter */
-    if (filter->N == 0) {
+    if (elements->len == 0) {
+        filter->N = 0;
+        filter->F = 0;
         filter->encoded = cstr_new_sz(0);
         return true;
     }
 
-    /* Hash all elements and collect into a sorted array */
-    uint64_t *hashes = dogecoin_calloc(filter->N, sizeof(uint64_t));
-    if (!hashes) return false;
+    /* Collapse duplicate elements before anything else.
+     *
+     * BIP158 encodes a set. The reference construction hashes into a Python
+     * set; Core's GCSFilter takes an ElementSet (unordered_set), so equal
+     * elements appear once and N is the count after collapsing. Taking a
+     * vector_t here means callers can hand us repeats -- and they will, since
+     * elements are scriptPubKeys and a block that pays the same script twice
+     * supplies one.
+     *
+     * Left in, a repeat inflates N and emits a zero delta. The result still
+     * round-trips through this implementation and differs, byte for byte, from
+     * what every other implementation produces for the same block: a
+     * non-canonical filter, whose hash and therefore whose filter-header chain
+     * will not match peers.
+     *
+     * Note this collapses equal *elements*, not equal hashes. Two distinct
+     * elements that reduce into the same slot of [0, F) stay as two entries and
+     * encode a zero delta, which is what Core does -- BuildHashedSet sorts but
+     * does not unique. Collapsing those instead would be a different, equally
+     * incompatible filter. */
+    cstring **distinct = dogecoin_calloc(elements->len, sizeof(cstring *));
+    if (!distinct) return false;
 
     unsigned int i;
-    for (i = 0; i < filter->N; i++) {
-        cstring *elem = (cstring *)vector_idx(elements, i);
-        hashes[i] = gcs_hash_element(filter->key, filter->F, (const uint8_t *)elem->str, elem->len);
+    for (i = 0; i < (unsigned int)elements->len; i++) {
+        distinct[i] = (cstring *)vector_idx(elements, i);
     }
+    qsort(distinct, elements->len, sizeof(cstring *), compare_element);
+
+    uint32_t n_distinct = 0;
+    for (i = 0; i < (unsigned int)elements->len; i++) {
+        if (n_distinct == 0 || compare_element(&distinct[n_distinct - 1], &distinct[i]) != 0) {
+            distinct[n_distinct++] = distinct[i];
+        }
+    }
+
+    /* N, and therefore the range F that every element is reduced into, are
+     * fixed by the distinct count. A decoder recovers F the same way from the
+     * serialized N, so this has to be settled before the first hash. */
+    filter->N = n_distinct;
+    filter->F = (uint64_t)filter->N * (uint64_t)filter->M;
+
+    uint64_t *hashes = dogecoin_calloc(filter->N, sizeof(uint64_t));
+    if (!hashes) { dogecoin_free(distinct); return false; }
+
+    for (i = 0; i < filter->N; i++) {
+        hashes[i] = gcs_hash_element(filter->key, filter->F,
+                                     (const uint8_t *)distinct[i]->str, distinct[i]->len);
+    }
+    dogecoin_free(distinct);
 
     /* Sort hashes */
     qsort(hashes, filter->N, sizeof(uint64_t), compare_uint64);
@@ -492,6 +547,23 @@ dogecoin_bool gcs_filter_deserialize(gcs_filter *filter, uint8_t filter_type, co
     /* Deserialize: N (CompactSize) || encoded_filter_data */
     uint32_t N;
     if (!deser_varlen(&N, buf)) return false;
+
+    /* N arrives from a peer and nothing downstream re-derives it, so bound it
+     * against what the payload could actually hold. Golomb-Rice with this P
+     * spends at least P + 1 bits per element -- one stop bit for a zero
+     * quotient, plus the P-bit remainder -- so a filter claiming more elements
+     * than (8 * len) / (P + 1) is malformed by construction.
+     *
+     * Without this a peer can claim N near 2^32 with a short payload. The
+     * decode loops in gcs_filter_match and gcs_filter_match_any do terminate,
+     * because golomb_rice_decode fails at the end of the buffer, so this is
+     * not a live denial of service today. It is a guard for the consumers that
+     * land on top of this: anything that trusts N for sizing, progress
+     * accounting or comparison against a checkpoint gets a value the data
+     * cannot back. Rejecting here is cheaper than auditing each of them. */
+    uint64_t max_n = ((uint64_t)buf->len * 8) / (uint64_t)(GCS_BASIC_FILTER_P + 1);
+    if ((uint64_t)N > max_n) return false;
+
     filter->N = N;
     filter->F = (uint64_t)N * (uint64_t)filter->M;
 
