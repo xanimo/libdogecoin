@@ -2755,6 +2755,120 @@ LIBDOGECOIN_API void par_hdr_assign(dogecoin_spv_client *client, dogecoin_node *
 
 /* Flush completed segments (in order) into the primary headers DB.
  * Returns the number of segments flushed. */
+/* Check the invariants the segment array is supposed to hold, and log any that
+ * do not. Returns the number of violations, 0 when healthy.
+ *
+ * Deliberately not assert(). This codebase compiles with NDEBUG in release, so
+ * an assert here would document the invariants while checking them only in
+ * builds nobody ships. These conditions are cheap -- one pass over ~89
+ * segments -- and the failures they describe are silent ones, which is exactly
+ * the case for paying at runtime.
+ *
+ * Called after the operations that mutate segment ownership or flush state.
+ * It reports rather than aborts: a violation means a bug in this file, and
+ * killing a node mid-sync is a worse outcome than finishing with a diagnostic
+ * in the log. */
+static uint32_t par_hdr_check(dogecoin_spv_client *client, const char *where)
+{
+    par_hdr_state *s = client->par_hdr;
+    uint32_t bad = 0;
+    uint32_t i;
+
+    if (!s) return 0;
+
+#define PAR_HDR_BAD(fmt, ...)                                                  \
+    do {                                                                       \
+        bad++;                                                                 \
+        if (client->nodegroup && client->nodegroup->log_write_cb)              \
+            client->nodegroup->log_write_cb("[par-hdr][INVARIANT] %s: " fmt,   \
+                                            where, __VA_ARGS__);               \
+    } while (0)
+
+    /* flush_idx only ever moves forward, and never past the end. */
+    if (s->flush_idx > s->num_segs)
+        PAR_HDR_BAD("flush_idx %u exceeds num_segs %u\n",
+                    s->flush_idx, s->num_segs);
+
+    for (i = 0; i < s->num_segs; i++) {
+        const par_hdr_seg *seg = &s->segs[i];
+
+        /* A segment below flush_idx has been written to the DB; one at or
+         * above it has not. Ordered flushing is what lets the downloader skip
+         * proof-of-work, so a hole here breaks the anchoring argument. */
+        if (i < s->flush_idx && !seg->flushed)
+            PAR_HDR_BAD("segment %u is below flush_idx %u but not flushed\n",
+                        i, s->flush_idx);
+        if (i >= s->flush_idx && seg->flushed)
+            PAR_HDR_BAD("segment %u is at/above flush_idx %u but flushed\n",
+                        i, s->flush_idx);
+
+        /* Flushed implies complete, and implies the staging buffer is gone --
+         * that release is what keeps peak RSS off the size of the chain. */
+        if (seg->flushed && !seg->complete)
+            PAR_HDR_BAD("segment %u flushed but not complete\n", i);
+        if (seg->flushed && seg->buf)
+            PAR_HDR_BAD("segment %u flushed but still holds its buffer\n", i);
+
+        /* A completed segment is owned by nobody: par_hdr_assign only
+         * considers !complete && node_id == -1, so a complete segment with an
+         * owner leaks that peer out of the assignment pool for the rest of the
+         * run. */
+        if (seg->complete && seg->node_id != -1)
+            PAR_HDR_BAD("segment %u complete but still owned by node %d\n",
+                        i, seg->node_id);
+        if (seg->complete && seg->shadow_id != -1)
+            PAR_HDR_BAD("segment %u complete but still shadowed by node %d\n",
+                        i, seg->shadow_id);
+
+        /* A shadow races the owner; it is meaningless without one, and a peer
+         * cannot race itself. */
+        if (seg->shadow_id != -1 && seg->node_id == -1)
+            PAR_HDR_BAD("segment %u has shadow %d but no owner\n",
+                        i, seg->shadow_id);
+        if (seg->shadow_id != -1 && seg->shadow_id == seg->node_id)
+            PAR_HDR_BAD("segment %u shadowed by its own owner %d\n",
+                        i, seg->node_id);
+
+        /* Heights bracket the range this segment is responsible for. */
+        if (seg->stop_height <= seg->start_height)
+            PAR_HDR_BAD("segment %u stop %u is not above start %u\n",
+                        i, seg->stop_height, seg->start_height);
+        if (seg->tip_height < seg->start_height)
+            PAR_HDR_BAD("segment %u tip %u is below start %u\n",
+                        i, seg->tip_height, seg->start_height);
+
+        /* count is the number of headers staged in buf -- but only until the
+         * segment is flushed, after which the buffer is released and count is
+         * kept as the record of how many headers went in. So this pair only
+         * describes unflushed segments. */
+        if (!seg->flushed) {
+            if (seg->count > 0 && !seg->buf)
+                PAR_HDR_BAD("segment %u claims %u staged headers with no buffer\n",
+                            i, seg->count);
+            if (seg->count > seg->cap)
+                PAR_HDR_BAD("segment %u count %u exceeds capacity %u\n",
+                            i, seg->count, seg->cap);
+        }
+
+        /* One peer, one segment. Two segments owned by the same node means
+         * par_hdr_recv cannot tell which one a batch belongs to -- it matches
+         * on node_id and takes the first. */
+        if (seg->node_id != -1) {
+            uint32_t j;
+            for (j = i + 1; j < s->num_segs; j++) {
+                if (s->segs[j].complete) continue;
+                if (s->segs[j].node_id == seg->node_id)
+                    PAR_HDR_BAD("node %d owns both segment %u and %u\n",
+                                seg->node_id, i, j);
+            }
+        }
+    }
+
+#undef PAR_HDR_BAD
+
+    return bad;
+}
+
 static uint32_t par_hdr_flush(dogecoin_spv_client *client)
 {
     par_hdr_state *s = client->par_hdr;
@@ -2923,6 +3037,8 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         s->last_flush_idx     = s->flush_idx;
         s->last_progress_time = (uint64_t)time(NULL);
     }
+
+    par_hdr_check(client, "after flush");
 
     return flushed;
 }
@@ -3212,6 +3328,8 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
 
         /* Re-assign this node to the next segment */
         par_hdr_assign(client, node);
+
+        par_hdr_check(client, "after segment complete");
 
         /* Check if all segments are done */
         if (s->flush_idx >= s->num_segs) {
