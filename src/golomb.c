@@ -444,6 +444,24 @@ dogecoin_bool gcs_filter_match_any(const gcs_filter *filter, const vector_t *ele
 /*  BIP 158 Basic Filter Construction                               */
 /* ================================================================ */
 
+/* Groundwork, deliberately unused.
+ *
+ * Nothing in libdogecoin calls this. The BIP157 stack built on top of this file
+ * is consume-only: it sends getcfilters/getcfheaders/getcfcheckpt and parses the
+ * responses, and there are no handlers for inbound requests, no deserializers
+ * for the request messages, and no serializers for the response messages.
+ * Building a filter is what a *server* does.
+ *
+ * Serving is not a matter of wiring up the missing messages. A basic filter
+ * includes the scriptPubKey of every input's prevout -- the prev_output_scripts
+ * argument below -- which the node must already hold. That needs a UTXO set or
+ * the ability to fetch every spent transaction, and libdogecoin stores headers.
+ * Until block storage and a UTXO index exist, there is nothing to build filters
+ * from.
+ *
+ * Kept because it is the correct primitive and it pins the element-selection
+ * rules next to the encoder they have to agree with. Anyone wiring up serving
+ * starts here rather than re-deriving it. */
 dogecoin_bool gcs_build_basic_filter(gcs_filter *filter, const uint256_t blockhash, const vector_t *txs, const vector_t *prev_output_scripts) {
     if (!filter || !txs) return false;
 
