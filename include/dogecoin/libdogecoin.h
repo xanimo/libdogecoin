@@ -212,8 +212,13 @@ int verifyHDMasterPubKeypair(char hd_privkey_master[HDKEYLEN], char p2pkh_pubkey
 /* verify that a dogecoin address is valid. */
 int verifyP2pkhAddress(char p2pkh_pubkey[P2PKHLEN], size_t len);
 
-/* get derived hd address */
-int getDerivedHDAddress(const char masterkey[HDKEYLEN], uint32_t account, dogecoin_bool ischange, uint32_t addressindex, char outaddress[P2PKHLEN], dogecoin_bool outprivkey);
+/* get derived hd extended key at m/44'/3'/<account>'/<ischange>/<addressindex>.
+ *
+ * NOTE: despite the name, this writes a serialized extended key (dgpv.../dgub...),
+ * not a P2PKH address, and it writes up to HDKEYLEN bytes.  The output buffer
+ * must be sized accordingly.  See issue #217.  If you want an address, use
+ * getDerivedHDAddressAsP2PKH() instead. */
+int getDerivedHDAddress(const char masterkey[HDKEYLEN], uint32_t account, dogecoin_bool ischange, uint32_t addressindex, char outaddress[HDKEYLEN], dogecoin_bool outprivkey);
 
 /* get derived hd p2pkh address */
 int getDerivedHDAddressAsP2PKH(const char masterkey[HDKEYLEN], uint32_t account, dogecoin_bool ischange, uint32_t addressindex, char outp2pkh[P2PKHLEN]);
