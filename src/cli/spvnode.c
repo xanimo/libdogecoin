@@ -179,14 +179,14 @@ become_daemon(int flags)
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
-        {"ips", no_argument, NULL, 'i'},
+        {"ips", required_argument, NULL, 'i'},
         {"debug", no_argument, NULL, 'd'},
-        {"maxnodes", no_argument, NULL, 'm'},
-        {"mnemonic", no_argument, NULL, 'n'},
+        {"maxnodes", required_argument, NULL, 'm'},
+        {"mnemonic", required_argument, NULL, 'n'},
         {"pass_phrase", no_argument, NULL, 's'},
-        {"dbfile", no_argument, NULL, 'f'},
+        {"dbfile", required_argument, NULL, 'f'},
         {"continuous", no_argument, NULL, 'c'},
-        {"address", no_argument, NULL, 'a'},
+        {"address", required_argument, NULL, 'a'},
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
         {"wallet_file", required_argument, NULL, 'w'},
@@ -487,7 +487,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgq", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkjxgq", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
