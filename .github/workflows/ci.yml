@@ -735,6 +735,51 @@ jobs:
           UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
         run: make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
 
+  # ---------------------------------------------------------------------------
+  # CMake build-system parity gate.
+  #
+  # CMake is only exercised by the three x86_64-win-native legs, all of which
+  # build WITH_NET=ON. Every Linux leg uses autotools. So CMakeLists.txt and
+  # Makefile.am can describe different libraries indefinitely and nothing
+  # notices, and WITH_NET=OFF is never built under CMake at all.
+  #
+  # That blind spot has produced three separate link failures: compact_filter.c
+  # and compact_block.c were each unconditional in Makefile.am but inside
+  # IF(WITH_NET) in CMake while their tests were registered unconditionally, and
+  # cf_checkpoints.c was PRIVATE where it had to be PUBLIC. Each surfaced only on
+  # Windows, which made a build-system disagreement look platform-specific.
+  #
+  # Builds both configurations natively and runs the suite for each. Neither the
+  # depends tree nor autotools is involved: libevent and secp256k1 are vendored
+  # in-tree and CMake drives them itself.
+  # ---------------------------------------------------------------------------
+  cmake-parity:
+    name: x86_64-linux-cmake
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: install packages
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y \
+            cmake build-essential python3 libgmp-dev
+
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: build and test (WITH_NET=OFF)
+        run: |
+          cmake -B build-nonet -DWITH_NET=OFF -DUSE_TESTS=ON
+          cmake --build build-nonet -j"$(getconf _NPROCESSORS_ONLN)"
+          ./build-nonet/tests
+
+      - name: build and test (WITH_NET=ON)
+        run: |
+          cmake -B build-net -DWITH_NET=ON -DUSE_TESTS=ON
+          cmake --build build-net -j"$(getconf _NPROCESSORS_ONLN)"
+          ./build-net/tests
+
   sign-x86_64-win:
     needs: build
     timeout-minutes: 30
