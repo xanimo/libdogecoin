@@ -100,6 +100,7 @@ extern void test_tx_sign();
 extern void test_scripts();
 extern void test_utils();
 extern void test_utils_null_file_guards();
+extern void test_utils_hex_to_bin_null_guards();
 extern void test_vector();
 extern void test_qr();
 
@@ -239,6 +240,7 @@ int main()
     u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
     u_run_test(test_utils_null_file_guards);
+    u_run_test(test_utils_hex_to_bin_null_guards);
     u_run_test(test_vector);
     u_run_test(test_qr);
 

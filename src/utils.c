@@ -154,15 +154,35 @@ void utils_clear_buffers(void)
  * @brief This function takes a hex-encoded string and
  * loads a buffer with its binary representation.
  *
- * @param str The hex string to convert.
- * @param out The buffer for the raw data to be returned.
+ * @param str The hex string to convert. Required.
+ * @param out The buffer for the raw data to be returned. Required, and must
+ *        have room for inLen / 2 bytes.
  * @param inLen The number of characters in the hex string.
- * @param outLen The number of raw bytes that were written to the out buffer.
+ * @param outLen Optional. If non-NULL, receives the number of raw bytes
+ *        written to out, or 0 if str or out was NULL.
  *
  * @return Nothing.
  */
 void utils_hex_to_bin(const char* str, unsigned char* out, size_t inLen, size_t* outLen)
     {
+    /* Exported, and every argument is dereferenced unconditionally below:
+       dogecoin_mem_zero(out, ...) first, then str inside the loop, then
+       *outLen at the end.
+
+       outLen is the one that bites. It is a size out-parameter, which by
+       convention a caller may decline by passing NULL, and the signature gives
+       no hint otherwise -- so passing NULL is the natural thing to try and it
+       segfaults on the last line, after the conversion has already succeeded
+       and written to out. Nothing in tree passes NULL today, which is why this
+       has not shown up; it took about a minute to hit when writing a new
+       caller. */
+    if (!str || !out) {
+        if (outLen) {
+            *outLen = 0;
+            }
+        return;
+        }
+
     size_t bLen = inLen / 2;
     size_t i;
     dogecoin_mem_zero(out, bLen);
@@ -187,7 +207,9 @@ void utils_hex_to_bin(const char* str, unsigned char* out, size_t inLen, size_t*
             }
         out++;
         }
-    *outLen = i;
+    if (outLen) {
+        *outLen = i;
+        }
     }
 
 

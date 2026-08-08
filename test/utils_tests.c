@@ -141,6 +141,43 @@ void test_dit()
  * crashed on ordinary input. print_image() is LIBDOGECOIN_API, so it is
  * reachable with NULL from outside this file as well.
  */
+
+/* utils_hex_to_bin dereferences every argument. outLen is the one that invites
+   a NULL -- it is a size out-parameter, which callers conventionally decline,
+   and the crash landed on the last line after the conversion had already
+   succeeded. */
+void test_utils_hex_to_bin_null_guards()
+{
+    unsigned char out[4];
+    size_t outlen = 0xdeadbeef;
+
+    /* outLen declined: must convert and not crash */
+    memset(out, 0xAA, sizeof(out));
+    utils_hex_to_bin("01020304", out, 8, NULL);
+    u_assert_int_eq(out[0], 0x01);
+    u_assert_int_eq(out[1], 0x02);
+    u_assert_int_eq(out[2], 0x03);
+    u_assert_int_eq(out[3], 0x04);
+
+    /* still reports the length when asked */
+    memset(out, 0xAA, sizeof(out));
+    utils_hex_to_bin("01020304", out, 8, &outlen);
+    u_assert_int_eq((int)outlen, 4);
+    u_assert_int_eq(out[3], 0x04);
+
+    /* a NULL input or destination reports zero rather than writing anything */
+    outlen = 0xdeadbeef;
+    utils_hex_to_bin(NULL, out, 8, &outlen);
+    u_assert_int_eq((int)outlen, 0);
+
+    outlen = 0xdeadbeef;
+    utils_hex_to_bin("01020304", NULL, 8, &outlen);
+    u_assert_int_eq((int)outlen, 0);
+
+    /* and neither combination crashes with outLen also declined */
+    utils_hex_to_bin(NULL, NULL, 8, NULL);
+}
+
 void test_utils_null_file_guards()
 {
     /* Must return quietly rather than dereferencing the NULL FILE*. */
