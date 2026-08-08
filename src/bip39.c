@@ -672,6 +672,8 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
         mnemonic[0] = '\0';
     }
     *mnemonic_size = 0;
+    size_t written = 0;   /* bytes already placed in mnemonic, excluding NUL */
+    if (mnemonic) mnemonic[0] = '\0';
 
     char elevenBits[12] = {""};
 
@@ -705,16 +707,46 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
                 }
             }
             else {
+                /* Bound the assembly against the destination.
+                 *
+                 * mnemonic_size is an out-parameter -- it reports what was
+                 * written, it never limited it -- and no capacity is passed in,
+                 * so these strcat calls had nothing to check against. The
+                 * contract in bip39.h is that the destination is a MNEMONIC,
+                 * which is MAX_MNEMONIC_STRING_SIZE bytes, so that is the
+                 * capacity to respect.
+                 *
+                 * With the built-in wordlists this could not be reached: the
+                 * longest is Korean at 33 bytes a word, and even its 24 longest
+                 * words come to 747 with separators. A caller-supplied wordlist
+                 * has no such ceiling, and 24 words of the maximum token length
+                 * exceeds the buffer. Truncating would be worse than failing --
+                 * a truncated mnemonic is a different mnemonic, and it would be
+                 * written to a wallet without complaint -- so refuse. */
+                size_t word_len = strlen(word);
+                size_t sep_len = (i < segSize - 1) ? strlen(space) : 0;
+                if (written + word_len + sep_len + 1 > MAX_MNEMONIC_STRING_SIZE) {
+                    fprintf(stderr,
+                            "ERROR: mnemonic exceeds %d bytes; wordlist tokens are too long\n",
+                            (int)MAX_MNEMONIC_STRING_SIZE);
+                    dogecoin_free(segment);
+                    return -1;
+                }
+
                 /* Concatenate the word from the wordlist to the mnemonic */
-                strcat(mnemonic, word);
+                memcpy(mnemonic + written, word, word_len);
+                written += word_len;
+                mnemonic[written] = '\0';
 
                 /* update mnemonic_size with the length of the mnemonic */
-                *mnemonic_size += strlen(word);
+                *mnemonic_size += word_len;
 
                 /* Concatenate a space to the mnemonic only if it's not the last word */
-                if (i < segSize - 1) {
-                    strcat(mnemonic, space);
-                    *mnemonic_size += strlen(space);
+                if (sep_len) {
+                    memcpy(mnemonic + written, space, sep_len);
+                    written += sep_len;
+                    mnemonic[written] = '\0';
+                    *mnemonic_size += sep_len;
                 }
             }
 

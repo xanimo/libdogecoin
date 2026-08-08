@@ -1470,6 +1470,29 @@ void test_bip39_custom_wordlist_bounds()
     }
     remove(path);
 
+    /* Multi-byte UTF-8 words must load. The bound is in bytes while
+       MAX_CHARS_IN_MNEMONIC_WORD counts characters, and the shipped wordlists
+       are not all ASCII -- the longest Korean entry is 33 bytes and the longest
+       Japanese is 27. A 16-byte bound rejected a custom list mirroring either,
+       reporting "word longer than 16 characters" for an 8-character word. */
+    fp = wordlist_tmp_open(path);
+    u_assert_true(fp != NULL);
+    for (i = 0; i < LANG_WORD_CNT; i++) {
+        /* 11 Hangul syllables, 3 bytes each = 33 bytes, the Korean maximum */
+        fprintf(fp, "\xea\xb0\x80\xea\xb0\x81\xea\xb0\x84\xea\xb0\x88\xea\xb0\x90"
+                    "\xea\xb0\x91\xea\xb0\x94\xea\xb0\x81\xea\xb0\x84\xea\xb0\x88"
+                    "\xea\xb0\x90\n");
+    }
+    fclose(fp);
+    u_assert_int_eq(get_custom_words(path, wordlist), 0);
+    u_assert_true(wordlist[0] != NULL);
+    u_assert_int_eq((int)strlen(wordlist[0]), 33);
+    for (i = 0; i < LANG_WORD_CNT; i++) {
+        free(wordlist[i]);
+        wordlist[i] = NULL;
+    }
+    remove(path);
+
     /* A file with too few words is still refused. */
     fp = wordlist_tmp_open(path);
     u_assert_true(fp != NULL);
