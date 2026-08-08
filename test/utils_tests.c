@@ -5,6 +5,8 @@
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
+#include <errno.h>
+#include <unistd.h>
 #include <test/utest.h>
 
 #include <assert.h>
@@ -289,4 +291,28 @@ void test_utils_fopen_private()
     u_assert_true(dogecoin_fopen_private(NULL, "wb") == NULL);
     u_assert_true(dogecoin_fopen_private(path, NULL) == NULL);
 #endif
+
+    /* "r" must not create. O_RDWR|O_CREAT used to be unconditional, so asking
+       to open an existing file created an empty one instead of failing -- on
+       the wallet path that turns "open my wallet" into "start a new one". */
+    remove(path);
+    fp = dogecoin_fopen_private(path, "rb");
+    u_assert_true(fp == NULL);
+    u_assert_true(stat(path, &st) != 0);
+
+    /* "wx": exclusive create, which is what replaced the access()-then-open
+       race in seal.c. Refuses an existing file and will not follow a symlink
+       planted between the two calls the old pattern needed. */
+    fp = dogecoin_fopen_private(path, "wbx");
+    u_assert_true(fp != NULL);
+    fclose(fp);
+    u_assert_int_eq(stat(path, &st), 0);
+    u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+
+    fp = dogecoin_fopen_private(path, "wbx");
+    u_assert_true(fp == NULL);
+    u_assert_int_eq(errno, EEXIST);
+
+    remove(path);
 }
+

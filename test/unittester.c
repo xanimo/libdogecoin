@@ -138,6 +138,7 @@ extern void test_examples();
 extern void test_wallet_basics();
 extern void test_wallet();
 extern void test_wallet_null_tx_guards();
+extern void test_wallet_file_is_private();
 extern void test_wallet_malformed_reclen();
 extern void test_wallet_reorg_utxo_update();
 extern void test_wallet_utxo_idx_not_reused();
@@ -280,6 +281,7 @@ int main()
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
     u_run_test(test_wallet_null_tx_guards);
+    u_run_test(test_wallet_file_is_private);
     u_run_test(test_wallet_malformed_reclen);
     u_run_test(test_wallet_reorg_utxo_update);
     u_run_test(test_wallet_utxo_idx_not_reused);

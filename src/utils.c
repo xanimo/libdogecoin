@@ -722,17 +722,39 @@ FILE* dogecoin_fopen_private(const char* path, const char* mode)
        fopen already gets whatever the parent grants. */
     return fopen(path, mode);
 #else
-    int flags = O_RDWR | O_CREAT;
+    int flags;
     int fd;
     FILE* fp;
 
     if (!path || !mode) {
         return NULL;
     }
-    if (strchr(mode, 'a')) {
-        flags |= O_APPEND;
-    } else if (strchr(mode, 'w')) {
-        flags |= O_TRUNC;
+
+    /* Translate the stdio mode rather than assuming it creates.
+     *
+     * O_CREAT was previously unconditional, so "r"/"r+" -- open an existing
+     * file -- would create one instead of failing, and a read-only file could
+     * not be opened at all because O_RDWR was also unconditional. Both matter
+     * here: this is the wallet path, where "open the existing wallet" and
+     * "start a new one" are different operations and conflating them can
+     * present an empty wallet as a real one. */
+    switch (mode[0]) {
+        case 'r':
+            flags = strchr(mode, '+') ? O_RDWR : O_RDONLY;
+            break;
+        case 'w':
+            flags = (strchr(mode, '+') ? O_RDWR : O_WRONLY) | O_CREAT;
+            /* C11 'x': create exclusively, fail if the path exists. Callers use
+               it to replace a check-then-open, which is a race an attacker with
+               write access to the directory wins by planting a symlink between
+               the two calls. O_EXCL also refuses to follow one. */
+            flags |= strchr(mode, 'x') ? O_EXCL : O_TRUNC;
+            break;
+        case 'a':
+            flags = (strchr(mode, '+') ? O_RDWR : O_WRONLY) | O_CREAT | O_APPEND;
+            break;
+        default:
+            return NULL;
     }
     /* 0600. The mode only applies when the file is created, so an existing
        file keeps whatever permissions it already had -- this tightens new
