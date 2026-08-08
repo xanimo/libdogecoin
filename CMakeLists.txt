@@ -590,6 +590,7 @@ IF(USE_TESTS)
         test/opreturn_tests.c
         test/psbt_tests.c
         test/rfc6979_tests.c
+        test/rng_entropy_tests.c
         test/qr_tests.c
         test/random_tests.c
         test/rmd160_tests.c
