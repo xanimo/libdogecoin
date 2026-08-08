@@ -802,13 +802,19 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
                2; we simply do not enable compact blocks for it rather than
                treating it as misbehaviour, since the announcement is legitimate
                on a witness chain. */
-            node->cmpct_high_bandwidth = hb;
             if (cmpct_version == CMPCTBLOCK_VERSION) {
                 node->cmpct_enabled = true;
                 node->cmpct_version = cmpct_version;
+                node->cmpct_high_bandwidth = hb;
             } else {
+                /* Record nothing we are not going to honour. Leaving the
+                   announced preference on a peer whose version we refuse
+                   leaves the state saying "wants unsolicited cmpctblocks" for
+                   a peer we will never send one to, which reads as negotiated
+                   when it is not. */
                 node->cmpct_enabled = false;
                 node->cmpct_version = 0;
+                node->cmpct_high_bandwidth = false;
                 node->nodegroup->log_write_cb(
                     "node %d announced compact block version %llu; only version %d "
                     "is supported on a pre-segwit chain\n",

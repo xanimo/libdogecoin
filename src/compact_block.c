@@ -284,6 +284,15 @@ dogecoin_bool dogecoin_compact_block_serialize(cstring *s, const dogecoin_compac
 {
     if (!s || !cmpctblk) return false;
 
+    /* A count with no array behind it would emit a header promising N entries
+       and then supply none: a message malformed on the wire, which this
+       deserializer would itself reject. Refuse to build it.
+       Checked before anything is appended, so a rejected block leaves the
+       output buffer untouched rather than holding a truncated message that a
+       caller might still transmit. */
+    if (cmpctblk->short_ids_count > 0 && !cmpctblk->short_ids) return false;
+    if (cmpctblk->prefilled_count > 0 && !cmpctblk->prefilled_txs) return false;
+
     /* Block header: the bytes we received, if we have them. Core streams the
        CBlockHeader it holds, AuxPoW included; replaying the retained span is
        the same thing by other means, and it is the only way to reproduce a
@@ -307,7 +316,7 @@ dogecoin_bool dogecoin_compact_block_serialize(cstring *s, const dogecoin_compac
 
     /* Short IDs: varint count + raw 6-byte IDs */
     ser_varlen(s, cmpctblk->short_ids_count);
-    if (cmpctblk->short_ids_count > 0 && cmpctblk->short_ids) {
+    if (cmpctblk->short_ids_count > 0) {
         ser_bytes(s, cmpctblk->short_ids,
                   (size_t)cmpctblk->short_ids_count * SHORTTXID_LENGTH);
     }
@@ -566,7 +575,7 @@ dogecoin_bool dogecoin_p2p_msg_sendcmpct_deser(
     uint64_t version;
     if (!deser_u64(&version, buf)) return false;
 
-    if (high_bandwidth_out) *high_bandwidth_out = (announce == 1);
+    if (high_bandwidth_out) *high_bandwidth_out = (announce != 0);
     if (version_out) *version_out = version;
     return true;
 }
@@ -703,6 +712,7 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
     /* Build a mapping from short_ids positions to available_txs positions.
      * short_ids[j] corresponds to the j-th non-prefilled slot. */
     uint32_t short_idx = 0;
+    uint32_t j;
     if (cmpctblk->short_ids_count > 0) {
         shortid_to_txpos = dogecoin_calloc(cmpctblk->short_ids_count, sizeof(uint32_t));
         if (!shortid_to_txpos) goto fail;
@@ -715,12 +725,28 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
         }
     }
 
+    /* Two identical short ids in one block cannot be resolved: both slots would
+       be filled from whichever transaction matched, and the block assembled
+       from them would not be the block the peer sent. Core rejects the message
+       outright in this case rather than guessing, so do the same before any
+       matching work. 6 bytes is short enough that this is reachable by chance,
+       and cheaply forgeable on purpose. */
+    for (j = 0; j < cmpctblk->short_ids_count; j++) {
+        uint32_t j2;
+        for (j2 = j + 1; j2 < cmpctblk->short_ids_count; j2++) {
+            if (shortid_cmp(&cmpctblk->short_ids[j * SHORTTXID_LENGTH],
+                            &cmpctblk->short_ids[j2 * SHORTTXID_LENGTH]) == 0) {
+                goto fail;
+            }
+        }
+    }
+
     /* Try to match each short ID against known transactions */
     uint32_t missing_count = 0;
-    uint32_t j;
     for (j = 0; j < cmpctblk->short_ids_count; j++) {
         const uint8_t *target_shortid = &cmpctblk->short_ids[j * SHORTTXID_LENGTH];
-        dogecoin_bool found = false;
+        dogecoin_tx *match = NULL;
+        dogecoin_bool ambiguous = false;
 
         uint32_t k;
         for (k = 0; k < known_txs_count; k++) {
@@ -736,13 +762,19 @@ dogecoin_bool dogecoin_compact_block_reconstruct(
                 txhash, computed_shortid);
 
             if (shortid_cmp(target_shortid, computed_shortid) == 0) {
-                state->available_txs[shortid_to_txpos[j]] = known_txs[k];
-                found = true;
-                break;
+                if (match) { ambiguous = true; break; }
+                match = known_txs[k];
             }
         }
 
-        if (!found) {
+        /* Taking the first match would assemble a block containing a
+           transaction the peer never sent, and it would pass reconstruction
+           silently. When two known transactions answer to one short id, treat
+           the slot as missing and request the real one -- the extra round trip
+           costs a getblocktxn, which is what Core spends here too. */
+        if (match && !ambiguous) {
+            state->available_txs[shortid_to_txpos[j]] = match;
+        } else {
             missing_count++;
         }
     }

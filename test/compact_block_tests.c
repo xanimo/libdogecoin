@@ -29,6 +29,8 @@
 
 #include <test/utest.h>
 
+#include "data/bip152_vectors.h"
+
 #include <dogecoin/block.h>
 #include <dogecoin/compact_block.h>
 #include <dogecoin/mem.h>
@@ -451,6 +453,119 @@ static void test_compact_block_serialize_refuses_headerless_auxpow(void)
     dogecoin_compact_block_free(cb);
 }
 
+
+/* ================================================================ */
+/*  BIP152 short-id known answers                                   */
+/* ================================================================ */
+
+/* Everything else here is a round trip. A round trip cannot tell a correct
+   short id from a consistently wrong one, and the short id is the whole basis
+   on which a peer's block is reassembled from our mempool. */
+static void test_compact_block_shortid_known_answers(void)
+{
+    uint64_t k0 = 0, k1 = 0;
+    dogecoin_compact_block_derive_sipkeys_raw(BIP152_HEADER, 80, BIP152_NONCE, &k0, &k1);
+    u_assert_true(k0 == BIP152_K0);
+    u_assert_true(k1 == BIP152_K1);
+
+    int i;
+    for (i = 0; i < BIP152_SHORTID_COUNT; i++) {
+        uint8_t sid[SHORTTXID_LENGTH];
+        dogecoin_compact_block_compute_short_id(k0, k1,
+            (uint8_t *)BIP152_SHORTIDS[i].txid, sid);
+        u_assert_int_eq(memcmp(sid, BIP152_SHORTIDS[i].shortid, SHORTTXID_LENGTH), 0);
+    }
+}
+
+/* ================================================================ */
+/*  Attacker-controlled counts and self-contradicting messages      */
+/* ================================================================ */
+
+static void test_compact_block_rejects_oversized_counts(void)
+{
+    uint256_t dummy;
+    memset(dummy, 0x22, sizeof(dummy));
+
+    /* A prefilled_count far larger than the remaining payload. Unbounded, this
+       reaches a calloc of count * sizeof(dogecoin_prefilled_tx) before a single
+       entry is parsed. */
+    {
+        cstring *msg = cstr_new_sz(128);
+        uint8_t hdr[CMPCTBLOCK_HEADER_BASE_SIZE];
+        memset(hdr, 0, sizeof(hdr));
+        ser_bytes(msg, hdr, sizeof(hdr));
+        ser_u64(msg, 0x1122334455667788ULL);   /* nonce */
+        ser_varlen(msg, 0);                    /* short_ids_count */
+        ser_varlen(msg, 0xFFFFFFFFu);          /* prefilled_count, absurd */
+
+        struct const_buffer buf = { msg->str, msg->len };
+        dogecoin_compact_block *cb = dogecoin_compact_block_new();
+        u_assert_true(dogecoin_compact_block_deserialize(cb, &buf, NULL) == false);
+        dogecoin_compact_block_free(cb);
+        cstr_free(msg, true);
+    }
+
+    /* A short_ids_count whose 6-byte entries cannot fit in the payload. */
+    {
+        cstring *msg = cstr_new_sz(128);
+        uint8_t hdr[CMPCTBLOCK_HEADER_BASE_SIZE];
+        memset(hdr, 0, sizeof(hdr));
+        ser_bytes(msg, hdr, sizeof(hdr));
+        ser_u64(msg, 1);
+        ser_varlen(msg, 0xFFFFFFu);            /* short_ids_count, absurd */
+
+        struct const_buffer buf = { msg->str, msg->len };
+        dogecoin_compact_block *cb = dogecoin_compact_block_new();
+        u_assert_true(dogecoin_compact_block_deserialize(cb, &buf, NULL) == false);
+        dogecoin_compact_block_free(cb);
+        cstr_free(msg, true);
+    }
+}
+
+/* A count with no array behind it must not be serialized: it would emit a
+   header promising N entries and supply none. */
+static void test_compact_block_serialize_rejects_count_without_array(void)
+{
+    dogecoin_compact_block *cb = dogecoin_compact_block_new();
+    cb->header.version = 1;
+    cb->nonce = 7;
+
+    cb->short_ids_count = 3;
+    cb->short_ids = NULL;
+    cstring *out = cstr_new_sz(64);
+    u_assert_true(dogecoin_compact_block_serialize(out, cb) == false);
+    u_assert_int_eq((int)out->len, 0);
+    cstr_free(out, true);
+
+    cb->short_ids_count = 0;
+    cb->prefilled_count = 2;
+    cb->prefilled_txs = NULL;
+    out = cstr_new_sz(64);
+    u_assert_true(dogecoin_compact_block_serialize(out, cb) == false);
+    u_assert_int_eq((int)out->len, 0);
+    cstr_free(out, true);
+
+    cb->prefilled_count = 0;
+    dogecoin_compact_block_free(cb);
+}
+
+/* Two identical short ids in one block cannot be resolved: both slots would be
+   filled from whichever transaction matched. Core rejects rather than guess. */
+static void test_compact_block_reconstruct_rejects_duplicate_shortids(void)
+{
+    dogecoin_compact_block *cb = dogecoin_compact_block_new();
+    cb->short_ids_count = 2;
+    cb->short_ids = dogecoin_calloc(2, SHORTTXID_LENGTH);
+    memset(cb->short_ids, 0xAB, 2 * SHORTTXID_LENGTH);   /* identical */
+    cb->prefilled_count = 0;
+
+    dogecoin_compact_block_state *state = dogecoin_compact_block_state_new();
+    u_assert_true(dogecoin_compact_block_reconstruct(cb, state, NULL, 0) == false);
+
+    dogecoin_compact_block_state_free(state);
+    dogecoin_compact_block_free(cb);
+}
+
 void test_compact_block(void)
 {
     test_compact_block_new_free();
@@ -468,4 +583,8 @@ void test_compact_block(void)
     test_compact_block_auxpow_bit_without_body_is_rejected();
     test_compact_block_real_auxpow_header_roundtrip();
     test_compact_block_serialize_refuses_headerless_auxpow();
+    test_compact_block_shortid_known_answers();
+    test_compact_block_rejects_oversized_counts();
+    test_compact_block_serialize_rejects_count_without_array();
+    test_compact_block_reconstruct_rejects_duplicate_shortids();
 }
