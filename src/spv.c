@@ -2661,6 +2661,7 @@ static par_hdr_state *par_hdr_init(const dogecoin_chainparams *params)
         seg->stop_height = arr[arr_i].height;
         utils_uint256_sethex((char *)arr[arr_i].hash, seg->stop_hash);
 
+
         /* start = genesis when i==0, else checkpoint[arr_i-1] */
         if (i == 0) {
             seg->start_height = 0;
@@ -3107,6 +3108,94 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
             seg_idx, seg->count, seg->tip_height, seg->stop_height);
 
     if (seg->tip_height >= seg->stop_height) {
+        /* The segment claims to have reached its checkpoint. Verify that it
+         * actually landed on it before trusting the range.
+         *
+         * stop_hash comes from the checkpoint array and is sent as getheaders
+         * hash_stop, but nothing compared it against what arrived. Safety was
+         * emergent: a divergent segment left a chaintip the *next* segment
+         * could not extend, so it surfaced one segment late, as a connect
+         * failure away from its cause -- and the final segment has no next
+         * segment, so nothing caught it at all.
+         *
+         * This is the whole justification for skipping proof-of-work between
+         * checkpoints, so it is worth checking directly rather than inferring.
+         * The segment has never been flushed at this point (flush only touches
+         * complete && !flushed segments, in order), so rejecting it costs
+         * nothing already written. */
+        if (memcmp(seg->tip_hash, seg->stop_hash, DOGECOIN_HASH_LENGTH) != 0) {
+            dogecoin_headers_db *hdb =
+                (dogecoin_headers_db *)client->headers_db_ctx;
+
+            seg->flush_fails++;
+
+            char got_hex[65] = {0}, want_hex[65] = {0};
+            for (int _k = 0; _k < 32; _k++) {
+                snprintf(got_hex  + _k*2, 3, "%02x", ((const uint8_t *)seg->tip_hash)[31-_k]);
+                snprintf(want_hex + _k*2, 3, "%02x", ((const uint8_t *)seg->stop_hash)[31-_k]);
+            }
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] segment %u: terminal hash mismatch at height %u "
+                    "from node %d (attempt %u)\n"
+                    "  expected %s\n"
+                    "  got      %s\n",
+                    seg_idx, seg->tip_height, (int)node->nodeid,
+                    seg->flush_fails, want_hex, got_hex);
+
+            uint64_t staged = (uint64_t)seg->count * PAR_HDR_RAW_LEN;
+            s->buffered_bytes = (s->buffered_bytes > staged)
+                              ? s->buffered_bytes - staged : 0;
+            dogecoin_free(seg->buf);
+            seg->buf   = NULL;
+            seg->cap   = 0;
+            seg->count = 0;
+
+            /* Resume from the primary DB if it is already inside this segment
+             * -- that only happens when an earlier flush failed partway and
+             * left the chaintip mid-range -- otherwise from the checkpoint
+             * anchor, since nothing from this segment reached the DB. */
+            if (hdb && hdb->chaintip &&
+                (uint32_t)hdb->chaintip->height >  seg->start_height &&
+                (uint32_t)hdb->chaintip->height <= seg->stop_height) {
+                memcpy(seg->tip_hash, hdb->chaintip->hash, DOGECOIN_HASH_LENGTH);
+                seg->tip_height = (uint32_t)hdb->chaintip->height;
+            } else {
+                memcpy(seg->tip_hash, seg->start_hash, DOGECOIN_HASH_LENGTH);
+                seg->tip_height = seg->start_height;
+            }
+
+            seg->complete        = false;
+            seg->node_id         = -1;
+            seg->shadow_id       = -1;
+            seg->shadow_at       = 0;
+            seg->count_at_assign = 0;
+            node->state &= ~NODE_HEADERSYNC;
+
+            if (seg->flush_fails >= PAR_HDR_MAX_FLUSH_FAILS) {
+                s->active = false;
+                for (uint32_t k = 0; k < s->num_segs; k++) {
+                    if (k == seg_idx || !s->segs[k].buf) continue;
+                    uint64_t held = (uint64_t)s->segs[k].count * PAR_HDR_RAW_LEN;
+                    s->buffered_bytes = (s->buffered_bytes > held)
+                                      ? s->buffered_bytes - held : 0;
+                    dogecoin_free(s->segs[k].buf);
+                    s->segs[k].buf   = NULL;
+                    s->segs[k].cap   = 0;
+                    s->segs[k].count = 0;
+                }
+                if (client->nodegroup && client->nodegroup->log_write_cb)
+                    client->nodegroup->log_write_cb(
+                        "[par-hdr] segment %u failed terminal check %u times — "
+                        "disabling parallel download, falling back to "
+                        "sequential from height %u\n",
+                        seg_idx, seg->flush_fails, seg->tip_height);
+            } else {
+                par_hdr_assign(client, node);
+            }
+            return;
+        }
+
         /* Segment complete */
         seg->complete = true;
         seg->node_id  = -1;
