@@ -306,6 +306,7 @@ tests_SOURCES = \
     test/smpv_tests.c \
     test/tpm_tests.c \
     test/psbt_tests.c \
+    test/rfc6979_tests.c \
     test/transaction_tests.c \
     test/validation_tests.c \
     test/tx_tests.c \
