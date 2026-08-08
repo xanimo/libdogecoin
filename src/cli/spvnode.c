@@ -200,6 +200,7 @@ static struct option long_options[] = {
         {"filtered_blocks", no_argument, NULL, 'g'},
         {"select_checkpoint", no_argument, NULL, 'q'},
         {"daemon", no_argument, NULL, 'z'},
+        {"genesis_headers", no_argument, NULL, 'H'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -216,7 +217,7 @@ static void print_usage() {
     print_version();
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
-(-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
+(-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-H[--genesis_headers]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
 (-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-q|--select_checkpoint) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
@@ -296,10 +297,10 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
 
     if (chain == &dogecoin_chainparams_main) {
         checkpoints = dogecoin_mainnet_checkpoint_array;
-        count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+        count = (int)(dogecoin_mainnet_checkpoint_count);
     } else if (chain == &dogecoin_chainparams_test) {
         checkpoints = dogecoin_testnet_checkpoint_array;
-        count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+        count = (int)(dogecoin_testnet_checkpoint_count);
     } else {
         return -1;
     }
@@ -404,10 +405,10 @@ void spv_sync_completed(dogecoin_spv_client* client) {
 
             if (client->chainparams == &dogecoin_chainparams_main) {
                 checkpoints = dogecoin_mainnet_checkpoint_array;
-                checkpoint_count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+                checkpoint_count = (int)(dogecoin_mainnet_checkpoint_count);
             } else if (client->chainparams == &dogecoin_chainparams_test) {
                 checkpoints = dogecoin_testnet_checkpoint_array;
-                checkpoint_count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+                checkpoint_count = (int)(dogecoin_testnet_checkpoint_count);
             }
             if (checkpoints && checkpoint_count > 0) {
                 suggested_checkpoint_height = (int)checkpoints[0].height;
@@ -470,6 +471,7 @@ int main(int argc, char* argv[]) {
     char* name = 0;
     char* headers_name = 0;
     dogecoin_bool full_sync = false;
+    dogecoin_bool genesis_headers = false;
     dogecoin_bool have_decl_daemon = false;
     dogecoin_bool prompt = true;
     dogecoin_bool encrypted = false;
@@ -487,7 +489,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkjxgq", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkjxgqH", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -521,6 +523,9 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'b':
                     full_sync = true;
+                    break;
+                case 'H':
+                    genesis_headers = true;
                     break;
                 case 'p':
                     use_checkpoint = true;
@@ -713,6 +718,14 @@ int main(int argc, char* argv[]) {
             printf("Empty wallet - no BIP37 filter set\n");
         } else {
             printf("Filtered block mode disabled (use -g/--filtered_blocks to enable)\n");
+        }
+
+        if (genesis_headers) {
+            if (!dogecoin_spv_client_enable_genesis_headers(client))
+                printf("[par-hdr] warning: no checkpoints for this chain; genesis header sync unavailable\n");
+            else
+                printf("[par-hdr] parallel genesis header download enabled (%u segments)\n",
+                       (unsigned int)client->par_hdr->num_segs);
         }
 
         client->sync_transaction = dogecoin_wallet_check_transaction;

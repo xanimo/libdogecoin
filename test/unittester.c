@@ -48,6 +48,7 @@ extern void test_bip44();
 extern void test_block_header();
 extern void test_buffer();
 extern void test_chacha20();
+extern void test_checkpoints();
 extern void test_cstr();
 extern void test_ecc();
 extern void test_hash();
@@ -179,6 +180,7 @@ int main()
     u_run_test(test_block_header);
     u_run_test(test_buffer);
     u_run_test(test_chacha20);
+    u_run_test(test_checkpoints);
     u_run_test(test_cstr);
     u_run_test(test_ecc);
     u_run_test(test_hash);

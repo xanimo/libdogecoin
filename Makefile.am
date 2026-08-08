@@ -280,6 +280,7 @@ tests_SOURCES = \
     test/block_tests.c \
     test/buffer_tests.c \
     test/chacha20_tests.c \
+    test/checkpoints_tests.c \
     test/context_tests.c \
     test/cstr_tests.c \
     test/ecc_tests.c \

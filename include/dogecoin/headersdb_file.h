@@ -55,6 +55,8 @@ typedef struct dogecoin_headers_db_
     dogecoin_blockindex genesis;
     dogecoin_blockindex *chaintip;
     dogecoin_blockindex *chainbottom;
+    dogecoin_bool batch_write;   /**< Suppress per-record fdatasync; caller must commit after */
+    dogecoin_bool skip_pow;      /**< Skip scrypt PoW verify (for checkpoint-anchored bulk loads) */
 } dogecoin_headers_db;
 
 dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);

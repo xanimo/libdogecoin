@@ -54,12 +54,63 @@ typedef struct spv_block_sample_
     uint64_t fees;      // total fees
 } spv_block_sample;
 
+#define PAR_HDR_RAW_LEN 80
+
+/* How many times a segment may fail to connect at flush before the parallel
+ * downloader gives up entirely and lets the sequential path take over. Each
+ * retry re-requests the segment from whatever the primary DB actually reached,
+ * usually from a different peer. */
+#define PAR_HDR_MAX_FLUSH_FAILS 3
+
+/* One parallel header-download segment.  Each segment spans the open-closed
+ * height interval (start_height, stop_height] and is assigned to one node. */
+typedef struct par_hdr_seg_ {
+    uint32_t  start_height;   /* height of start_hash (exclusive lower bound) */
+    uint256_t start_hash;     /* block hash at start_height — getheaders locator */
+    uint32_t  stop_height;    /* height of stop_hash  (inclusive upper bound)  */
+    uint256_t stop_hash;      /* block hash at stop_height — getheaders hash_stop */
+
+    /* download progress */
+    int       node_id;        /* assigned node (-1 = unassigned)               */
+    int       shadow_id;      /* second node racing this segment (-1 = none)   */
+    uint64_t  shadow_at;      /* time the shadow was attached                  */
+    uint64_t  requested_at;   /* time of the last getheaders sent for this seg */
+    uint64_t  assigned_at;    /* time the current owner took this segment      */
+    uint32_t  count_at_assign;/* headers already buffered when it took it      */
+    uint32_t  tip_height;     /* highest header received so far in this segment */
+    uint256_t tip_hash;       /* hash of that header (next-batch locator)       */
+
+    /* buffered raw 80-byte block headers in ascending height order */
+    uint8_t  *buf;
+    uint32_t  count;          /* headers buffered */
+    uint32_t  cap;            /* buffer capacity  */
+
+    dogecoin_bool complete;   /* all stop_height - start_height headers received */
+    dogecoin_bool flushed;    /* segment has been flushed into the primary DB    */
+    uint32_t  flush_fails;    /* times this segment failed to connect at flush   */
+} par_hdr_seg;
+
+/* Top-level state for a parallel genesis header download. */
+typedef struct par_hdr_state_ {
+    par_hdr_seg  *segs;             /* ordered array of segments                */
+    uint32_t      num_segs;         /* total segment count                      */
+    uint32_t      flush_idx;        /* index of the next segment pending flush  */
+    uint32_t      last_flush_idx;   /* flush_idx at the last observed progress  */
+    uint64_t      last_progress_time; /* time of that progress                  */
+    uint64_t      buffered_bytes;   /* raw header bytes staged across segments  */
+    uint32_t      rate_ref;         /* last median peer rate seen while >=3 segs
+                                     * were in flight; the tail has no crowd to
+                                     * compare against, so it compares to this */
+    dogecoin_bool active;           /* download in progress                     */
+} par_hdr_state;
+
 typedef struct dogecoin_spv_client_
 {
     dogecoin_node_group *nodegroup;
     uint64_t last_headersrequest_time;
     uint64_t oldest_item_of_interest;
     dogecoin_bool use_checkpoints;
+    struct par_hdr_state_ *par_hdr;  /* parallel genesis header sync state */
     const dogecoin_chainparams *chainparams;
     int stateflags;
     uint64_t last_statecheck_time;
@@ -129,6 +180,8 @@ typedef struct dogecoin_spv_client_
        OP_RETURN spam (capped + LRU-evicted by spv_zk_add_pending). */
     void* zk_pending_commits;
 } dogecoin_spv_client;
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_enable_genesis_headers(dogecoin_spv_client *client);
 
 LIBDOGECOIN_API dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params, dogecoin_bool debug, dogecoin_bool headers_memonly, dogecoin_bool use_checkpoints, dogecoin_bool full_sync, int maxnodes, const char *http_server);
 LIBDOGECOIN_API void dogecoin_spv_client_free(dogecoin_spv_client *client);
