@@ -188,8 +188,11 @@ void test_wallet_file_is_private()
     u_assert_int_eq(dogecoin_wallet_load(wallet, path, &error, &created, false), true);
     u_assert_true(created);
 
+    /* fstat the handle the wallet is holding rather than re-resolving the
+       path: this asserts the mode of the file that was actually created. */
     struct stat st;
-    u_assert_int_eq(stat(path, &st), 0);
+    u_assert_true(wallet->dbfile != NULL);
+    u_assert_int_eq(fstat(fileno(wallet->dbfile), &st), 0);
     u_assert_int_eq((int)(st.st_mode & 0777), 0600);
 
     dogecoin_wallet_free(wallet);

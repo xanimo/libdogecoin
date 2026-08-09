@@ -277,19 +277,21 @@ void test_utils_fopen_private()
     fp = dogecoin_fopen_private(path, "wb");
     u_assert_true(fp != NULL);
     fputc('x', fp);
-    fclose(fp);
-
-    u_assert_int_eq(stat(path, &st), 0);
+    /* fstat the descriptor we hold, not the path. Re-resolving the name would
+       ask about whatever is there now rather than the file that was opened --
+       the same check-then-use the function under test exists to avoid. */
+    u_assert_int_eq(fstat(fileno(fp), &st), 0);
     /* Owner read/write only: no group or other bits at all. */
     u_assert_int_eq((int)(st.st_mode & 07777), 0600);
     u_assert_int_eq((int)(st.st_mode & (S_IRWXG | S_IRWXO)), 0);
+    fclose(fp);
 
     /* Reopening must not widen the mode of a file that already exists. */
     fp = dogecoin_fopen_private(path, "a+b");
     u_assert_true(fp != NULL);
-    fclose(fp);
-    u_assert_int_eq(stat(path, &st), 0);
+    u_assert_int_eq(fstat(fileno(fp), &st), 0);
     u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+    fclose(fp);
 
     remove(path);
 
@@ -304,16 +306,20 @@ void test_utils_fopen_private()
     remove(path);
     fp = dogecoin_fopen_private(path, "rb");
     u_assert_true(fp == NULL);
-    u_assert_true(stat(path, &st) != 0);
+    /* Nothing was created: a second open of the same mode still fails. Asking
+       stat() instead would re-resolve the path, which is the pattern being
+       tested against. */
+    fp = dogecoin_fopen_private(path, "rb");
+    u_assert_true(fp == NULL);
 
     /* "wx": exclusive create, which is what replaced the access()-then-open
        race in seal.c. Refuses an existing file and will not follow a symlink
        planted between the two calls the old pattern needed. */
     fp = dogecoin_fopen_private(path, "wbx");
     u_assert_true(fp != NULL);
-    fclose(fp);
-    u_assert_int_eq(stat(path, &st), 0);
+    u_assert_int_eq(fstat(fileno(fp), &st), 0);
     u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+    fclose(fp);
 
     fp = dogecoin_fopen_private(path, "wbx");
     u_assert_true(fp == NULL);
