@@ -19,6 +19,16 @@ static const char *wallettmpfile = "/tmp/dummy";
 #endif
 #endif
 
+#ifndef _WIN32
+/* Android has no writable /tmp; the rest of this suite already special-cases
+   it for wallettmpfile. */
+#ifdef __ANDROID__
+#define DOGECOIN_TEST_TMPDIR "/data/local/tmp"
+#else
+#define DOGECOIN_TEST_TMPDIR "/tmp"
+#endif
+#endif
+
 #include <sys/stat.h>
 #include <test/utest.h>
 
@@ -175,7 +185,7 @@ void test_wallet_file_is_private()
        to create the same path is itself a check-then-use, and the name is
        already known by then. A 0700 directory nobody else can enter makes the
        creation below unambiguous. */
-    char dir[] = "/tmp/dogecoin_wallet_perm_XXXXXX";
+    char dir[] = DOGECOIN_TEST_TMPDIR "/dogecoin_wallet_perm_XXXXXX";
     u_assert_true(mkdtemp(dir) != NULL);
     char path[128];
     snprintf(path, sizeof(path), "%s/w.db", dir);

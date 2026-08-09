@@ -6,8 +6,22 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
 #include <errno.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <test/utest.h>
+
+#ifndef _WIN32
+/* Android has no writable /tmp; the rest of this suite already special-cases
+   it for wallettmpfile. */
+#ifdef __ANDROID__
+#define DOGECOIN_TEST_TMPDIR "/data/local/tmp"
+#else
+#define DOGECOIN_TEST_TMPDIR "/tmp"
+#endif
+#endif
+
+
 
 #include <assert.h>
 #ifndef _WIN32
@@ -267,7 +281,7 @@ void test_utils_fopen_private()
        and every stat()-then-open below would be a real check-then-use against a
        path anyone can pre-create. mkdtemp gives us 0700 and a name nobody can
        predict. */
-    char dir[] = "/tmp/dogecoin_fopen_priv_XXXXXX";
+    char dir[] = DOGECOIN_TEST_TMPDIR "/dogecoin_fopen_priv_XXXXXX";
     u_assert_true(mkdtemp(dir) != NULL);
     char path[128];
     snprintf(path, sizeof(path), "%s/f.tmp", dir);
@@ -298,7 +312,6 @@ void test_utils_fopen_private()
     /* NULL arguments are refused rather than passed through. */
     u_assert_true(dogecoin_fopen_private(NULL, "wb") == NULL);
     u_assert_true(dogecoin_fopen_private(path, NULL) == NULL);
-#endif
 
     /* "r" must not create. O_RDWR|O_CREAT used to be unconditional, so asking
        to open an existing file created an empty one instead of failing -- on
@@ -327,5 +340,6 @@ void test_utils_fopen_private()
 
     remove(path);
     rmdir(dir);
+#endif /* _WIN32 */
 }
 
