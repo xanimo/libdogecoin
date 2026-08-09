@@ -191,7 +191,16 @@ dogecoin_bool dogecoin_ecc_sign_compact_recoverable(const uint8_t* private_key, 
     dogecoin_bool ok = 0;
     if (!secp256k1_ecdsa_sign_recoverable(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL))
         goto out;
-    *outlen = 65;
+    /* 64, not 65. serialize_compact writes r||s and nothing else, and the
+       recovery id leaves through *recid rather than the buffer.
+       65 belongs to the _fcomp variant below, which prepends a 27+recid[+4]
+       header byte and serialises at &sigrec[1] -- a different layout with a
+       different reader (dogecoin_recover_pubkey parses from offset 1, while
+       dogecoin_ecc_recover_pubkey, the one that pairs with this function,
+       parses from offset 0).
+       Reporting 65 here told the caller about a byte this function never
+       wrote. */
+    *outlen = 64;
     if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_ctx, sigrec, recid, &sig))
         goto out;
     ok = 1;

@@ -32,6 +32,64 @@
 #include <dogecoin/key.h>
 #include <dogecoin/utils.h>
 
+
+/* The two recoverable signers use different layouts, and each is paired with a
+   reader that expects it:
+
+     dogecoin_key_sign_hash_compact_recoverable        64 bytes, r||s at [0],
+                                                       recid via *recid
+       -> dogecoin_ecc_recover_pubkey  parses from offset 0
+
+     ..._recoverable_fcomp                             65 bytes, 27+recid[+4]
+                                                       header at [0], r||s at [1]
+       -> dogecoin_recover_pubkey      parses from offset 1
+
+   The first reported *outlen = 65 while writing 64, so a caller that trusted
+   the length read one byte the function never wrote. */
+void test_key_recoverable_outlen()
+{
+    dogecoin_key key;
+    dogecoin_privkey_init(&key);
+    dogecoin_privkey_gen(&key);
+
+    uint256_t hash;
+    memset(hash, 0x5C, sizeof(hash));
+
+    /* A 65th byte with a known value: the plain variant must not touch it, and
+       must not claim it. */
+    unsigned char sig[65];
+    memset(sig, 0xA5, sizeof(sig));
+
+    size_t outlen = sizeof(sig);
+    int recid = -1;
+    u_assert_int_eq(dogecoin_key_sign_hash_compact_recoverable(&key, hash, sig, &outlen, &recid), true);
+
+    u_assert_uint32_eq((uint32_t)outlen, 64);
+    u_assert_int_eq(sig[64], 0xA5);
+    u_assert_true(recid >= 0 && recid <= 3);
+
+    /* And the length it reports is the length its own reader consumes: the
+       signature still recovers the public key it was made with. */
+    dogecoin_pubkey pubkey, recovered;
+    dogecoin_pubkey_init(&pubkey);
+    dogecoin_pubkey_init(&recovered);
+    dogecoin_pubkey_from_key(&key, &pubkey);
+    u_assert_int_eq(dogecoin_key_sign_recover_pubkey(sig, hash, recid, &recovered), true);
+    u_assert_mem_eq(pubkey.pubkey, recovered.pubkey, sizeof(pubkey.pubkey));
+
+    /* The fcomp variant does write 65, and its header byte encodes recid. */
+    unsigned char sigf[65];
+    memset(sigf, 0xA5, sizeof(sigf));
+    size_t outlenf = sizeof(sigf);
+    int recidf = -1;
+    u_assert_int_eq(dogecoin_key_sign_hash_compact_recoverable_fcomp(&key, hash, sigf, &outlenf, &recidf), true);
+    u_assert_uint32_eq((uint32_t)outlenf, 65);
+    u_assert_int_eq(sigf[0], 27 + recidf + 4);
+    u_assert_mem_eq(sigf + 1, sig, 64);
+
+    dogecoin_privkey_cleanse(&key);
+}
+
 void test_key()
 {
     dogecoin_key key;
