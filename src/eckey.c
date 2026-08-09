@@ -210,7 +210,25 @@ eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
     assert(dogecoin_pubkey_is_valid(&key->public_key) == 1);
-    strcpy(key->public_key_hex, utils_uint8_to_hex((const uint8_t *)&key->public_key, 33));
+    /* Measured copy rather than strcpy from a function that can return NULL.
+       33 bytes hex-encode to 66 characters plus a terminator, which is exactly
+       PUBKEYHEXLEN -- it fits, and nothing at the call site says so. Spell the
+       bound out rather than leave it to be re-derived, and handle the NULL
+       that strcpy would have dereferenced. */
+    {
+        const char *pubkey_hex = utils_uint8_to_hex((const uint8_t *)&key->public_key, 33);
+        if (pubkey_hex == NULL) {
+            dogecoin_key_free(key);
+            return NULL;
+        }
+        size_t pubkey_hex_len = PUBKEYHEXLEN - 1;   /* 66 hex chars for 33 bytes */
+        if (pubkey_hex_len + 1 > PUBKEYHEXLEN) {
+            dogecoin_key_free(key);
+            return NULL;
+        }
+        memcpy(key->public_key_hex, pubkey_hex, pubkey_hex_len);
+        key->public_key_hex[pubkey_hex_len] = '\0';
+    }
     uint8_t pkeybase58c[34];
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     pkeybase58c[0] = chain->b58prefix_secret_address;
@@ -249,7 +267,25 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
     assert(dogecoin_pubkey_is_valid(&key->public_key) == 1);
-    strcpy(key->public_key_hex, utils_uint8_to_hex((const uint8_t *)&key->public_key, 33));
+    /* Measured copy rather than strcpy from a function that can return NULL.
+       33 bytes hex-encode to 66 characters plus a terminator, which is exactly
+       PUBKEYHEXLEN -- it fits, and nothing at the call site says so. Spell the
+       bound out rather than leave it to be re-derived, and handle the NULL
+       that strcpy would have dereferenced. */
+    {
+        const char *pubkey_hex = utils_uint8_to_hex((const uint8_t *)&key->public_key, 33);
+        if (pubkey_hex == NULL) {
+            dogecoin_key_free(key);
+            return NULL;
+        }
+        size_t pubkey_hex_len = PUBKEYHEXLEN - 1;   /* 66 hex chars for 33 bytes */
+        if (pubkey_hex_len + 1 > PUBKEYHEXLEN) {
+            dogecoin_key_free(key);
+            return NULL;
+        }
+        memcpy(key->public_key_hex, pubkey_hex, pubkey_hex_len);
+        key->public_key_hex[pubkey_hex_len] = '\0';
+    }
     uint8_t pkeybase58c[34];
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
