@@ -687,6 +687,20 @@ void dogecoin_compute_merkle_root(const uint256_t* leaves, size_t leaf_count,
         return;
     }
 
+    /* count is 32-bit because the level walk below indexes inner[] by the
+       trailing-zero position of count, and inner[] has 32 entries. leaf_count
+       is size_t and this is exported, so a caller can pass more leaves than
+       count can hold: count then wraps to 0, every bit test in the inner loop
+       succeeds, level runs to 32, and the shift is undefined before the write
+       to inner[32] goes out of bounds. No block can carry this many
+       transactions -- it is unreachable through dogecoin_block_merkle_root --
+       but the API does not stop anyone calling it directly. */
+    if (leaf_count > UINT32_MAX) {
+        dogecoin_mem_zero(root_out, sizeof(uint256_t));
+        if (mutated_out) *mutated_out = false;
+        return;
+    }
+
     dogecoin_bool mutated = false;
     uint32_t count = 0;
     uint256_t inner[32];
@@ -738,6 +752,18 @@ void dogecoin_compute_merkle_root(const uint256_t* leaves, size_t leaf_count,
 
 dogecoin_bool dogecoin_block_merkle_root(dogecoin_tx** txs, size_t txs_count,
                                          uint256_t root_out, dogecoin_bool* mutated_out) {
+    /* Report a definite value on every path. dogecoin_compute_merkle_root()
+       already does, so leaving it untouched here made the wrapper the odd one
+       out, and the natural call site --
+
+           dogecoin_bool mutated;
+           dogecoin_block_merkle_root(txs, n, root, &mutated);
+           if (mutated) { ... }
+
+       -- reads an uninitialised variable when this returns false. Treating a
+       block as mutated, or as clean, on a coin flip is worse than either. */
+    if (mutated_out) *mutated_out = false;
+
     if (!txs || txs_count == 0 || !root_out) return false;
     uint256_t* leaves = dogecoin_calloc(txs_count, sizeof(uint256_t));
     if (!leaves) return false;

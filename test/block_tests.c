@@ -26,6 +26,7 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
 
+#include <stdint.h>
 #include <test/utest.h>
 
 struct blockheadertest {
@@ -108,6 +109,45 @@ static void test_auxpow_oversized_input_is_rejected(void)
     u_assert_true(!dogecoin_block_header_parse(&header, &buf, &dogecoin_chainparams_main));
 
     dogecoin_free(blob);
+}
+
+
+/* Two API-boundary properties that no happy-path test can reach. */
+void test_block_merkle_root_edges()
+{
+    uint256_t root;
+    uint256_t leaves[2];
+    memset(leaves, 0x11, sizeof(leaves));
+
+    /* mutated_out must hold a definite value on every path. The natural call
+       site declares it uninitialised and tests it after the call, so leaving it
+       untouched on failure means treating a block as mutated, or as clean, on
+       whatever was on the stack. */
+    dogecoin_bool mutated = true;
+    u_assert_true(dogecoin_block_merkle_root(NULL, 2, root, &mutated) == false);
+    u_assert_true(mutated == false);
+
+    mutated = true;
+    dogecoin_tx *txs[1] = { NULL };
+    u_assert_true(dogecoin_block_merkle_root(txs, 1, root, &mutated) == false);
+    u_assert_true(mutated == false);
+
+    /* leaf_count is size_t while the level walk counts in uint32_t and indexes
+       inner[32]. Above UINT32_MAX the counter wraps to zero, every bit test in
+       the inner loop succeeds, level reaches 32, and the shift is undefined
+       before the write runs off the end of inner[]. Unreachable through a real
+       block, but this is exported. The guard returns before a single leaf is
+       read, so passing a short array with an absurd count is safe here. */
+    if (sizeof(size_t) > 4) {
+        size_t absurd = (size_t)UINT32_MAX + 1;
+        dogecoin_bool m2 = true;
+        memset(root, 0xAA, sizeof(root));
+        dogecoin_compute_merkle_root(leaves, absurd, root, &m2);
+        u_assert_true(m2 == false);
+        uint256_t zero;
+        memset(zero, 0, sizeof(zero));
+        u_assert_int_eq(memcmp(root, zero, sizeof(zero)), 0);
+    }
 }
 
 void test_block_header()
