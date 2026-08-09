@@ -128,7 +128,29 @@ int get_mnemonic(const int entropysize, const char* entropy, const char* wordlis
 
     /* Convert local entropy and copy to entropy parameter if allocated */
     if (entropy_out != NULL) {
-        strcpy(entropy_out, utils_uint8_to_hex(local_entropy, entBytes));
+        /* Copy a measured length rather than strcpy'ing into a caller pointer
+           whose size this function is never told. entropysize is validated
+           above to 128..256, so entBytes is 16..32 and the hex form is at most
+           64 characters plus a terminator -- exactly what HEX_ENTROPY holds,
+           which is the type the header tells callers to pass. The bound is
+           real, but nothing in the signature carries it, so spell it out. */
+        const char *entropy_hex = utils_uint8_to_hex(local_entropy, entBytes);
+        if (entropy_hex == NULL) {
+            fprintf(stderr, "ERROR: Failed to convert entropy to hex\n");
+            dogecoin_free(entropyBits);
+            dogecoin_free(local_entropy);
+            return -1;
+        }
+        size_t entropy_hex_len = (size_t)entBytes * HEX_CHARS_PER_BYTE;
+        if (entropy_hex_len + 1 > MAX_ENTROPY_STRING_SIZE) {
+            fprintf(stderr, "ERROR: Entropy hex exceeds %d bytes\n",
+                    (int)MAX_ENTROPY_STRING_SIZE);
+            dogecoin_free(entropyBits);
+            dogecoin_free(local_entropy);
+            return -1;
+        }
+        memcpy(entropy_out, entropy_hex, entropy_hex_len);
+        entropy_out[entropy_hex_len] = '\0';
         utils_clear_buffers();
     }
 
