@@ -171,11 +171,14 @@ static const char * wallet_txns[] = {
 void test_wallet_file_is_private()
 {
 #ifndef _WIN32
-    char path[] = "/tmp/dogecoin_wallet_perm_XXXXXX";
-    int fd = mkstemp(path);
-    u_assert_true(fd >= 0);
-    close(fd);
-    unlink(path);   /* we want the library to create it, not mkstemp */
+    /* mkdtemp, not mkstemp-then-unlink: unlinking and then asking the library
+       to create the same path is itself a check-then-use, and the name is
+       already known by then. A 0700 directory nobody else can enter makes the
+       creation below unambiguous. */
+    char dir[] = "/tmp/dogecoin_wallet_perm_XXXXXX";
+    u_assert_true(mkdtemp(dir) != NULL);
+    char path[128];
+    snprintf(path, sizeof(path), "%s/w.db", dir);
 
     mode_t old = umask(0022);   /* the permissive case that exposed this */
 
@@ -192,6 +195,7 @@ void test_wallet_file_is_private()
     dogecoin_wallet_free(wallet);
     umask(old);
     unlink(path);
+    rmdir(dir);
 #endif
 }
 

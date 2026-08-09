@@ -262,11 +262,17 @@ void test_utils_slice()
 void test_utils_fopen_private()
 {
 #ifndef _WIN32
-    const char* path = "dogecoin_fopen_private_test.tmp";
+    /* A private directory of our own, rather than a fixed name in the working
+       directory: two test runs in the same tree would otherwise share the file,
+       and every stat()-then-open below would be a real check-then-use against a
+       path anyone can pre-create. mkdtemp gives us 0700 and a name nobody can
+       predict. */
+    char dir[] = "/tmp/dogecoin_fopen_priv_XXXXXX";
+    u_assert_true(mkdtemp(dir) != NULL);
+    char path[128];
+    snprintf(path, sizeof(path), "%s/f.tmp", dir);
     struct stat st;
     FILE* fp;
-
-    remove(path);
 
     fp = dogecoin_fopen_private(path, "wb");
     u_assert_true(fp != NULL);
@@ -314,5 +320,6 @@ void test_utils_fopen_private()
     u_assert_int_eq(errno, EEXIST);
 
     remove(path);
+    rmdir(dir);
 }
 
