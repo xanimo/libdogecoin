@@ -41,6 +41,7 @@ extern void test_aes();
 extern void test_arith_uint256();
 extern void test_base58();
 extern void test_base64();
+extern void test_cf_checkpoints();
 extern void test_compact_filter();
 extern void test_dit();
 extern void test_bip32();
@@ -176,6 +177,7 @@ int main()
     u_run_test(test_arith_uint256);
     u_run_test(test_base58);
     u_run_test(test_base64);
+    u_run_test(test_cf_checkpoints);
     u_run_test(test_compact_filter);
     u_run_test(test_dit);
     u_run_test(test_bip32);

@@ -34,6 +34,22 @@
  * peer's cfcheckpt response before any filter headers are trusted.
  */
 
+/* Provenance
+ *
+ * These tables were committed before contrib/devtools/gen_cf_checkpoints.py
+ * existed, so they carry no record of the node, version or date they came
+ * from. Nothing here is known to be wrong -- the shape is asserted by
+ * test/cf_checkpoints_tests.c -- but "re-derive and diff" is the only way to
+ * review 12,862 lines of hex, and that cannot be done against data whose
+ * origin is unrecorded.
+ *
+ * Regenerate both networks with the script and replace these arrays, so the
+ * header it emits states the node version, chain tip and generation date.
+ *
+ * Spacing is per network: 1,000 on mainnet, 10,000 on testnet. See
+ * include/dogecoin/cf_checkpoints.h for why, and for what it costs on testnet.
+ */
+
 #include <dogecoin/cf_checkpoints.h>
 
 const dogecoin_cf_checkpoint dogecoin_mainnet_cf_checkpoint_array[] = {

@@ -287,6 +287,7 @@ tests_SOURCES = \
     test/block_tests.c \
     test/compact_block_tests.c \
     test/buffer_tests.c \
+    test/cf_checkpoints_tests.c \
     test/chacha20_tests.c \
     test/checkpoints_tests.c \
     test/context_tests.c \
