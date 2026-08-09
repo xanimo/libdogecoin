@@ -717,7 +717,15 @@ char* concat(char* prefix, char* suffix) {
 
 FILE* dogecoin_fopen_private(const char* path, const char* mode)
 {
-#ifdef _WIN32
+#ifdef USE_OPTEE
+    /* A trusted application has no filesystem: open(), fdopen() and close()
+       are not provided, and referencing them fails the TA link even though
+       nothing in the TA calls this. The rest of utils.c guards its filesystem
+       code the same way. */
+    (void)path;
+    (void)mode;
+    return NULL;
+#elif defined(_WIN32)
     /* No umask on Windows; a new file inherits the directory's ACL, so plain
        fopen already gets whatever the parent grants. */
     return fopen(path, mode);
