@@ -69,6 +69,13 @@
 
 #define SIG_DER_MAX 74
 #define SIG_COMPACT 64
+/* The recoverable signers write 65 bytes, not 64: _fcomp puts a 27+recid[+4]
+   header at sigrec[0] and the 64-byte r||s at &sigrec[1], and the plain
+   recoverable variant reports *outlen = 65 even though it serialises 64. Sizing
+   these buffers at SIG_COMPACT overflowed them by a byte -- adjacent on the
+   stack, so cmp1's overflow landed in cmp2[0] and the comparison failed on
+   aarch64 while passing on x86_64, which is what a stack overflow looks like. */
+#define SIG_RECOVERABLE 65
 #define NUM_ROUNDS  8
 
 /* Two distinct message hashes. */
@@ -88,7 +95,7 @@ void test_rfc6979()
 
     unsigned char der1[SIG_DER_MAX], der2[SIG_DER_MAX];
     size_t der1len, der2len;
-    unsigned char cmp1[SIG_COMPACT], cmp2[SIG_COMPACT], cmp3[SIG_COMPACT];
+    unsigned char cmp1[SIG_RECOVERABLE], cmp2[SIG_RECOVERABLE], cmp3[SIG_RECOVERABLE];
     size_t cmp1len, cmp2len, cmp3len;
     int recid1, recid2;
     int i;
