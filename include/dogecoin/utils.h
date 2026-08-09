@@ -73,11 +73,6 @@ LIBDOGECOIN_API char* to_string(uint8_t* x);
 LIBDOGECOIN_API char* hash_to_string(uint8_t* x);
 LIBDOGECOIN_API uint8_t* hash_to_bytes(uint8_t* x);
 LIBDOGECOIN_API void* safe_malloc(size_t size);
-/* Fast, NON-CRYPTOGRAPHIC randomness, seeded from the wall clock. For values
-   that only need to be unlikely to repeat -- P2P nonces are the in-tree use.
-   Never for keys, seeds, entropy or anything an attacker benefits from
-   predicting: use dogecoin_random_bytes(), which fails closed. */
-LIBDOGECOIN_API void dogecoin_cheap_random_bytes(uint8_t* buf, size_t len);
 LIBDOGECOIN_API void dogecoin_get_default_datadir(cstring* path_out);
 LIBDOGECOIN_API void dogecoin_file_commit(FILE* file);
 LIBDOGECOIN_API void print_image(FILE *fptr);
