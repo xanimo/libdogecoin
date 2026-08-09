@@ -180,7 +180,7 @@ static const char * wallet_txns[] = {
    by the time it is called. */
 void test_wallet_file_is_private()
 {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(USE_OPTEE)
     /* mkdtemp, not mkstemp-then-unlink: unlinking and then asking the library
        to create the same path is itself a check-then-use, and the name is
        already known by then. A 0700 directory nobody else can enter makes the

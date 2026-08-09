@@ -275,7 +275,10 @@ void test_utils_slice()
  */
 void test_utils_fopen_private()
 {
-#ifndef _WIN32
+/* The 0600-on-create guarantee only exists on the POSIX path. Windows has no
+   umask, and OP-TEE has no filesystem in the TA and no open/fdopen/close to
+   build it from, so both fall back to plain fopen. */
+#if !defined(_WIN32) && !defined(USE_OPTEE)
     /* A private directory of our own, rather than a fixed name in the working
        directory: two test runs in the same tree would otherwise share the file,
        and every stat()-then-open below would be a real check-then-use against a

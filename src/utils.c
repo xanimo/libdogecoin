@@ -717,17 +717,17 @@ char* concat(char* prefix, char* suffix) {
 
 FILE* dogecoin_fopen_private(const char* path, const char* mode)
 {
-#ifdef USE_OPTEE
-    /* A trusted application has no filesystem: open(), fdopen() and close()
-       are not provided, and referencing them fails the TA link even though
-       nothing in the TA calls this. The rest of utils.c guards its filesystem
-       code the same way. */
-    (void)path;
-    (void)mode;
-    return NULL;
-#elif defined(_WIN32)
-    /* No umask on Windows; a new file inherits the directory's ACL, so plain
-       fopen already gets whatever the parent grants. */
+#if defined(USE_OPTEE) || defined(_WIN32)
+    /* OP-TEE provides fopen but not the POSIX open/fdopen/close this uses --
+       referencing them fails the TA link even though nothing in the TA calls
+       this function. Fall back rather than return NULL: the same library is
+       linked for the host side of an OP-TEE build, where wallet.c does open
+       files, and stubbing this out made those calls fail and took the mode
+       assertions with them.
+       Windows has no umask, so a new file inherits the directory ACL and plain
+       fopen already gets whatever the parent grants.
+       Neither platform gets the 0600-on-create guarantee; on OP-TEE the TA has
+       no filesystem to guarantee it for. */
     return fopen(path, mode);
 #else
     int flags;
