@@ -104,6 +104,7 @@ libdogecoin_la_SOURCES = \
     src/bip39.c \
     src/bip44.c \
     src/block.c \
+    src/compact_block.c \
     src/buffer.c \
     src/chacha20.c \
     src/context.c \
@@ -278,6 +279,7 @@ tests_SOURCES = \
     test/bip39_tests.c \
     test/bip44_tests.c \
     test/block_tests.c \
+    test/compact_block_tests.c \
     test/buffer_tests.c \
     test/chacha20_tests.c \
     test/checkpoints_tests.c \
@@ -370,6 +372,8 @@ tests_SOURCES += \
     test/raccoong_hash_vec_tests.c \
     test/raccoong_buff_mu_tests.c \
     test/raccoong_sign_tests.c \
+    test/data/auxpow_block_371338.h \
+    test/data/bip152_vectors.h \
     test/data/raccoong_polyr_vectors.h \
     test/data/raccoong_ntt_vectors.h \
     test/data/raccoong_gaussian_vectors.h \
