@@ -539,7 +539,6 @@ static void test_gcs_bip158_vectors(void)
         size_t got_len = 0;
         utils_hex_to_bin((char *)t->filter, expect, strlen(t->filter), &got_len);
         u_assert_int_eq(memcmp(ser->str, expect, expect_len), 0);
-        dogecoin_free(expect);
 
         /* header chain: dbl_sha256(dbl_sha256(N||data) || prev_header) */
         uint256_t prev_header, want_header, got_header;
@@ -548,6 +547,51 @@ static void test_gcs_bip158_vectors(void)
         u_assert_true(gcs_filter_compute_header(f, prev_header, got_header));
         u_assert_int_eq(memcmp(got_header, want_header, 32), 0);
 
+        /* Matching, against the published bytes rather than against our own
+         * encoder. Everything above builds a filter and compares it to the
+         * spec; nothing above decodes one. Without this, an encoder and a
+         * decoder that were wrong in the same way would still agree with each
+         * other and pass -- the round-trip tests are self-consistent by
+         * construction. Deserializing the vector's own bytes and querying them
+         * is what makes the decode side answer to an external oracle. */
+        gcs_filter *dec = gcs_filter_new();
+        struct const_buffer dbuf = {expect, expect_len};
+        u_assert_true(gcs_filter_deserialize(dec, GCS_BASIC_FILTER_TYPE, blockhash, &dbuf));
+        u_assert_uint32_eq(dec->N, f->N);
+
+        /* Every element of the block must be found in the decoded filter,
+         * individually and as a set. */
+        for (k = 0; k < t->n_elements; k++) {
+            u_assert_true(gcs_filter_match(dec, (const uint8_t *)t->elements[k],
+                                           (size_t)t->element_len[k]));
+        }
+        if (t->n_elements > 0) {
+            u_assert_true(gcs_filter_match_any(dec, elements));
+        } else {
+            /* N == 0: nothing can match, and match_any must say so rather than
+             * walking an empty bitstream. */
+            u_assert_true(!gcs_filter_match_any(dec, elements));
+        }
+
+        /* A script that is in no vector must not match. GCS is probabilistic,
+         * so this is a fixed-input assertion rather than a statistical one:
+         * with M = 784931 and these N, a collision here would be deterministic
+         * and would show up on the first run, not intermittently. */
+        {
+            static const uint8_t absent[] = {
+                0x76, 0xa9, 0x14,
+                0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                0x88, 0xac };
+            vector_t *miss = vector_new(1, cstr_free_cb);
+            vector_add(miss, cstr_new_buf((const char *)absent, sizeof(absent)));
+            u_assert_true(!gcs_filter_match(dec, absent, sizeof(absent)));
+            u_assert_true(!gcs_filter_match_any(dec, miss));
+            vector_free(miss, true);
+        }
+
+        gcs_filter_free(dec);
+        dogecoin_free(expect);
         cstr_free(ser, true);
         gcs_filter_free(f);
         vector_free(elements, true);
