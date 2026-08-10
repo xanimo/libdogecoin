@@ -85,6 +85,15 @@ typedef struct par_hdr_seg_ {
     uint32_t  count;          /* headers buffered */
     uint32_t  cap;            /* buffer capacity  */
 
+    /* The segment's final header, retained whole: the standard 80 bytes plus
+     * the AuxPoW blob when the version carries bit 0x100. buf holds only the
+     * 80-byte prefix of each header, which is all connect_hdr needs, but it is
+     * not enough to verify an AuxPoW proof -- and every mainnet segment above
+     * height 371337 is merge-mined. Kept for the last header of the segment
+     * only, so this costs one blob per segment rather than one per header. */
+    uint8_t  *tail_raw;
+    uint32_t  tail_len;
+
     dogecoin_bool complete;   /* all stop_height - start_height headers received */
     dogecoin_bool flushed;    /* segment has been flushed into the primary DB    */
     uint32_t  flush_fails;    /* times this segment failed to connect at flush   */
