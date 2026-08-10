@@ -148,6 +148,17 @@ void dogecoin_rnd_set_mapper(const dogecoin_rnd_mapper mapper)
     current_rnd_mapper = mapper;
     }
 
+/* Struct-free entry point for callers that include only libdogecoin.h, which
+   cannot carry the mapper's struct definition without colliding with
+   dogecoin/random.h. Keeps the default initialiser: a platform generator that
+   needs no setup is the normal case, and the default init is a no-op. */
+void dogecoin_rnd_set_bytes_cb(dogecoin_bool (*cb)(uint8_t* buf, uint32_t len, const uint8_t update_seed))
+    {
+    if (!cb) { dogecoin_rnd_set_mapper_default(); return; }
+    current_rnd_mapper.dogecoin_random_init  = dogecoin_random_init_internal;
+    current_rnd_mapper.dogecoin_random_bytes = cb;
+    }
+
 void dogecoin_random_init(void)
     {
     current_rnd_mapper.dogecoin_random_init();
@@ -185,12 +196,13 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     return true;
     }
 #else
-/* Define a function pointer for random */
-DOGECOIN_THREAD_LOCAL int (*rng_ptr) (void*, size_t) = NULL;
-void set_rng(int (*ptr)(void *, size_t))
-    {
-    rng_ptr = ptr;
-    }
+/* An enclave or trusted application supplies its own generator through
+   dogecoin_rnd_set_mapper(), which replaces this whole function rather than
+   short-circuiting part of it. The old set_rng()/rng_ptr hook did the latter:
+   it returned early on success but fell through to the POSIX fallback below on
+   any failure, which is the one path an enclave cannot take. It was also never
+   declared in any header, so each backend wrote its own prototype and all three
+   disagreed on the callback's type. */
 void dogecoin_random_init_internal(void)
     {
     }
@@ -228,13 +240,6 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     errno = ENOSYS;
     return -1;
 #else
-#if USE_OPENENCLAVE || USE_OPTEE
-    if (rng_ptr != NULL)
-        if (rng_ptr(buf, len) == 0)
-            return true;
-
-#endif
-
     (void)update_seed; //unused
     FILE* frand = fopen(RANDOM_DEVICE, "rb");
     if (!frand)

@@ -75,8 +75,25 @@ int fprintf(void *stream, const char *format, ...);
 int fopen(const char *path, const char *mode);
 int fclose(void *stream);
 
+/* Route libdogecoin's randomness at the TEE generator.
+   TEE_GenerateRandom returns void and always fills the buffer, so the shim
+   reports success unconditionally; there is no status to propagate. Going
+   through the mapper rather than the old set_rng hook means the library's
+   POSIX fallback is unreachable rather than merely skipped on success -- a TA
+   has no filesystem to open, and fopen here is a stub. */
+static dogecoin_bool ta_random_bytes(uint8_t *buf, uint32_t len, const uint8_t update_seed)
+{
+    (void)update_seed;
+    TEE_GenerateRandom(buf, len);
+    return true;
+}
+
+static void ta_set_rng(void)
+{
+    dogecoin_rnd_set_bytes_cb(ta_random_bytes);
+}
+
 // Function prototypes for the TA
-void set_rng(void (*ptr)(void *, uint32_t));
 
 #define AUTH_TOKEN_LEN 6 // 6-digit TOTP
 uint32_t get_totp(const char* shared_secret, uint64_t timestamp);
@@ -328,7 +345,7 @@ static TEE_Result generate_and_store_master_key(uint32_t param_types, TEE_Param 
                              TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
 
     // Initialize the random number generator
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
@@ -397,7 +414,7 @@ static TEE_Result generate_and_store_mnemonic(uint32_t param_types, TEE_Param pa
     EMSG("Starting mnemonic generation");
 
     // Initialize the random number generator
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
@@ -572,7 +589,7 @@ static TEE_Result generate_extended_public_key(uint32_t param_types, TEE_Param p
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
 
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
@@ -677,7 +694,7 @@ static TEE_Result generate_address(uint32_t param_types, TEE_Param params[4]) {
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
 
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
@@ -780,7 +797,7 @@ static TEE_Result sign_message_with_private_key(uint32_t param_types, TEE_Param 
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
 
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
@@ -898,7 +915,7 @@ static TEE_Result sign_transaction_with_private_key(uint32_t param_types, TEE_Pa
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
 
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
@@ -1050,7 +1067,7 @@ static TEE_Result delegate_key(uint32_t param_types, TEE_Param params[4]) {
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, delegate_password, seed);
 
-    set_rng(&TEE_GenerateRandom);
+    ta_set_rng();
 
     dogecoin_ecc_start();
 
