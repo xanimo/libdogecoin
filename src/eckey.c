@@ -200,6 +200,24 @@ eckey* new_eckey(dogecoin_bool is_testnet) {
     return new_eckey_ts(default_eckey_context(), is_testnet);
 }
 
+/* Copy a hex public key into eckey's fixed public_key_hex field.
+ *
+ * Measures rather than assuming. The previous form set the length to
+ * PUBKEYHEXLEN - 1 on the strength of utils_uint8_to_hex(..., 33) returning
+ * exactly 66 characters, then "checked" it with `pubkey_hex_len + 1 >
+ * PUBKEYHEXLEN` -- 67 > 67, false on every input, so the guard could not fire
+ * and the copy rested on the same unchecked invariant the rest of this change
+ * exists to remove. strnlen makes the bound real: an over-long hex string is
+ * rejected instead of silently truncated to whatever the field happens to hold. */
+static dogecoin_bool eckey_set_public_key_hex(eckey* key, const char* pubkey_hex) {
+    if (!key || !pubkey_hex) return false;
+    size_t len = strnlen(pubkey_hex, PUBKEYHEXLEN);
+    if (len >= PUBKEYHEXLEN) return false;   /* unterminated or too long */
+    memcpy(key->public_key_hex, pubkey_hex, len);
+    key->public_key_hex[len] = '\0';
+    return true;
+}
+
 eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
     if (!ctx) return NULL;
     eckey* key = (struct eckey*)dogecoin_calloc(1, sizeof *key);
@@ -221,13 +239,10 @@ eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet) {
             dogecoin_key_free(key);
             return NULL;
         }
-        size_t pubkey_hex_len = PUBKEYHEXLEN - 1;   /* 66 hex chars for 33 bytes */
-        if (pubkey_hex_len + 1 > PUBKEYHEXLEN) {
+        if (!eckey_set_public_key_hex(key, pubkey_hex)) {
             dogecoin_key_free(key);
             return NULL;
         }
-        memcpy(key->public_key_hex, pubkey_hex, pubkey_hex_len);
-        key->public_key_hex[pubkey_hex_len] = '\0';
     }
     uint8_t pkeybase58c[34];
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
@@ -278,13 +293,10 @@ eckey* new_eckey_from_privkey_ts(dogecoin_eckey_context* ctx, char* private_key)
             dogecoin_key_free(key);
             return NULL;
         }
-        size_t pubkey_hex_len = PUBKEYHEXLEN - 1;   /* 66 hex chars for 33 bytes */
-        if (pubkey_hex_len + 1 > PUBKEYHEXLEN) {
+        if (!eckey_set_public_key_hex(key, pubkey_hex)) {
             dogecoin_key_free(key);
             return NULL;
         }
-        memcpy(key->public_key_hex, pubkey_hex, pubkey_hex_len);
-        key->public_key_hex[pubkey_hex_len] = '\0';
     }
     uint8_t pkeybase58c[34];
     pkeybase58c[0] = chain->b58prefix_secret_address;
