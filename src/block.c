@@ -477,7 +477,11 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
 static int parse_dogecoin_auxpow_fields(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params) {
     (void)params;
     if (buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
-        return printf("\ntransaction is invalid or to large.\n\n");
+        /* printf returns the character count, so returning it reported ~38 --
+           truthy -- from a guard whose contract is 1 for success and 0 for
+           failure. An over-large AuxPoW blob was therefore treated as parsed. */
+        printf("\ntransaction is invalid or to large.\n\n");
+        return false;
         }
 
     size_t consumedlength = 0;

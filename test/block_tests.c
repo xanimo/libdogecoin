@@ -18,6 +18,7 @@
 #include <dogecoin/block.h>
 
 #include <dogecoin/cstr.h>
+#include <dogecoin/protocol.h>
 #include <dogecoin/key.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/pow.h>
@@ -80,8 +81,38 @@ static void test_check_merkle_branch()
     vector_free(merkle_branch, true);
 }
 
+/* The oversized-input guard in parse_dogecoin_auxpow_fields returned
+   printf("..."), i.e. the character count -- around 38, and truthy -- from a
+   function contracted to return 1 for success and 0 for failure. An AuxPoW blob
+   larger than a P2P message can carry was therefore reported as parsed.
+
+   Tested through dogecoin_block_header_parse rather than
+   deserialize_dogecoin_auxpow_block: the latter runs check_auxpow afterwards,
+   which rejects the buffer for an unrelated reason, so it returns false either
+   way and cannot tell the guard from its absence. The pure parse path has no
+   such second opinion, which is exactly what makes it able to fail here. */
+static void test_auxpow_oversized_input_is_rejected(void)
+{
+    /* 80-byte header with the AuxPoW version bit set, then more trailing data
+       than a P2P message can hold, which is what the guard exists to refuse. */
+    size_t trailing = (size_t)DOGECOIN_MAX_P2P_MSG_SIZE + 1;
+    size_t total = 80 + trailing;
+    uint8_t *blob = dogecoin_calloc(1, total);
+    u_assert_true(blob != NULL);
+    blob[0] = 0x02; blob[1] = 0x01;   /* version = 0x00000102, bit 0x100 set */
+
+    dogecoin_block_header header;
+    dogecoin_mem_zero(&header, sizeof(header));
+    struct const_buffer buf = { blob, total };
+    u_assert_true(!dogecoin_block_header_parse(&header, &buf, &dogecoin_chainparams_main));
+
+    dogecoin_free(blob);
+}
+
 void test_block_header()
 {
+    test_auxpow_oversized_input_is_rejected();
+
     size_t outlen;
     char hexbuf[161];
     unsigned int i;
