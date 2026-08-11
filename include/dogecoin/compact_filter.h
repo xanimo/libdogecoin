@@ -431,6 +431,27 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_cf_validate_checkpoints(
 LIBDOGECOIN_API size_t dogecoin_cf_load_hardcoded_checkpoints(
     dogecoin_compact_filter_state *state, const dogecoin_chainparams *chain);
 
+/**
+ * @brief Look up the compiled-in filter header for a height, if one exists.
+ *
+ * This is the authoritative anchor for cfheaders validation. A peer's cfcheckpt
+ * response must never be the thing a filter header is checked against: a peer
+ * that answers with a short list is only validated over the prefix it chose to
+ * send, and anything above that would be accepted unanchored.
+ *
+ * Searches rather than indexing. Checkpoint spacing is not the same on every
+ * chain -- mainnet is one per CFCHECKPT_INTERVAL, testnet is one per ten of
+ * them, because testnet3 is ~65M blocks deep against mainnet's ~6.3M -- so
+ * `height / CFCHECKPT_INTERVAL - 1` is only ever right for one of them.
+ *
+ * @param chain      The chain params.
+ * @param height     Block height to look up.
+ * @param header_out Receives the filter header in internal byte order.
+ * @return true if a compiled-in checkpoint exists at exactly @p height.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_cf_hardcoded_checkpoint_at(
+    const dogecoin_chainparams *chain, uint32_t height, uint256_t header_out);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* __LIBDOGECOIN_COMPACT_FILTER_H__ */

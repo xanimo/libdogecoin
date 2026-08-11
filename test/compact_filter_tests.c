@@ -539,6 +539,49 @@ static void test_cfcheckpt_deser_unbounded_count(void)
 /*  Public test entry point                                         */
 /* ================================================================ */
 
+/* The compiled-in table is what cfheaders are anchored against, so the lookup has
+   to answer correctly for every real height and refuse everything else. A false
+   positive would anchor a header against the wrong block; a false negative would
+   silently drop an anchor. */
+static void test_cf_hardcoded_checkpoint_lookup(void)
+{
+    uint256_t got, want;
+
+    size_t count = 0;
+    const dogecoin_cf_checkpoint *cps =
+        dogecoin_cf_get_checkpoints(&dogecoin_chainparams_main, &count);
+    u_assert_true(cps != NULL);
+    u_assert_true(count > 0);
+
+    /* Every entry, so an ordering fault anywhere in 6k+ rows is caught rather
+       than only wherever a handful of probes happen to land. */
+    size_t i;
+    for (i = 0; i < count; i++) {
+        u_assert_true(dogecoin_cf_hardcoded_checkpoint_at(&dogecoin_chainparams_main,
+                                                          cps[i].height, got));
+        utils_uint256_sethex((char *)cps[i].filter_header, want);
+        u_assert_int_eq(memcmp(got, want, 32), 0);
+        if (i > 0) u_assert_true(cps[i].height > cps[i - 1].height);
+    }
+
+    /* Absent: between entries, below the first, above the last, and zero. */
+    u_assert_true(!dogecoin_cf_hardcoded_checkpoint_at(&dogecoin_chainparams_main,
+                                                       cps[0].height - 1, got));
+    u_assert_true(!dogecoin_cf_hardcoded_checkpoint_at(&dogecoin_chainparams_main,
+                                                       cps[0].height + 1, got));
+    u_assert_true(!dogecoin_cf_hardcoded_checkpoint_at(&dogecoin_chainparams_main,
+                                                       cps[count - 1].height + 1, got));
+    u_assert_true(!dogecoin_cf_hardcoded_checkpoint_at(&dogecoin_chainparams_main, 0, got));
+
+    /* The sentinel is past the count and must not be reachable. */
+    u_assert_true(cps[count].height == 0 && cps[count].filter_header == NULL);
+
+    /* A chain with no table answers false rather than reading past the end. */
+    u_assert_true(!dogecoin_cf_hardcoded_checkpoint_at(&dogecoin_chainparams_regtest,
+                                                       1000, got));
+    u_assert_true(!dogecoin_cf_hardcoded_checkpoint_at(NULL, 1000, got));
+}
+
 void test_compact_filter(void)
 {
     test_cfheaders_deser_unbounded_count();
@@ -555,5 +598,6 @@ void test_compact_filter(void)
     test_cf_checkpoints_get();
     test_cf_checkpoints_load();
     test_cf_checkpoints_validate();
+    test_cf_hardcoded_checkpoint_lookup();
     test_cfilter_indexing_with_base_height();
 }

@@ -510,6 +510,35 @@ dogecoin_bool dogecoin_cf_validate_checkpoints(
     return true;
 }
 
+dogecoin_bool dogecoin_cf_hardcoded_checkpoint_at(
+    const dogecoin_chainparams *chain, uint32_t height, uint256_t header_out)
+{
+    if (!chain || !header_out) return false;
+
+    size_t count = 0;
+    const dogecoin_cf_checkpoint *cps = dogecoin_cf_get_checkpoints(chain, &count);
+    if (!cps || count == 0) return false;
+
+    /* Heights are ascending and the count excludes the {0, NULL} sentinel, so a
+       binary search is well defined. Deliberately not height / CFCHECKPT_INTERVAL - 1:
+       mainnet carries one checkpoint per interval and testnet one per ten, so an
+       index formula silently reads the wrong entry on whichever chain it was not
+       written for. */
+    size_t lo = 0, hi = count;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (cps[mid].height == height) {
+            if (!cps[mid].filter_header) return false;
+            /* Table stores display-order hex; sethex reverses to internal order. */
+            utils_uint256_sethex((char *)cps[mid].filter_header, header_out);
+            return true;
+        }
+        if (cps[mid].height < height) lo = mid + 1;
+        else hi = mid;
+    }
+    return false;
+}
+
 size_t dogecoin_cf_load_hardcoded_checkpoints(
     dogecoin_compact_filter_state *state, const dogecoin_chainparams *chain)
 {
