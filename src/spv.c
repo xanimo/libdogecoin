@@ -877,6 +877,9 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->cfilter_state = dogecoin_compact_filter_state_new();
     if (client->cfilter_state) {
         client->cfilter_state->enabled = true;
+        /* The compiled-in checkpoints are the trust anchor. Load them here so the
+           client holds them before it ever speaks to a peer. */
+        dogecoin_cf_load_hardcoded_checkpoints(client->cfilter_state, params);
     }
     dogecoin_mem_zero(client->cf_prev_filter_header, sizeof(uint256_t));
     client->cf_computed_height = 0;
@@ -3004,21 +3007,24 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     uint256_t *new_header = dogecoin_calloc(1, sizeof(uint256_t));
                     dogecoin_hash(combined, 64, *new_header);
 
-                    /* Validate against checkpoint if at a boundary.
-                     * Dogecoin Core checkpoints are at heights 1000, 2000, ...
-                     * cp_idx = height / CFCHECKPT_INTERVAL - 1: 1000→0, 2000→1, etc. */
-                    if (cfstate->checkpoints && cfstate->checkpoints->len > 0 &&
-                        height > 0 && (height % CFCHECKPT_INTERVAL) == 0) {
-                        uint32_t cp_idx = (height / CFCHECKPT_INTERVAL) - 1;
-                        if (cp_idx < cfstate->checkpoints->len) {
-                            uint256_t *checkpoint = (uint256_t *)vector_idx(cfstate->checkpoints, cp_idx);
-                            if (memcmp(*new_header, checkpoint, 32) != 0) {
-                                if (client->nodegroup && client->nodegroup->log_write_cb)
-                                    client->nodegroup->log_write_cb("[bip157] cfheader at height %u does NOT match checkpoint!\n", height);
-                                valid = false;
-                                dogecoin_free(new_header);
-                                break;
-                            }
+                    /* Anchor on the compiled-in table, looked up by height.
+                     *
+                     * This used to index cfstate->checkpoints, which the cfcheckpt
+                     * handler filled from the peer's response -- so a peer that
+                     * answered with a short list was validated only over the prefix
+                     * it chose to send, and everything above that was accepted with
+                     * no anchor at all. The table is ours and a peer cannot shorten
+                     * it. Looking up by height rather than by index also keeps this
+                     * correct on testnet, whose checkpoints are one per ten
+                     * intervals rather than one per interval. */
+                    uint256_t anchor;
+                    if (dogecoin_cf_hardcoded_checkpoint_at(client->chainparams, height, anchor)) {
+                        if (memcmp(*new_header, anchor, 32) != 0) {
+                            if (client->nodegroup && client->nodegroup->log_write_cb)
+                                client->nodegroup->log_write_cb("[bip157] cfheader at height %u does NOT match checkpoint!\n", height);
+                            valid = false;
+                            dogecoin_free(new_header);
+                            break;
                         }
                     }
 
@@ -3119,19 +3125,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     client->nodegroup->log_write_cb("[bip157] cfcheckpt: type=%u n_checkpoints=%u\n",
                         cfcp_msg.filter_type, (unsigned int)cfcp_msg.filter_headers->len);
 
-                if (cfstate->checkpoints) {
-                    vector_free(cfstate->checkpoints, true);
-                }
-                cfstate->checkpoints = vector_new(cfcp_msg.filter_headers->len, dogecoin_free);
-
-                unsigned int i;
-                for (i = 0; i < cfcp_msg.filter_headers->len; i++) {
-                    uint256_t *cp = dogecoin_calloc(1, sizeof(uint256_t));
-                    memcpy(cp, vector_idx(cfcp_msg.filter_headers, i), 32);
-                    vector_add(cfstate->checkpoints, cp);
-                }
-
-                if (!dogecoin_cf_validate_checkpoints(client->chainparams, cfstate->checkpoints)) {
+                /* Validate the peer's list without adopting it. Overwriting
+                   cfstate->checkpoints here is what let a truncated response
+                   disable anchoring: the replacement was only checked over the
+                   indices the peer supplied, and the cfheaders path then trusted
+                   its length. The compiled-in set loaded at client construction
+                   stays put; this message is a misbehaviour signal, nothing more. */
+                if (!dogecoin_cf_validate_checkpoints(client->chainparams, cfcp_msg.filter_headers)) {
                     if (client->nodegroup && client->nodegroup->log_write_cb)
                         client->nodegroup->log_write_cb("[bip157] cfcheckpt FAILED hardcoded validation — misbehaving node %d\n", node->nodeid);
                     dogecoin_node_misbehave(node);
@@ -4974,6 +4974,7 @@ LIBDOGECOIN_API void dogecoin_spv_enable_compact_filters(dogecoin_spv_client *cl
         if (client->cfilter_state) {
             client->cfilter_state->enabled = true;
             client->compact_filters_enabled = true;
+            dogecoin_cf_load_hardcoded_checkpoints(client->cfilter_state, client->chainparams);
             if (client->nodegroup && client->nodegroup->log_write_cb)
                 client->nodegroup->log_write_cb("[bip157] compact filter sync enabled\n");
         }

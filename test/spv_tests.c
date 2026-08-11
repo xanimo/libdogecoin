@@ -42,6 +42,7 @@
 
 #include <dogecoin/arith_uint256.h>
 #include <dogecoin/block.h>
+#include <dogecoin/compact_filter.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/net.h>
 #include <dogecoin/protocol.h>
@@ -85,8 +86,97 @@ dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *cli
     return true;
 }
 
+/* One construction, two properties, because a mainnet client is expensive to
+   build here -- opening the cfheaders db walks the on-disk file, and doing that
+   twice pushed the suite past its runtime.
+
+   Property one: the client holds the compiled-in checkpoints before it talks to
+   anyone. dogecoin_cf_load_hardcoded_checkpoints() previously had exactly one
+   caller in the whole BIP157 stack -- a unit test -- so at runtime the checkpoint
+   set came entirely from a peer's cfcheckpt, and a peer answering with a short
+   list left every filter header above it unanchored. The suite stayed green
+   throughout because the test called the loader itself and nothing asserted the
+   client did.
+
+   Property two: a peer cannot take them away. Driven through
+   nodegroup->postcmd_cb, which is dogecoin_net_spv_post_cmd, so this is the
+   production dispatch path rather than a re-implementation of it. No socket is
+   involved -- the handler reads node->nodeid and node->nodegroup, both of which
+   dogecoin_node_group_add_node sets. */
+static void test_spv_checkpoints_are_ours_and_stay_ours(void)
+{
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+
+    size_t table_count = 0;
+    const dogecoin_cf_checkpoint *table = dogecoin_cf_get_checkpoints(chain, &table_count);
+    u_assert_true(table != NULL);
+    u_assert_true(table_count > 1);
+
+    dogecoin_spv_client* client = dogecoin_spv_client_new(chain, false, true, true, false, 8, NULL);
+    u_assert_true(client != NULL);
+    u_assert_true(client->cfilter_state != NULL);
+    u_assert_true(client->cfilter_state->checkpoints != NULL);
+    u_assert_true(client->nodegroup != NULL);
+    u_assert_true(client->nodegroup->postcmd_cb != NULL);
+
+    /* Loaded, and with the table's values rather than an empty vector. */
+    u_assert_uint32_eq((uint32_t)client->cfilter_state->checkpoints->len,
+                       (uint32_t)table_count);
+    uint256_t want;
+    utils_uint256_sethex((char *)table[0].filter_header, want);
+    u_assert_int_eq(memcmp(vector_idx(client->cfilter_state->checkpoints, 0), want, 32), 0);
+
+    /* A one-entry cfcheckpt, through the real handler. The entry is genuine, so
+       validation passes and the peer is not marked misbehaving -- the attack is
+       the truncation, not a forged value. */
+    dogecoin_node* node = dogecoin_node_new();
+    u_assert_true(node != NULL);
+    dogecoin_node_group_add_node(client->nodegroup, node);
+
+    cstring* payload = cstr_new_sz(64);
+    uint8_t filter_type = GCS_BASIC_FILTER_TYPE;
+    ser_bytes(payload, &filter_type, 1);
+    uint256_t stop_hash;
+    dogecoin_mem_zero(stop_hash, sizeof(stop_hash));
+    ser_u256(payload, stop_hash);
+    ser_varlen(payload, 1);
+    uint256_t cp0;
+    utils_uint256_sethex((char *)table[0].filter_header, cp0);
+    ser_u256(payload, cp0);
+
+    dogecoin_p2p_msg_hdr hdr;
+    dogecoin_mem_zero(&hdr, sizeof(hdr));
+    memcpy(hdr.command, DOGECOIN_MSG_CFCHECKPT, strlen(DOGECOIN_MSG_CFCHECKPT));
+
+    struct const_buffer buf = { payload->str, payload->len };
+    client->nodegroup->postcmd_cb(node, &hdr, &buf);
+
+    /* Still the whole table, still the table's values. Before the fix the
+       handler freed this vector and rebuilt it from the message, leaving one. */
+    u_assert_uint32_eq((uint32_t)client->cfilter_state->checkpoints->len,
+                       (uint32_t)table_count);
+    uint256_t last;
+    utils_uint256_sethex((char *)table[table_count - 1].filter_header, last);
+    u_assert_int_eq(memcmp(vector_idx(client->cfilter_state->checkpoints,
+                                      table_count - 1), last, 32), 0);
+
+    /* And dogecoin_cf_validate_checkpoints still accepts that truncated list --
+       pinned deliberately, so nobody routes anchoring back through it. */
+    vector_t *truncated = vector_new(1, dogecoin_free);
+    uint256_t *one = dogecoin_calloc(1, sizeof(uint256_t));
+    memcpy(one, cp0, 32);
+    vector_add(truncated, one);
+    u_assert_true(dogecoin_cf_validate_checkpoints(chain, truncated));
+    vector_free(truncated, true);
+
+    cstr_free(payload, true);
+    dogecoin_spv_client_free(client);
+}
+
 void test_spv()
 {
+    test_spv_checkpoints_are_ours_and_stay_ours();
+
     // set chain:
     const dogecoin_chainparams* chain = &dogecoin_chainparams_test;
 
