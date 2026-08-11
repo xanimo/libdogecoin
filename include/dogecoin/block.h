@@ -108,6 +108,20 @@ typedef struct dogecoin_auxpow_block_ {
 } dogecoin_auxpow_block;
 
 LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
+/**
+ * @brief Release what a header owns, without freeing the header.
+ *
+ * dogecoin_block_header_free ends in dogecoin_free(header), so it cannot be used
+ * on a header that is embedded by value in another struct -- and two of them are:
+ * dogecoin_blockindex holds one, and dogecoin_compact_block holds one. Since a
+ * parsed header now owns an auxpow_payload (a transaction plus two heap arrays),
+ * those owners have to release it explicitly or leak it on every merge-mined
+ * block. This is the entry point for that.
+ *
+ * Idempotent: the payload pointer is nulled, so a second call is a no-op.
+ */
+LIBDOGECOIN_API void dogecoin_block_header_destroy(dogecoin_block_header* header);
+
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 LIBDOGECOIN_API dogecoin_auxpow_block* dogecoin_auxpow_block_new();
 LIBDOGECOIN_API void dogecoin_auxpow_block_free(dogecoin_auxpow_block* block);

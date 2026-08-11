@@ -259,7 +259,7 @@ fail:
     return NULL;
     }
 
-void dogecoin_block_header_free(dogecoin_block_header* header) {
+void dogecoin_block_header_destroy(dogecoin_block_header* header) {
     if (!header) return;
     dogecoin_auxpow_payload_free(header->auxpow_payload);
     header->auxpow_payload = NULL;
@@ -269,6 +269,11 @@ void dogecoin_block_header_free(dogecoin_block_header* header) {
     header->bits = 0;
     header->timestamp = 0;
     header->nonce = 0;
+    }
+
+void dogecoin_block_header_free(dogecoin_block_header* header) {
+    if (!header) return;
+    dogecoin_block_header_destroy(header);
     dogecoin_free(header);
     }
 

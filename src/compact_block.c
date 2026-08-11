@@ -36,6 +36,7 @@
 
 #include <string.h>
 
+#include <dogecoin/block.h>
 #include <dogecoin/compact_block.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/sha2.h>
@@ -57,6 +58,12 @@ dogecoin_compact_block *dogecoin_compact_block_new(void)
 void dogecoin_compact_block_free(dogecoin_compact_block *cmpctblk)
 {
     if (!cmpctblk) return;
+
+    /* The header is embedded by value, and a parsed merge-mined header owns an
+       auxpow_payload -- a transaction plus two heap arrays. Nothing released it
+       here, so every AuxPoW cmpctblock leaked it. dogecoin_block_header_free
+       cannot be used: it ends in dogecoin_free(header). */
+    dogecoin_block_header_destroy(&cmpctblk->header);
 
     if (cmpctblk->header_raw) {
         dogecoin_free(cmpctblk->header_raw);
