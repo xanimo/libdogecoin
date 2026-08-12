@@ -4,8 +4,7 @@ set -e -o pipefail
 
 # ./contrib/scripts/test.sh --host <target host triplet>
 
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2> /dev/null)
-$PROJECT_ROOT/contrib/scripts/check_dir.sh
+"$(dirname "$0")/check_dir.sh"
 
 if [ $# -eq 0 ]; then
     echo "No arguments provided"

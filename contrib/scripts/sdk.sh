@@ -2,9 +2,7 @@
 export LC_ALL=C
 set -e -o pipefail
 
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2> /dev/null)
-
-$PROJECT_ROOT/contrib/scripts/check_dir.sh
+"$(dirname "$0")/check_dir.sh"
 
 SDK_URL=https://bitcoincore.org/depends-sources/sdks
 SDK_SHASUM="df75d30ecafc429e905134333aeae56ac65fac67cb4182622398fd717df77619"
