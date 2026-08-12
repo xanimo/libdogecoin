@@ -94,6 +94,16 @@ case "$HOST" in
         ;;
 esac
 
+# guix names its cross-toolchain packages, and the directories inside them,
+# after the triple its cross-base accepts. That is not the -pc- form gitian uses
+# for the two linux hosts, so normalise it here. HOST keeps gitian's spelling
+# everywhere else: depends, contrib/scripts and the artifact names all use it.
+case "$HOST" in
+    i686-pc-linux-gnu)   GUIX_TARGET=i686-linux-gnu ;;
+    x86_64-pc-linux-gnu) GUIX_TARGET=x86_64-linux-gnu ;;
+    *)                   GUIX_TARGET="$HOST" ;;
+esac
+
 # Set environment variables to point the CROSS toolchain to the right
 # includes/libs for $HOST
 case "$HOST" in
@@ -107,9 +117,9 @@ case "$HOST" in
             *)                  echo "Unhandled mingw host '$HOST'... Aborting..."; exit 1 ;;
         esac
         CROSS_GLIBC="$(store_path "mingw-w64-${win_arch}-winpthreads")"
-        CROSS_GCC="$(store_path "gcc-cross-${HOST}")"
-        CROSS_GCC_LIB_STORE="$(store_path "gcc-cross-${HOST}" lib)"
-        CROSS_GCC_LIBS=( "${CROSS_GCC_LIB_STORE}/lib/gcc/${HOST}"/* ) # This expands to an array of directories...
+        CROSS_GCC="$(store_path "gcc-cross-${GUIX_TARGET}")"
+        CROSS_GCC_LIB_STORE="$(store_path "gcc-cross-${GUIX_TARGET}" lib)"
+        CROSS_GCC_LIBS=( "${CROSS_GCC_LIB_STORE}/lib/gcc/${GUIX_TARGET}"/* ) # This expands to an array of directories...
         CROSS_GCC_LIB="${CROSS_GCC_LIBS[0]}" # ...we just want the first one (there should only be one)
 
         # The search path ordering is generally:
@@ -117,25 +127,25 @@ case "$HOST" in
         #    2. libc-related search paths
         #    2. kernel-header-related search paths (not applicable to mingw-w64 hosts)
         export CROSS_C_INCLUDE_PATH="${CROSS_GCC_LIB}/include:${CROSS_GCC_LIB}/include-fixed:${CROSS_GLIBC}/include"
-        export CROSS_CPLUS_INCLUDE_PATH="${CROSS_GCC}/include/c++:${CROSS_GCC}/include/c++/${HOST}:${CROSS_GCC}/include/c++/backward:${CROSS_C_INCLUDE_PATH}"
-        export CROSS_LIBRARY_PATH="${CROSS_GCC_LIB_STORE}/lib:${CROSS_GCC}/${HOST}/lib:${CROSS_GCC_LIB}:${CROSS_GLIBC}/lib"
+        export CROSS_CPLUS_INCLUDE_PATH="${CROSS_GCC}/include/c++:${CROSS_GCC}/include/c++/${GUIX_TARGET}:${CROSS_GCC}/include/c++/backward:${CROSS_C_INCLUDE_PATH}"
+        export CROSS_LIBRARY_PATH="${CROSS_GCC_LIB_STORE}/lib:${CROSS_GCC}/${GUIX_TARGET}/lib:${CROSS_GCC_LIB}:${CROSS_GLIBC}/lib"
         ;;
     *darwin*)
         # The CROSS toolchain for darwin uses the SDK and ignores environment variables.
         # See depends/hosts/darwin.mk for more details.
         ;;
     *linux*)
-        CROSS_GLIBC="$(store_path "glibc-cross-${HOST}")"
-        CROSS_GLIBC_STATIC="$(store_path "glibc-cross-${HOST}" static)"
-        CROSS_KERNEL="$(store_path "linux-libre-headers-cross-${HOST}")"
-        CROSS_GCC="$(store_path "gcc-cross-${HOST}")"
-        CROSS_GCC_LIB_STORE="$(store_path "gcc-cross-${HOST}" lib)"
-        CROSS_GCC_LIBS=( "${CROSS_GCC_LIB_STORE}/lib/gcc/${HOST}"/* ) # This expands to an array of directories...
+        CROSS_GLIBC="$(store_path "glibc-cross-${GUIX_TARGET}")"
+        CROSS_GLIBC_STATIC="$(store_path "glibc-cross-${GUIX_TARGET}" static)"
+        CROSS_KERNEL="$(store_path "linux-libre-headers-cross-${GUIX_TARGET}")"
+        CROSS_GCC="$(store_path "gcc-cross-${GUIX_TARGET}")"
+        CROSS_GCC_LIB_STORE="$(store_path "gcc-cross-${GUIX_TARGET}" lib)"
+        CROSS_GCC_LIBS=( "${CROSS_GCC_LIB_STORE}/lib/gcc/${GUIX_TARGET}"/* ) # This expands to an array of directories...
         CROSS_GCC_LIB="${CROSS_GCC_LIBS[0]}" # ...we just want the first one (there should only be one)
 
         export CROSS_C_INCLUDE_PATH="${CROSS_GCC_LIB}/include:${CROSS_GCC_LIB}/include-fixed:${CROSS_GLIBC}/include:${CROSS_KERNEL}/include"
-        export CROSS_CPLUS_INCLUDE_PATH="${CROSS_GCC}/include/c++:${CROSS_GCC}/include/c++/${HOST}:${CROSS_GCC}/include/c++/backward:${CROSS_C_INCLUDE_PATH}"
-        export CROSS_LIBRARY_PATH="${CROSS_GCC_LIB_STORE}/lib:${CROSS_GCC}/${HOST}/lib:${CROSS_GCC_LIB}:${CROSS_GLIBC}/lib:${CROSS_GLIBC_STATIC}/lib"
+        export CROSS_CPLUS_INCLUDE_PATH="${CROSS_GCC}/include/c++:${CROSS_GCC}/include/c++/${GUIX_TARGET}:${CROSS_GCC}/include/c++/backward:${CROSS_C_INCLUDE_PATH}"
+        export CROSS_LIBRARY_PATH="${CROSS_GCC_LIB_STORE}/lib:${CROSS_GCC}/${GUIX_TARGET}/lib:${CROSS_GCC_LIB}:${CROSS_GLIBC}/lib:${CROSS_GLIBC_STATIC}/lib"
         ;;
     *)
         exit 1 ;;
