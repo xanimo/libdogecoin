@@ -97,27 +97,17 @@ else:
         # check above narrows who can supply such an archive, but it does not
         # make extraction safe on its own -- and zipfile.extractall (the branch
         # above) already sanitises member paths, so only tar was exposed.
-        if hasattr(tarfile, 'data_filter'):
-            tar.extractall(os.getcwd(), filter='data')
-        else:
-            # PEP 706 filters land in 3.12 and were backported to security
-            # releases of 3.8+. Where they are unavailable, check by hand
-            # rather than silently extracting unfiltered.
-            dest = os.path.abspath(os.getcwd())
-            for member in tar.getmembers():
-                target = os.path.abspath(os.path.join(dest, member.name))
-                if not (target == dest or target.startswith(dest + os.sep)):
-                    print("\033[31m> refusing tar member outside destination: "
-                          + member.name + "\033[0m")
-                    exit(1)
-                if member.issym() or member.islnk():
-                    link = os.path.abspath(os.path.join(
-                        os.path.dirname(target), member.linkname))
-                    if not (link == dest or link.startswith(dest + os.sep)):
-                        print("\033[31m> refusing tar link outside destination: "
-                              + member.name + "\033[0m")
-                        exit(1)
-            tar.extractall(dest)
+        #
+        # Refuse rather than hand-roll the filter. PEP 706 landed in 3.12 and
+        # was backported to security releases of 3.8+, so a python without it
+        # is one that is missing security updates -- not somewhere to be
+        # extracting an archive from the network.
+        if not hasattr(tarfile, 'data_filter'):
+            print("\033[31m> this python has no PEP 706 tar filters "
+                  "(needs 3.12+, or a patched 3.8+); refusing to extract"
+                  "\033[0m")
+            exit(1)
+        tar.extractall(os.getcwd(), filter='data')
         tar.close()
 
 deps_path = ["dogecoind"]
