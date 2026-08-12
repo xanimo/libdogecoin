@@ -6,8 +6,7 @@ set -e -o pipefail
 # ./contrib/scripts/setup.sh --host <host triplet> --depends
 # unless of course you are targeting docker which will not allow and should not be used with 'sudo'.
 
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2> /dev/null)
-$PROJECT_ROOT/contrib/scripts/check_dir.sh
+"$(dirname "$0")/check_dir.sh"
 
 if [ $# -eq 0 ]; then
     echo "No arguments provided"
