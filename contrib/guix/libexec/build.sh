@@ -267,7 +267,10 @@ mkdir -p "$DISTSRC"
     # "'.../libevent_core.la' is not a valid libtool archive".
     rm -rf depends
     ln -s "${WORKTREE}/depends" depends
-    make -C depends --jobs="$JOBS" HOST="$HOST" \
+    # Build through the absolute worktree path, not the symlink: libtool records
+    # whatever prefix it is handed, and going through DISTSRC/depends would bake
+    # the commit hash back into the .la files and re-poison BASE_CACHE.
+    make -C "${BASEPREFIX}" --jobs="$JOBS" HOST="$HOST" \
                                        ${V:+V=1} \
                                        ${SOURCES_PATH+SOURCES_PATH="$SOURCES_PATH"} \
                                        ${BASE_CACHE+BASE_CACHE="$BASE_CACHE"} \
