@@ -19,8 +19,6 @@ check_tools() {
     done
 }
 
-check_tools ar
-
 . "$(dirname "$0")/project_root.sh"
 require_project_root "contrib/scripts/combine.sh --target .libs/libdogecoin.a --append \"...\""
 
@@ -43,6 +41,18 @@ if has_param '--target' "$@"; then
     TARGET_LIB="$2"
 fi
 
+param_value() {
+    local term="$1"
+    shift
+    while [ $# -gt 0 ]; do
+        if [ "$1" = "$term" ]; then
+            echo "$2"
+            return 0
+        fi
+        shift
+    done
+}
+
 detect_os() {
     uname_out="$(uname -s)"
     case "${uname_out}" in
@@ -54,8 +64,38 @@ detect_os() {
     esac
 }
 
-detect_os
+# Key off the target, not the build machine. `uname -s` reports the host doing
+# the building, so a linux -> mingw cross took the linux branch and called the
+# build machine's ar. With no --host and no HOST in the environment, fall back
+# to uname so a native invocation behaves as it did.
+HOST_TRIPLET="$(param_value '--host' "$@")"
+[ -n "$HOST_TRIPLET" ] || HOST_TRIPLET="${HOST:-}"
+
+case "$HOST_TRIPLET" in
+    *mingw*)            machine=mingw;;
+    *cygwin*)           machine=cygwin;;
+    *darwin*|*apple*)   machine=mac;;
+    *linux*)            machine=linux;;
+    "")                 detect_os;;
+    *)                  machine="unknown:${HOST_TRIPLET}";;
+esac
 OS=$machine
+
+case "$OS" in
+    unknown:*)
+        echo "ERR: don't know how to combine archives for target '${OS#unknown:}'"
+        exit 1
+        ;;
+esac
+
+AR=ar
+[ -n "$HOST_TRIPLET" ] && AR="${HOST_TRIPLET}-ar"
+if [ "$OS" = "mac" ]; then
+    check_tools libtool
+else
+    check_tools "$AR"
+fi
+
 echo $OS
 if has_param '--append' "$@"; then
     LIBS_TO_APPEND=($4)
@@ -78,12 +118,16 @@ case $OS in
 "mac")
 libtool -static -o $TARGET_LIB $TARGET_LIB $LIBS
 ;;
-"linux") 
-ar -M << EOM 
+"linux"|"mingw"|"cygwin") 
+$AR -M << EOM 
     OPEN $(echo $TARGET_LIB)
     $(echo -e $LIBS)
     SAVE
     END
 EOM
+;;
+*)
+echo "ERR: don't know how to combine archives for target '$OS'"
+exit 1
 ;;
 esac
