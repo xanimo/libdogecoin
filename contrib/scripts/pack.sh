@@ -18,21 +18,8 @@ check_tools() {
 
 check_tools ar
 
-# The project root is where configure.ac sits. Testing for a git checkout
-# instead rejects an exported source tarball, which is what a release build
-# unpacks and builds from, and which carries no .git.
-at_project_root() {
-    [ -f "${PWD}/configure.ac" ] && [ -d "${PWD}/contrib/scripts" ]
-}
-
-if ! at_project_root; then
-cat << EOF
-ERR: This script must be invoked from the top level of the project
-Hint: This may look something like:
-    contrib/scripts/pack.sh --host=x86_64-pc-linux-gnu --prefix=build
-EOF
-exit 1
-fi
+. "$(dirname "$0")/project_root.sh"
+require_project_root "contrib/scripts/pack.sh --host=<target-host-triplet> --prefix=build"
 
 check_error() {
     if [ "$ERROR" ]; then
