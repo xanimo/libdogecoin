@@ -33,6 +33,7 @@ Required environment variables as seen inside the container:
     OUTDIR: ${OUTDIR:?not set}
 EOF
 
+WORKTREE="${PWD}"
 ACTUAL_OUTDIR="${OUTDIR}"
 OUTDIR="${DISTSRC}/output"
 
@@ -42,7 +43,7 @@ OUTDIR="${DISTSRC}/output"
 
 # The depends folder also serves as a base-prefix for depends packages for
 # $HOSTs after successfully building.
-BASEPREFIX="${DISTSRC}/depends"
+BASEPREFIX="${WORKTREE}/depends"
 
 # Given a package name and an output name, return the path of that output in our
 # current guix environment
@@ -258,11 +259,14 @@ mkdir -p "$DISTSRC"
     # Extract the source tarball
     tar --strip-components=1 -xf "${GIT_ARCHIVE}"
 
-    # Build depends here rather than in the worktree: contrib/scripts/build.sh
-    # --depends and pack.sh both resolve it as `pwd`/depends/<host>, so it has
-    # to sit inside this tree. gitian builds it in its source copy for the same
-    # reason. SOURCES_PATH and BASE_CACHE are absolute, so nothing is refetched
-    # or rebuilt between hosts.
+    # contrib/scripts/build.sh --depends and pack.sh both resolve depends as
+    # `pwd`/depends/<host>, so it has to be reachable from here. Point at the
+    # worktree copy rather than building into this tree: DISTSRC contains the
+    # commit hash, and libtool .la files record their prefix absolutely, so a
+    # BASE_CACHE populated under one commit fails under the next with
+    # "'.../libevent_core.la' is not a valid libtool archive".
+    rm -rf depends
+    ln -s "${WORKTREE}/depends" depends
     make -C depends --jobs="$JOBS" HOST="$HOST" \
                                        ${V:+V=1} \
                                        ${SOURCES_PATH+SOURCES_PATH="$SOURCES_PATH"} \
