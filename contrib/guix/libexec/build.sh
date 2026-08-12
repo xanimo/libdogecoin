@@ -294,8 +294,13 @@ mkdir -p "$DISTSRC"
     esac
     export CXXFLAGS="${CFLAGS}"
 
+    # guix-build exports DISTNAME (libdogecoin-<version>) into the container but
+    # not VERSION, and pack.sh drops the component entirely when --commit is
+    # empty, giving libdogecoin-<host> where gitian gives
+    # libdogecoin-<version>-<host>.
     ./contrib/scripts/build.sh --host "${HOST}" --depends
-    ./contrib/scripts/pack.sh --host="${HOST}" --prefix=build --commit="${VERSION}"
+    ./contrib/scripts/pack.sh --host="${HOST}" --prefix=build \
+                              --commit="${DISTNAME#libdogecoin-}"
 
     # pack.sh writes its archives to ./output inside DISTSRC, which is exactly
     # $OUTDIR (see the top of this script), so they are already in place.
