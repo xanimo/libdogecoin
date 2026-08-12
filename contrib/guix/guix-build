@@ -150,10 +150,10 @@ done
 avail_KiB="$(df -Pk "$VERSION_BASE" | sed 1d | tr -s ' ' | cut -d' ' -f4)"
 total_required_KiB=0
 for host in $HOSTS; do
+    # Measured across a full seven-host build: 86-103 MiB of build tree per
+    # host plus its share of the output. 512 MiB each is roughly 5x headroom.
     case "$host" in
-        *darwin*) required_KiB=440000 ;;
-        *mingw*)  required_KiB=7600000 ;;
-        *)        required_KiB=6400000 ;;
+        *) required_KiB=524288 ;;
     esac
     total_required_KiB=$((total_required_KiB+required_KiB))
 done
