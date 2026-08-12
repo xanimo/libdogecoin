@@ -52,12 +52,14 @@
 #include <dogecoin/headersdb.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/net.h>
+#include <dogecoin/pow.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/smpv.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/validation.h>
 #include <dogecoin/vector.h>
 #include <dogecoin/pqc_carrier.h>
 #include <dogecoin/pqc_dilithium.h>
