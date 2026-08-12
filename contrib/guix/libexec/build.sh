@@ -42,7 +42,7 @@ OUTDIR="${DISTSRC}/output"
 
 # The depends folder also serves as a base-prefix for depends packages for
 # $HOSTs after successfully building.
-BASEPREFIX="${PWD}/depends"
+BASEPREFIX="${DISTSRC}/depends"
 
 # Given a package name and an output name, return the path of that output in our
 # current guix environment
@@ -187,11 +187,16 @@ esac
 [ -e /bin ] || mkdir -p /bin
 [ -e /bin/pwd ] || ln -s --no-dereference "$(type -P pwd)" /bin/pwd
 
+# Every script under contrib/scripts, which the build below delegates to, is
+# "#!/bin/bash" and they invoke one another, so the interpreter has to exist at
+# that path rather than just on PATH.
+[ -e /bin/bash ] || ln -s --no-dereference "$(command -v bash)" /bin/bash
+
 # Determine the correct value for -Wl,--dynamic-linker for the current $HOST
 case "$HOST" in
     *linux*)
         glibc_dynamic_linker=$(
-            case "$HOST" in
+            case "$GUIX_TARGET" in
                 i686-linux-gnu)        echo /lib/ld-linux.so.2 ;;
                 x86_64-linux-gnu)      echo /lib64/ld-linux-x86-64.so.2 ;;
                 arm-linux-gnueabihf)   echo /lib/ld-linux-armhf.so.3 ;;
@@ -215,31 +220,6 @@ case "$HOST" in
         export ZERO_AR_DATE=yes
         ;;
 esac
-
-####################
-# Depends Building #
-####################
-
-# Build the depends tree, overriding variables that assume multilib gcc
-make -C depends --jobs="$JOBS" HOST="$HOST" \
-                                   ${V:+V=1} \
-                                   ${SOURCES_PATH+SOURCES_PATH="$SOURCES_PATH"} \
-                                   ${BASE_CACHE+BASE_CACHE="$BASE_CACHE"} \
-                                   ${SDK_PATH+SDK_PATH="$SDK_PATH"} \
-                                   i686_linux_CC=i686-linux-gnu-gcc \
-                                   i686_linux_CXX=i686-linux-gnu-g++ \
-                                   i686_linux_AR=i686-linux-gnu-ar \
-                                   i686_linux_RANLIB=i686-linux-gnu-ranlib \
-                                   i686_linux_NM=i686-linux-gnu-nm \
-                                   i686_linux_STRIP=i686-linux-gnu-strip \
-                                   x86_64_linux_CC=x86_64-linux-gnu-gcc \
-                                   x86_64_linux_CXX=x86_64-linux-gnu-g++ \
-                                   x86_64_linux_AR=x86_64-linux-gnu-ar \
-                                   x86_64_linux_RANLIB=x86_64-linux-gnu-ranlib \
-                                   x86_64_linux_NM=x86_64-linux-gnu-nm \
-                                   x86_64_linux_STRIP=x86_64-linux-gnu-strip \
-                                   FORCE_USE_SYSTEM_CLANG=1
-
 
 ###########################
 # Source Tarball Building #
@@ -277,6 +257,30 @@ mkdir -p "$DISTSRC"
 
     # Extract the source tarball
     tar --strip-components=1 -xf "${GIT_ARCHIVE}"
+
+    # Build depends here rather than in the worktree: contrib/scripts/build.sh
+    # --depends and pack.sh both resolve it as `pwd`/depends/<host>, so it has
+    # to sit inside this tree. gitian builds it in its source copy for the same
+    # reason. SOURCES_PATH and BASE_CACHE are absolute, so nothing is refetched
+    # or rebuilt between hosts.
+    make -C depends --jobs="$JOBS" HOST="$HOST" \
+                                       ${V:+V=1} \
+                                       ${SOURCES_PATH+SOURCES_PATH="$SOURCES_PATH"} \
+                                       ${BASE_CACHE+BASE_CACHE="$BASE_CACHE"} \
+                                       ${SDK_PATH+SDK_PATH="$SDK_PATH"} \
+                                       i686_linux_CC=i686-linux-gnu-gcc \
+                                       i686_linux_CXX=i686-linux-gnu-g++ \
+                                       i686_linux_AR=i686-linux-gnu-ar \
+                                       i686_linux_RANLIB=i686-linux-gnu-ranlib \
+                                       i686_linux_NM=i686-linux-gnu-nm \
+                                       i686_linux_STRIP=i686-linux-gnu-strip \
+                                       x86_64_linux_CC=x86_64-linux-gnu-gcc \
+                                       x86_64_linux_CXX=x86_64-linux-gnu-g++ \
+                                       x86_64_linux_AR=x86_64-linux-gnu-ar \
+                                       x86_64_linux_RANLIB=x86_64-linux-gnu-ranlib \
+                                       x86_64_linux_NM=x86_64-linux-gnu-nm \
+                                       x86_64_linux_STRIP=x86_64-linux-gnu-strip \
+                                       FORCE_USE_SYSTEM_CLANG=1
 
     # depends staged its native tools (cctools et al) under the prefix
     export PATH="${BASEPREFIX}/${HOST}/native/bin:${PATH}"
