@@ -259,6 +259,15 @@ time-machine() {
 }
 
 
+# depends resolves SDK_PATH against its own BASEDIR, which here is the extracted
+# source tree rather than the worktree. depends/SDKs is not tracked, so that path
+# is always empty and darwin fails deep inside libevent's configure with
+# "library not found for -lSystem". Default to the worktree copy so the darwin
+# host does not need an environment variable the other six do not.
+if [ -z "${SDK_PATH:-}" ] && [ -d "${PWD}/depends/SDKs" ]; then
+    export SDK_PATH="${PWD}/depends/SDKs"
+fi
+
 # Precious directories are those which should not be cleaned between successive
 # guix builds
 depends_precious_dir_names='SOURCES_PATH BASE_CACHE SDK_PATH'
