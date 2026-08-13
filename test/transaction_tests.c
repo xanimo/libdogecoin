@@ -343,8 +343,18 @@ void test_transaction()
     char* ref_finalized = finalize_transaction(ref_index, external_p2pkh_address, ".00113", "10.0", internal_p2pkh_address);
     u_assert_not_null(ref_finalized);
     char ref_unsigned_hex[512];
-    u_assert_true(strlen(ref_finalized) < sizeof(ref_unsigned_hex));
-    strcpy(ref_unsigned_hex, ref_finalized);
+    /* The assertion above the strcpy did bound this, but only because
+       u_assert_true expands to a macro containing `return` -- so the safety
+       lived in control flow a reader has to know about, and would vanish
+       silently if that macro ever stopped returning. Copy a measured length
+       instead; the assertion stays for the diagnostic. */
+    size_t ref_len = strlen(ref_finalized);
+    u_assert_true(ref_len < sizeof(ref_unsigned_hex));
+    if (ref_len >= sizeof(ref_unsigned_hex)) {
+        ref_len = sizeof(ref_unsigned_hex) - 1;
+    }
+    memcpy(ref_unsigned_hex, ref_finalized, ref_len);
+    ref_unsigned_hex[ref_len] = '\0';
     clear_transaction(ref_index);
 
     // Build the same transaction through the thread-safe index API on its own context:
