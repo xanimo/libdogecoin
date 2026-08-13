@@ -442,7 +442,10 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             // keep them only on-disk
             dogecoin_blockindex *scan_tip = db->chaintip;
             unsigned int i;
-            for (i = 0; i < db->max_hdr_in_mem + 1; i++)
+            /* scan_tip was dereferenced below before the `scan_tip &&` check
+               further down had a chance to run. chaintip is NULL until the
+               first header is connected. */
+            for (i = 0; scan_tip && i < db->max_hdr_in_mem + 1; i++)
             {
                 if (scan_tip->prev) {
                     scan_tip = scan_tip->prev;

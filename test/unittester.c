@@ -99,6 +99,8 @@ extern void test_invalid_tx_deser();
 extern void test_tx_sign();
 extern void test_scripts();
 extern void test_utils();
+extern void test_utils_null_file_guards();
+extern void test_utils_hex_to_bin_null_guards();
 extern void test_vector();
 extern void test_qr();
 
@@ -133,6 +135,7 @@ extern void test_examples();
 #ifdef WITH_WALLET
 extern void test_wallet_basics();
 extern void test_wallet();
+extern void test_wallet_null_tx_guards();
 extern void test_wallet_malformed_reclen();
 extern void test_wallet_reorg_utxo_update();
 extern void test_wallet_utxo_idx_not_reused();
@@ -236,6 +239,8 @@ int main()
     u_run_test(test_script_parse);
     u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
+    u_run_test(test_utils_null_file_guards);
+    u_run_test(test_utils_hex_to_bin_null_guards);
     u_run_test(test_vector);
     u_run_test(test_qr);
 
@@ -270,6 +275,7 @@ int main()
 #ifdef WITH_WALLET
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
+    u_run_test(test_wallet_null_tx_guards);
     u_run_test(test_wallet_malformed_reclen);
     u_run_test(test_wallet_reorg_utxo_update);
     u_run_test(test_wallet_utxo_idx_not_reused);
