@@ -12,11 +12,16 @@ name: clang-tidy
 on:
   push:
     branches:
-      - '*-dev-*'
+      - '*-dev*'
       - 'main'
   pull_request:
+    # Deliberately wider than the push filter above: a pull request must be
+    # analysed whichever branch it targets. '*-dev-*' never matched
+    # `0.1.5-dev` itself -- there is nothing after "-dev" -- so this job has
+    # never run on a pull request upstream, only on pushes to fork branches
+    # that happen to carry a suffix. Matches ci.yml's filter.
     branches:
-      - '*-dev-*'
+      - '*'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
