@@ -159,6 +159,19 @@ dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t up
     }
 
 #ifdef TESTING
+/*
+ * This branch replaces the CSPRNG with srand(time(NULL)) and rand(), which
+ * would make every key this library generates predictable from the wall clock.
+ * Nothing in the build system defines TESTING -- not CMakeLists.txt, not
+ * configure.ac -- so it is unreachable today. The guard is here so that it
+ * stays unreachable in anything shipped: a release build sets NDEBUG, and
+ * combining the two must fail loudly at compile time rather than quietly
+ * produce guessable keys.
+ */
+#ifdef NDEBUG
+#error "TESTING replaces the RNG with srand()/rand(); it must never be enabled in a release build"
+#endif
+
 void dogecoin_random_init_internal(void)
     {
     srand(time(NULL));
