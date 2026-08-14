@@ -472,11 +472,16 @@ void enclave_libdogecoin_generate_encrypted_seed(data_t* encrypted_blob) {
     uint8_t* blob;
     size_t blob_size;
 
+    // Set the Open Enclave random number generator in libdogecoin
+    oe_set_rng();
+
     // Generate a new seed
     if (!dogecoin_random_bytes(seed, sizeof(seed), 1)) {
         fprintf(stderr, "Failed to generate random bytes\n");
         // Handle error
+        encrypted_blob->data = NULL;
         encrypted_blob->size = 0;
+        return;
     }
 
     // Initialize the seal key info
@@ -523,7 +528,10 @@ void enclave_libdogecoin_generate_master_key(data_t* encrypted_blob) {
     else {
         printf("Error occurred.\n");
         // Handle error
+        encrypted_blob->data = NULL;
         encrypted_blob->size = 0;
+        dogecoin_ecc_stop();
+        return;
     }
 
     dogecoin_ecc_stop();
