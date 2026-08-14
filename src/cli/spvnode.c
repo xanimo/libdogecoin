@@ -70,6 +70,20 @@
 #include <dogecoin/seal.h>
 #include <dogecoin/smpv.h>
 #include <dogecoin/spv.h>
+
+/* dogecoin/dogecoin.h has already pulled <windows.h> on MSVC, guarded with
+   WIN32_LEAN_AND_MEAN; including it again above would drag in legacy
+   <winsock.h> and clash with <winsock2.h>. */
+#ifdef _MSC_VER
+#define spvnode_sleep(s) Sleep((DWORD)(s) * 1000)
+#else
+#define spvnode_sleep(s) sleep(s)
+#endif
+
+/* A DNS seed lookup that comes back empty is usually transient; retry a few
+   times before giving up rather than making the operator rerun by hand. */
+#define PEER_DISCOVERY_ATTEMPTS 3
+#define PEER_DISCOVERY_RETRY_S  2
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
 #include <dogecoin/rest.h>
@@ -833,6 +847,38 @@ int main(int argc, char* argv[]) {
             printf("done\n");
             printf("Discover peers...\n");
             dogecoin_spv_client_discover_peers(client, ips);
+
+            /* A DNS seed lookup that returns nothing is usually transient, so
+               try again before giving up. Announce each attempt: a silent retry
+               is indistinguishable from the hang this replaced. Only seeds are
+               retried -- addresses given on the command line will not start
+               resolving on their own. */
+            if (ips == NULL) {
+                int attempt;
+                for (attempt = 2; attempt <= PEER_DISCOVERY_ATTEMPTS &&
+                                  client->nodegroup->nodes->len == 0; attempt++) {
+                    printf("No peers from DNS seeds, retrying (%d/%d)...\n",
+                           attempt, PEER_DISCOVERY_ATTEMPTS);
+                    spvnode_sleep(PEER_DISCOVERY_RETRY_S);
+                    dogecoin_spv_client_discover_peers(client, ips);
+                }
+            }
+
+            /* With no peers the event loop still has the signal handlers
+               registered, so it blocks forever having nothing to do -- the node
+               looks hung and only CTRL+C ends it. Say so and stop instead. */
+            if (client->nodegroup->nodes->len == 0) {
+                fprintf(stderr, "Error: no peers to connect to. %s\n",
+                        ips ? "Check the addresses given to -i/--ips."
+                            : "DNS seed lookup returned nothing; check network "
+                              "connectivity and retry.");
+                dogecoin_spv_client_free(client);
+#if WITH_WALLET
+                cli_wallet_free(wallet);
+#endif
+                dogecoin_ecc_stop();
+                return EXIT_FAILURE;
+            }
 
             printf("Connecting to the p2p network...\n");
             printf("Press CTRL+C or send SIGINT/SIGTERM to disconnect.\n");
