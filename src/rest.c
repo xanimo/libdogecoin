@@ -320,8 +320,9 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
         char s[TIMESTAMP_MAX_LEN] = {0};
         time_t t = tip->header.timestamp;
-        struct tm *p = localtime(&t);
-        strftime(s, sizeof(s), "%F %T", p);
+        struct tm tmv;
+        struct tm *p = dogecoin_localtime(&t, &tmv);
+        if (p) strftime(s, sizeof(s), "%F %T", p);
         evbuffer_add_printf(evb, "%s\n", s);
     } else if (strcmp(path, "/getLastBlockInfo") == 0) {
         uint64_t size = client->last_block_size;
@@ -575,7 +576,8 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         if (tip) {
             char ts[32] = {0};
             time_t t = tip->header.timestamp;
-            struct tm *p = localtime(&t);
+            struct tm tmv;
+            struct tm *p = dogecoin_localtime(&t, &tmv);
             if (p) strftime(ts, sizeof(ts), "%F %T", p);
             evbuffer_add_printf(evb, "tip_height: %d\n", tip->height);
             evbuffer_add_printf(evb, "tip_time: %s\n", ts[0]?ts:"unknown");

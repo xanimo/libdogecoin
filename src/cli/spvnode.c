@@ -276,7 +276,9 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
     UNUSED(node);
     if (newtip) {
         time_t timestamp = client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp;
-        printf("New headers tip height %d from %s\n", newtip->height, ctime(&timestamp));
+        char tip_time[DOGECOIN_CTIME_LEN] = {0};
+        dogecoin_ctime(&timestamp, tip_time, sizeof tip_time);
+        printf("New headers tip height %d from %s\n", newtip->height, tip_time);
         }
     return true;
     }
