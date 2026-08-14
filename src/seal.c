@@ -1244,19 +1244,23 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
         }
         fp = _wfopen(fullpath, overwrite ? L"wb+" : L"wb");
     #else
-        if (mkdir(CRYPTO_DIR_PATH, 0777) == -1 && errno != EEXIST)
+        if (mkdir(CRYPTO_DIR_PATH, 0700) == -1 && errno != EEXIST)
         {
             fprintf(stderr, "ERROR: Failed to create directory\n");
             return false;
         }
         char fullpath[FILE_PATH_MAX_LEN] = {0};
         snprintf(fullpath, sizeof(fullpath), SEED_SW_FILE_NAME, file_num);
-        if (!overwrite && access(fullpath, F_OK) != -1)
+        /* Exclusive create rather than access() then open(): between those
+           two calls anyone able to write the directory can plant a symlink
+           and redirect an encrypted seed somewhere of their choosing.
+           O_EXCL both reports the collision and refuses to follow one. */
+        fp = dogecoin_fopen_private(fullpath, overwrite ? "wb+" : "wbx");
+        if (!fp && !overwrite && errno == EEXIST)
         {
             fprintf(stderr, "ERROR: File already exists. Use overwrite flag to replace it.\n");
             return false;
         }
-        fp = fopen(fullpath, overwrite ? "wb+" : "wb");
     #endif
         if (!fp)
         {
@@ -2101,19 +2105,23 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
         }
         fp = _wfopen(fullpath, overwrite ? L"wb+" : L"wb");
 #else
-        if (mkdir(CRYPTO_DIR_PATH, 0777) == -1 && errno != EEXIST)
+        if (mkdir(CRYPTO_DIR_PATH, 0700) == -1 && errno != EEXIST)
         {
             fprintf(stderr, "ERROR: Failed to create directory\n");
             return false;
         }
         char fullpath[FILE_PATH_MAX_LEN] = {0};
         snprintf(fullpath, sizeof(fullpath), MASTER_SW_FILE_NAME, file_num);
-        if (!overwrite && access(fullpath, F_OK) != -1)
+        /* Exclusive create rather than access() then open(): between those
+           two calls anyone able to write the directory can plant a symlink
+           and redirect an encrypted seed somewhere of their choosing.
+           O_EXCL both reports the collision and refuses to follow one. */
+        fp = dogecoin_fopen_private(fullpath, overwrite ? "wb+" : "wbx");
+        if (!fp && !overwrite && errno == EEXIST)
         {
             fprintf(stderr, "ERROR: File already exists. Use overwrite flag to replace it.\n");
             return false;
         }
-        fp = fopen(fullpath, overwrite ? "wb+" : "wb");
 #endif
         if (!fp)
         {
@@ -2984,19 +2992,23 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
         }
         fp = _wfopen(fullpath, overwrite ? L"wb+" : L"wb");
 #else
-        if (mkdir(CRYPTO_DIR_PATH, 0777) == -1 && errno != EEXIST)
+        if (mkdir(CRYPTO_DIR_PATH, 0700) == -1 && errno != EEXIST)
         {
             fprintf(stderr, "ERROR: Failed to create directory\n");
             return false;
         }
         char fullpath[FILE_PATH_MAX_LEN] = {0};
         snprintf(fullpath, sizeof(fullpath), MNEMONIC_SW_FILE_NAME, file_num);
-        if (!overwrite && access(fullpath, F_OK) != -1)
+        /* Exclusive create rather than access() then open(): between those
+           two calls anyone able to write the directory can plant a symlink
+           and redirect an encrypted seed somewhere of their choosing.
+           O_EXCL both reports the collision and refuses to follow one. */
+        fp = dogecoin_fopen_private(fullpath, overwrite ? "wb+" : "wbx");
+        if (!fp && !overwrite && errno == EEXIST)
         {
             fprintf(stderr, "ERROR: File already exists. Use overwrite flag to replace it.\n");
             return false;
         }
-        fp = fopen(fullpath, overwrite ? "wb+" : "wb");
 #endif
         if (!fp)
         {

@@ -86,6 +86,13 @@ LIBDOGECOIN_API char* concat(char* prefix, char* suffix);
 /* Copy str[start, end) into result, NUL-terminated. result must have room for
    (end - start) + 1 bytes -- the function takes no size for it. Yields an empty
    string if end <= start or start is past the end of str. */
+/* Open a file that should not be readable by other local users, creating it
+   0600 where the platform has POSIX permissions. Use for anything holding key
+   material, encrypted or not, and for the wallet database -- it carries the
+   master public key, which is enough to derive every address and reconstruct
+   the transaction history. An existing file keeps its current mode. */
+LIBDOGECOIN_API FILE* dogecoin_fopen_private(const char* path, const char* mode);
+
 LIBDOGECOIN_API void slice(const char *str, char *result, size_t start, size_t end);
 LIBDOGECOIN_API void replace_last_after_delim(const char *str, char* delim, char* replacement);
 LIBDOGECOIN_API void text_to_hex(char* in, char* out);

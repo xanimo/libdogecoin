@@ -980,7 +980,7 @@ dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_p
 
     // open wallet file if not already open
     if (!wallet->dbfile) {
-        wallet->dbfile = fopen(file_path, "a+b");
+        wallet->dbfile = dogecoin_fopen_private(file_path, "a+b");
         if (wallet->dbfile) {
             snprintf((char*)wallet->filename, sizeof(wallet->filename), "%s", file_path);
         }
@@ -1146,7 +1146,13 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
     }
 
-    wallet->dbfile = fopen(file_path, *created ? "a+b" : "r+b");
+    /* The creation path runs here, not in dogecoin_wallet_create(): that
+       function opens the file only when wallet->dbfile is still NULL, and by
+       the time it is called below this line has already set it. Opening
+       privately there tightened nothing, so the wallet database was created at
+       the process umask -- world-readable under a permissive one. */
+    wallet->dbfile = *created ? dogecoin_fopen_private(file_path, "a+b")
+                              : fopen(file_path, "r+b");
     if (wallet->dbfile) {
         snprintf((char*)wallet->filename, sizeof(wallet->filename), "%s", file_path);
     }

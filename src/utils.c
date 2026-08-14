@@ -32,6 +32,11 @@
 #endif
 
 #include <ctype.h>
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -707,6 +712,71 @@ char* concat(char* prefix, char* suffix) {
     memcpy_safe(file, prefix, prefix_length + 1);
     memcpy_safe(file + prefix_length, suffix, suffix_length + 1);
     return file;
+}
+
+
+FILE* dogecoin_fopen_private(const char* path, const char* mode)
+{
+#if defined(USE_OPTEE) || defined(_WIN32)
+    /* OP-TEE provides fopen but not the POSIX open/fdopen/close this uses --
+       referencing them fails the TA link even though nothing in the TA calls
+       this function. Fall back rather than return NULL: the same library is
+       linked for the host side of an OP-TEE build, where wallet.c does open
+       files, and stubbing this out made those calls fail and took the mode
+       assertions with them.
+       Windows has no umask, so a new file inherits the directory ACL and plain
+       fopen already gets whatever the parent grants.
+       Neither platform gets the 0600-on-create guarantee; on OP-TEE the TA has
+       no filesystem to guarantee it for. */
+    return fopen(path, mode);
+#else
+    int flags;
+    int fd;
+    FILE* fp;
+
+    if (!path || !mode) {
+        return NULL;
+    }
+
+    /* Translate the stdio mode rather than assuming it creates.
+     *
+     * O_CREAT was previously unconditional, so "r"/"r+" -- open an existing
+     * file -- would create one instead of failing, and a read-only file could
+     * not be opened at all because O_RDWR was also unconditional. Both matter
+     * here: this is the wallet path, where "open the existing wallet" and
+     * "start a new one" are different operations and conflating them can
+     * present an empty wallet as a real one. */
+    switch (mode[0]) {
+        case 'r':
+            flags = strchr(mode, '+') ? O_RDWR : O_RDONLY;
+            break;
+        case 'w':
+            flags = (strchr(mode, '+') ? O_RDWR : O_WRONLY) | O_CREAT;
+            /* C11 'x': create exclusively, fail if the path exists. Callers use
+               it to replace a check-then-open, which is a race an attacker with
+               write access to the directory wins by planting a symlink between
+               the two calls. O_EXCL also refuses to follow one. */
+            flags |= strchr(mode, 'x') ? O_EXCL : O_TRUNC;
+            break;
+        case 'a':
+            flags = (strchr(mode, '+') ? O_RDWR : O_WRONLY) | O_CREAT | O_APPEND;
+            break;
+        default:
+            return NULL;
+    }
+    /* 0600. The mode only applies when the file is created, so an existing
+       file keeps whatever permissions it already had -- this tightens new
+       files without silently changing anyone's existing ones. */
+    fd = open(path, flags, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return NULL;
+    }
+    fp = fdopen(fd, mode);
+    if (!fp) {
+        close(fd);
+    }
+    return fp;
+#endif
 }
 
 void slice(const char *str, char *result, size_t start, size_t end)

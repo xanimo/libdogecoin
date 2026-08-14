@@ -5,9 +5,29 @@
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
+#include <errno.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include <test/utest.h>
 
+#ifndef _WIN32
+/* Android has no writable /tmp; the rest of this suite already special-cases
+   it for wallettmpfile. */
+#ifdef __ANDROID__
+#define DOGECOIN_TEST_TMPDIR "/data/local/tmp"
+#else
+#define DOGECOIN_TEST_TMPDIR "/tmp"
+#endif
+#endif
+
+
+
 #include <assert.h>
+#ifndef _WIN32
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 #include <dogecoin/utils.h>
 
   /* test a buffer overflow protection */
@@ -241,3 +261,88 @@ void test_utils_slice()
     slice(NULL, buf, 0, 1);
     slice("abc", NULL, 0, 1);
 }
+
+/*
+ * The wallet database and the sealed seed files were created with plain
+ * fopen(), so their mode came from the process umask -- 0664 under the common
+ * 0002, i.e. readable by every local user and writable by the group.
+ *
+ * The wallet database holds the master public key, which is enough to derive
+ * every address and reconstruct the wallet's transaction history. The seal
+ * files hold encrypted seeds and mnemonics; encryption means a leak is not an
+ * immediate compromise, but handing out the ciphertext invites an offline
+ * attack on a password-derived key.
+ */
+void test_utils_fopen_private()
+{
+/* The 0600-on-create guarantee only exists on the POSIX path. Windows has no
+   umask, and OP-TEE has no filesystem in the TA and no open/fdopen/close to
+   build it from, so both fall back to plain fopen. */
+#if !defined(_WIN32) && !defined(USE_OPTEE)
+    /* A private directory of our own, rather than a fixed name in the working
+       directory: two test runs in the same tree would otherwise share the file,
+       and every stat()-then-open below would be a real check-then-use against a
+       path anyone can pre-create. mkdtemp gives us 0700 and a name nobody can
+       predict. */
+    char dir[] = DOGECOIN_TEST_TMPDIR "/dogecoin_fopen_priv_XXXXXX";
+    u_assert_true(mkdtemp(dir) != NULL);
+    char path[128];
+    snprintf(path, sizeof(path), "%s/f.tmp", dir);
+    struct stat st;
+    FILE* fp;
+
+    fp = dogecoin_fopen_private(path, "wb");
+    u_assert_true(fp != NULL);
+    fputc('x', fp);
+    /* fstat the descriptor we hold, not the path. Re-resolving the name would
+       ask about whatever is there now rather than the file that was opened --
+       the same check-then-use the function under test exists to avoid. */
+    u_assert_int_eq(fstat(fileno(fp), &st), 0);
+    /* Owner read/write only: no group or other bits at all. */
+    u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+    u_assert_int_eq((int)(st.st_mode & (S_IRWXG | S_IRWXO)), 0);
+    fclose(fp);
+
+    /* Reopening must not widen the mode of a file that already exists. */
+    fp = dogecoin_fopen_private(path, "a+b");
+    u_assert_true(fp != NULL);
+    u_assert_int_eq(fstat(fileno(fp), &st), 0);
+    u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+    fclose(fp);
+
+    remove(path);
+
+    /* NULL arguments are refused rather than passed through. */
+    u_assert_true(dogecoin_fopen_private(NULL, "wb") == NULL);
+    u_assert_true(dogecoin_fopen_private(path, NULL) == NULL);
+
+    /* "r" must not create. O_RDWR|O_CREAT used to be unconditional, so asking
+       to open an existing file created an empty one instead of failing -- on
+       the wallet path that turns "open my wallet" into "start a new one". */
+    remove(path);
+    fp = dogecoin_fopen_private(path, "rb");
+    u_assert_true(fp == NULL);
+    /* Nothing was created: a second open of the same mode still fails. Asking
+       stat() instead would re-resolve the path, which is the pattern being
+       tested against. */
+    fp = dogecoin_fopen_private(path, "rb");
+    u_assert_true(fp == NULL);
+
+    /* "wx": exclusive create, which is what replaced the access()-then-open
+       race in seal.c. Refuses an existing file and will not follow a symlink
+       planted between the two calls the old pattern needed. */
+    fp = dogecoin_fopen_private(path, "wbx");
+    u_assert_true(fp != NULL);
+    u_assert_int_eq(fstat(fileno(fp), &st), 0);
+    u_assert_int_eq((int)(st.st_mode & 07777), 0600);
+    fclose(fp);
+
+    fp = dogecoin_fopen_private(path, "wbx");
+    u_assert_true(fp == NULL);
+    u_assert_int_eq(errno, EEXIST);
+
+    remove(path);
+    rmdir(dir);
+#endif /* _WIN32 */
+}
+
