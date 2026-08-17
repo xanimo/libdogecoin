@@ -51,6 +51,43 @@ LIBDOGECOIN_API
 /* Maximum size of a mnemonic phrase string in bytes */
 #define MAX_MNEMONIC_STRING_SIZE (MAX_WORDS_IN_MNEMONIC * MAX_CHARS_IN_MNEMONIC_WORD * HEX_CHARS_PER_BYTE) + 1
 
+/*
+ * Longest token get_custom_words() will accept from a wordlist file, and the
+ * buffer it reads into.
+ *
+ * In BYTES, not characters. MAX_CHARS_IN_MNEMONIC_WORD counts characters, and
+ * fscanf field widths and strlen() count bytes -- the two are only the same for
+ * ASCII. The shipped wordlists are not all ASCII: the longest Japanese entry is
+ * 27 bytes and the longest Korean is 33, so a 16-byte bound rejects a custom
+ * wordlist mirroring either, reporting "word longer than 16 characters" for a
+ * perfectly valid 8-character word.
+ *
+ * Three bytes per character is the ceiling for the scripts BIP39 uses -- Hangul
+ * and CJK sit in the BMP -- so 16 * 3 covers every shipped list with margin.
+ *
+ * It has to be written as a plain integer, not that product: BIP39_STR()
+ * stringifies it straight into the fscanf field width, and "%(16 * 3)s" is not
+ * a format. The static assertion below keeps the literal honest.
+ *
+ * An earlier version of this comment justified the tighter bound as protecting
+ * the assembly downstream, which concatenated words into a MNEMONIC with no
+ * capacity check. That was true, and it was the wrong place to fix it:
+ * produce_mnemonic_sentence() now bounds its own writes and fails rather than
+ * overflow, so the loader no longer has to stand in for it.
+ *
+ * BIP39_STR() stringifies the length for the scanf field width, so the width
+ * and the buffer size cannot drift apart.
+ */
+#define BIP39_WORD_MAXLEN 48
+#define BIP39_WORD_BUFSZ (BIP39_WORD_MAXLEN + 1)
+
+/* Ties the literal above to what it is meant to be, since the literal is what
+   the scanf width needs and the derivation is what makes it correct. */
+typedef char bip39_word_maxlen_matches_char_bound[
+    (BIP39_WORD_MAXLEN == MAX_CHARS_IN_MNEMONIC_WORD * 3) ? 1 : -1];
+#define BIP39_STR_(x) #x
+#define BIP39_STR(x) BIP39_STR_(x)
+
 /* Maximum number of characters in a passphrase */
 #define MAX_CHARS_IN_PASSPHRASE 256
 

@@ -25,6 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <bip39/index.h>
 #include <dogecoin/bip39.h>
@@ -127,7 +128,29 @@ int get_mnemonic(const int entropysize, const char* entropy, const char* wordlis
 
     /* Convert local entropy and copy to entropy parameter if allocated */
     if (entropy_out != NULL) {
-        strcpy(entropy_out, utils_uint8_to_hex(local_entropy, entBytes));
+        /* Copy a measured length rather than strcpy'ing into a caller pointer
+           whose size this function is never told. entropysize is validated
+           above to 128..256, so entBytes is 16..32 and the hex form is at most
+           64 characters plus a terminator -- exactly what HEX_ENTROPY holds,
+           which is the type the header tells callers to pass. The bound is
+           real, but nothing in the signature carries it, so spell it out. */
+        const char *entropy_hex = utils_uint8_to_hex(local_entropy, entBytes);
+        if (entropy_hex == NULL) {
+            fprintf(stderr, "ERROR: Failed to convert entropy to hex\n");
+            dogecoin_free(entropyBits);
+            dogecoin_free(local_entropy);
+            return -1;
+        }
+        size_t entropy_hex_len = (size_t)entBytes * HEX_CHARS_PER_BYTE;
+        if (entropy_hex_len + 1 > MAX_ENTROPY_STRING_SIZE) {
+            fprintf(stderr, "ERROR: Entropy hex exceeds %d bytes\n",
+                    (int)MAX_ENTROPY_STRING_SIZE);
+            dogecoin_free(entropyBits);
+            dogecoin_free(local_entropy);
+            return -1;
+        }
+        memcpy(entropy_out, entropy_hex, entropy_hex_len);
+        entropy_out[entropy_hex_len] = '\0';
         utils_clear_buffers();
     }
 
@@ -463,7 +486,9 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
 #ifndef USE_OPTEE /* OPTEE does not support file I/O */
     int i = 0;
     FILE * fp;
-    char word[1024];
+    int c;
+    size_t wordlen;
+    char word[BIP39_WORD_BUFSZ];
 
     /* Check that file path is valid */
     if (filepath == NULL) {
@@ -477,19 +502,42 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
         return -1;
     }
 
-    while (fscanf(fp, "%s", word) == 1) {
+    while (fscanf(fp, "%" BIP39_STR(BIP39_WORD_MAXLEN) "s", word) == 1) {
+        /*
+         * The width above bounds the write, but on its own it would silently
+         * split an over-long token into several words rather than rejecting
+         * the file. Peek at the next byte: if the token filled the buffer and
+         * did not end at whitespace or EOF, it was longer than any BIP39 word
+         * can be and the file is malformed.
+         */
+        if (strlen(word) == BIP39_WORD_MAXLEN) {
+            c = fgetc(fp);
+            if (c != EOF && !isspace(c)) {
+                fprintf(stderr, "ERROR: word longer than %d characters\n", BIP39_WORD_MAXLEN);
+                fclose(fp);
+                return -1;
+            }
+            if (c != EOF) {
+                ungetc(c, fp);
+            }
+        }
         if (i >= LANG_WORD_CNT) {
             fprintf(stderr, "ERROR: too many words in file\n");
             fclose(fp);
             return -1;
         }
-        wordlist[i] = malloc(strlen(word) + 1);
+        /* Size and copy from one measured length rather than strcpy'ing a
+           string whose bound the compiler cannot see. Equivalent once the read
+           above is bounded, but it keeps the safety argument local to these
+           three lines instead of depending on the scanf width further up. */
+        wordlen = strlen(word);
+        wordlist[i] = malloc(wordlen + 1);
         if (wordlist[i] == NULL) {
             fprintf(stderr, "ERROR: cannot allocate memory\n");
             fclose(fp);
             return -1;
         }
-        strcpy(wordlist[i], word);
+        memcpy(wordlist[i], word, wordlen + 1);
         i++;
     }
 
@@ -646,6 +694,8 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
         mnemonic[0] = '\0';
     }
     *mnemonic_size = 0;
+    size_t written = 0;   /* bytes already placed in mnemonic, excluding NUL */
+    if (mnemonic) mnemonic[0] = '\0';
 
     char elevenBits[12] = {""};
 
@@ -679,16 +729,46 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
                 }
             }
             else {
+                /* Bound the assembly against the destination.
+                 *
+                 * mnemonic_size is an out-parameter -- it reports what was
+                 * written, it never limited it -- and no capacity is passed in,
+                 * so these strcat calls had nothing to check against. The
+                 * contract in bip39.h is that the destination is a MNEMONIC,
+                 * which is MAX_MNEMONIC_STRING_SIZE bytes, so that is the
+                 * capacity to respect.
+                 *
+                 * With the built-in wordlists this could not be reached: the
+                 * longest is Korean at 33 bytes a word, and even its 24 longest
+                 * words come to 747 with separators. A caller-supplied wordlist
+                 * has no such ceiling, and 24 words of the maximum token length
+                 * exceeds the buffer. Truncating would be worse than failing --
+                 * a truncated mnemonic is a different mnemonic, and it would be
+                 * written to a wallet without complaint -- so refuse. */
+                size_t word_len = strlen(word);
+                size_t sep_len = (i < segSize - 1) ? strlen(space) : 0;
+                if (written + word_len + sep_len + 1 > MAX_MNEMONIC_STRING_SIZE) {
+                    fprintf(stderr,
+                            "ERROR: mnemonic exceeds %d bytes; wordlist tokens are too long\n",
+                            (int)MAX_MNEMONIC_STRING_SIZE);
+                    dogecoin_free(segment);
+                    return -1;
+                }
+
                 /* Concatenate the word from the wordlist to the mnemonic */
-                strcat(mnemonic, word);
+                memcpy(mnemonic + written, word, word_len);
+                written += word_len;
+                mnemonic[written] = '\0';
 
                 /* update mnemonic_size with the length of the mnemonic */
-                *mnemonic_size += strlen(word);
+                *mnemonic_size += word_len;
 
                 /* Concatenate a space to the mnemonic only if it's not the last word */
-                if (i < segSize - 1) {
-                    strcat(mnemonic, space);
-                    *mnemonic_size += strlen(space);
+                if (sep_len) {
+                    memcpy(mnemonic + written, space, sep_len);
+                    written += sep_len;
+                    mnemonic[written] = '\0';
+                    *mnemonic_size += sep_len;
                 }
             }
 
