@@ -49,10 +49,26 @@ LIBDOGECOIN_BEGIN_DECL
 /**
  * @brief BIP 157 compact filter header checkpoint.
  *
- * Filter header checkpoints at every CFCHECKPT_INTERVAL (1000) blocks.
+ * The spacing is per network and is not CFCHECKPT_INTERVAL on both:
+ *
+ *   mainnet   every  1,000 blocks
+ *   testnet   every 10,000 blocks
+ *
+ * CFCHECKPT_INTERVAL (1000) is the protocol quantity -- getcfcheckpt asks a
+ * peer for filter headers at multiples of 1000, and that is fixed by BIP157.
+ * These arrays are our own trust anchors, and testnet is an order of magnitude
+ * longer than mainnet, so storing every 1000th there would cost ten times the
+ * entries for anchors nobody disputes.
+ *
+ * The consequence is worth stating rather than leaving to be discovered: on
+ * testnet only every tenth entry of a getcfcheckpt response has a local anchor
+ * to be checked against. The nine between are accepted on the strength of the
+ * filter header chain alone.
  */
 typedef struct dogecoin_cf_checkpoint_ {
-    uint32_t height;           /**< Block height (multiple of CFCHECKPT_INTERVAL) */
+    uint32_t height;           /**< Block height; a multiple of the network's
+                                    checkpoint spacing above, not necessarily
+                                    of CFCHECKPT_INTERVAL */
     const char* filter_header; /**< Filter header hash as 64-char hex string */
 } dogecoin_cf_checkpoint;
 
