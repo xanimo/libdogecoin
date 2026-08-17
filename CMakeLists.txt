@@ -391,6 +391,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/block.c
     src/buffer.c
     src/chacha20.c
+    src/compact_filter.c
     src/context.c
     src/compact_block.c
     src/cstr.c
@@ -470,6 +471,12 @@ ENDIF()
 ENDIF()
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC
     src/chainparams.c
+    # PUBLIC for the same reason as chainparams: these are const data
+    # referenced from the CLI targets, and a PRIVATE source is compiled only
+    # into the library. On a Windows DLL build the executables then cannot
+    # reach the arrays -- data symbols do not resolve across the DLL boundary
+    # without dllimport, and LIBDOGECOIN_API expands to nothing for consumers.
+    src/cf_checkpoints.c
 )
 
 IF(WIN32 AND USE_TPM2)
@@ -569,6 +576,7 @@ IF(USE_TESTS)
         test/compact_block_tests.c
         test/context_tests.c
         test/cstr_tests.c
+        test/compact_filter_tests.c
         test/golomb_tests.c
         test/ecc_tests.c
         test/hash_tests.c
