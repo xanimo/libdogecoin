@@ -164,6 +164,19 @@ LIBDOGECOIN_API void dogecoin_block_header_serialize(cstring* s, const dogecoin_
 /** Serialize an AuxPoW proof in wire order. */
 LIBDOGECOIN_API void dogecoin_auxpow_payload_serialize(cstring* s, const dogecoin_auxpow_payload* payload);
 
+/** Compute a merkle root over pre-hashed leaves.
+ *
+ *  @param mutated_out set true when the tree contains a duplicated subtree.
+ *         A block whose merkle tree is mutated must be rejected: two different
+ *         transaction lists can otherwise produce the same root (CVE-2012-2459).
+ *         Callers that ignore this flag are accepting mutated blocks.
+ */
+LIBDOGECOIN_API void dogecoin_compute_merkle_root(const uint256_t* leaves, size_t leaf_count, uint256_t root_out, dogecoin_bool* mutated_out);
+
+/** Compute the merkle root of a transaction vector. Hashes each transaction and
+ *  reduces. Returns false on allocation failure or a NULL entry. */
+LIBDOGECOIN_API dogecoin_bool dogecoin_block_merkle_root(dogecoin_tx** txs, size_t txs_count, uint256_t root_out, dogecoin_bool* mutated_out);
+
 /** Serialize a whole block: the header in wire form, then the transaction
  *  vector.
  *
