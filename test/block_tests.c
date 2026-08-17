@@ -347,6 +347,33 @@ void test_auxpow_deserialize_real_vector() {
     u_assert_int_eq(dogecoin_block_header_validate(plain, &dogecoin_chainparams_main, NULL), 1);
     dogecoin_block_header_free(plain);
 
+    /* Round-trip: a parsed merge-mined header must serialize back to exactly the
+       bytes it came from. This is the check that makes the serializer worth
+       anything -- emitting something well-formed but different would still let
+       short IDs and block hashes diverge from Core. */
+    dogecoin_block_header* rt = dogecoin_block_header_new();
+    struct const_buffer cb3 = { buf, blen };
+    u_assert_int_eq(dogecoin_block_header_parse(rt, &cb3, &dogecoin_chainparams_main), 1);
+    size_t hdr_span = blen - cb3.len;
+    u_assert_int_eq(hdr_span > 80, 1);
+
+    cstring* full = cstr_new_sz(hdr_span + 16);
+    dogecoin_block_header_serialize_full(full, rt);
+    u_assert_int_eq(full->len == hdr_span, 1);
+    u_assert_int_eq(memcmp(full->str, buf, hdr_span), 0);
+
+    /* And the pure form stays 80 bytes: the block hash, the scrypt proof of
+       work and the headers.db record are all computed over it, so it must not
+       start emitting AuxPoW just because the header now retains some. */
+    cstring* pure = cstr_new_sz(96);
+    dogecoin_block_header_serialize(pure, rt);
+    u_assert_int_eq(pure->len == 80, 1);
+    u_assert_int_eq(memcmp(pure->str, buf, 80), 0);
+
+    cstr_free(full, true);
+    cstr_free(pure, true);
+    dogecoin_block_header_free(rt);
+
     dogecoin_free(buf);
 }
 
