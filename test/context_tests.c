@@ -7,7 +7,8 @@
 #include <string.h>
 
 #include <test/utest.h>
-#include <dogecoin/libdogecoin.h>
+#include <dogecoin/chainparams.h>
+#include <dogecoin/context.h>
 
 void test_context_keypair_ex()
 {

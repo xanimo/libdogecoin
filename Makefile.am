@@ -49,6 +49,7 @@ noinst_HEADERS = \
     include/dogecoin/cf_checkpoints.h \
     include/dogecoin/compact_filter.h \
     include/dogecoin/common.h \
+    include/dogecoin/context.h \
     include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \
