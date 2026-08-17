@@ -379,7 +379,9 @@ void print_block(dogecoin_auxpow_block* block) {
  *
  * @return 1 if deserialization was successful, 0 otherwise.
  */
-int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, arith_uint256* chainwork) {
+static int parse_dogecoin_auxpow_fields(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params);
+
+int dogecoin_block_header_parse(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params) {
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
     int ret = false;
     if (!deser_s32(&block->header->version, buf))
@@ -396,7 +398,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
         goto cleanup;
     dogecoin_block_header_copy(header, block->header);
     if ((block->header->version & 0x100) != 0 && buf->len) {
-        if (!deserialize_dogecoin_auxpow_block(block, buf, params, chainwork)) {
+        if (!parse_dogecoin_auxpow_fields(block, buf, params)) {
             printf("%s:%d:%s:%s\n", __FILE__, __LINE__, __func__, strerror(errno));
             goto cleanup;
         }
@@ -431,9 +433,55 @@ cleanup:
     return ret;
     }
 
-int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, arith_uint256* chainwork) {
+int dogecoin_block_header_validate(dogecoin_block_header* header, const dogecoin_chainparams *params, arith_uint256* chainwork) {
+    if (!header) return false;
+    /* Nothing to check for a header with no AuxPoW: its proof of work is over
+       the 80 base bytes, which is the caller's to verify -- headersdb_file.c
+       does exactly that for the non-AuxPoW case, and fills chainwork itself. */
+    if (!header->auxpow_payload) return true;
+
+    /* check_auxpow wants a dogecoin_auxpow_block. Build one that borrows from
+       the header and its payload rather than copying: it is never freed, so the
+       borrowed pointers are not released twice. dogecoin_auxpow_block_free
+       would take the header and parent_header with it, which is exactly the
+       ownership tangle the payload type exists to avoid. */
+    dogecoin_auxpow_payload* p = header->auxpow_payload;
+    dogecoin_auxpow_block view;
+    dogecoin_mem_zero(&view, sizeof(view));
+    view.header                 = header;
+    view.parent_coinbase        = p->parent_coinbase;
+    memcpy_safe(view.parent_hash, p->parent_hash, sizeof(uint256_t));
+    view.parent_merkle_count    = p->parent_merkle_count;
+    view.parent_coinbase_merkle = p->parent_coinbase_merkle;
+    view.parent_merkle_index    = p->parent_merkle_index;
+    view.aux_merkle_count       = p->aux_merkle_count;
+    view.aux_merkle_branch      = p->aux_merkle_branch;
+    view.aux_merkle_index       = p->aux_merkle_index;
+    view.parent_header          = p->parent_header;
+
+    if (!check_auxpow(&view, (dogecoin_chainparams*)params, chainwork)) {
+        printf("check_auxpow failed!\n");
+        return false;
+    }
+    return true;
+    }
+
+int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct const_buffer* buf, const dogecoin_chainparams *params, arith_uint256* chainwork) {
+    if (!dogecoin_block_header_parse(header, buf, params)) return false;
+    return dogecoin_block_header_validate(header, params, chainwork);
+    }
+
+/* Parse the AuxPoW fields off the wire. No validation: check_auxpow is scrypt
+   work on the parent chain, and doing it here means every caller pays for it
+   during parsing whether or not it wants the answer yet. */
+static int parse_dogecoin_auxpow_fields(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params) {
+    (void)params;
     if (buffer->len > DOGECOIN_MAX_P2P_MSG_SIZE) {
-        return printf("\ntransaction is invalid or to large.\n\n");
+        /* printf returns the character count, so returning it reported ~38 --
+           truthy -- from a guard whose contract is 1 for success and 0 for
+           failure. An over-large AuxPoW blob was therefore treated as parsed. */
+        printf("\ntransaction is invalid or to large.\n\n");
+        return false;
         }
 
     size_t consumedlength = 0;
@@ -547,11 +595,18 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         return false;
     }
 
+    return true;
+    }
+
+/* Unchanged behaviour and signature: parse, then validate. Callers that want
+   only the fields use parse_dogecoin_auxpow_fields via
+   dogecoin_block_header_parse. */
+int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const_buffer* buffer, const dogecoin_chainparams *params, arith_uint256* chainwork) {
+    if (!parse_dogecoin_auxpow_fields(block, buffer, params)) return false;
     if (!check_auxpow(block, (dogecoin_chainparams*)params, chainwork)) {
         printf("check_auxpow failed!\n");
         return false;
     }
-
     return true;
     }
 
