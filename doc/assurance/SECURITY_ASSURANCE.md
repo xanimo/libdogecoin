@@ -70,14 +70,29 @@ produces. Status reflects the current state, not the plan.
 
 | Method | Tooling | CWE coverage | Artifact | Status |
 |---|---|---|---|---|
-| Static analysis (dataflow) | CodeQL `security-extended` | CWE Top 25 | Security-tab results, per-PR | Landing (PR #359) |
-| Static analysis (pattern) | cppcheck `--enable=all`, CWE-tagged | 119/125/787, 190, 401/415/416, 476 | XML report artifact + triage | Landing (PR #359) |
-| Static analysis (semantic) | clang-tidy `cert-*`,`bugprone-*`,`clang-analyzer-*` | 190, 197, 758, 476, 686 | Advisory report artifact | Landing (PR #359) |
+| Static analysis (dataflow) | CodeQL `security-extended` | CWE Top 25 | Security-tab results, per-PR | **Merged (#359)** — live on `0.1.5-dev` |
+| Static analysis (pattern) | cppcheck `--enable=all`, CWE-tagged | 119/125/787, 190, 401/415/416, 476 | XML report artifact + triage | **Merged (#359)** — gate currently red on `0.1.5-dev`; see note below |
+| Static analysis (semantic) | clang-tidy `cert-*`,`bugprone-*`,`clang-analyzer-*` | 190, 197, 758, 476, 686 | Advisory report artifact | **Merged (#359)** |
 | Dynamic (sanitizers) | ASan/UBSan over full test suite | 119/125/787, 190, 758, 457 | Clean-run logs per branch | In progress; sweep reproduces #324/#325 on `0.1.5-dev` |
-| Sanitizer CI gate | `make check` under ASan+UBSan | as above, continuous | Gating CI job | Open, draft (PR #328) |
-| Fuzzing | libFuzzer harnesses (tx, block, wtx, logdb, protocol, PSBT, BIP38 decrypt + code parser, wallet records) | 119/125/787, 400, parser-state confusion | Corpora, crash triage | Infra open (#351); PSBT integrated (#357); BIP38 + wallet harnesses staged, pending #351(+#277). **Surface complete** — every untrusted-input parser has a harness |
-| Coverage measurement | llvm-cov over fuzz targets | validates fuzzing reach | Reachability report | Open (PR #360) |
+| Sanitizer CI gate | `make check` under ASan+UBSan | as above, continuous | Gating CI job | **Merged (#328, 2026-07-22)** — `x86_64-linux-asan-ubsan`, gating every PR |
+| Fuzzing | libFuzzer harnesses (tx, block, wtx, logdb, protocol, PSBT, BIP38 decrypt + code parser, wallet records) | 119/125/787, 400, parser-state confusion | Corpora, crash triage | Infra **merged (#351)**; PSBT **merged (#357)**; BIP38 + wallet harnesses staged, unblocked now #351 and #277 have landed. **Surface complete** — every untrusted-input parser has a harness |
+| Coverage measurement | llvm-cov over fuzz targets | validates fuzzing reach | Reachability report | **Merged (#360)** |
 | Constant-time verification | dudect / Welch t-test, `-O2` | 208, 385 | Per-function CT verdict | Established (#365); 2 primitives verified |
+> **Note on the cppcheck gate (2026-08-05).** The job currently fails on
+> `0.1.5-dev` itself, reproduced on an untouched checkout. Its header documents a
+> phase-0 policy of "only `error` severity fails the job", but the gating step
+> invokes `--enable=warning --error-exitcode=1`, so warnings fail it too. There
+> are 34 findings on the base: 2 were real and are fixed in #401 (an unbounded
+> `fscanf` into a fixed buffer, reachable through the public wordlist API, and
+> table indexing guarded only by an `assert` that compiles out under `NDEBUG`);
+> 18 are `%d` used with unsigned values; 6 are null-check ordering warnings in
+> `wallet.c`/`utils.c` still to be triaged; the remaining 8 are false positives
+> (cppcheck 2.7 cannot parse `HASH_DEL`/`assert`, and the OP-TEE `uninitvar`
+> hits are `TEEC_MEMREF_TEMP_OUTPUT` buffers the TA writes into). Either the
+> gate is narrowed to match its stated policy or the backlog is dispositioned in
+> `contrib/analysis/cppcheck-suppressions.txt`; until then it is red for every
+> pull request.
+
 | Hand audit | Line-by-line of high-stakes paths | logic flaws tools miss (131, 640-class) | Signed-off review notes | Ongoing (BIP38/sweep, PSBT, key paths) |
 
 Two methods are worth calling out. **Coverage measurement** (PR #360) is what
@@ -219,17 +234,17 @@ free work in `#343` overlaps the seal double-free; disposition tracked in #363.
 
 | Item | PR | Status |
 |---|---|---|
-| Phase 0 static-analysis workflows (CodeQL filter fix + cppcheck + clang-tidy) | #359 | Approved; un-drafted, open — pending merge |
-| libFuzzer harness infrastructure | #351 | Approved, open |
-| Coverage reachability tooling | #360 | Open, stacked on #351 |
-| PSBT (BIP174) fuzz harness + fixes | #357 | Open |
-| BIP38 + wallet fuzz harnesses (staged on #351) | (pending) | Built + verified; open when #351 lands |
-| ASAN+UBSAN CI gate | #328 | Open, draft |
-| Function-pointer type-mismatch UB fix (typed trampolines) | #361 | Open — found by this sweep; verified UBSan-clean |
-| PQC test assertions / cmake liboqs / raccoon-g build | #346, #347, #348 | Open |
-| Key-material zeroization (key/eckey/bip32) | #362 | Draft — CWE-226 series |
-| Key-material zeroization (seal: sw/TPM/YubiKey) | #363 | Draft — hardware-validated; overlaps #343 |
-| Constant-time verification tests (dudect) | #365 | Draft — 2 primitives verified |
+| Phase 0 static-analysis workflows (CodeQL filter fix + cppcheck + clang-tidy) | #359 | **Merged 2026-08-04** |
+| libFuzzer harness infrastructure | #351 | **Merged 2026-08-04** |
+| Coverage reachability tooling | #360 | **Merged 2026-08-05** |
+| PSBT (BIP174) fuzz harness + fixes | #357 | **Merged 2026-08-04** |
+| BIP38 + wallet fuzz harnesses (staged on #351) | (pending) | Built + verified; **#351 has landed, so these are unblocked** |
+| ASAN+UBSAN CI gate | #328 | **Merged 2026-07-22** (closed issue #329) |
+| Function-pointer type-mismatch UB fix (typed trampolines) | #361 | **Merged 2026-07-21** — found by this sweep |
+| PQC test assertions / cmake liboqs / raccoon-g build | #346, #347, #348 | **All merged 2026-08-05** |
+| Key-material zeroization (key/eckey/bip32) | #362 | **Merged 2026-07-30** — CWE-226 series |
+| Key-material zeroization (seal: sw/TPM/YubiKey) | #363 | **Merged 2026-08-05** — hardware-validated; #343 also merged |
+| Constant-time verification tests (dudect) | #365 | **Merged 2026-08-05** — 2 primitives verified |
 | Security assurance case + audit artifacts | #366 | Draft — this document |
 
 ## 5. Independent corroboration
