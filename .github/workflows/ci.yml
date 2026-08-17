@@ -6,8 +6,21 @@ on:
   push:
     branches: [ "*-dev*" ]
     tags: [ "v*" ]
+    paths-ignore:
+      - '**/*.md'
+      - 'doc/**'
   pull_request:
     branches: [ "*" ]
+    paths-ignore:
+      - '**/*.md'
+      - 'doc/**'
+
+# One in-flight run per branch or pull request: a newer push supersedes an older
+# one instead of queueing another 20-job matrix beside it. Releases are exempt --
+# a tag build and main must always run to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build:

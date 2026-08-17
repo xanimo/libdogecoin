@@ -6,15 +6,29 @@ on:
     branches:
       - '*-dev*'
       - 'main'
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches:
-      - '*-dev*'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
       - 'contrib/**'
       - 'doc/**'
+  pull_request:
+    # Deliberately wider than the push filter above: a pull request must be
+    # analysed whichever branch it targets. Restricting this to '*-dev-*' meant
+    # 0.1.5-dev itself never matched (no trailing dash) and neither did main, so
+    # CodeQL ran on 1 pull request against CI's 42. Matches ci.yml's filter.
+    branches:
+      - '*'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - 'contrib/**'
+      - 'doc/**'
+
+# Mirrors ci.yml: one in-flight analysis per branch or pull request, with
+# releases exempt so a tag build and main always complete.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   analyze:
