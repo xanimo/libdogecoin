@@ -290,6 +290,7 @@ tests_SOURCES = \
     test/buffer_tests.c \
     test/cf_checkpoints_tests.c \
     test/chacha20_tests.c \
+    test/chainparams_abi_tests.c \
     test/checkpoints_tests.c \
     test/context_tests.c \
     test/cstr_tests.c \
