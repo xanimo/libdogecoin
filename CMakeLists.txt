@@ -397,6 +397,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/ctaes.c
     src/ecc.c
     src/eckey.c
+    src/golomb.c
     src/key.c
     src/koinu.c
     src/map.c
@@ -568,6 +569,7 @@ IF(USE_TESTS)
         test/compact_block_tests.c
         test/context_tests.c
         test/cstr_tests.c
+        test/golomb_tests.c
         test/ecc_tests.c
         test/hash_tests.c
         test/key_tests.c
