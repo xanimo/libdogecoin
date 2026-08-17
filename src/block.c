@@ -175,6 +175,7 @@ dogecoin_block_header* dogecoin_block_header_new() {
     header->auxpow->check = check;
     header->auxpow->ctx = header;
     header->auxpow->is = false;
+    header->auxpow_payload = NULL;
     return header;
     }
 
@@ -207,14 +208,72 @@ dogecoin_auxpow_block* dogecoin_auxpow_block_new() {
  *
  * @return Nothing.
  */
-void dogecoin_block_header_free(dogecoin_block_header* header) {
+void dogecoin_auxpow_payload_free(dogecoin_auxpow_payload* payload) {
+    if (!payload) return;
+    dogecoin_tx_free(payload->parent_coinbase);
+    dogecoin_free(payload->parent_coinbase_merkle);
+    dogecoin_free(payload->aux_merkle_branch);
+    /* parent_header is a plain 80-byte header: its own auxpow_payload is NULL,
+       so this does not recurse. */
+    dogecoin_block_header_free(payload->parent_header);
+    dogecoin_free(payload);
+    }
+
+dogecoin_auxpow_payload* dogecoin_auxpow_payload_copy(const dogecoin_auxpow_payload* src) {
+    if (!src) return NULL;
+    dogecoin_auxpow_payload* dst = dogecoin_calloc(1, sizeof(*dst));
+    if (!dst) return NULL;
+
+    memcpy_safe(dst->parent_hash, src->parent_hash, sizeof(uint256_t));
+    dst->parent_merkle_count = src->parent_merkle_count;
+    dst->parent_merkle_index = src->parent_merkle_index;
+    dst->aux_merkle_count    = src->aux_merkle_count;
+    dst->aux_merkle_index    = src->aux_merkle_index;
+
+    if (src->parent_coinbase) {
+        dst->parent_coinbase = dogecoin_tx_new();
+        if (!dst->parent_coinbase) goto fail;
+        dogecoin_tx_copy(dst->parent_coinbase, src->parent_coinbase);
+    }
+    if (src->parent_merkle_count && src->parent_coinbase_merkle) {
+        size_t n = (size_t)src->parent_merkle_count * sizeof(uint256_t);
+        dst->parent_coinbase_merkle = dogecoin_malloc(n);
+        if (!dst->parent_coinbase_merkle) goto fail;
+        memcpy_safe(dst->parent_coinbase_merkle, src->parent_coinbase_merkle, n);
+    }
+    if (src->aux_merkle_count && src->aux_merkle_branch) {
+        size_t n = (size_t)src->aux_merkle_count * sizeof(uint256_t);
+        dst->aux_merkle_branch = dogecoin_malloc(n);
+        if (!dst->aux_merkle_branch) goto fail;
+        memcpy_safe(dst->aux_merkle_branch, src->aux_merkle_branch, n);
+    }
+    if (src->parent_header) {
+        dst->parent_header = dogecoin_block_header_new();
+        if (!dst->parent_header) goto fail;
+        dogecoin_block_header_copy(dst->parent_header, src->parent_header);
+    }
+    return dst;
+
+fail:
+    dogecoin_auxpow_payload_free(dst);
+    return NULL;
+    }
+
+void dogecoin_block_header_destroy(dogecoin_block_header* header) {
     if (!header) return;
+    dogecoin_auxpow_payload_free(header->auxpow_payload);
+    header->auxpow_payload = NULL;
     header->version = 0;
     dogecoin_mem_zero(&header->prev_block, DOGECOIN_HASH_LENGTH);
     dogecoin_mem_zero(&header->merkle_root, DOGECOIN_HASH_LENGTH);
     header->bits = 0;
     header->timestamp = 0;
     header->nonce = 0;
+    }
+
+void dogecoin_block_header_free(dogecoin_block_header* header) {
+    if (!header) return;
+    dogecoin_block_header_destroy(header);
     dogecoin_free(header);
     }
 
@@ -342,6 +401,29 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
             goto cleanup;
         }
         dogecoin_block_header_copy(header, block->header);
+        /* Move the proof onto the header instead of letting cleanup free it.
+           Ownership transfers: the fields are nulled on the block so
+           dogecoin_auxpow_block_free does not release what the header now owns. */
+        dogecoin_auxpow_payload* payload = dogecoin_calloc(1, sizeof(*payload));
+        if (!payload) goto cleanup;
+        payload->parent_coinbase        = block->parent_coinbase;
+        memcpy_safe(payload->parent_hash, block->parent_hash, sizeof(uint256_t));
+        payload->parent_merkle_count    = block->parent_merkle_count;
+        payload->parent_coinbase_merkle = block->parent_coinbase_merkle;
+        payload->parent_merkle_index    = block->parent_merkle_index;
+        payload->aux_merkle_count       = block->aux_merkle_count;
+        payload->aux_merkle_branch      = block->aux_merkle_branch;
+        payload->aux_merkle_index       = block->aux_merkle_index;
+        payload->parent_header          = block->parent_header;
+        block->parent_coinbase          = NULL;
+        block->parent_coinbase_merkle   = NULL;
+        block->aux_merkle_branch        = NULL;
+        block->parent_header            = NULL;
+        /* No free of a prior payload here: dogecoin_block_header_copy above has
+           already overwritten the pointer, and header may have arrived as an
+           uninitialised stack struct. Callers own dest's prior contents, the
+           same contract every other field in this function follows. */
+        header->auxpow_payload = payload;
     }
     ret = true;
 cleanup:
@@ -510,6 +592,17 @@ void dogecoin_block_header_copy(dogecoin_block_header* dest, const dogecoin_bloc
     dest->auxpow->check = src->auxpow->check;
     dest->auxpow->ctx = src->auxpow->ctx;
     dest->auxpow->is = src->auxpow->is;
+    /* Deep-copy the proof. Carrying only the hook fields is what discarded it
+       before, so a copied merge-mined header could not be re-serialized or
+       re-validated without going back to the wire bytes.
+
+       Assign, do not free what dest held. Every other field here is a plain
+       overwrite: this function treats dest as raw memory, and callers pass
+       uninitialised stack headers to it -- net_tests.c does, via
+       dogecoin_block_header_deserialize. Freeing dest->auxpow_payload would
+       dereference whatever the stack happened to contain. A dest that already
+       owns a payload is the caller's to release, as with every other member. */
+    dest->auxpow_payload = dogecoin_auxpow_payload_copy(src->auxpow_payload);
     }
 
 /**

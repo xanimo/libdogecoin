@@ -256,6 +256,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     if (!connected)
                     {
                         printf("\nConnecting header %s failed (at height: %d) read_write: %d\n", hash_to_string(hash), db->chaintip->height, db->read_write_file);
+                        dogecoin_block_header_destroy(&pindex->header);
                         dogecoin_free(pindex);
                     }
                     else {
@@ -514,6 +515,7 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256_t
         if (blockindex_f) {
             blockindex_f = *(dogecoin_blockindex **)blockindex_f;
         }
+        dogecoin_block_header_destroy(&blockindex->header);
         dogecoin_free(blockindex);
         return blockindex_f;
     }

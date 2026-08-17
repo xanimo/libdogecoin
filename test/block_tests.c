@@ -258,7 +258,36 @@ void test_auxpow_deserialize_real_vector() {
     u_assert_uint32_eq(header->bits, 456184976);
     u_assert_uint32_eq(header->nonce, 0);
 
+    /* The AuxPoW proof must survive the parse. It used to be built into a local
+       dogecoin_auxpow_block and freed at cleanup, so a caller holding the header
+       could not re-serialize or re-validate it without going back to the wire. */
+    u_assert_not_null(header->auxpow_payload);
+    u_assert_not_null(header->auxpow_payload->parent_coinbase);
+    u_assert_not_null(header->auxpow_payload->parent_header);
+    u_assert_int_eq(header->auxpow_payload->parent_merkle_count > 0, 1);
+    u_assert_not_null(header->auxpow_payload->parent_coinbase_merkle);
+
+    /* And it must copy deeply. dogecoin_block_header_copy carried only the
+       auxpow hook fields, so a copied merge-mined header silently lost its
+       proof; now the copy owns its own, and freeing one must not disturb the
+       other. */
+    dogecoin_block_header* dup = dogecoin_block_header_new();
+    dogecoin_block_header_copy(dup, header);
+    u_assert_not_null(dup->auxpow_payload);
+    u_assert_int_eq(dup->auxpow_payload != header->auxpow_payload, 1);
+    u_assert_int_eq(dup->auxpow_payload->parent_coinbase
+                    != header->auxpow_payload->parent_coinbase, 1);
+    u_assert_int_eq(dup->auxpow_payload->parent_merkle_count
+                    == header->auxpow_payload->parent_merkle_count, 1);
+    u_assert_mem_eq(dup->auxpow_payload->parent_hash,
+                    header->auxpow_payload->parent_hash, DOGECOIN_HASH_LENGTH);
+
+    /* Free the source first: the copy must still be intact, which it can only
+       be if nothing is shared. */
     dogecoin_block_header_free(header);
+    u_assert_not_null(dup->auxpow_payload);
+    u_assert_not_null(dup->auxpow_payload->parent_header);
+    dogecoin_block_header_free(dup);
     dogecoin_free(buf);
 }
 

@@ -48,6 +48,30 @@ typedef struct _auxpow {
     void *ctx;
 } auxpow;
 
+/* The AuxPoW proof carried by a merge-mined header, owned by the header it
+   belongs to.
+ *
+ * This deliberately has no back-pointer to its owning header, unlike
+ * dogecoin_auxpow_block. That struct owns both its header and its parent_header
+ * and frees them, so a header could not hold one without the two owning each
+ * other. The payload owns only parent_header, which is a plain 80-byte header
+ * with no payload of its own, so ownership terminates.
+ *
+ * The auxpow.check / auxpow.ctx hook on dogecoin_block_header is unaffected:
+ * it is a validation hook whose context the caller supplies at call time, not a
+ * reference to this data. */
+typedef struct dogecoin_auxpow_payload_ {
+    dogecoin_tx* parent_coinbase;
+    uint256_t parent_hash;
+    uint8_t parent_merkle_count;
+    uint256_t* parent_coinbase_merkle;
+    uint32_t parent_merkle_index;
+    uint8_t aux_merkle_count;
+    uint256_t* aux_merkle_branch;
+    uint32_t aux_merkle_index;
+    struct dogecoin_block_header_* parent_header;
+} dogecoin_auxpow_payload;
+
 typedef struct dogecoin_block_header_ {
     int32_t version;
     uint256_t prev_block;
@@ -56,7 +80,19 @@ typedef struct dogecoin_block_header_ {
     uint32_t bits;
     uint32_t nonce;
     auxpow auxpow[1];
+    /** AuxPoW proof for a merge-mined header, NULL otherwise. Retained so the
+        header can reproduce the bytes it was parsed from: the deserializer used
+        to parse this into a local dogecoin_auxpow_block and free it, and
+        dogecoin_block_header_copy carried only the auxpow hook fields, so the
+        proof was discarded and anything needing it had to re-parse. */
+    dogecoin_auxpow_payload* auxpow_payload;
 } dogecoin_block_header;
+
+/** Free an AuxPoW payload and everything it owns. */
+LIBDOGECOIN_API void dogecoin_auxpow_payload_free(dogecoin_auxpow_payload* payload);
+
+/** Deep-copy an AuxPoW payload. Returns NULL if src is NULL. */
+LIBDOGECOIN_API dogecoin_auxpow_payload* dogecoin_auxpow_payload_copy(const dogecoin_auxpow_payload* src);
 
 typedef struct dogecoin_auxpow_block_ {
     dogecoin_block_header* header;
@@ -72,6 +108,20 @@ typedef struct dogecoin_auxpow_block_ {
 } dogecoin_auxpow_block;
 
 LIBDOGECOIN_API dogecoin_block_header* dogecoin_block_header_new();
+/**
+ * @brief Release what a header owns, without freeing the header.
+ *
+ * dogecoin_block_header_free ends in dogecoin_free(header), so it cannot be used
+ * on a header that is embedded by value in another struct -- and two of them are:
+ * dogecoin_blockindex holds one, and dogecoin_compact_block holds one. Since a
+ * parsed header now owns an auxpow_payload (a transaction plus two heap arrays),
+ * those owners have to release it explicitly or leak it on every merge-mined
+ * block. This is the entry point for that.
+ *
+ * Idempotent: the payload pointer is nulled, so a second call is a no-op.
+ */
+LIBDOGECOIN_API void dogecoin_block_header_destroy(dogecoin_block_header* header);
+
 LIBDOGECOIN_API void dogecoin_block_header_free(dogecoin_block_header* header);
 LIBDOGECOIN_API dogecoin_auxpow_block* dogecoin_auxpow_block_new();
 LIBDOGECOIN_API void dogecoin_auxpow_block_free(dogecoin_auxpow_block* block);
