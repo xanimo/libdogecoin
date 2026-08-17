@@ -16,6 +16,7 @@
 
 #include "data/auxpow_block_371338.h"
 #include <dogecoin/block.h>
+#include <dogecoin/serialize.h>
 
 #include <dogecoin/cstr.h>
 #include <dogecoin/protocol.h>
@@ -369,6 +370,35 @@ void test_auxpow_deserialize_real_vector() {
     dogecoin_block_header_serialize(pure, rt);
     u_assert_int_eq(pure->len == 80, 1);
     u_assert_int_eq(memcmp(pure->str, buf, 80), 0);
+
+    /* Whole-block round trip: header span plus the transaction vector must come
+       back byte-identical. This is the form a reconstructed compact block has to
+       be turned into before the rest of the client can consume it, so anything
+       less than exact would desync the very path it exists to serve. */
+    struct const_buffer txbuf = { buf + hdr_span, blen - hdr_span };
+    uint32_t tx_count = 0;
+    u_assert_int_eq(deser_varlen(&tx_count, &txbuf), 1);
+    u_assert_int_eq(tx_count > 0, 1);
+
+    dogecoin_tx** txs = dogecoin_calloc(tx_count, sizeof(*txs));
+    u_assert_not_null(txs);
+    uint32_t ti;
+    for (ti = 0; ti < tx_count; ti++) {
+        txs[ti] = dogecoin_tx_new();
+        size_t consumed = 0;
+        u_assert_int_eq(dogecoin_tx_deserialize(txbuf.p, txbuf.len, txs[ti], &consumed), 1);
+        u_assert_int_eq(deser_skip(&txbuf, consumed), 1);
+    }
+    u_assert_int_eq((int)txbuf.len, 0);   /* the vector accounted for every byte */
+
+    cstring* whole = cstr_new_sz(blen + 32);
+    dogecoin_block_serialize(whole, rt, txs, tx_count);
+    u_assert_int_eq(whole->len == blen, 1);
+    u_assert_int_eq(memcmp(whole->str, buf, blen), 0);
+
+    cstr_free(whole, true);
+    for (ti = 0; ti < tx_count; ti++) dogecoin_tx_free(txs[ti]);
+    dogecoin_free(txs);
 
     cstr_free(full, true);
     cstr_free(pure, true);

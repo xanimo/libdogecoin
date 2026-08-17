@@ -649,6 +649,21 @@ void dogecoin_block_header_serialize_full(cstring* s, const dogecoin_block_heade
         dogecoin_auxpow_payload_serialize(s, header->auxpow_payload);
     }
 
+void dogecoin_block_serialize(cstring* s, const dogecoin_block_header* header,
+                              dogecoin_tx** txs, uint32_t txs_count) {
+    if (!s || !header) return;
+    /* A block is its header in wire form -- AuxPoW and all, which is why this
+       uses the full serializer rather than the pure one -- followed by the
+       transaction vector. */
+    dogecoin_block_header_serialize_full(s, header);
+    ser_varlen(s, txs_count);
+    uint32_t i;
+    for (i = 0; i < txs_count; i++) {
+        if (!txs || !txs[i]) return;   /* caller passed a hole; stop rather than emit a short block */
+        dogecoin_tx_serialize(s, txs[i]);
+    }
+    }
+
 void dogecoin_block_header_serialize(cstring* s, const dogecoin_block_header* header) {
     ser_s32(s, header->version);
     ser_u256(s, header->prev_block);
