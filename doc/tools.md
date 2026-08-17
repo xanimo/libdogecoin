@@ -88,6 +88,7 @@ Most of these commands require a flag following them to denote things like exist
 | -w, --overwrite | overwrite | no | generate_mnemonic or bip32_extended_master_key -w |
 | -b, --silent | silent | no | generate_mnemonic or bip32_extended_master_key -b |
 | -j, --use_tpm | use_tpm | no | generate_mnemonic, bip32_extended_master_key, decrypt_master_key, decrypt_mnemonic, seed_to_master_key, mnemonic_to_key or mnemonic_to_addresses -j |
+| -u, --yubikey | yubikey | no | generate_mnemonic, bip32_extended_master_key, decrypt_master_key, decrypt_mnemonic, seed_to_master_key, mnemonic_to_key or mnemonic_to_addresses -u (requires --enable-yubikey; mutually exclusive with -j) |
 | -t, --testnet  | designate_testnet   | no  | generate_private_key -t |
 | -s  | script_hex          | yes | comp2der -s <compact_signature> |
 | -x  | transaction_hex     | yes | sign -x <transaction_hex> -s <pubkey_script> -i <index_of_utxo_to_sign> -h <sig_hash_type> |
@@ -106,11 +107,11 @@ Below is a list of all the commands and the flags that they require. As a remind
 | derive_child_keys         | -p, -m                 | -t   | Generates a child key derived from the specified public or private key using the specified derivation path.
 | generate_mnemonic         | None                   | -e, -y, -w, -b | Generates a 24-word english seed phrase randomly or from optional hex entropy. |
 | list_encryption_keys_in_tpm | None                 | None | List the encryption keys in the TPM. |
-| decrypt_master_key | -y   | -j | Decrypt the master key with the TPM or SW. |
-| decrypt_mnemonic | -y     | -j | Decrypt the mnemonic with the TPM or SW. |
-| seed_to_master_key | -y   | -j, -t | Generates an extended master private key from a seed for either mainnet or testnet. |
-| mnemonic_to_key | -n      | -a, -y, -o, g, -i, -t | Generates a private key from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
-| mnemonic_to_addresses     | -n      | -a, -y, -o, g, -i, -t   | Generates an address from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
+| decrypt_master_key | -y   | -j, -u | Decrypt the master key with the TPM, YubiKey, or SW. |
+| decrypt_mnemonic | -y     | -j, -u | Decrypt the mnemonic with the TPM, YubiKey, or SW. |
+| seed_to_master_key | -y   | -j, -u, -t | Generates an extended master private key from a seed for either mainnet or testnet. |
+| mnemonic_to_key | -n      | -a, -y, -j, -u, -o, g, -i, -t | Generates a private key from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
+| mnemonic_to_addresses     | -n      | -a, -y, -j, -u, -o, g, -i, -t   | Generates an address from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
 | print_keys                | -p                     | -t   | Print all keys associated with the provided private key.
 | sign                      | -x, -s, -i, -h, -p     | -t   | See the definition of sign_raw_transaction in the Transaction API.
 | comp2der                  | -s                     | None | Convert a compact signature to a DER signature.
