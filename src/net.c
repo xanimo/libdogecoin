@@ -367,6 +367,21 @@ dogecoin_node* dogecoin_node_new()
  *
  * @return dogecoin_bool (uint8_t)
  */
+/* evutil_parse_sockaddr_port() accepts a bare address and leaves the port at
+   whatever the caller had, which for a fresh node is zero. Dialling port zero
+   never connects and nothing says so, so -i 1.2.3.4 loops on "0 connected
+   nodes" forever. Fill in the chain's port when the string carried none. */
+static void node_default_port(dogecoin_node* node, uint16_t port)
+{
+    if (node->addr.sa_family == AF_INET) {
+        struct sockaddr_in* s = (struct sockaddr_in*)&node->addr;
+        if (s->sin_port == 0) s->sin_port = htons(port);
+    } else if (node->addr.sa_family == AF_INET6) {
+        struct sockaddr_in6* s = (struct sockaddr_in6*)&node->addr;
+        if (s->sin6_port == 0) s->sin6_port = htons(port);
+    }
+}
+
 dogecoin_bool dogecoin_node_set_ipport(dogecoin_node* node, const char* ipport)
 {
     int outlen = (int)sizeof(node->addr);
@@ -939,9 +954,16 @@ dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *g
         unsigned int i;
         for (i = 0; i <= strlen(ips); i++) {
             if (i == strlen(ips) || ips[i] == ',') {
-                dogecoin_node* node = dogecoin_node_new();
-                if (dogecoin_node_set_ipport(node, working_str) > 0) {
-                    dogecoin_node_group_add_node(group, node);
+                if (working_str[0] != '\0') {
+                    dogecoin_node* node = dogecoin_node_new();
+                    if (dogecoin_node_set_ipport(node, working_str) > 0) {
+                        node_default_port(node, group->chainparams->default_port);
+                        dogecoin_node_group_add_node(group, node);
+                    } else {
+                        /* Also the only path that freed nothing on failure. */
+                        fprintf(stderr, "net: ignoring unparseable peer \"%s\"\n", working_str);
+                        dogecoin_node_free(node);
+                    }
                 }
                 offset = 0;
                 dogecoin_mem_zero(working_str, sizeof(working_str));
