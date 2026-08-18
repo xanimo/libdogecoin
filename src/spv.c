@@ -3031,6 +3031,14 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     vector_add(cfstate->filter_headers, new_header);
                     memcpy(prev_header, *new_header, 32);
 
+                    /* Persist as we go. Only the genesis header was written
+                       here, so cfheaders.dat kept just its file header and the
+                       chain was refetched on every start; the flush below had
+                       nothing to write. The parallel path already does this in
+                       cfh_par_finish(). */
+                    if (client->cfheaders_db)
+                        dogecoin_cfheaders_db_write(client->cfheaders_db, height, *new_header);
+
                     if (client->cf_export_enabled &&
                         height > 0 && (height % CF_EXPORT_INTERVAL) == 0) {
                         char *hex = utils_uint8_to_hex(*new_header, 32);
