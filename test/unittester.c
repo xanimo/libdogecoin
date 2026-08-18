@@ -67,6 +67,7 @@ extern void test_map_idx_not_reused();
 extern void test_memory();
 extern void test_moon();
 extern void test_op_return();
+extern void test_rfc6979();
 extern void test_random();
 extern void test_random_failure_is_false();
 extern void test_rmd160();
@@ -214,6 +215,7 @@ int main()
     u_run_test(test_memory);
     u_run_test(test_moon);
     u_run_test(test_op_return);
+    u_run_test(test_rfc6979);
     u_run_test(test_random);
     u_run_test(test_random_failure_is_false);
     u_run_test(test_rmd160);
