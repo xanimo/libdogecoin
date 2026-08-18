@@ -282,11 +282,9 @@ static void cfh_par_init(dogecoin_spv_client *client,
             dogecoin_mem_zero(anchor, sizeof(anchor));
             anchored = true;
         } else {
-            uint32_t prev_h = start - 1;
-            uint32_t cp_idx = prev_h / CFCHECKPT_INTERVAL;
-            if ((prev_h % CFCHECKPT_INTERVAL) == 0 && cp_idx > 0 &&
-                cfstate->checkpoints && (cp_idx - 1) < cfstate->checkpoints->len) {
-                memcpy(anchor, vector_idx(cfstate->checkpoints, cp_idx - 1), 32);
+            uint256_t cp;
+            if (dogecoin_cf_hardcoded_checkpoint_at(client->chainparams, start - 1, cp)) {
+                memcpy(anchor, cp, 32);
                 anchored = true;
             }
         }
@@ -678,11 +676,9 @@ static void cfh_par_handle_response(dogecoin_spv_client *client,
         dogecoin_hash(combined, 64, new_header);
 
         /* Validate against cfcheckpt at checkpoint boundaries */
-        if (cfstate->checkpoints && cfstate->checkpoints->len > 0 &&
-            height > 0 && (height % CFCHECKPT_INTERVAL) == 0) {
-            uint32_t cp_idx = height / CFCHECKPT_INTERVAL - 1;
-            if (cp_idx < cfstate->checkpoints->len) {
-                uint256_t *checkpoint = (uint256_t *)vector_idx(cfstate->checkpoints, cp_idx);
+        if (height > 0) {
+            uint256_t checkpoint;
+            if (dogecoin_cf_hardcoded_checkpoint_at(client->chainparams, height, checkpoint)) {
                 if (memcmp(new_header, checkpoint, 32) != 0) {
                     if (client->nodegroup && client->nodegroup->log_write_cb)
                         client->nodegroup->log_write_cb(
