@@ -36,8 +36,23 @@
 
 #include <sys/time.h>
 
-// Define the enclave's random number generator
-void set_rng(oe_result_t (*ptr)(void *, size_t));
+/* Route libdogecoin's randomness at the enclave generator.
+   oe_random returns oe_result_t, so the shim propagates OE_OK as success --
+   the old set_rng hook typed the callback as returning int and compared
+   against 0, which happened to agree but was never declared anywhere the
+   compiler could check. Going through the mapper also makes the library's
+   POSIX fallback unreachable rather than skipped on success; an enclave
+   cannot open /dev/urandom. */
+static dogecoin_bool oe_random_bytes(uint8_t *buf, uint32_t len, const uint8_t update_seed)
+{
+    (void)update_seed;
+    return oe_random(buf, (size_t)len) == OE_OK;
+}
+
+static void oe_set_rng(void)
+{
+    dogecoin_rnd_set_bytes_cb(oe_random_bytes);
+}
 
 #define AUTH_TOKEN_LEN 6 // 6-digit TOTP
 uint32_t get_totp(const char* shared_secret, uint64_t timestamp);
@@ -66,7 +81,7 @@ void enclave_libdogecoin()
     }
 
    // Set the Open Enclave random number generator in libdogecoin
-   set_rng (&oe_random);
+   oe_set_rng();
 
    // Let's do something with libdogecoin
    dogecoin_ecc_start();
@@ -115,7 +130,7 @@ void enclave_libdogecoin_run_example()
     dogecoin_bool result = false;
 
     // Set the Open Enclave random number generator in libdogecoin
-    set_rng (&oe_random);
+    oe_set_rng();
 
     dogecoin_ecc_start();
 
@@ -457,11 +472,16 @@ void enclave_libdogecoin_generate_encrypted_seed(data_t* encrypted_blob) {
     uint8_t* blob;
     size_t blob_size;
 
+    // Set the Open Enclave random number generator in libdogecoin
+    oe_set_rng();
+
     // Generate a new seed
     if (!dogecoin_random_bytes(seed, sizeof(seed), 1)) {
         fprintf(stderr, "Failed to generate random bytes\n");
         // Handle error
+        encrypted_blob->data = NULL;
         encrypted_blob->size = 0;
+        return;
     }
 
     // Initialize the seal key info
@@ -498,7 +518,7 @@ void enclave_libdogecoin_generate_master_key(data_t* encrypted_blob) {
     size_t blob_size;
 
     // Set the Open Enclave random number generator in libdogecoin
-    set_rng (&oe_random);
+    oe_set_rng();
 
     dogecoin_ecc_start();
 
@@ -508,7 +528,10 @@ void enclave_libdogecoin_generate_master_key(data_t* encrypted_blob) {
     else {
         printf("Error occurred.\n");
         // Handle error
+        encrypted_blob->data = NULL;
         encrypted_blob->size = 0;
+        dogecoin_ecc_stop();
+        return;
     }
 
     dogecoin_ecc_stop();
@@ -551,7 +574,7 @@ void enclave_libdogecoin_generate_mnemonic(data_t* encrypted_blob, char* mnemoni
     oe_result_t result;
 
     // Set the Open Enclave random number generator in libdogecoin
-    set_rng(&oe_random);
+    oe_set_rng();
 
     dogecoin_ecc_start();
 
@@ -915,7 +938,7 @@ void enclave_libdogecoin_sign_message(const data_t* encrypted_blob, char* custom
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
 
     // Set the Open Enclave random number generator in libdogecoin
-    set_rng (&oe_random);
+    oe_set_rng();
 
     dogecoin_ecc_start();
 
@@ -1025,7 +1048,7 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
 
     // Set the Open Enclave random number generator in libdogecoin
-    set_rng (&oe_random);
+    oe_set_rng();
 
     dogecoin_ecc_start();
 

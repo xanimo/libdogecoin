@@ -838,6 +838,20 @@ char* dogecoin_smpv_watcher_to_json(const dogecoin_smpv_watcher* watcher);
 /* fill buffer with cryptographically secure random bytes */
 dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t update_seed);
 
+/* Replace the byte source, for callers that have one of their own -- an enclave
+   or a trusted application whose platform supplies entropy and where the POSIX
+   fallback is not merely unnecessary but unavailable.
+
+   This takes the callback rather than the dogecoin_rnd_mapper struct that
+   dogecoin/random.h exposes, deliberately. This header is self-contained and
+   an enclave includes it rather than the internal ones, but a struct cannot be
+   defined in both: C forbids re-declaring a tag even identically, so any
+   translation unit including both headers would fail to compile. A function
+   declaration duplicates safely; a struct definition does not.
+
+   Thread-local, like the mapper it sets. Pass NULL to restore the default. */
+void dogecoin_rnd_set_bytes_cb(dogecoin_bool (*cb)(uint8_t* buf, uint32_t len, const uint8_t update_seed));
+
 /* Crypto API
 --------------------------------------------------------------------------
 */
