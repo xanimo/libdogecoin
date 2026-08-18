@@ -36,7 +36,7 @@ jobs:
             clang llvm libevent-dev
 
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: run coverage
         run: |
@@ -55,7 +55,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: fuzz-coverage-report
           path: |
