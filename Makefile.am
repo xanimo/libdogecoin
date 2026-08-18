@@ -427,6 +427,7 @@ endif
 
 if WITH_NET
 noinst_HEADERS += \
+    include/dogecoin/cfheadersdb_file.h \
     include/dogecoin/headersdb.h \
     include/dogecoin/headersdb_file.h \
     include/dogecoin/protocol.h \
@@ -435,6 +436,7 @@ noinst_HEADERS += \
     include/dogecoin/spv.h
 
 libdogecoin_la_SOURCES += \
+    src/cfheadersdb_file.c \
     src/headersdb_file.c \
     src/bip37.c \
     src/net.c \
@@ -447,6 +449,7 @@ libdogecoin_la_CFLAGS += $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 
 if USE_TESTS
 tests_SOURCES += \
+    test/cfheadersdb_tests.c \
     test/net_tests.c \
     test/protocol_tests.c \
     test/spv_tests.c
