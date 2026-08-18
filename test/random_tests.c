@@ -80,3 +80,69 @@ void test_random()
     // switch back to the default random callback mapper
     dogecoin_rnd_set_mapper_default();
 }
+
+
+/* --- regression: a failing RNG must report false, never a truthy value --- */
+
+static void rnd_noop_init(void) {}
+
+/* Fails correctly: reports false and leaves the buffer alone. */
+static dogecoin_bool rnd_fail_false(uint8_t* buf, uint32_t len, const uint8_t update_seed)
+{
+    (void)buf; (void)len; (void)update_seed;
+    return false;
+}
+
+/* Fails the way the WIN32 branch used to: `return -1` from a function whose
+   return type is dogecoin_bool. */
+static dogecoin_bool rnd_fail_minus_one(uint8_t* buf, uint32_t len, const uint8_t update_seed)
+{
+    (void)buf; (void)len; (void)update_seed;
+    return (dogecoin_bool)-1;
+}
+
+/*
+ * dogecoin_bool is a uint8_t, so `return -1` reaches the caller as 255 -- a
+ * true value. The WIN32 path did exactly that on both of its failure exits
+ * (CryptGenRandom failure, and no RNG provider at all), so every caller
+ * written as `if (!dogecoin_random_bytes(...))` saw success while buf still
+ * held whatever was on the stack.
+ *
+ * The second half of this test pins that hazard as an executable fact rather
+ * than a comment: if the convention or the underlying type ever changes, this
+ * is where it surfaces.
+ */
+void test_random_failure_is_false()
+{
+    dogecoin_rnd_mapper mapper;
+    uint8_t buf[32];
+    dogecoin_bool r;
+
+    /* A correct failure is exactly false, and callers can test it. */
+    mapper.dogecoin_random_init = rnd_noop_init;
+    mapper.dogecoin_random_bytes = rnd_fail_false;
+    dogecoin_rnd_set_mapper(mapper);
+
+    memset(buf, 0xAB, sizeof(buf));
+    r = dogecoin_random_bytes(buf, sizeof(buf), 0);
+    u_assert_int_eq((int)r, 0);
+    u_assert_true(!r);
+
+    /* The trap this change removes: -1 survives as 255 and is truthy, so the
+       caller's `if (!r)` never fires. */
+    mapper.dogecoin_random_bytes = rnd_fail_minus_one;
+    dogecoin_rnd_set_mapper(mapper);
+
+    r = dogecoin_random_bytes(buf, sizeof(buf), 0);
+    u_assert_int_eq((int)r, 255);
+    /* Spelled out rather than u_assert_true(r): that macro compares against 1,
+       and the whole point here is that 255 is not 1 yet is still true. */
+    u_assert_int_eq(r ? 1 : 0, 1);
+    u_assert_int_eq((int)(!r), 0);
+
+    dogecoin_rnd_set_mapper_default();
+
+    /* And the real RNG still succeeds and writes the buffer. */
+    memset(buf, 0, sizeof(buf));
+    u_assert_true(dogecoin_random_bytes(buf, sizeof(buf), 0));
+}

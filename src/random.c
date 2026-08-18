@@ -208,7 +208,7 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     InitOnceExecuteOnce(&rng_init_once, rng_initialize_once, NULL, NULL);
     if (BCryptGenRandomFunc != NULL
         && BCryptGenRandomFunc(NULL, buf, len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0 /*STATUS_SUCCESS*/)
-        return 1;
+        return true;
     /* CryptGenRandom, defined in <wincrypt.h>
        <https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgenrandom>
        works in older releases as well, but is now deprecated.
@@ -217,16 +217,22 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     if (crypt_provider_ok) {
         if (!CryptGenRandom(crypt_provider, len, buf)) {
             errno = EIO;
-            return -1;
+            dogecoin_mem_zero(buf, len);
+            return false;
             }
-        return 1;
+        return true;
         }
 # else
     if (BCryptGenRandomFunc(NULL, buf, len, BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0 /*STATUS_SUCCESS*/)
-        return 1;
+        return true;
 # endif
+    /* No usable RNG at all. This must report failure, not -1: the return type
+       is dogecoin_bool, which is a uint8_t, so -1 arrives at the caller as 255
+       -- a true value. Every caller writing `if (!dogecoin_random_bytes(...))`
+       saw success while buf still held whatever was on the stack. */
     errno = ENOSYS;
-    return -1;
+    dogecoin_mem_zero(buf, len);
+    return false;
 #else
 #if USE_OPENENCLAVE || USE_OPTEE
     if (rng_ptr != NULL)
