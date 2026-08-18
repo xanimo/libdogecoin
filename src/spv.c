@@ -266,6 +266,38 @@ static void cfh_par_init(dogecoin_spv_client *client,
             cfstate->cfh_par_done++;
             continue;
         }
+        /* Settle the anchor before committing to the chunk. Every chunk after
+         * the first is validated independently, so it needs the compiled-in
+         * checkpoint covering the height before its start. Past the last
+         * compiled-in checkpoint there is none, and a chunk anchored on zero
+         * produces a header chain that is wrong from its first entry: the
+         * cfilter check then fails at the seam. Hand the tail to the last
+         * anchored chunk instead, which chains its own batches, so it stays
+         * verified and only loses parallelism. */
+        uint8_t anchor[32];
+        dogecoin_bool anchored = false;
+        if (wi == 0) {
+            /* Genesis anchor comes from the first CFHEADERS response's
+             * prev_filter_header field; initialise to zero for now. */
+            dogecoin_mem_zero(anchor, sizeof(anchor));
+            anchored = true;
+        } else {
+            uint32_t prev_h = start - 1;
+            uint32_t cp_idx = prev_h / CFCHECKPT_INTERVAL;
+            if ((prev_h % CFCHECKPT_INTERVAL) == 0 && cp_idx > 0 &&
+                cfstate->checkpoints && (cp_idx - 1) < cfstate->checkpoints->len) {
+                memcpy(anchor, vector_idx(cfstate->checkpoints, cp_idx - 1), 32);
+                anchored = true;
+            }
+        }
+        if (!anchored) {
+            if (effective_n > 0)
+                cfstate->cfh_par_chunks[effective_n - 1].end = tip;
+            ch->node_id = -2;  /* no work for this slot */
+            cfstate->cfh_par_done++;
+            continue;
+        }
+
         ch->start    = start;
         ch->end      = start + chunk_sz - 1;
         if (ch->end > tip) ch->end = tip;
@@ -273,24 +305,8 @@ static void cfh_par_init(dogecoin_spv_client *client,
         ch->node_id  = -1;  /* unassigned */
         ch->n_received = 0;
         ch->complete = false;
+        memcpy(ch->prev_fh, anchor, 32);
         effective_n++;
-
-        if (wi == 0) {
-            /* Genesis anchor comes from the first CFHEADERS response's
-             * prev_filter_header field; initialise to zero for now. */
-            memset(ch->prev_fh, 0, 32);
-        } else {
-            /* Anchor = cfcheckpt filter header immediately before start.
-             * start - 1 must be a multiple of CFCHECKPT_INTERVAL. */
-            uint32_t prev_h  = ch->start - 1;
-            uint32_t cp_idx  = prev_h / CFCHECKPT_INTERVAL;
-            if (cp_idx > 0 && (cp_idx - 1) < cfstate->checkpoints->len) {
-                memcpy(ch->prev_fh,
-                       vector_idx(cfstate->checkpoints, cp_idx - 1), 32);
-            } else {
-                memset(ch->prev_fh, 0, 32);
-            }
-        }
     }
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
