@@ -899,6 +899,9 @@ size_t dogecoin_get_peers_from_dns(const char* seed, vector_t* ips_out, int port
  * @return dogecoin_bool (uint8_t)
  */
 dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *group, const char *ips) {
+    /* Report whether a peer was actually added. Returning true regardless left
+       the caller unable to tell a working resolver from eight dead seeds. */
+    const size_t nodes_before = group->nodes->len;
     if (ips == NULL) {
         /* === DNS QUERY === */
         vector_t* ips_dns = vector_new(10, free);
@@ -948,7 +951,7 @@ dogecoin_bool dogecoin_node_group_add_peers_by_ip_or_seed(dogecoin_node_group *g
             }
         }
     }
-    return true;
+    return group->nodes->len > nodes_before;
 }
 
 /**
