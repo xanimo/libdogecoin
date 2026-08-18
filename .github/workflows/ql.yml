@@ -50,6 +50,11 @@ jobs:
     - name: checkout repository
       uses: actions/checkout@v5
 
+    - name: bound apt
+      run: |
+        printf 'Acquire::ForceIPv4 "true";\nAcquire::Retries "3";\nAcquire::http::Timeout "30";\n' \
+          | sudo tee /etc/apt/apt.conf.d/99ci-apt > /dev/null
+
     - name: update system
       run: |
         sudo apt-get update --yes
