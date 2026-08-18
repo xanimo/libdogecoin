@@ -178,8 +178,6 @@ jobs:
             host: x86_64-pc-windows-msvc
             os: windows-2022
             packages: cmake
-            postinstall: |
-              choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
             dep-opts: "CROSS_COMPILE='no' SPEED=slow V=1"
             config-opts: ""
             run-tests: true
@@ -188,8 +186,6 @@ jobs:
             host: x86_64-pc-windows-msvc
             os: windows-2022
             packages: cmake
-            postinstall: |
-              choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
             dep-opts: "CROSS_COMPILE='no' SPEED=slow V=1"
             config-opts: ""
             run-tests: false
@@ -198,8 +194,6 @@ jobs:
             host: x86_64-pc-windows-msvc
             os: windows-2022
             packages: cmake
-            postinstall: |
-              choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
             dep-opts: "CROSS_COMPILE='no' SPEED=slow V=1"
             config-opts: ""
             run-tests: false
