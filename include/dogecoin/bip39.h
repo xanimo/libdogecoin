@@ -210,6 +210,11 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
 /* size of the generated mnemonic in bytes (output) */
 /* generated mnemonic (output) */
 /* returns 0 (success), -1 (fail) */
+/* entropy_out receives the entropy as a hex string and must have room for
+   MAX_ENTROPY_STRING_SIZE bytes -- the type is HEX_ENTROPY. The signature says
+   char*, so the requirement is not visible at the call site; entropy_size is
+   validated to 128..256 bits, which bounds the write to 64 hex characters plus
+   a terminator. */
 LIBDOGECOIN_API int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* language, const char* space, const char* entropy, const char* filename, char* entropy_out, size_t* size, char* words);
 
 /* Verifies the mnemonic phrase */
