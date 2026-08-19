@@ -174,14 +174,16 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     return false;
                 }
                 if (confirm[0] == 'y' || confirm[0] == 'Y') {
-                    remove(file_path_local); // remove the existing file
-                    create = true; // Set create to true as a new file will be created
+                    /* No remove() here: "w+b" below truncates, and removing
+                       first is a check-then-use an attacker with write access
+                       to the directory wins by planting a symlink. */
+                    create = true;
                 }
             }
         }
     }
 
-    db->headers_tree_file = fopen(file_path_local, create ? "a+b" : "r+b");
+    db->headers_tree_file = fopen(file_path_local, create ? "w+b" : "r+b");
     cstr_free(path_ret, true);
     if (create) {
         // write file-header-magic
