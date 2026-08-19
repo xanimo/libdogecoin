@@ -391,6 +391,7 @@ void enclave_libdogecoin_run_example()
     printf("\nTESTS COMPLETE!\n");
     dogecoin_ecc_stop();
 
+    dogecoin_mem_zero(mnemonic, sizeof(mnemonic));
 }
 
 // Secure Key Manager
@@ -481,6 +482,7 @@ void enclave_libdogecoin_generate_encrypted_seed(data_t* encrypted_blob) {
         // Handle error
         encrypted_blob->data = NULL;
         encrypted_blob->size = 0;
+        dogecoin_mem_zero(seed, sizeof(seed));
         return;
     }
 
@@ -506,6 +508,8 @@ void enclave_libdogecoin_generate_encrypted_seed(data_t* encrypted_blob) {
         // Handle error
         encrypted_blob->size = 0;
     }
+
+    dogecoin_mem_zero(seed, sizeof(seed));
 }
 
 // ECALL to generate and encrypt a new master keypair
@@ -633,6 +637,8 @@ void enclave_libdogecoin_generate_mnemonic(data_t* encrypted_blob, char* mnemoni
         fprintf(stderr, "Sealing failed with %d\n", result);
         encrypted_blob->size = 0;
     }
+
+    dogecoin_mem_zero(mnemonic_and_creds, sizeof(mnemonic_and_creds));
 }
 
 void enclave_libdogecoin_generate_extended_public_key(const data_t* encrypted_blob, char* custom_path, char* pubkey, uint32_t account, char* change_level, const uint32_t auth_token, char* password)
@@ -727,6 +733,8 @@ void enclave_libdogecoin_generate_extended_public_key(const data_t* encrypted_bl
     if (!deriveBIP44ExtendedPublicKey(master_key, &account, change_level, NULL, custom_path, derived_pubkey, keypath)) {
         fprintf(stderr, "Failed to derive extended public key\n");
         dogecoin_ecc_stop();
+        dogecoin_mem_zero(seed, sizeof(seed));
+        dogecoin_mem_zero(master_key, sizeof(master_key));
         return;
     }
 
@@ -735,6 +743,8 @@ void enclave_libdogecoin_generate_extended_public_key(const data_t* encrypted_bl
 
     dogecoin_ecc_stop();
 
+    dogecoin_mem_zero(seed, sizeof(seed));
+    dogecoin_mem_zero(master_key, sizeof(master_key));
     dogecoin_free(persistent_data);
 }
 
@@ -852,6 +862,8 @@ void enclave_libdogecoin_generate_address(const data_t* encrypted_blob, char* cu
 
     dogecoin_ecc_stop();
 
+    dogecoin_mem_zero(seed, sizeof(seed));
+    dogecoin_mem_zero(master_key, sizeof(master_key));
     dogecoin_free(persistent_data);
 }
 
@@ -961,6 +973,9 @@ void enclave_libdogecoin_sign_message(const data_t* encrypted_blob, char* custom
 
     dogecoin_ecc_stop();
 
+    dogecoin_mem_zero(seed, sizeof(seed));
+    dogecoin_mem_zero(master_key, sizeof(master_key));
+    dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
     dogecoin_free(sig);
     dogecoin_free(persistent_data);
 }
@@ -1070,6 +1085,9 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
     if (idx < 0) {
         printf("Failed to store raw transaction\n");
         dogecoin_ecc_stop();
+        dogecoin_mem_zero(seed, sizeof(seed));
+        dogecoin_mem_zero(master_key, sizeof(master_key));
+        dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
         dogecoin_free(persistent_data);
         return;
     }
@@ -1080,6 +1098,9 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
         printf("Failed to sign transaction\n");
         dogecoin_free(myscriptpubkey);
         dogecoin_ecc_stop();
+        dogecoin_mem_zero(seed, sizeof(seed));
+        dogecoin_mem_zero(master_key, sizeof(master_key));
+        dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
         dogecoin_free(persistent_data);
         return;
     }
@@ -1090,6 +1111,9 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
         printf("Failed to get signed transaction\n");
         dogecoin_free(myscriptpubkey);
         dogecoin_ecc_stop();
+        dogecoin_mem_zero(seed, sizeof(seed));
+        dogecoin_mem_zero(master_key, sizeof(master_key));
+        dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
         dogecoin_free(persistent_data);
         return;
     }
@@ -1099,5 +1123,9 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
 
     dogecoin_free(myscriptpubkey);
     dogecoin_ecc_stop();
+
+    dogecoin_mem_zero(seed, sizeof(seed));
+    dogecoin_mem_zero(master_key, sizeof(master_key));
+    dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
     dogecoin_free(persistent_data);
 }
