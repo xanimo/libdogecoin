@@ -973,6 +973,7 @@ void enclave_libdogecoin_sign_message(const data_t* encrypted_blob, char* custom
 
     dogecoin_ecc_stop();
 
+    dogecoin_hdnode_free(hdnode);
     dogecoin_mem_zero(seed, sizeof(seed));
     dogecoin_mem_zero(master_key, sizeof(master_key));
     dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
@@ -1085,6 +1086,7 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
     if (idx < 0) {
         printf("Failed to store raw transaction\n");
         dogecoin_ecc_stop();
+        dogecoin_hdnode_free(hdnode);
         dogecoin_mem_zero(seed, sizeof(seed));
         dogecoin_mem_zero(master_key, sizeof(master_key));
         dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
@@ -1098,6 +1100,7 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
         printf("Failed to sign transaction\n");
         dogecoin_free(myscriptpubkey);
         dogecoin_ecc_stop();
+        dogecoin_hdnode_free(hdnode);
         dogecoin_mem_zero(seed, sizeof(seed));
         dogecoin_mem_zero(master_key, sizeof(master_key));
         dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
@@ -1111,6 +1114,7 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
         printf("Failed to get signed transaction\n");
         dogecoin_free(myscriptpubkey);
         dogecoin_ecc_stop();
+        dogecoin_hdnode_free(hdnode);
         dogecoin_mem_zero(seed, sizeof(seed));
         dogecoin_mem_zero(master_key, sizeof(master_key));
         dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
@@ -1124,6 +1128,7 @@ void enclave_libdogecoin_sign_transaction(const data_t* encrypted_blob, char* cu
     dogecoin_free(myscriptpubkey);
     dogecoin_ecc_stop();
 
+    dogecoin_hdnode_free(hdnode);
     dogecoin_mem_zero(seed, sizeof(seed));
     dogecoin_mem_zero(master_key, sizeof(master_key));
     dogecoin_mem_zero(privkeywif, sizeof(privkeywif));
