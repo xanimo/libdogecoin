@@ -1017,7 +1017,9 @@ int file_copy(char src [], char dest [])
         fclose (stream_read);
         return -2;
      }
-#ifndef _WIN32
+    /* The enclave libc has no fchmod, and the mode carries no meaning there
+       anyway: the host filesystem is not what an enclave writes to. */
+#if !defined(_WIN32) && !defined(USE_OPENENCLAVE)
     {
         struct stat src_sb;
         if (fstat (fileno (stream_read), &src_sb) == 0)
