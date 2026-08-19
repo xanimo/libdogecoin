@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dogecoin/utils.h>
 #include <qr/qr.h>
 #include <qr/png.h>
 #include <qr/jpeg.h>
@@ -198,6 +199,10 @@ int qrgen_string_to_qr_pngfile(const char * outFilename, const char* inString, u
         unsigned error = lodepng_encode24(&png, &pngsize, image, width, height);
         if (!error)    
         {
+            /* lodepng is vendored and opens the path itself; create it 0600
+               first so its "wb" reopen inherits the mode rather than the umask. */
+            FILE* pre = dogecoin_fopen_private(outFilename, "wb");
+            if (pre) fclose(pre);
             lodepng_save_file(png, pngsize, outFilename);
             free(png);
             free(image);
@@ -250,7 +255,11 @@ int qrgen_string_to_qr_jpgfile(const char* outFilename, const char* inString, ui
         jpec_enc_t* enc = jpec_enc_new(image, width, height);
         jpg = jpec_enc_run(enc, &jpgsize);
 
-        FILE* file = fopen(outFilename, "wb");
+        /* qrgen_string_to_qr_*file take an arbitrary string, so the image can
+           be a QR of a private key or a seed phrase. Do not publish it at the
+           umask. */
+        FILE* file = dogecoin_fopen_private(outFilename, "wb");
+        if (!file) return -1;
         fwrite(jpg, sizeof(uint8_t), jpgsize, file);
         fclose(file);
         jpec_enc_del(enc);

@@ -1009,12 +1009,21 @@ int file_copy(char src [], char dest [])
     stream_read = fopen (src, "r");
     if (stream_read == NULL)
         return -1;
-    stream_write = fopen (dest, "w");   //create and write to file
+    /* A copy of a 0600 wallet landing at the umask hands out what the original
+       was protecting. Create private, then match whatever the source carried. */
+    stream_write = dogecoin_fopen_private (dest, "w");
     if (stream_write == NULL)
      {
         fclose (stream_read);
         return -2;
      }
+#ifndef _WIN32
+    {
+        struct stat src_sb;
+        if (fstat (fileno (stream_read), &src_sb) == 0)
+            (void)fchmod (fileno (stream_write), src_sb.st_mode & 0777);
+    }
+#endif
     while ((c = fgetc(stream_read)) != EOF)
         fputc (c, stream_write);
     fclose (stream_read);
