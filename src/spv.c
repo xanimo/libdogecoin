@@ -3276,7 +3276,16 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         buf->len -= PAR_HDR_RAW_LEN;
 
         /* For AUXPoW blocks, skip the variable-length chain data */
-        if (is_aux && !par_hdr_skip_auxpow(buf)) break;
+        if (is_aux && !par_hdr_skip_auxpow(buf)) {
+            /* The same correction the deserialize failure below makes: the 80
+               bytes were counted but the header is never staged, and
+               buffered_bytes is what gates segment assignment. Left uncorrected
+               a peer sending one malformed AuxPoW blob per headers message
+               inflates it 80 at a time until it passes PAR_HDR_MAX_BUFFERED,
+               after which no segment but the flush head is ever assigned. */
+            s->buffered_bytes -= PAR_HDR_RAW_LEN;
+            break;
+        }
 
         /* Compute header hash from the buffered 80 bytes */
         dogecoin_block_header hdr;
