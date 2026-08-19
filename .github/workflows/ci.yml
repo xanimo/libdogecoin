@@ -773,7 +773,7 @@ jobs:
             cmake build-essential python3 libgmp-dev
 
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: build and test (WITH_NET=OFF)
         run: |
@@ -1327,7 +1327,7 @@ jobs:
             clang llvm libevent-dev
 
       - name: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: configure libdogecoin (clang + libFuzzer)
         run: |

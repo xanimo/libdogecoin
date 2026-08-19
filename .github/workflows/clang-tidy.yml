@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: install toolchain
         run: |
@@ -63,7 +63,7 @@ jobs:
           grep -c "warning:" clang-tidy-report.txt || echo "0 warnings"
 
       - name: upload report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: clang-tidy-report
           path: clang-tidy-report.txt
