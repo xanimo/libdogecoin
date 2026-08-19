@@ -52,12 +52,14 @@
 #include <dogecoin/headersdb.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/net.h>
+#include <dogecoin/pow.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/smpv.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/validation.h>
 #include <dogecoin/vector.h>
 #include <dogecoin/pqc_carrier.h>
 #include <dogecoin/pqc_dilithium.h>
@@ -1757,8 +1759,14 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             {
                 client->nodegroup->log_write_cb("Header deserialization failed (node %d)\n", node->nodeid);
             }
-            if (!deser_skip(buf, 1)) {
-                client->nodegroup->log_write_cb("Header deserialization (tx count skip) failed (node %d)\n", node->nodeid);
+            /* Per-header transaction count. Always zero in a headers
+               message, so the old 1-byte skip was right in practice, but the
+               wire type is a varint and reading it as one keeps a
+               non-minimally-encoded zero from desynchronising the parse one
+               byte into the next header. */
+            uint32_t hdr_tx_count = 0;
+            if (!deser_varlen(&hdr_tx_count, buf)) {
+                client->nodegroup->log_write_cb("Header deserialization (tx count) failed (node %d)\n", node->nodeid);
             }
 
             if (!connected)
@@ -2873,6 +2881,68 @@ static uint32_t par_hdr_check(dogecoin_spv_client *client, const char *where)
     return bad;
 }
 
+/* Verify proof of work on the header that lands on a segment's checkpoint.
+ *
+ * The flush loop turns skip_pow on for the whole batch. The justification is
+ * that both ends of a segment are pinned to a compiled-in checkpoint, so the
+ * headers between them are implied by the hash chain -- but that argument only
+ * holds if the segment really reaches its checkpoint with real work behind it,
+ * and until now nothing checked the work at all. The terminal hash comparison
+ * in par_hdr_recv proves the segment arrived at the right block; this proves
+ * the block was mined.
+ *
+ * One header per segment: 114 checks on mainnet, against ~6.2M headers.
+ * Merge-mined headers are the overwhelming majority (everything above 371337),
+ * and for those the scrypt target applies to the parent block, so the check is
+ * check_auxpow over the retained proof rather than a hash of the 80 bytes. */
+static dogecoin_bool par_hdr_verify_tail(dogecoin_spv_client *client,
+                                         par_hdr_seg *seg, uint32_t seg_idx)
+{
+    if (!seg->tail_raw || seg->tail_len < PAR_HDR_RAW_LEN) {
+        /* A complete segment always retained its final header. Missing means
+           the segment was rebuilt after a failed flush without re-reaching the
+           checkpoint, so refuse rather than write it on trust. */
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] segment %u: no retained terminal header to verify\n",
+                seg_idx);
+        return false;
+    }
+
+    dogecoin_chainparams *params = (dogecoin_chainparams *)client->chainparams;
+    arith_uint256 chainwork = {{0}};
+    dogecoin_block_header hdr;
+    dogecoin_mem_zero(&hdr, sizeof(hdr));
+
+    /* Deserializing the whole record with params runs check_auxpow on the
+       AuxPoW branch; the 80-byte-only call in par_hdr_recv cannot, because the
+       proof is not in that span. */
+    struct const_buffer tbuf = { seg->tail_raw, seg->tail_len };
+    if (!dogecoin_block_header_deserialize(&hdr, &tbuf, params, &chainwork)) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] segment %u: terminal header failed validation at height %u\n",
+                seg_idx, seg->stop_height);
+        return false;
+    }
+
+    if (!is_auxpow(hdr.version)) {
+        uint256_t hash = {0};
+        cstring *s80 = cstr_new_sz(96);
+        dogecoin_block_header_serialize(s80, &hdr);
+        dogecoin_block_header_scrypt_hash(s80, &hash);
+        cstr_free(s80, true);
+        if (!check_pow(&hash, hdr.bits, client->chainparams, &chainwork)) {
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb(
+                    "[par-hdr] segment %u: terminal header fails proof of work at height %u\n",
+                    seg_idx, seg->stop_height);
+            return false;
+        }
+    }
+    return true;
+}
+
 static uint32_t par_hdr_flush(dogecoin_spv_client *client)
 {
     par_hdr_state *s = client->par_hdr;
@@ -2898,8 +2968,12 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
                 s->flush_idx, seg->count,
                 seg->start_height + 1, seg->stop_height);
 
-        uint32_t bad = 0;
-        for (uint32_t j = 0; j < seg->count; j++) {
+        /* Check the work behind the checkpoint header before writing any of
+         * this segment. A failure takes the same recovery path as a connect
+         * failure below: nothing is committed, the segment is dropped and
+         * re-requested, usually from a different peer. */
+        uint32_t bad = par_hdr_verify_tail(client, seg, s->flush_idx) ? 0 : 1;
+        for (uint32_t j = 0; !bad && j < seg->count; j++) {
             struct const_buffer cbuf = {
                 (const void *)(seg->buf + (size_t)j * PAR_HDR_RAW_LEN),
                 PAR_HDR_RAW_LEN
@@ -2963,6 +3037,9 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
             seg->buf   = NULL;
             seg->cap   = 0;
             seg->count = 0;
+            dogecoin_free(seg->tail_raw);
+            seg->tail_raw = NULL;
+            seg->tail_len = 0;
 
             if (hdb && hdb->chaintip) {
                 memcpy(seg->tip_hash, hdb->chaintip->hash, DOGECOIN_HASH_LENGTH);
@@ -3029,6 +3106,9 @@ static uint32_t par_hdr_flush(dogecoin_spv_client *client)
         dogecoin_free(seg->buf);
         seg->buf = NULL;
         seg->cap = 0;
+        dogecoin_free(seg->tail_raw);
+        seg->tail_raw = NULL;
+        seg->tail_len = 0;
     }
 
     if (hdb) {
@@ -3171,6 +3251,10 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
     for (uint32_t i = 0; i < count; i++) {
         if (buf->len < PAR_HDR_RAW_LEN) break;
 
+        /* Start of this header's whole wire record, kept so the segment's last
+         * header can be retained with its AuxPoW proof attached. */
+        const uint8_t *rec_start = (const uint8_t *)buf->p;
+
         /* Peek at version to detect AUXPoW (wire format: little-endian int32) */
         uint32_t wire_ver;
         memcpy(&wire_ver, buf->p, 4);
@@ -3218,8 +3302,27 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         seg->tip_height++;
         seg->count++;
 
-        /* skip tx_count varint (always 0x00 in headers messages) */
-        if (buf->len > 0) { buf->p = (const uint8_t *)buf->p + 1; buf->len--; }
+        /* Retain the whole record for the header that lands on the checkpoint.
+         * par_hdr_flush verifies its proof of work before writing any of the
+         * segment, and for a merge-mined header that needs the AuxPoW blob,
+         * which buf does not carry. Do it before the tx_count varint is
+         * consumed so the span is exactly the header record. */
+        if (seg->tip_height == seg->stop_height) {
+            size_t rec_len = (size_t)((const uint8_t *)buf->p - rec_start);
+            dogecoin_free(seg->tail_raw);
+            seg->tail_raw = dogecoin_malloc(rec_len);
+            memcpy(seg->tail_raw, rec_start, rec_len);
+            seg->tail_len = (uint32_t)rec_len;
+        }
+
+        /* Consume the per-header transaction count. A headers message carries
+         * one after every header and it is always zero, so a 1-byte skip is
+         * correct in practice -- but the wire type is a varint, and saying so
+         * in code rather than in a comment means a peer that encodes the zero
+         * non-minimally desynchronises the parse loudly here instead of
+         * silently one byte into the next header. */
+        uint32_t tx_count = 0;
+        if (!deser_varlen(&tx_count, buf)) break;
     }
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
@@ -3270,6 +3373,9 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
             seg->buf   = NULL;
             seg->cap   = 0;
             seg->count = 0;
+            dogecoin_free(seg->tail_raw);
+            seg->tail_raw = NULL;
+            seg->tail_len = 0;
 
             /* Resume from the primary DB if it is already inside this segment
              * -- that only happens when an earlier flush failed partway and
@@ -3655,8 +3761,10 @@ LIBDOGECOIN_API void par_hdr_free(dogecoin_spv_client *client)
 {
     if (!client || !client->par_hdr) return;
     par_hdr_state *s = client->par_hdr;
-    for (uint32_t i = 0; i < s->num_segs; i++)
+    for (uint32_t i = 0; i < s->num_segs; i++) {
         dogecoin_free(s->segs[i].buf);
+        dogecoin_free(s->segs[i].tail_raw);
+    }
     dogecoin_free(s->segs);
     dogecoin_free(s);
     client->par_hdr = NULL;
