@@ -27,6 +27,7 @@
 */
 
 #include <dogecoin/protocol.h>
+#include <dogecoin/random.h>
 #include <dogecoin/hash.h>
 #include <dogecoin/portable_endian.h>
 #include <dogecoin/buffer.h>
@@ -219,7 +220,19 @@ void dogecoin_p2p_msg_version_init(dogecoin_p2p_version_msg* msg, const dogecoin
         msg->addr_from = *addrFrom;
     else
         dogecoin_p2p_address_init(&msg->addr_from);
-    dogecoin_cheap_random_bytes((uint8_t*)&msg->nonce, sizeof(msg->nonce));
+    /* The version nonce is how a node recognises a connection to itself: it
+       compares an inbound nonce against the ones it has sent. A predictable
+       sequence makes two distinct nodes look like one, so this wants real
+       randomness even though the value is public.
+
+       This function is void and exported, so it cannot report the failure.
+       Zero is the fallback: it means two nodes that both failed will mistake
+       each other for themselves and not connect. That is a poor outcome and a
+       small one -- a node whose RNG is unavailable cannot generate keys either,
+       so it has already lost -- and it is confined to nodes in that state. */
+    if (!dogecoin_random_bytes((uint8_t*)&msg->nonce, sizeof(msg->nonce), 0)) {
+        msg->nonce = 0;
+    }
     if (strSubVer && strlen(strSubVer) < 128)
         memcpy_safe(msg->useragent, strSubVer, strlen(strSubVer));
 

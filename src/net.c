@@ -66,6 +66,7 @@
 #include <dogecoin/hash.h>
 #include <dogecoin/net.h>
 #include <dogecoin/compact_block.h>
+#include <dogecoin/random.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/utils.h>
@@ -286,7 +287,15 @@ void node_periodical_timer(int fd, short int event, void* ctx)
     time plus the ping interval. */
     if (((node->state & NODE_CONNECTED) == NODE_CONNECTED) && node->lastping + DOGECOIN_PING_INTERVAL_S < now) {
         uint64_t nonce;
-        dogecoin_cheap_random_bytes((uint8_t*)&nonce, sizeof(nonce));
+        /* A ping nonce only has to match the pong that answers it, so this
+           does not need to be unguessable -- but there is no reason to reach
+           for a second, weaker generator to say so, and the one that was here
+           produced a fixed sequence under OP-TEE. Skip the ping rather than
+           send a predictable one if the RNG is unavailable; the next interval
+           will try again. */
+        if (!dogecoin_random_bytes((uint8_t*)&nonce, sizeof(nonce), 0)) {
+            return;
+        }
         cstring* pingmsg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_PING, &nonce, sizeof(nonce));
         dogecoin_node_send(node, pingmsg);
         cstr_free(pingmsg, true);

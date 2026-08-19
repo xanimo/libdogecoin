@@ -527,24 +527,6 @@ void* safe_malloc(size_t size)
     }
 
 
-/**
- * @brief This function generates a buffer of random bytes.
- *
- * @param buf The buffer to store the random data.
- * @param len The number of random bytes to generate.
- *
- * @return Nothing.
- */
-    void dogecoin_cheap_random_bytes(uint8_t* buf, size_t len)
-    {
-#ifndef USE_OPTEE // OPTEE has its own secure random number generator
-    srand(time(NULL)); // insecure
-#endif
-    for (size_t i = 0; i < len; i++) {
-        buf[i] = rand(); // weak non secure cryptographic rng
-        }
-    }
-
 
 /**
  * @brief This function takes a path variable and appends
