@@ -18,25 +18,8 @@ check_tools() {
 
 check_tools ar
 
-git_root() {
-    git rev-parse --show-toplevel 2> /dev/null
-}
-
-same_dir() {
-    local resolved1 resolved2
-    resolved1="$(git_root)"
-    resolved2="$(echo `pwd`)"
-    [ "$resolved1" = "$resolved2" ]
-}
-
-if ! same_dir "${PWD}" "$(git_root)"; then
-cat << EOF
-ERR: This script must be invoked from the top level of the git repository
-Hint: This may look something like:
-    contrib/scripts/combine_lib.sh
-EOF
-exit 1
-fi
+. "$(dirname "$0")/project_root.sh"
+require_project_root "contrib/scripts/pack.sh --host=<target-host-triplet> --prefix=build"
 
 check_error() {
     if [ "$ERROR" ]; then
