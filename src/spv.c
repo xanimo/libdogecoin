@@ -1134,7 +1134,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             time_t t = lasttime;
             struct tm tmv;
             struct tm *p = dogecoin_localtime(&t, &tmv);
-            if (p) strftime(s, sizeof s, "%F %T", p);
+            if (p) strftime(s, sizeof s, "%Y-%m-%d %H:%M:%S", p);
             else s[0] = '\0';
             char *ctime_no_newline;
             ctime_no_newline = strtok(s, "\n");
