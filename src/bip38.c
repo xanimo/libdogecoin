@@ -361,7 +361,7 @@ static dogecoin_bool bip38_ec_derived_key(
         BIP38_SCRYPT_DERIVED_SIZE);
 }
 
-static void bip38_ownerentropy_generate(
+static dogecoin_bool bip38_ownerentropy_generate(
     dogecoin_bool use_lot_sequence,
     uint32_t lot,
     uint32_t sequence,
@@ -369,14 +369,19 @@ static void bip38_ownerentropy_generate(
 {
     if (use_lot_sequence) {
         uint32_t lotsequence = lot * 4096u + sequence;
-        dogecoin_random_bytes(ownerentropy_out, 4, 1);
+        if (!dogecoin_random_bytes(ownerentropy_out, 4, 1)) {
+            return false;
+        }
         ownerentropy_out[4] = (uint8_t)((lotsequence >> 24) & 0xff);
         ownerentropy_out[5] = (uint8_t)((lotsequence >> 16) & 0xff);
         ownerentropy_out[6] = (uint8_t)((lotsequence >> 8) & 0xff);
         ownerentropy_out[7] = (uint8_t)(lotsequence & 0xff);
     } else {
-        dogecoin_random_bytes(ownerentropy_out, 8, 1);
+        if (!dogecoin_random_bytes(ownerentropy_out, 8, 1)) {
+            return false;
+        }
     }
+    return true;
 }
 
 static dogecoin_bool bip38_parse_intermediate_code(
@@ -1182,8 +1187,17 @@ void dogecoin_bip38_generate_lot_sequence(
         return;
     }
 
-    dogecoin_random_bytes((uint8_t*)&lot_raw, sizeof(lot_raw), 1);
-    dogecoin_random_bytes((uint8_t*)&sequence_raw, sizeof(sequence_raw), 1);
+    /* This is LIBDOGECOIN_API and returns void, so it cannot report failure
+       directly without breaking the signature. Emit lot 0 instead: every
+       caller of these values already rejects it (`lot == 0` at the top of both
+       encrypt paths), so an RNG failure surfaces there rather than producing a
+       lot and sequence derived from an unwritten buffer. */
+    if (!dogecoin_random_bytes((uint8_t*)&lot_raw, sizeof(lot_raw), 1)
+        || !dogecoin_random_bytes((uint8_t*)&sequence_raw, sizeof(sequence_raw), 1)) {
+        *lot_out = 0;
+        *sequence_out = 0;
+        return;
+    }
     *lot_out = (lot_raw % BIP38_LOT_MAX) + 1u;
     *sequence_out = sequence_raw % (BIP38_SEQUENCE_MAX + 1u);
 }
@@ -1352,7 +1366,9 @@ static dogecoin_bool bip38_encrypt_ec_with_passphrase(
     if (ownerentropy_override) {
         memcpy(ownerentropy, ownerentropy_override, 8);
     } else {
-        bip38_ownerentropy_generate(use_lot_sequence, lot, sequence, ownerentropy);
+        if (!bip38_ownerentropy_generate(use_lot_sequence, lot, sequence, ownerentropy)) {
+            return false;
+        }
     }
 
     if (!bip38_derive_passfactor(passphrase, ownerentropy, use_lot_sequence, passfactor)) {
@@ -1364,8 +1380,12 @@ static dogecoin_bool bip38_encrypt_ec_with_passphrase(
 
     if (seedb_override) {
         memcpy(seedb, seedb_override, BIP38_SEEDB_LEN);
-    } else {
-        dogecoin_random_bytes(seedb, BIP38_SEEDB_LEN, 1);
+    } else if (!dogecoin_random_bytes(seedb, BIP38_SEEDB_LEN, 1)) {
+        /* seedb derives factorb, and the private key is passfactor * factorb
+           mod N. Continuing here would mint a key from whatever the RNG left
+           in the buffer. */
+        dogecoin_mem_zero(seedb, BIP38_SEEDB_LEN);
+        return false;
     }
 
     chain = bip38_chain_from_address_hint(address_hint);
@@ -1417,7 +1437,9 @@ dogecoin_bool dogecoin_bip38_generate_intermediate_code(
     if (ownerentropy_override) {
         memcpy(ownerentropy, ownerentropy_override, 8);
     } else {
-        bip38_ownerentropy_generate(use_lot_sequence, lot, sequence, ownerentropy);
+        if (!bip38_ownerentropy_generate(use_lot_sequence, lot, sequence, ownerentropy)) {
+            return false;
+        }
     }
 
     if (!bip38_derive_passfactor(passphrase, ownerentropy, use_lot_sequence, passfactor)) {
@@ -1470,8 +1492,12 @@ dogecoin_bool dogecoin_bip38_encrypt_from_intermediate(
 
     if (seedb_override) {
         memcpy(seedb, seedb_override, BIP38_SEEDB_LEN);
-    } else {
-        dogecoin_random_bytes(seedb, BIP38_SEEDB_LEN, 1);
+    } else if (!dogecoin_random_bytes(seedb, BIP38_SEEDB_LEN, 1)) {
+        /* seedb derives factorb, and the private key is passfactor * factorb
+           mod N. Continuing here would mint a key from whatever the RNG left
+           in the buffer. */
+        dogecoin_mem_zero(seedb, BIP38_SEEDB_LEN);
+        return false;
     }
 
     chain = bip38_chain_from_address_hint(address_chain_hint);

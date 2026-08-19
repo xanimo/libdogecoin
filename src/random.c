@@ -274,7 +274,15 @@ void random_seed(struct fast_random_context* this)
     dogecoin_random_init();
     uint256_t seed;
     dogecoin_mem_zero(seed, 32);
-    dogecoin_random_bytes(seed, 32, 0);
+    if (!dogecoin_random_bytes(seed, 32, 0)) {
+        /* random_seed is reached through a void function pointer in
+           fast_random_context, so it cannot report failure without changing
+           that interface. Leave requires_seed set and do not key the RNG: a
+           later call re-enters here and tries again, rather than the context
+           coming up keyed with an all-zero seed and looking ready. */
+        dogecoin_mem_zero(seed, 32);
+        return;
+    }
     this->rng->setkey(this->rng, seed, 32);
     this->requires_seed = false;
 }

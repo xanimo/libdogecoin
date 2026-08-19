@@ -672,13 +672,16 @@ static void sphincs_shake_128f_commit_bench(benchmark_context *ctx) {
 
 /* ---- secp256k1 via ECC module (no direct secp includes) ---- */
 
-static void make_valid_privkey(uint8_t sk[32]) {
+static dogecoin_bool make_valid_privkey(uint8_t sk[32]) {
     /* try random bytes until valid */
     while (1) {
-        dogecoin_random_bytes(sk, 32, 0);
-        if (dogecoin_ecc_verify_privatekey(sk)) return;
+        if (!dogecoin_random_bytes(sk, 32, 0)) {
+            dogecoin_mem_zero(sk, 32);
+            return false;
+        }
+        if (dogecoin_ecc_verify_privatekey(sk)) return true;
         sk[0] ^= 0x01; /* nudge */
-        if (dogecoin_ecc_verify_privatekey(sk)) return;
+        if (dogecoin_ecc_verify_privatekey(sk)) return true;
     }
 }
 
@@ -688,7 +691,7 @@ static void make_msg32(const uint8_t *src, uint8_t out32[32]) {
 
 static void secp_keypair_bench(benchmark_context *ctx) {
     /* keypair = generate priv + derive compressed pub */
-    uint8_t sk[32]; make_valid_privkey(sk);
+    uint8_t sk[32]; if (!make_valid_privkey(sk)) return;
     uint8_t pk[33]; size_t pklen = 33;
     dogecoin_ecc_get_pubkey(sk, pk, &pklen, true);
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
@@ -699,7 +702,7 @@ static void secp_sign_bench(benchmark_context *ctx) {
     /* reuse one key for stable sign throughput */
     static int primed = 0;
     static uint8_t sk[32];
-    if (!primed) { make_valid_privkey(sk); primed = 1; }
+    if (!primed) { if (!make_valid_privkey(sk)) return; primed = 1; }
 
     uint8_t msg32[32]; make_msg32(ctx->input, msg32);
     uint256_t msg_hash; memcpy(msg_hash, msg32, 32);
@@ -718,7 +721,7 @@ static void secp_verify_bench(benchmark_context *ctx) {
     static unsigned char sigder[80]; static size_t siglen = 0;
 
     if (!primed) {
-        uint8_t sk[32]; make_valid_privkey(sk);
+        uint8_t sk[32]; if (!make_valid_privkey(sk)) return;
         pklen = 33; dogecoin_ecc_get_pubkey(sk, pk, &pklen, true);
         make_msg32(ctx->input, msg32);
         memcpy(msg_hash, msg32, 32);
