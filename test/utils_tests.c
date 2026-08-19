@@ -346,3 +346,42 @@ void test_utils_fopen_private()
 #endif /* _WIN32 */
 }
 
+/*
+ * localtime() and ctime() hand back a pointer into one static buffer shared
+ * with gmtime() and asctime(), so a second call clobbers the first caller's
+ * result. dogecoin_localtime() and dogecoin_ctime() write into caller storage.
+ * The aliasing is what the test pins: two conversions must survive each other.
+ */
+void test_utils_reentrant_time()
+{
+    time_t a = 1000000000; /* 2001-09-09T01:46:40Z */
+    time_t b = 1600000000; /* 2020-09-13T12:26:40Z */
+    struct tm ta, tb;
+
+    /* Both conversions must hold: the second must not overwrite the first.
+       Compared field by field rather than through strftime, which is the CRT's
+       behaviour and not what this is testing. */
+    u_assert_int_eq(dogecoin_localtime(&a, &ta) != NULL, 1);
+    u_assert_int_eq(dogecoin_localtime(&b, &tb) != NULL, 1);
+    u_assert_int_eq(ta.tm_year + 1900, 2001);
+    u_assert_int_eq(tb.tm_year + 1900, 2020);
+
+    /* Same for the ctime form, including that it does not disturb the tm above. */
+    char ca[DOGECOIN_CTIME_LEN] = {0}, cb[DOGECOIN_CTIME_LEN] = {0};
+    u_assert_int_eq(dogecoin_ctime(&a, ca, sizeof(ca)) != NULL, 1);
+    u_assert_int_eq(dogecoin_ctime(&b, cb, sizeof(cb)) != NULL, 1);
+    u_assert_int_eq(strcmp(ca, cb) != 0, 1);
+    u_assert_int_eq(ta.tm_year + 1900, 2001);
+
+    /* ctime's contract is a 26-byte buffer; anything smaller is refused
+       rather than overrun. */
+    char tiny[8] = {0};
+    u_assert_int_eq(dogecoin_ctime(&a, tiny, sizeof(tiny)) == NULL, 1);
+    u_assert_int_eq(tiny[0], 0);
+
+    /* NULL arguments are refused rather than dereferenced. */
+    u_assert_int_eq(dogecoin_localtime(NULL, &ta) == NULL, 1);
+    u_assert_int_eq(dogecoin_localtime(&a, NULL) == NULL, 1);
+    u_assert_int_eq(dogecoin_ctime(NULL, ca, sizeof(ca)) == NULL, 1);
+    u_assert_int_eq(dogecoin_ctime(&a, NULL, DOGECOIN_CTIME_LEN) == NULL, 1);
+}

@@ -1132,8 +1132,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             time_t lasttime = pindex->header.timestamp;
             char s[1000];
             time_t t = lasttime;
-            struct tm *p = localtime(&t);
-            strftime(s, sizeof s, "%F %T", p);
+            struct tm tmv;
+            struct tm *p = dogecoin_localtime(&t, &tmv);
+            if (p) strftime(s, sizeof s, "%F %T", p);
+            else s[0] = '\0';
             char *ctime_no_newline;
             ctime_no_newline = strtok(s, "\n");
             printf("%s|%d|%s|%d\n", hash_to_string(pindex->hash), pindex->height, ctime_no_newline, hdr->data_len);
@@ -1791,7 +1793,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (amount_of_headers == MAX_HEADERS_RESULTS && ((node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC))
         {
             time_t lasttime = chaintip->header.timestamp;
-            client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, ctime(&lasttime));
+            char lasttime_str[DOGECOIN_CTIME_LEN] = {0};
+            dogecoin_ctime(&lasttime, lasttime_str, sizeof lasttime_str);
+            client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, lasttime_str);
             dogecoin_net_spv_node_request_headers_or_blocks(node, false);
         }
     }

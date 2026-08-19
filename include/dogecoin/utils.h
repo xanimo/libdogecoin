@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <dogecoin/cstr.h>
 #include <dogecoin/dogecoin.h>
@@ -87,6 +88,40 @@ LIBDOGECOIN_API void print_bits(size_t const size, void const* ptr);
 LIBDOGECOIN_API void prepend(char* s, const char* t);
 LIBDOGECOIN_API void append(char* s, char* t);
 LIBDOGECOIN_API char* concat(char* prefix, char* suffix);
+
+/* Reentrant time formatting. localtime() and ctime() return pointers into one
+   static buffer shared with gmtime() and asctime(), so two threads formatting a
+   time at once corrupt each other's result, and any later call overwrites a
+   pointer the caller still holds. Both are used from network callbacks here.
+
+   Write into caller storage instead. Return the output on success, NULL on
+   failure. DOGECOIN_CTIME_LEN is the size ctime() is specified to need. */
+#define DOGECOIN_CTIME_LEN 26
+
+/* Inline so the reference to the platform call lands only in translation units
+   that format a time. The OP-TEE trusted application links utils.o for other
+   helpers and its libc has no localtime_r, so a definition there would break
+   that link over a function the TA never calls. */
+static inline struct tm* dogecoin_localtime(const time_t* timer, struct tm* out)
+{
+    if (!timer || !out) return NULL;
+#if defined(_WIN32) || defined(WIN32)
+    return localtime_s(out, timer) == 0 ? out : NULL;
+#else
+    return localtime_r(timer, out);
+#endif
+}
+
+static inline char* dogecoin_ctime(const time_t* timer, char* buf, size_t buflen)
+{
+    if (!timer || !buf || buflen < DOGECOIN_CTIME_LEN) return NULL;
+#if defined(_WIN32) || defined(WIN32)
+    return ctime_s(buf, buflen, timer) == 0 ? buf : NULL;
+#else
+    return ctime_r(timer, buf);
+#endif
+}
+
 /* Copy str[start, end) into result, NUL-terminated. result must have room for
    (end - start) + 1 bytes -- the function takes no size for it. Yields an empty
    string if end <= start or start is past the end of str. */

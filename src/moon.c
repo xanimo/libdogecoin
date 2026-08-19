@@ -27,6 +27,8 @@
 #include <string.h>
 #include <time.h>
 
+#include <dogecoin/utils.h>
+
 /**
  * @brief Calling the moon, it returns the current moon phase
  * @return moon icon
@@ -38,7 +40,8 @@ char* moon()
   double jd;                      // Julian days
 
   time_t t = time(NULL);          // get time
-  struct tm tm = *localtime(&t);  // get localtime
+  struct tm tm;                   // get localtime
+  if (!dogecoin_localtime(&t, &tm)) return "";
   int y = tm.tm_year + 1900;      // year, because its only above 1900, we add 1900 to the year
   int m = tm.tm_mon;              // month
   int d = tm.tm_mday - 2;         // day, because it can show the moon with 2 days in advance, we subtract
