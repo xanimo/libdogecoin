@@ -766,6 +766,17 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
     dogecoin_blockindex *pindex = client->headers_db->getchaintip(client->headers_db_ctx);
     client->nodegroup->log_write_cb("Statecheck: amount of connected nodes: %d\nchaintip hash: %s\nchaintip height: %d\n", dogecoin_node_group_amount_of_connected_nodes(client->nodegroup, NODE_CONNECTED), hash_to_string(pindex->hash), pindex->height);
 
+    /* Segments flush in order, so the chaintip does not move until the lowest
+       one lands: on a fresh parallel sync the line above reads height 0 for
+       minutes while every peer is busy, which is indistinguishable from a
+       stall. Report the staging progress that is actually moving. */
+    if (client->par_hdr && client->par_hdr->active) {
+        client->nodegroup->log_write_cb(
+            "par-hdr: segment %u of %u flushed, %llu MB staged\n",
+            client->par_hdr->flush_idx, client->par_hdr->num_segs,
+            (unsigned long long)(client->par_hdr->buffered_bytes / (1024 * 1024)));
+    }
+
     if (client->last_headersrequest_time > 0 && *now > client->last_headersrequest_time)
     {
         int64_t timedetla = *now - client->last_headersrequest_time;
