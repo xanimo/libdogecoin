@@ -775,7 +775,7 @@ dogecoin_bool dogecoin_block_merkle_root(dogecoin_tx** txs, size_t txs_count,
         }
         dogecoin_tx_hash(txs[i], leaves[i]);
     }
-    dogecoin_compute_merkle_root(leaves, txs_count, root_out, mutated_out);
+    dogecoin_compute_merkle_root((const uint256_t*)leaves, txs_count, root_out, mutated_out);
     dogecoin_free(leaves);
     return true;
     }

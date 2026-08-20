@@ -26,10 +26,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <dogecoin/bip38.h>
-
-#ifndef __LIBDOGECOIN_TX_H__
-typedef struct dogecoin_tx_ dogecoin_tx;
-#endif
+#include <dogecoin/tx.h>
 
 /* Sweep APIs use the same transaction object as the rest of libdogecoin. */
 typedef dogecoin_tx dogecoin_transaction;

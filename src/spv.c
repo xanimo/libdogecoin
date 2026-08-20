@@ -3450,7 +3450,7 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
             if (client->nodegroup && client->nodegroup->log_write_cb)
                 client->nodegroup->log_write_cb(
                     "[par-hdr] all segments complete — primary DB height %d [%us elapsed]\n",
-                    tip ? tip->height : -1, spv_elapsed(client));
+                    tip ? (int)tip->height : -1, spv_elapsed(client));
         }
     } else {
         /* More headers needed for this segment */

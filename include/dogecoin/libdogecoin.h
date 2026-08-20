@@ -36,6 +36,7 @@
 #include "dogecoin.h"
 #include "constants.h"
 #include "uthash.h"
+#include "cstr.h"
 
 
 /* Chainparams
@@ -94,9 +95,6 @@ typedef struct dogecoin_context_ {
     int thread_safe; /* nonzero when constructed via dogecoin_ctx_new_ts() (alias in dogecoin.h) */
     char last_error[256];
 } dogecoin_context;
-
-/* forward declarations for opaque types referenced by the PQC and ZK APIs */
-typedef struct cstring cstring;
 
 /* forward declarations for network/SPV node types */
 typedef struct dogecoin_node_ dogecoin_node;

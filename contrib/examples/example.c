@@ -1272,10 +1272,21 @@ int main() {
 
 		// 3. Build an unsigned spending tx via the transaction builder.
 		//    vout=0 makes the input reference prev_tx output at index 0.
-		const char* psbt_dest = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
-		const char* psbt_dummy_txid = "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074";
+		//    Compute the real txid of psbt_prev_tx so the PSBT signer can verify
+		//    the UTXO hash matches the input being signed.
+		//    dogecoin_tx_hash returns raw bytes; add_utxo (via utils_uint256_sethex)
+		//    expects the display/explorer format where bytes are reversed, so reverse
+		//    before converting to hex.
+		uint256_t psbt_prev_txid_raw;
+		dogecoin_tx_hash(psbt_prev_tx, psbt_prev_txid_raw);
+		uint8_t psbt_prev_txid_rev[32];
+		for (int psbt_ri = 0; psbt_ri < 32; psbt_ri++)
+			psbt_prev_txid_rev[psbt_ri] = psbt_prev_txid_raw[31 - psbt_ri];
+		char psbt_real_txid[65];
+		utils_bin_to_hex(psbt_prev_txid_rev, 32, psbt_real_txid);
+		char psbt_dest[] = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
 		int psbt_tix = start_transaction();
-		add_utxo(psbt_tix, psbt_dummy_txid, 0);
+		add_utxo(psbt_tix, psbt_real_txid, 0);
 		add_output(psbt_tix, psbt_dest, "9.9");
 		char* psbt_unsigned_hex = finalize_transaction(psbt_tix, psbt_dest, "0.1", "10", psbt_addr);
 		if (!psbt_unsigned_hex) {

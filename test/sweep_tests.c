@@ -103,7 +103,7 @@ static const bip38_test_vector BIP38_EC_VECTORS[] = {
 /* Test official BIP38 vectors (non-EC multiplied). */
 static void test_bip38_reference_vectors(void)
 {
-    printf("Testing BIP38 reference vectors (non-EC multiplied)...\n");
+    debug_print("%s","Testing BIP38 reference vectors (non-EC multiplied)...\n");
 
     size_t i;
     for (i = 0; i < sizeof(BIP38_NON_EC_VECTORS) / sizeof(BIP38_NON_EC_VECTORS[0]); i++) {
@@ -125,12 +125,12 @@ static void test_bip38_reference_vectors(void)
         u_assert_mem_eq(decrypted_key, expected_priv, DOGECOIN_ECKEY_PKEY_LENGTH);
     }
 
-    printf("  BIP38 reference vector tests passed\n");
+    debug_print("%s","  BIP38 reference vector tests passed\n");
 }
 
 static void test_bip38_ec_reference_vectors(void)
 {
-    printf("Testing BIP38 reference vectors (EC multiplied)...\n");
+    debug_print("%s","Testing BIP38 reference vectors (EC multiplied)...\n");
 
     size_t i;
     for (i = 0; i < sizeof(BIP38_EC_VECTORS) / sizeof(BIP38_EC_VECTORS[0]); i++) {
@@ -152,12 +152,12 @@ static void test_bip38_ec_reference_vectors(void)
         u_assert_mem_eq(decrypted_key, expected_priv, DOGECOIN_ECKEY_PKEY_LENGTH);
     }
 
-    printf("  BIP38 EC reference vector tests passed\n");
+    debug_print("%s","  BIP38 EC reference vector tests passed\n");
 }
 
 static void test_bip38_ec_intermediate_encrypt_roundtrip(void)
 {
-    printf("Testing BIP38 EC intermediate + encrypt roundtrip...\n");
+    debug_print("%s","Testing BIP38 EC intermediate + encrypt roundtrip...\n");
 
     const char* passphrase = "TestingOneTwoThree";
     const char* expected_intermediate =
@@ -192,12 +192,12 @@ static void test_bip38_ec_intermediate_encrypt_roundtrip(void)
     u_assert_true(dogecoin_ecc_verify_privatekey(priv));
     dogecoin_mem_zero(priv, sizeof(priv));
 
-    printf("  BIP38 EC intermediate + encrypt roundtrip tests passed\n");
+    debug_print("%s","  BIP38 EC intermediate + encrypt roundtrip tests passed\n");
 }
 
 static void test_bip38_ec_lot_sequence_vectors(void)
 {
-    printf("Testing BIP38 EC lot/sequence vectors...\n");
+    debug_print("%s","Testing BIP38 EC lot/sequence vectors...\n");
 
     const char* passphrase = "MOLON LABE";
     const char* encrypted =
@@ -267,12 +267,12 @@ static void test_bip38_ec_lot_sequence_vectors(void)
         decrypted_key, &compressed, &lot, &sequence));
 
     dogecoin_mem_zero(decrypted_key, sizeof(decrypted_key));
-    printf("  BIP38 EC lot/sequence vector tests passed\n");
+    debug_print("%s","  BIP38 EC lot/sequence vector tests passed\n");
 }
 
 static void test_bip38_mainnet_wrappers(void)
 {
-    printf("Testing BIP38 mainnet confirm/decrypt_with_lot_sequence wrappers...\n");
+    debug_print("%s","Testing BIP38 mainnet confirm/decrypt_with_lot_sequence wrappers...\n");
 
     /* Non-_ex wrappers use BIP38_ADDRESS_MATCH_MAINNET; generate Dogecoin keys. */
     const char* passphrase = "TestingOneTwoThree";
@@ -325,12 +325,12 @@ static void test_bip38_mainnet_wrappers(void)
     u_assert_uint32_eq(sequence, 7U);
 
     dogecoin_mem_zero(priv, sizeof(priv));
-    printf("  BIP38 mainnet wrapper tests passed\n");
+    debug_print("%s","  BIP38 mainnet wrapper tests passed\n");
 }
 
 static void test_bip38_ec_lot_sequence_greek_vector(void)
 {
-    printf("Testing BIP38 EC lot/sequence (Greek passphrase vector)...\n");
+    debug_print("%s","Testing BIP38 EC lot/sequence (Greek passphrase vector)...\n");
 
     /* BIP-0038 test vector: Greek uppercase ΜΟΛΩΝ ΛΑΒΕ (UTF-8). */
     const char* passphrase = "\xCE\x9C\xCE\x9F\xCE\x9B\xCE\xA9\xCE\x9D \xCE\x9B\xCE\x91\xCE\x92\xCE\x95";
@@ -367,12 +367,12 @@ static void test_bip38_ec_lot_sequence_greek_vector(void)
     u_assert_true(dogecoin_bip38_is_confirmation_code(confirmation));
 
     dogecoin_mem_zero(decrypted_key, sizeof(decrypted_key));
-    printf("  BIP38 EC Greek lot/sequence vector tests passed\n");
+    debug_print("%s","  BIP38 EC Greek lot/sequence vector tests passed\n");
 }
 
 static void test_bip38_nfc_passphrase_vector(void)
 {
-    printf("Testing BIP38 NFC passphrase vector...\n");
+    debug_print("%s","Testing BIP38 NFC passphrase vector...\n");
 
     /* Decomposed UTF-8 input (includes embedded NUL); scrypt uses NFC per BIP-0038. */
     static const uint8_t decomposed_passphrase[] = {
@@ -421,13 +421,13 @@ static void test_bip38_nfc_passphrase_vector(void)
     dogecoin_privkey_cleanse(&nfc_key);
     dogecoin_pubkey_cleanse(&nfc_pub);
     dogecoin_mem_zero(decrypted_key, sizeof(decrypted_key));
-    printf("  BIP38 NFC passphrase vector tests passed\n");
+    debug_print("%s","  BIP38 NFC passphrase vector tests passed\n");
 }
 
 /* Test paper wallet creation and validation */
 static void test_paper_wallet_creation(void)
 {
-    printf("Testing paper wallet creation...\n");
+    debug_print("%s","Testing paper wallet creation...\n");
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
@@ -448,7 +448,7 @@ static void test_paper_wallet_creation(void)
     char address[P2PKHLEN];
     result = dogecoin_paper_wallet_get_address(wallet1, address, sizeof(address));
     u_assert_true(result);
-    printf("  WIF Address: %s\n", address);
+    debug_print("  WIF Address: %s\n", address);
 
     u_assert_true(dogecoin_paper_wallet_is_valid(wallet1));
 
@@ -474,20 +474,20 @@ static void test_paper_wallet_creation(void)
 
     result = dogecoin_paper_wallet_get_address(wallet2, address, sizeof(address));
     u_assert_true(result);
-    printf("  Hex Address: %s\n", address);
+    debug_print("  Hex Address: %s\n", address);
 
     u_assert_true(dogecoin_paper_wallet_is_valid(wallet2));
 
     dogecoin_paper_wallet_free(wallet2);
 
     sweep_test_cleanup_transactions();
-    printf("  Paper wallet creation tests passed\n");
+    debug_print("%s","  Paper wallet creation tests passed\n");
 }
 
 /* Test BIP38 encryption/decryption */
 static void test_bip38_encryption(void)
 {
-    printf("Testing BIP38 encryption/decryption...\n");
+    debug_print("%s","Testing BIP38 encryption/decryption...\n");
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
@@ -499,7 +499,7 @@ static void test_bip38_encryption(void)
 
     char address[P2PKHLEN];
     dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, address);
-    printf("  Test address: %s\n", address);
+    debug_print("  Test address: %s\n", address);
 
     char encrypted_key[BIP38_ENCRYPTED_KEY_LENGTH + 1];
     size_t encrypted_size = sizeof(encrypted_key);
@@ -514,7 +514,7 @@ static void test_bip38_encryption(void)
         &encrypted_size
     );
     u_assert_true(result);
-    printf("  Encrypted key: %s\n", encrypted_key);
+    debug_print("  Encrypted key: %s\n", encrypted_key);
 
     result = dogecoin_bip38_is_valid(encrypted_key);
     u_assert_true(result);
@@ -542,13 +542,13 @@ static void test_bip38_encryption(void)
 
     dogecoin_paper_wallet_free(wallet);
 
-    printf("  BIP38 encryption/decryption tests passed\n");
+    debug_print("%s","  BIP38 encryption/decryption tests passed\n");
 }
 
 /* Test sweep options */
 static void test_sweep_options(void)
 {
-    printf("Testing sweep options...\n");
+    debug_print("%s","Testing sweep options...\n");
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
@@ -576,13 +576,13 @@ static void test_sweep_options(void)
 
     dogecoin_sweep_options_free(options);
 
-    printf("  Sweep options tests passed\n");
+    debug_print("%s","  Sweep options tests passed\n");
 }
 
 /* Test sweep result */
 static void test_sweep_result(void)
 {
-    printf("Testing sweep result...\n");
+    debug_print("%s","Testing sweep result...\n");
 
     dogecoin_sweep_result* result = dogecoin_sweep_result_new();
     u_assert_not_null(result);
@@ -614,13 +614,13 @@ static void test_sweep_result(void)
 
     dogecoin_sweep_result_free(result);
 
-    printf("  Sweep result tests passed\n");
+    debug_print("%s","  Sweep result tests passed\n");
 }
 
 /* Test paper wallet private key extraction */
 static void test_paper_wallet_private_key_extraction(void)
 {
-    printf("Testing paper wallet private key extraction...\n");
+    debug_print("%s","Testing paper wallet private key extraction...\n");
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
@@ -665,13 +665,13 @@ static void test_paper_wallet_private_key_extraction(void)
 
     dogecoin_paper_wallet_free(wallet2);
 
-    printf("  Paper wallet private key extraction tests passed\n");
+    debug_print("%s","  Paper wallet private key extraction tests passed\n");
 }
 
 /* Re-set on one wallet object must not leak the prior address buffer. */
 static void test_paper_wallet_reuse(void)
 {
-    printf("Testing paper wallet set_* reuse...\n");
+    debug_print("%s","Testing paper wallet set_* reuse...\n");
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     dogecoin_paper_wallet* wallet = dogecoin_paper_wallet_new();
@@ -703,12 +703,12 @@ static void test_paper_wallet_reuse(void)
     dogecoin_mem_zero(priv, sizeof(priv));
 
     dogecoin_paper_wallet_free(wallet);
-    printf("  Paper wallet reuse tests passed\n");
+    debug_print("%s","  Paper wallet reuse tests passed\n");
 }
 
 static void test_bip38_confirm_interop_testnet(void)
 {
-    printf("Testing BIP38 INTEROP confirm (testnet address hash)...\n");
+    debug_print("%s","Testing BIP38 INTEROP confirm (testnet address hash)...\n");
 
     const char* passphrase = "interop_testnet_confirm";
     char encrypted[BIP38_ENCRYPTED_KEY_LENGTH + 1];
@@ -743,13 +743,13 @@ static void test_bip38_confirm_interop_testnet(void)
     u_assert_true(confirmed_address[0] == 'n' || confirmed_address[0] == 'm');
 
     dogecoin_mem_zero(gen_priv, sizeof(gen_priv));
-    printf("  BIP38 INTEROP confirm testnet tests passed\n");
+    debug_print("%s","  BIP38 INTEROP confirm testnet tests passed\n");
 }
 
 /* Test BIP38 validation */
 static void test_bip38_validation(void)
 {
-    printf("Testing BIP38 validation...\n");
+    debug_print("%s","Testing BIP38 validation...\n");
 
     u_assert_int_eq((int)dogecoin_bip38_is_valid(NULL), 0);
     u_assert_int_eq((int)dogecoin_bip38_is_valid(""), 0);
@@ -799,12 +799,12 @@ static void test_bip38_validation(void)
         }
     }
 
-    printf("  BIP38 validation tests passed\n");
+    debug_print("%s","  BIP38 validation tests passed\n");
 }
 
 static void test_bip38_negative_cases(void)
 {
-    printf("Testing BIP38 negative cases...\n");
+    debug_print("%s","Testing BIP38 negative cases...\n");
 
     /* Non-EC and EC keys reject a wrong passphrase via address-hash check. */
     const char* non_ec_encrypted = BIP38_NON_EC_VECTORS[0].encrypted;
@@ -875,13 +875,13 @@ static void test_bip38_negative_cases(void)
         }
     }
 
-    printf("  BIP38 negative tests passed\n");
+    debug_print("%s","  BIP38 negative tests passed\n");
 }
 
 /* Test sweep functionality (basic WIF + UTXO setup; signing is covered by transaction tests). */
 static void test_sweep_functionality(void)
 {
-    printf("Testing sweep functionality...\n");
+    debug_print("%s","Testing sweep functionality...\n");
     sweep_test_cleanup_transactions();
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
@@ -1002,12 +1002,12 @@ static void test_sweep_functionality(void)
     dogecoin_paper_wallet_free(wallet);
 
     sweep_test_cleanup_transactions();
-    printf("  Sweep functionality tests passed\n");
+    debug_print("%s","  Sweep functionality tests passed\n");
 }
 
 static void test_bip38_generate_and_sweep(void)
 {
-    printf("Testing BIP38 generate + sweep transaction build...\n");
+    debug_print("%s","Testing BIP38 generate + sweep transaction build...\n");
     sweep_test_cleanup_transactions();
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
@@ -1074,12 +1074,12 @@ static void test_bip38_generate_and_sweep(void)
     dogecoin_pubkey_cleanse(&pubkey);
 
     sweep_test_cleanup_transactions();
-    printf("  BIP38 generate + sweep tests passed (BIP38 + wallet + options)\n");
+    debug_print("%s","  BIP38 generate + sweep tests passed (BIP38 + wallet + options)\n");
 }
 
 static void test_multi_utxo_sweep(void)
 {
-    printf("Testing multi-UTXO sweep (same key)...\n");
+    debug_print("%s","Testing multi-UTXO sweep (same key)...\n");
     sweep_test_cleanup_transactions();
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
@@ -1126,12 +1126,12 @@ static void test_multi_utxo_sweep(void)
     dogecoin_paper_wallet_free(wallet);
 
     sweep_test_cleanup_transactions();
-    printf("  Multi-UTXO sweep tests passed\n");
+    debug_print("%s","  Multi-UTXO sweep tests passed\n");
 }
 
 static void test_multi_wallet_sweep(void)
 {
-    printf("Testing multi-wallet sweep...\n");
+    debug_print("%s","Testing multi-wallet sweep...\n");
     sweep_test_cleanup_transactions();
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
@@ -1239,13 +1239,13 @@ static void test_multi_wallet_sweep(void)
     }
 
     sweep_test_cleanup_transactions();
-    printf("  Multi-wallet sweep tests passed\n");
+    debug_print("%s","  Multi-wallet sweep tests passed\n");
 }
 
 /* Test error handling */
 static void test_rbf_locktime_sweep(void)
 {
-    printf("Testing RBF + locktime sweep...\n");
+    debug_print("%s","Testing RBF + locktime sweep...\n");
     sweep_test_cleanup_transactions();
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
@@ -1285,12 +1285,12 @@ static void test_rbf_locktime_sweep(void)
     dogecoin_sweep_options_free(options);
     dogecoin_paper_wallet_free(wallet);
     sweep_test_cleanup_transactions();
-    printf("  RBF + locktime sweep tests passed\n");
+    debug_print("%s","  RBF + locktime sweep tests passed\n");
 }
 
 static void test_sweep_error_handling(void)
 {
-    printf("Testing error handling...\n");
+    debug_print("%s","Testing error handling...\n");
 
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
@@ -1380,7 +1380,7 @@ static void test_sweep_error_handling(void)
         dogecoin_paper_wallet_free(ok_wallet);
     }
 
-    printf("  Error handling tests passed\n");
+    debug_print("%s","  Error handling tests passed\n");
 }
 
 void test_sweep(void)

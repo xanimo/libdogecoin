@@ -142,7 +142,7 @@ void test_block_merkle_root_edges()
         size_t absurd = (size_t)UINT32_MAX + 1;
         dogecoin_bool m2 = true;
         memset(root, 0xAA, sizeof(root));
-        dogecoin_compute_merkle_root(leaves, absurd, root, &m2);
+        dogecoin_compute_merkle_root((const uint256_t*)leaves, absurd, root, &m2);
         u_assert_true(m2 == false);
         uint256_t zero;
         memset(zero, 0, sizeof(zero));
