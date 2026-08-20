@@ -22,6 +22,7 @@
  OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#include <inttypes.h>
 #include <assert.h>
 #ifdef HAVE_CONFIG_H
 #  include "libdogecoin-config.h"
@@ -192,7 +193,7 @@ dogecoin_bool hd_print_node(const dogecoin_chainparams* chain, const char* nodes
     if (dogecoin_hdnode_has_privkey(&node)) {
         printf("privatekey WIF:      %s\n", privkey_wif);
     }
-    printf("depth:               %d\n", node.depth);
+    printf("depth:               %" PRIu32 "\n", node.depth);
     printf("child index:         %u\n", node.child_num);
     char addr[34 + 1];
     addresses_from_pubkey(&dogecoin_chainparams_main, str, addr);

@@ -2149,7 +2149,7 @@ uint8_t* dogecoin_get_utxos(char* address) {
             if (strncmp(utxo->address, address, strlen(utxo->address))==0 && !is_spent(utxo)) {
                 int utxo_index_length = integer_length(i);
                 char* utxo_index_hex = dogecoin_char_vla(utxo_index_length+1);
-                sprintf(utxo_index_hex, "%d", i);
+                sprintf(utxo_index_hex, "%u", i);
                 // index
                 concat_str = concat(concat_str, utxo_index_hex);
                 char* txid_hex = utils_uint8_to_hex(utxo->txid, 32);

@@ -27,6 +27,7 @@
 
 */
 
+#include <inttypes.h>
 #include <assert.h>
 #include <ctype.h>
 #ifndef _MSC_VER
@@ -1642,7 +1643,7 @@ int main(int argc, char* argv[])
         enum dogecoin_tx_out_type type = dogecoin_script_classify(script, NULL);
         printf("script: %s\n", scripthex);
         printf("script-type: %s\n", dogecoin_tx_out_type_to_str(type));
-        printf("inputindex: %d\n", inputindex);
+        printf("inputindex: %" PRIu32 "\n", inputindex);
         printf("sighashtype: %d\n", sighashtype);
         printf("hash: %s\n", hex);
 
@@ -2445,7 +2446,7 @@ int main(int argc, char* argv[])
                 return showError("Failed to generate wif address from mnemonic\n");
                 }
 
-            printf("Address %d: %s\n", inputindex, hd_pubkey_address);
+            printf("Address %" PRIu32 ": %s\n", inputindex, hd_pubkey_address);
             }
 
         /* clear and free passphrase */

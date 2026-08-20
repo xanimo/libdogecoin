@@ -306,9 +306,9 @@ void print_transaction(dogecoin_tx* x) {
     // parse inputs:
     unsigned int i = 0;
     for (; i < x->vin->len; i++) {
-        printf("block->parent_coinbase->tx_in->i:               %d\n", i);
+        printf("block->parent_coinbase->tx_in->i:               %u\n", i);
         dogecoin_tx_in* tx_in = vector_idx(x->vin, i);
-        printf("block->parent_coinbase->vin->prevout.n:         %d\n", tx_in->prevout.n);
+        printf("block->parent_coinbase->vin->prevout.n:         %" PRIu32 "\n", tx_in->prevout.n);
         char* hex_utxo_txid = utils_uint8_to_hex(tx_in->prevout.hash, sizeof tx_in->prevout.hash);
         printf("block->parent_coinbase->tx_in->prevout.hash:    %s\n", hex_utxo_txid);
         char* script_sig = utils_uint8_to_hex((const uint8_t*)tx_in->script_sig->str, tx_in->script_sig->len);
@@ -320,12 +320,12 @@ void print_transaction(dogecoin_tx* x) {
     // parse outputs:
     i = 0;
     for (; i < x->vout->len; i++) {
-        printf("block->parent_coinbase->tx_out->i:              %d\n", i);
+        printf("block->parent_coinbase->tx_out->i:              %u\n", i);
         dogecoin_tx_out* tx_out = vector_idx(x->vout, i);
         printf("block->parent_coinbase->tx_out->script_pubkey:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
         printf("block->parent_coinbase->tx_out->value:          %" PRId64 "\n", tx_out->value);
     }
-    printf("block->parent_coinbase->locktime:               %d\n", x->locktime);
+    printf("block->parent_coinbase->locktime:               %" PRIu32 "\n", x->locktime);
     cstr_free(tx, true);
 }
 
@@ -346,14 +346,14 @@ void print_parent_header(dogecoin_auxpow_block* block) {
         printf("block->parent_coinbase_merkle[%zu]:               "
                 "%s\n", j, hash_to_string((uint8_t*)block->parent_coinbase_merkle[j]));
     }
-    printf("block->parent_merkle_index:                     %d\n", block->parent_merkle_index);
+    printf("block->parent_merkle_index:                     %" PRIu32 "\n", block->parent_merkle_index);
     printf("block->aux_merkle_count:                        %d\n", block->aux_merkle_count);
     j = 0;
     for (; j < block->aux_merkle_count; j++) {
         printf("block->aux_merkle_branch[%zu]:                    "
                 "%s\n", j, hash_to_string((uint8_t*)block->aux_merkle_branch[j]));
     }
-    printf("block->aux_merkle_index:                        %d\n", block->aux_merkle_index);
+    printf("block->aux_merkle_index:                        %" PRIu32 "\n", block->aux_merkle_index);
     printf("block->parent_header->version:                  %i\n", block->parent_header->version);
     printf("block->parent_header->prev_block:               %s\n", hash_to_string(block->parent_header->prev_block));
     printf("block->parent_header->merkle_root:              %s\n", hash_to_string(block->parent_header->merkle_root));

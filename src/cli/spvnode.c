@@ -292,7 +292,7 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
         time_t timestamp = client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp;
         char tip_time[DOGECOIN_CTIME_LEN] = {0};
         dogecoin_ctime(&timestamp, tip_time, sizeof tip_time);
-        printf("New headers tip height %d from %s\n", newtip->height, tip_time);
+        printf("New headers tip height %" PRIu32 " from %s\n", newtip->height, tip_time);
         }
     return true;
     }
