@@ -388,7 +388,7 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
     //2* (3-byte header + 20-byte hash + 2-byte footer) + 1-byte null terminator
     char* script_hash = dogecoin_malloc(40 + 6 + 4 + 1);
     if (!dogecoin_p2pkh_address_to_pubkey_hash(new_p2pkh_pubkey, script_hash)) return false;
-    free(new_p2pkh_pubkey);
+    dogecoin_free(new_p2pkh_pubkey);
     return script_hash;
 }
 

@@ -990,7 +990,7 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
 
     uint256_t sighash;
     dogecoin_mem_zero(sighash, sizeof(sighash));
-    free(script_data);
+    dogecoin_free(script_data);
 
     dogecoin_tx_sighash(txtmp, script, inputindex, sighashtype, sighash);
 
@@ -1048,7 +1048,7 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
             printf("signed tx too large (max 100 kB)\n");
             cstr_free(signed_tx, true);
             dogecoin_tx_free(txtmp);
-            free(signed_tx_hex);
+            dogecoin_free(signed_tx_hex);
             return false;
         }
         // Overwrite the caller's buffer in place. Copy only the actual signed
@@ -1064,7 +1064,7 @@ int sign_raw_transaction(int inputindex, char* incomingrawtx, char* scripthex, i
         debug_print("signed TX: %s\n", incomingrawtx);
         cstr_free(signed_tx, true);
         dogecoin_tx_free(txtmp);
-        free(signed_tx_hex);
+        dogecoin_free(signed_tx_hex);
     }
     return true;
 }

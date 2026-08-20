@@ -174,7 +174,7 @@ int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size) {
          * paper-wallet sweep work: small fee koinu hit this path and
          * finalize_transaction failed without a proper C string. */
         str[10] = '\0';
-        free(swap);
+        dogecoin_free(swap);
     } else {
         char tmp[KOINU_COINS_STR_MAX_LEN];
         string(koinu, tmp);

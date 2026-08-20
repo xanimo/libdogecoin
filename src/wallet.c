@@ -2026,7 +2026,7 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
                             dogecoin_wallet_addr_free(waddr);
                         }
                     }
-                    free(buf);
+                    dogecoin_free(buf);
                 } else if (rectype == WALLET_DB_REC_TYPE_TX) {
                     /* Bound the record length from the file before allocating;
                        see dogecoin_wallet_load_transaction() for rationale. */

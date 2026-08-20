@@ -264,7 +264,7 @@ static void print_multisig_info(const dogecoin_chainparams* chain, const char* p
         if (strlen(token) != 66) {
             printf("Error: Public keys must be compressed hex (66 chars each)\n");
             vector_free(pubkeys, true);
-            free(pubkeys_input_copy);
+            dogecoin_free(pubkeys_input_copy);
             return;
         }
 
@@ -278,7 +278,7 @@ static void print_multisig_info(const dogecoin_chainparams* chain, const char* p
             printf("Error: Invalid compressed public key in list\n");
             dogecoin_free(pk);
             vector_free(pubkeys, true);
-            free(pubkeys_input_copy);
+            dogecoin_free(pubkeys_input_copy);
             return;
         }
         vector_add(pubkeys, pk);
@@ -290,7 +290,7 @@ static void print_multisig_info(const dogecoin_chainparams* chain, const char* p
         printf("Error: Failed to build multisig redeem script\n");
         cstr_free(redeem_script, true);
         vector_free(pubkeys, true);
-        free(pubkeys_input_copy);
+        dogecoin_free(pubkeys_input_copy);
         return;
     }
 
@@ -305,7 +305,7 @@ static void print_multisig_info(const dogecoin_chainparams* chain, const char* p
         printf("Error: Failed to derive p2sh address from redeem script\n");
         cstr_free(redeem_script, true);
         vector_free(pubkeys, true);
-        free(pubkeys_input_copy);
+        dogecoin_free(pubkeys_input_copy);
         return;
     }
 
@@ -314,7 +314,7 @@ static void print_multisig_info(const dogecoin_chainparams* chain, const char* p
 
     cstr_free(redeem_script, true);
     vector_free(pubkeys, true);
-    free(pubkeys_input_copy);
+    dogecoin_free(pubkeys_input_copy);
 }
 
 void sub_menu(int txindex, int is_testnet) {
@@ -1412,7 +1412,7 @@ int main(int argc, char* argv[])
         /* clean memory */
         dogecoin_mem_zero(pubkey_hex, strlen(pubkey_hex));
         dogecoin_mem_zero(address_p2pkh, strlen(address_p2pkh));
-        free(address_p2pkh);
+        dogecoin_free(address_p2pkh);
         /* Creating a new address from a public key. */
         }
     else if (strcmp(cmd, "p2pkh") == 0) {
@@ -1582,12 +1582,12 @@ int main(int argc, char* argv[])
 
                 if (!hd_derive(chain, pkey, keypathnew, newextkey, sizeof(newextkey)))
                     {
-                    free(keypathnew);
+                    dogecoin_free(keypathnew);
                     return showError("Deriving child key failed\n");
                     }
                 else
                     {
-                    free(keypathnew);
+                    dogecoin_free(keypathnew);
                     hd_print_node(chain, newextkey);
                     }
                 }
@@ -1630,7 +1630,7 @@ int main(int argc, char* argv[])
         uint8_t* script_data = dogecoin_uint8_vla(strlen(scripthex) / 2 + 1);
         utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlen);
         cstring* script = cstr_new_buf(script_data, outlen);
-        free(script_data);
+        dogecoin_free(script_data);
 
         uint256_t sighash;
         dogecoin_mem_zero(sighash, sizeof(sighash));
@@ -1694,7 +1694,7 @@ int main(int argc, char* argv[])
             utils_bin_to_hex((unsigned char*)signed_tx->str, signed_tx->len, signed_tx_hex);
             printf("signed TX: %s\n", signed_tx_hex);
             cstr_free(signed_tx, true);
-            free(signed_tx_hex);
+            dogecoin_free(signed_tx_hex);
             }
         dogecoin_tx_free(tx);
         }
@@ -1926,7 +1926,7 @@ int main(int argc, char* argv[])
         utils_bin_to_hex((unsigned char*)out_tx->str, out_tx->len, out_tx_hex);
         printf("tx with scriptsig set: %s\n", out_tx_hex);
         cstr_free(out_tx, true);
-        free(out_tx_hex);
+        dogecoin_free(out_tx_hex);
         dogecoin_tx_free(tx);
     }
     else if (strcmp(cmd, "pqc_chunk_hex") == 0) {
@@ -1984,7 +1984,7 @@ int main(int argc, char* argv[])
         uint8_t* script_data = dogecoin_uint8_vla(strlen(scripthex) / 2 + 1);
         utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlen);
         cstring* script = cstr_new_buf(script_data, outlen);
-        free(script_data);
+        dogecoin_free(script_data);
 
         uint8_t sighash32[32];
         dogecoin_mem_zero(sighash32, sizeof(sighash32));
@@ -2017,7 +2017,7 @@ int main(int argc, char* argv[])
         char* hexbuf = dogecoin_char_vla(sigderlen * 2 + 1);
         utils_bin_to_hex(sigder, sigderlen, hexbuf);
         printf("DER: %s\n", hexbuf);
-        free(hexbuf);
+        dogecoin_free(hexbuf);
         }
     else if (strcmp(cmd, "bip32maintotest") == 0) { /* Creating a bip32 master key from a private key. */
         dogecoin_hdnode node;
