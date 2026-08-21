@@ -61,6 +61,8 @@ typedef struct dogecoin_node_group_ {
     int desired_amount_connected_nodes;
     const dogecoin_chainparams* chainparams;
     struct evhttp* http_server; /* HTTP server for processing API requests */
+    struct event* maintenance_timer; /* group heartbeat, outlives any single node */
+    dogecoin_bool auto_reconnect;    /* opt in: keep trying to reach the target peer count */
 
     /* callbacks */
     int (*log_write_cb)(const char* format, ...); /* log callback, default=printf */
@@ -80,6 +82,16 @@ enum {
     NODE_CONNECTIONSTATE_ERRORED_TIMEOUT = 101,
 };
 
+/* Peer recovery. Every event in this file belongs to a node and dies with it, so
+   a group that loses its last peer has nothing left to schedule: the loop spins
+   and never reconnects. The group keeps its own timer to survive that, and a
+   failed address becomes eligible again on a doubling backoff rather than being
+   retired for good, which otherwise walks the peer count down to zero one
+   outage at a time. */
+#define DOGECOIN_MAINTENANCE_TIMER_S 10
+#define DOGECOIN_RETRY_BACKOFF_BASE_S 30
+#define DOGECOIN_RETRY_BACKOFF_MAX_S 300
+
 /* basic node structure */
 typedef struct dogecoin_node_ {
     struct sockaddr addr;
@@ -89,6 +101,8 @@ typedef struct dogecoin_node_ {
     int nodeid;
     uint64_t lastping;
     uint64_t time_started_con;
+    uint64_t retry_at;          /* earliest retry after a failure, 0 = eligible now */
+    unsigned int conn_failures; /* consecutive failures, drives the backoff */
     uint64_t time_last_request;
     uint256_t last_requested_inv;
 
@@ -161,6 +175,8 @@ LIBDOGECOIN_API void dogecoin_node_group_add_node(dogecoin_node_group* group, do
 LIBDOGECOIN_API void dogecoin_node_group_event_loop(dogecoin_node_group* group);
 
 /* connect to more nodes */
+LIBDOGECOIN_API void dogecoin_node_arm_retry(dogecoin_node* node);
+LIBDOGECOIN_API void dogecoin_node_group_maintenance(dogecoin_node_group* group);
 LIBDOGECOIN_API dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group);
 
 /* get the amount of connected nodes */
