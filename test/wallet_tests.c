@@ -265,7 +265,7 @@ void test_wallet_malformed_reclen()
     const char* path = "malformed_reclen_tests.wallet";
     unlink(path);
 
-    FILE* f = fopen(path, "wb");
+    FILE* f = dogecoin_fopen_private(path, "wb");
     u_assert_int_eq(f != NULL, 1);
     /* header: magic(4) + version(4, LE = 1) + genesis hash(32) */
     fwrite(hdr_magic, 4, 1, f);
