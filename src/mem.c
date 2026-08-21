@@ -276,14 +276,14 @@ int dogecoin_mem_cmp_ct(const void* a, const void* b, size_t len)
 uint8_t* dogecoin_uint8_vla(size_t size)
 {
     uint8_t* outarray;
-    outarray = (uint8_t*)malloc(size * sizeof(uint8_t));
+    outarray = (uint8_t*)dogecoin_malloc(size * sizeof(uint8_t));
     return outarray;
 }
 
 uint32_t* dogecoin_uint32_vla(size_t size)
 {
     uint32_t* outarray;
-    outarray = (uint32_t*)malloc(size * sizeof(uint32_t));
+    outarray = (uint32_t*)dogecoin_malloc(size * sizeof(uint32_t));
     return outarray;
 }
 
@@ -296,14 +296,17 @@ uint256_t* dogecoin_uint256_vla(size_t size) {
 char* dogecoin_char_vla(size_t size)
 {
     char* outarray;
-    outarray = (char*)malloc(size * sizeof(char));
+    outarray = (char*)dogecoin_malloc(size * sizeof(char));
     return outarray;
 }
 
 char* dogecoin_string_vla(size_t size)
 {
     char* outarray;
-    outarray = (char*)malloc(size + 1 * sizeof(char));
+    outarray = (char*)dogecoin_malloc(size + 1 * sizeof(char));
+    if (outarray == NULL) {
+        return NULL;
+    }
     outarray[size] = '\0';
     return outarray;
 }
@@ -311,20 +314,20 @@ char* dogecoin_string_vla(size_t size)
 unsigned char* dogecoin_uchar_vla(size_t size)
 {
     unsigned char* outarray;
-    outarray = (unsigned char*)malloc(size * sizeof(unsigned char));
+    outarray = (unsigned char*)dogecoin_malloc(size * sizeof(unsigned char));
     return outarray;
 }
 
 unsigned char** dogecoin_ucharptr_vla(size_t size)
 {
     unsigned char** outarray;
-    outarray = (unsigned char**)malloc(size * sizeof(unsigned char*));
+    outarray = (unsigned char**)dogecoin_malloc(size * sizeof(unsigned char*));
     return outarray;
 }
 
 uint8_t** dogecoin_uint8ptr_vla(size_t size)
 {
     uint8_t** outarray;
-    outarray = (uint8_t**)malloc(size * sizeof(uint8_t*));
+    outarray = (uint8_t**)dogecoin_malloc(size * sizeof(uint8_t*));
     return outarray;
 }

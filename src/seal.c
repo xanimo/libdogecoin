@@ -990,7 +990,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, co
     }
 
     // Allocate memory for the encrypted seed
-    pbOutput = (PBYTE)malloc(cbResult);
+    pbOutput = (PBYTE)dogecoin_malloc(cbResult);
     if (!pbOutput)
     {
         fprintf(stderr, "ERROR: Failed to allocate memory for encrypted data\n");
@@ -1145,7 +1145,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_tpm(SEED seed, const in
     fseek(fp, 0, SEEK_SET);
 
     // Allocate memory for the encrypted seed
-    pbOutput = (PBYTE) malloc(fileSize);
+    pbOutput = (PBYTE) dogecoin_malloc(fileSize);
     if (!pbOutput)
     {
         fprintf(stderr, "ERROR: Failed to allocate memory for reading file\n");
@@ -1365,7 +1365,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, con
     // Encrypt the seed using AES
     size_t encrypted_size = size;
     dogecoin_bool padding_used = false;
-    encrypted_seed = malloc(encrypted_size);
+    encrypted_seed = dogecoin_malloc(encrypted_size);
     if (!encrypted_seed)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
@@ -1579,7 +1579,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
 
     // Read the encrypted seed from the file or blob
     size_t encrypted_size = ENCRYPTED_SEED_SIZE;
-    encrypted_seed = malloc(encrypted_size);
+    encrypted_seed = dogecoin_malloc(encrypted_size);
     if (!encrypted_seed)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
@@ -1847,7 +1847,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
     }
 
     // Allocate memory for the encrypted HD node
-    pbResult = (PBYTE)malloc(cbResult);
+    pbResult = (PBYTE)dogecoin_malloc(cbResult);
     if (pbResult == NULL)
     {
         fprintf(stderr, "ERROR: Failed to allocate memory for the encrypted HD node\n");
@@ -2006,7 +2006,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_tpm(dogecoin_hdnode* 
     fseek(fp, 0, SEEK_SET);
 
     // Allocate memory for the encrypted HD node
-    pbOutput = (PBYTE) malloc(fileSize);
+    pbOutput = (PBYTE) dogecoin_malloc(fileSize);
     if (!pbOutput)
     {
         fprintf(stderr, "ERROR: Failed to allocate memory for reading file\n");
@@ -2234,7 +2234,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
     // Encrypt the HD node with AES
     size_t encrypted_size = sizeof(dogecoin_hdnode);
     dogecoin_bool padding_used = false;
-    encrypted_data = malloc(encrypted_size);
+    encrypted_data = dogecoin_malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
@@ -2448,7 +2448,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
 
     // Read the encrypted HD node from the file or blob
     size_t encrypted_size = sizeof(dogecoin_hdnode);
-    encrypted_data = malloc(encrypted_size);
+    encrypted_data = dogecoin_malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
@@ -2729,7 +2729,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     }
 
     // Allocate memory for the encrypted data
-    pbOutput = (PBYTE) malloc(cbResult);
+    pbOutput = (PBYTE) dogecoin_malloc(cbResult);
     if (!pbOutput)
     {
         fprintf(stderr, "ERROR: Failed to allocate memory for encrypted data\n");
@@ -2892,7 +2892,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_tpm(MNEMONIC mnemon
     fseek(fp, 0, SEEK_SET);
 
     // Allocate memory for the encrypted data
-    pbOutput = (PBYTE) malloc(fileSize);
+    pbOutput = (PBYTE) dogecoin_malloc(fileSize);
     if (!pbOutput)
     {
         fprintf(stderr, "ERROR: Failed to allocate memory for reading file\n");
@@ -3120,7 +3120,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONI
 
     size_t encrypted_size = ENCRYPTED_MNEMONIC_SIZE;
     dogecoin_bool padding_used = false;
-    encrypted_data = malloc(encrypted_size);
+    encrypted_data = dogecoin_malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");
@@ -3321,7 +3321,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
 
     // Read the encrypted mnemonic from the file or blob
     size_t encrypted_size = ENCRYPTED_MNEMONIC_SIZE;
-    encrypted_data = malloc(encrypted_size);
+    encrypted_data = dogecoin_malloc(encrypted_size);
     if (!encrypted_data)
     {
         fprintf(stderr, "ERROR: Memory allocation failed.\n");

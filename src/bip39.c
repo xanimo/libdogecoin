@@ -229,7 +229,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
     }
 
     /* create salt, passphrase could be empty string */
-    char *salt = malloc(strlen(passphrase) + 9);
+    char *salt = dogecoin_malloc(strlen(passphrase) + 9);
     if (salt == NULL) {
         fprintf(stderr, "ERROR: Failed to allocate memory for salt\n");
         return -1;
@@ -264,13 +264,13 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         return -1;
     }
 
-    LPWSTR pass_w = malloc((pass_wlen) * sizeof(WCHAR));
+    LPWSTR pass_w = dogecoin_malloc((pass_wlen) * sizeof(WCHAR));
     if (pass_w == NULL) {
         fprintf(stderr, "ERROR: allocating memory for passphrase wide characters\n");
         dogecoin_free(salt);
         return -1;
     }
-    LPWSTR salt_w = malloc((salt_wlen) * sizeof(WCHAR));
+    LPWSTR salt_w = dogecoin_malloc((salt_wlen) * sizeof(WCHAR));
     if (salt_w == NULL) {
         fprintf(stderr, "ERROR: allocating memory for salt wide characters\n");
         dogecoin_free(salt);
@@ -316,7 +316,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         return -1;
     }
 
-    LPWSTR norm_pass = malloc((norm_pass_len) * sizeof(WCHAR));
+    LPWSTR norm_pass = dogecoin_malloc((norm_pass_len) * sizeof(WCHAR));
     if (norm_pass == NULL) {
         fprintf(stderr, "ERROR: allocating memory for normalized passphrase\n");
         dogecoin_free(salt);
@@ -324,7 +324,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         dogecoin_free(salt_w);
         return -1;
     }
-    LPWSTR norm_salt = malloc((norm_salt_len) * sizeof(WCHAR));
+    LPWSTR norm_salt = dogecoin_malloc((norm_salt_len) * sizeof(WCHAR));
     if (norm_salt == NULL) {
         dogecoin_free(salt);
         dogecoin_free(pass_w);
@@ -379,7 +379,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         return -1;
     }
 
-    char* norm_pass_mb = malloc(norm_pass_mb_len * sizeof(char));
+    char* norm_pass_mb = dogecoin_malloc(norm_pass_mb_len * sizeof(char));
     if (norm_pass_mb == NULL) {
         fprintf(stderr, "ERROR: allocating memory for normalized passphrase multi-byte characters\n");
         dogecoin_free(salt);
@@ -389,7 +389,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         dogecoin_free(norm_salt);
         return -1;
     }
-    char* norm_salt_mb = malloc(norm_salt_mb_len * sizeof(char));
+    char* norm_salt_mb = dogecoin_malloc(norm_salt_mb_len * sizeof(char));
     if (norm_salt_mb == NULL) {
         fprintf(stderr, "ERROR: allocating memory for normalized salt multi-byte characters\n");
         dogecoin_free(salt);
@@ -531,7 +531,7 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
            above is bounded, but it keeps the safety argument local to these
            three lines instead of depending on the scanf width further up. */
         wordlen = strlen(word);
-        wordlist[i] = malloc(wordlen + 1);
+        wordlist[i] = dogecoin_malloc(wordlen + 1);
         if (wordlist[i] == NULL) {
             fprintf(stderr, "ERROR: cannot allocate memory\n");
             fclose(fp);
@@ -805,7 +805,7 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
 
     /* make a mutable copy so we can insert '\0' */
     size_t mlen = strlen(mnemonic);
-    char* buf = malloc(mlen + 1);
+    char* buf = dogecoin_malloc(mlen + 1);
     if (!buf) {
         fprintf(stderr, "ERROR: malloc failed for mnemonic copy\n");
         return -1;
@@ -921,7 +921,7 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
     dogecoin_mem_zero(buf, mlen + 1);
     dogecoin_free(bitstr);
     dogecoin_free(entropy);
-    free(buf);
+    dogecoin_free(buf);
     return 0;
 }
 
@@ -1128,7 +1128,7 @@ int generateEnglishMnemonic (const HEX_ENTROPY entropy, const ENTROPY_SIZE size,
 
     /* allocate space for entropy if valid */
     if (entropy) {
-        entropy_out = malloc(sizeof(char) * MAX_ENTROPY_STRING_SIZE);
+        entropy_out = dogecoin_malloc(sizeof(char) * MAX_ENTROPY_STRING_SIZE);
         if (entropy_out == NULL) {
 
             fprintf(stderr, "ERROR: Failed to allocate memory for mnemonic\n");
