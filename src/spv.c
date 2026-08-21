@@ -767,6 +767,17 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
     dogecoin_blockindex *pindex = client->headers_db->getchaintip(client->headers_db_ctx);
     client->nodegroup->log_write_cb("Statecheck: amount of connected nodes: %d\nchaintip hash: %s\nchaintip height: %d\n", dogecoin_node_group_amount_of_connected_nodes(client->nodegroup, NODE_CONNECTED), hash_to_string(pindex->hash), pindex->height);
 
+    /* Segments flush in order, so the chaintip does not move until the lowest
+       one lands: on a fresh parallel sync the line above reads height 0 for
+       minutes while every peer is busy, which is indistinguishable from a
+       stall. Report the staging progress that is actually moving. */
+    if (client->par_hdr && client->par_hdr->active) {
+        client->nodegroup->log_write_cb(
+            "par-hdr: segment %u of %u flushed, %llu MB staged\n",
+            client->par_hdr->flush_idx, client->par_hdr->num_segs,
+            (unsigned long long)(client->par_hdr->buffered_bytes / (1024 * 1024)));
+    }
+
     if (client->last_headersrequest_time > 0 && *now > client->last_headersrequest_time)
     {
         int64_t timedetla = *now - client->last_headersrequest_time;
@@ -3277,7 +3288,16 @@ static void par_hdr_recv(dogecoin_spv_client *client, dogecoin_node *node,
         buf->len -= PAR_HDR_RAW_LEN;
 
         /* For AUXPoW blocks, skip the variable-length chain data */
-        if (is_aux && !par_hdr_skip_auxpow(buf)) break;
+        if (is_aux && !par_hdr_skip_auxpow(buf)) {
+            /* The same correction the deserialize failure below makes: the 80
+               bytes were counted but the header is never staged, and
+               buffered_bytes is what gates segment assignment. Left uncorrected
+               a peer sending one malformed AuxPoW blob per headers message
+               inflates it 80 at a time until it passes PAR_HDR_MAX_BUFFERED,
+               after which no segment but the flush head is ever assigned. */
+            s->buffered_bytes -= PAR_HDR_RAW_LEN;
+            break;
+        }
 
         /* Compute header hash from the buffered 80 bytes */
         dogecoin_block_header hdr;
