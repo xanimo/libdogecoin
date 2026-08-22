@@ -1344,6 +1344,15 @@ jobs:
             --macos-keychain="$HOME/Library/Keychains/build.keychain" \
             --commit=${{ github.ref_name }}
 
+      - name: Notarize Gitian macOS tarballs
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.LIBDOGECOIN_DEV_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.LIBDOGECOIN_DEV_APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY: ${{ secrets.LIBDOGECOIN_DEV_APPLE_API_KEY }}
+        run: |
+          ./contrib/scripts/notarize-macos.sh --path=gitian/builds/${{ github.ref_name }}
+
       - name: Upload signed Gitian artifacts
         uses: actions/upload-artifact@v6
         with:
