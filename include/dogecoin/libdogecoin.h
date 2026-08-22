@@ -237,8 +237,8 @@ dogecoin_bool gen_privatekey(const dogecoin_chainparams* chain, char privkey_wif
 int genPrivkey(const dogecoin_bool is_testnet, char privkey_wif[PRIVKEYWIFLEN], size_t strsize_wif, char privkey_hex[PRIVKEYHEXLEN]);
 
 /* p2pkh utilities */
-/* takes raw scriptPubKey bytes of script_pubkey_hex_length, not a fixed-size hex string */
-dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, size_t script_pubkey_hex_length, char p2pkh[P2PKHLEN], const dogecoin_chainparams* chain);
+/* takes raw scriptPubKey bytes, not hex, and the length varies by script */
+dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey, size_t script_pubkey_len, char p2pkh[P2PKHLEN], const dogecoin_chainparams* chain);
 dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char p2pkh[P2PKHLEN], char scripthash[SCRIPTPUBKEYLEN]);
 char* dogecoin_address_to_pubkey_hash(char p2pkh[P2PKHLEN]);
 char* dogecoin_private_key_wif_to_pubkey_hash(char private_key_wif[PRIVKEYWIFLEN]);
