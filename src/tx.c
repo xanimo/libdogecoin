@@ -1058,7 +1058,7 @@ dogecoin_bool dogecoin_tx_add_puzzle_out(dogecoin_tx* tx, const int64_t amount, 
  * @param tx The pointer to the transaction which will be updated.
  * @param chain The pointer to the chainparams which contain the prefixes for the address types.
  * @param amount The amount that will be sent in the transaction.
- * @param address The address to send coins to, which can be a P2PKH, P2SH, or P2WPKH address.
+ * @param address The address to send coins to, either P2PKH or P2SH.
  *
  * @return 1 if the address was added successfully, 0 otherwise.
  */
@@ -1406,15 +1406,29 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 
 /** This function gets the address from a given scriptPubKey.
  *
- * @param pubkey_hash The hex-encoded P2PKH scriptPubKey, not a bare hash160.
+ * @param script_pubkey_hex The hex-encoded P2PKH scriptPubKey, not a bare hash160.
  * @param is_testnet The pointer to the chainparams which contain the prefixes for the address types.
- * @param p2pkh_address The address to send coins to, which can be a P2PKH, P2SH, or P2WPKH address.
+ * @param p2pkh_address The resulting P2PKH address.
  *
  * @return 1 if the address was added successfully, 0 otherwise.
  */
-int getAddrFromPubkeyHash(const char pubkey_hash[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
-    /* A bare hash160 zero-pads to 25 bytes here and yields a well-formed but wrong
-       address, so reject anything that is not a full scriptPubKey. */
-    if (!pubkey_hash || strlen(pubkey_hash) != SCRIPTPUBKEYLEN - 1) return false;
-    return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
+int getAddrFromScriptPubKey(const char script_pubkey_hex[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
+    if (!script_pubkey_hex || strlen(script_pubkey_hex) != SCRIPTPUBKEYLEN - 1) return false;
+    return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(script_pubkey_hex), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
+}
+
+/** This function gets the address from a given hash160, inverting
+ * dogecoin_address_to_pubkey_hash.
+ *
+ * @param pubkey_hash The hex-encoded hash160, 40 characters.
+ * @param is_testnet The pointer to the chainparams which contain the prefixes for the address types.
+ * @param p2pkh_address The resulting P2PKH address.
+ *
+ * @return 1 if the address was added successfully, 0 otherwise.
+ */
+int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
+    if (!pubkey_hash || strlen(pubkey_hash) != PUBKEYHASHLEN - 1) return false;
+    uint8_t* hash160 = utils_hex_to_uint8(pubkey_hash);
+    if (!hash160) return false;
+    return dogecoin_p2pkh_addr_from_hash160(hash160, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main, p2pkh_address, P2PKHLEN);
 }

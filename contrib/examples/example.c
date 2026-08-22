@@ -757,9 +757,11 @@ int main() {
 		if (pkh_from_addr) {
 			printf("dogecoin_address_to_pubkey_hash: %s\n", pkh_from_addr);
 			char roundtrip[P2PKHLEN];
-			/* takes a scriptPubKey, not the bare hash160 above */
-			if (getAddrFromPubkeyHash(script_hex, false, roundtrip)) {
+			if (getAddrFromPubkeyHash(pkh_from_addr, false, roundtrip)) {
 				printf("getAddrFromPubkeyHash: %s\n", roundtrip);
+			}
+			if (getAddrFromScriptPubKey(script_hex, false, roundtrip)) {
+				printf("getAddrFromScriptPubKey: %s\n", roundtrip);
 			}
 			char p2pkh_from_hash[P2PKHLEN];
 			/* takes raw scriptPubKey bytes, so decode the hex first */
