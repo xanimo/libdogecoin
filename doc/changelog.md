@@ -2,6 +2,30 @@
 
 ## [Released]
 
+## [0.1.5-pre] - 2025-06-27
+## What's Changed
+* merge v0.1.4 into main by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/253
+* ci: updated to 22.04 runner by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/255
+* ci: remove obsolete packages by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/256
+* open 0.1.5-dev for development by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/254
+* ql: updated to v3 by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/257
+* get entropy size instead of default 256 by @joijuke in https://github.com/dogecoinfoundation/libdogecoin/pull/258
+* bip39: updated to verify checksum by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/259
+* tests: added test case for large transactions to transaction_tests.c by @raffecat in https://github.com/dogecoinfoundation/libdogecoin/pull/261
+* utils: updated buffer length for max tx by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/262
+* added TXHEXMAXLEN by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/263
+* transaction: added check, replaced memcpy by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/265
+* transaction: added external buffer functions by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/266
+* transaction: added finalize_transaction_ex by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/267
+* transaction: added wrappers by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/268
+* fixate 0.1.5 pre by @edtubbs in https://github.com/dogecoinfoundation/libdogecoin/pull/269
+
+## New Contributors
+* @raffecat made their first contribution in https://github.com/dogecoinfoundation/libdogecoin/pull/261
+
+**Full Changelog**: https://github.com/dogecoinfoundation/libdogecoin/compare/v0.1.4...v0.1.5-pre
+
+
 ## [0.1.4] - 2025-04-10
 ## What's Changed
 * merge v0.1.3 into main by @xanimo in https://github.com/dogecoinfoundation/libdogecoin/pull/204
