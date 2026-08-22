@@ -595,10 +595,14 @@ void test_transaction()
     // ----------------------------------------------------------------
     // test conversion from p2pkh to script hash and back
 
-    char* res = dogecoin_malloc(40 + 6 + 4 + 1);
+    char* res = dogecoin_malloc(SCRIPTPUBKEYLEN);
     char p2pkh_address[P2PKHLEN];
     u_assert_int_eq(dogecoin_p2pkh_address_to_pubkey_hash(internal_p2pkh_address, res), 1);
     u_assert_str_eq(res, utxo_scriptpubkey);
+
+    /* The declared output size is the contract downstream bindings size from, so
+       exercise it exactly: an allocation of SCRIPTPUBKEYLEN must hold the result. */
+    u_assert_int_eq((int)strlen(res), SCRIPTPUBKEYLEN - 1);
 
     u_assert_true(getAddrFromPubkeyHash(res, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address));
     u_assert_str_eq(p2pkh_address, internal_p2pkh_address);
@@ -609,6 +613,23 @@ void test_transaction()
     u_assert_true(getAddrFromPubkeyHash(res, isTestnetFromB58Prefix(external_p2pkh_address), p2pkh_address));
     u_assert_str_eq(p2pkh_address, external_p2pkh_address);
     dogecoin_free(res);
+
+    /* Same call against a buffer sized from the header, with a guard right behind
+       it, so an over-long write is caught without a sanitizer. */
+    struct { char script[SCRIPTPUBKEYLEN]; unsigned char guard[8]; } bounded;
+    dogecoin_mem_zero(&bounded, sizeof bounded);
+    memset(bounded.guard, 0x7e, sizeof bounded.guard);
+    u_assert_int_eq(dogecoin_p2pkh_address_to_pubkey_hash(internal_p2pkh_address, bounded.script), 1);
+    u_assert_str_eq(bounded.script, utxo_scriptpubkey);
+    size_t g;
+    for (g = 0; g < sizeof bounded.guard; g++) {
+        u_assert_int_eq(bounded.guard[g], 0x7e);
+    }
+
+    /* A bare hash160 used to round-trip to a well-formed but wrong address. */
+    char* hash160 = dogecoin_address_to_pubkey_hash(internal_p2pkh_address);
+    u_assert_int_eq((int)strlen(hash160), PUBKEYHASHLEN - 1);
+    u_assert_int_eq(getAddrFromPubkeyHash(hash160, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address), 0);
 
     // ----------------------------------------------------------------
     // test conversion from private key (wif) to script hash

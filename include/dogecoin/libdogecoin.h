@@ -180,7 +180,7 @@ void dogecoin_ecc_stop(void);
 #define PUBKEYHEXLEN 67
 
 //#define PUBKEYHASHLEN 40 //should be 40 for pubkeyhash.  Internally this is cited as 41 for strings that represent it because +stringterm.
-#define PUBKEYHASHLEN 41
+#define PUBKEYHASHLEN 41 // bare hash160 hex only, not a scriptPubKey
 
 //#define SCRIPTPUBKEYLEN 50 //should be 50 for pubkeyhash.  Internally this is cited as 51 for strings that represent it because +stringterm.
 #define SCRIPTPUBKEYLEN 51
@@ -237,13 +237,14 @@ dogecoin_bool gen_privatekey(const dogecoin_chainparams* chain, char privkey_wif
 int genPrivkey(const dogecoin_bool is_testnet, char privkey_wif[PRIVKEYWIFLEN], size_t strsize_wif, char privkey_hex[PRIVKEYHEXLEN]);
 
 /* p2pkh utilities */
-dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char script_pubkey_hex[PUBKEYHEXLEN], size_t script_pubkey_hex_length, char p2pkh[P2PKHLEN], const dogecoin_chainparams* chain);
-dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char p2pkh[P2PKHLEN], char scripthash[PUBKEYHASHLEN]);
+/* takes raw scriptPubKey bytes of script_pubkey_hex_length, not a fixed-size hex string */
+dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, size_t script_pubkey_hex_length, char p2pkh[P2PKHLEN], const dogecoin_chainparams* chain);
+dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char p2pkh[P2PKHLEN], char scripthash[SCRIPTPUBKEYLEN]);
 char* dogecoin_address_to_pubkey_hash(char p2pkh[P2PKHLEN]);
 char* dogecoin_private_key_wif_to_pubkey_hash(char private_key_wif[PRIVKEYWIFLEN]);
 
-/* generate the p2pkh address from a given pubkey hash */
-int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]);
+/* generate the p2pkh address from a given scriptPubKey hex */
+int getAddrFromPubkeyHash(const char pubkey_hash[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]);
 
 /* privkey utilities */
 typedef struct dogecoin_key_ {

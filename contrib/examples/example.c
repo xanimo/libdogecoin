@@ -757,11 +757,13 @@ int main() {
 		if (pkh_from_addr) {
 			printf("dogecoin_address_to_pubkey_hash: %s\n", pkh_from_addr);
 			char roundtrip[P2PKHLEN];
-			if (getAddrFromPubkeyHash(pkh_from_addr, false, roundtrip)) {
+			/* takes a scriptPubKey, not the bare hash160 above */
+			if (getAddrFromPubkeyHash(script_hex, false, roundtrip)) {
 				printf("getAddrFromPubkeyHash: %s\n", roundtrip);
 			}
 			char p2pkh_from_hash[P2PKHLEN];
-			if (dogecoin_pubkey_hash_to_p2pkh_address(pkh_from_addr, strlen(pkh_from_addr), p2pkh_from_hash, &dogecoin_chainparams_main)) {
+			/* takes raw scriptPubKey bytes, so decode the hex first */
+			if (dogecoin_pubkey_hash_to_p2pkh_address((char*)utils_hex_to_uint8(script_hex), strlen(script_hex) / 2, p2pkh_from_hash, &dogecoin_chainparams_main)) {
 				printf("pubkey_hash_to_p2pkh_address: %s\n", p2pkh_from_hash);
 			}
 		}
