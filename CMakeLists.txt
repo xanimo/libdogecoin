@@ -5,7 +5,31 @@ SET(CMAKE_C_STANDARD 99)
 SET(CMAKE_C_STANDARD_REQUIRED TRUE)
 
 SET(LIBDOGECOIN_NAME dogecoin)
-PROJECT(lib${LIBDOGECOIN_NAME} VERSION "0.1.5")
+
+# Read the version out of configure.ac so it is written down in exactly one
+# place.  PROJECT() only accepts numeric components, so the suffix is carried
+# separately and appended to PACKAGE_VERSION below.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/configure.ac" _configure_ac)
+foreach(_part MAJOR MINOR BUILD)
+  if(NOT _configure_ac MATCHES "define\\(_PKG_VERSION_${_part}, ([0-9]+)\\)")
+    message(FATAL_ERROR "cannot read _PKG_VERSION_${_part} from configure.ac")
+  endif()
+  set(_v_${_part} "${CMAKE_MATCH_1}")
+endforeach()
+if(_configure_ac MATCHES "define\\(_PKG_VERSION_IS_RELEASE, ([a-z]+)\\)" AND CMAKE_MATCH_1 STREQUAL "true")
+  if(_configure_ac MATCHES "define\\(_PKG_VERSION_SUFFIX, \\[([^]]*)\\]\\)")
+    set(_v_SUFFIX "${CMAKE_MATCH_1}")
+  else()
+    set(_v_SUFFIX "")
+  endif()
+else()
+  set(_v_SUFFIX "-dev")
+endif()
+unset(_configure_ac)
+
+PROJECT(lib${LIBDOGECOIN_NAME} VERSION "${_v_MAJOR}.${_v_MINOR}.${_v_BUILD}")
+set(LIBDOGECOIN_VERSION "${PROJECT_VERSION}${_v_SUFFIX}")
+message(STATUS "libdogecoin version: ${LIBDOGECOIN_VERSION}")
 
 option(BUILD_SHARED_LIBS "Build the shared library" OFF)
 if(BUILD_SHARED_LIBS)
@@ -221,7 +245,7 @@ endif()
 
 ADD_DEFINITIONS(
     -DPACKAGE_NAME="${PROJECT_NAME}"
-    -DPACKAGE_VERSION="${PROJECT_VERSION-pre}"
+    -DPACKAGE_VERSION="${LIBDOGECOIN_VERSION}"
     -DRANDOM_DEVICE="${RANDOM_DEVICE}"
 )
 IF(BUILD_SHARED_LIBS)
