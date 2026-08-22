@@ -123,8 +123,9 @@ int main() {
 	char* extout = dogecoin_char_vla(extoutsize);
 	char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
 
+	/* returns a serialized extended key, not an address; see getDerivedHDAddressAsP2PKH below */
 	if (getDerivedHDAddress(masterkey_main_ext, 0, false, 0, extout, true)) {
-		printf("Derived HD Addresses:\n%s\n%s\n\n", extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
+		printf("Derived HD Extended Keys:\n%s\n%s\n\n", extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
 	} else {
 		printf("getDerviedHDAddress failed!\n");
 		return -1;

@@ -19,7 +19,9 @@
     - [**getHDNodePrivateKeyWIFByPath**](#getHDNodePrivateKeyWIFByPath)
     - [**getHDNodeAndExtKeyByPath**](#getHDNodeAndExtKeyByPath)
     - [**getDerivedHDAddress**](#getderivedhdaddress)
+    - [**getDerivedHDAddressAsP2PKH**](#getderivedhdaddressasp2pkh)
     - [**getDerivedHDAddressByPath**](#getderivedhdaddressbypath)
+    - [**getDerivedHDKeyByPath**](#getderivedhdkeybypath)
   - [Advanced Address API](#advanced-address-api)
     - [**generateRandomEnglishMnemonic:**](#generaterandomenglishmnemonic)
     - [**generateRandomEnglishMnemonicTPM:**](#generaterandomenglishmnemonictpm)
@@ -368,8 +370,10 @@ int main() {
 
 `int getDerivedHDAddress(const char* masterkey, uint32_t account, bool ischange, uint32_t addressindex, char* outaddress, bool outprivkey)`
 
-This function derives a hierarchical deterministic address by way of providing the extended master key, account, ischange and addressindex.
+This function derives a hierarchical deterministic child key at `m/44'/3'/<account>'/<ischange>/<addressindex>` by way of providing the extended master key, account, ischange and addressindex.
 It will return 1 if the function is successful and 0 if not.
+
+Despite the name, `outaddress` receives a **serialized extended key** (`dgpv...` for private, `dgub...` for public), not a P2PKH address, and the write is up to `HDKEYLEN` bytes. Size the buffer to `HDKEYLEN`, not `P2PKHLEN`. If you want a spendable address, use [getDerivedHDAddressAsP2PKH](#getderivedhdaddressasp2pkh). See issue #217.
 
 _C usage:_
 
@@ -379,7 +383,7 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  size_t extoutsize = 112;
+  size_t extoutsize = HDKEYLEN;
   char* extout = dogecoin_char_vla(extoutsize);
   char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
   dogecoin_ecc_start();
@@ -388,6 +392,35 @@ int main() {
   u_assert_str_eq(extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
   dogecoin_ecc_stop();
   free(extout);
+}
+```
+
+---
+
+### **getDerivedHDAddressAsP2PKH**
+
+`int getDerivedHDAddressAsP2PKH(const char* masterkey, uint32_t account, bool ischange, uint32_t addressindex, char* outp2pkh)`
+
+This function takes the same BIP-44 arguments as [getDerivedHDAddress](#getderivedhdaddress) but writes a base58-encoded P2PKH address to `outp2pkh` (use a buffer of at least `P2PKHLEN` bytes).
+It returns 1 on success and 0 on failure.
+
+This is the function to reach for when you want an address to receive Dogecoin at.
+
+_C usage:_
+
+```C
+#include "libdogecoin.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main() {
+  char p2pkh[P2PKHLEN];
+  char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
+  dogecoin_ecc_start();
+  int res = getDerivedHDAddressAsP2PKH(masterkey_main_ext, 0, false, 0, p2pkh);
+  u_assert_int_eq(res, true);
+  u_assert_str_eq(p2pkh, "DCm7oSg95sxwn3sWxYUDHgKKbB2mDmuR3B");
+  dogecoin_ecc_stop();
 }
 ```
 
@@ -415,6 +448,37 @@ int main() {
   int res = getDerivedHDAddressByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout);
   u_assert_int_eq(res, true);
   u_assert_str_eq(extout, "DCm7oSg95sxwn3sWxYUDHgKKbB2mDmuR3B");
+  dogecoin_ecc_stop();
+}
+```
+
+---
+
+### **getDerivedHDKeyByPath**
+
+`int getDerivedHDKeyByPath(const char* masterkey, const char* derived_path, char* outaddress, bool outprivkey)`
+
+This function derives a child key from the given master key using a custom BIP-44 derivation path in string format (`derived_path`, e.g. `m/44'/3'/0'/0/0`), and serializes it into `outaddress`.
+Pass `true` for `outprivkey` to get an extended private key (`dgpv...`) or `false` for an extended public key (`dgub...`).
+The write is up to `HDKEYLEN` bytes, so size the buffer accordingly.
+It returns 1 on success and 0 on failure.
+
+This is the path-based counterpart to [getDerivedHDAddress](#getderivedhdaddress), and the function that one calls internally. Use it when you need a key to derive further children from; use [getDerivedHDAddressByPath](#getderivedhdaddressbypath) when you want an address.
+
+_C usage:_
+
+```C
+#include "libdogecoin.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main() {
+  char extout[HDKEYLEN];
+  char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
+  dogecoin_ecc_start();
+  int res = getDerivedHDKeyByPath(masterkey_main_ext, "m/44'/3'/0'/0/0", extout, true);
+  u_assert_int_eq(res, true);
+  u_assert_str_eq(extout, "dgpv5BeiZXttUioRMzXUhD3s2uE9F23EhAwFu9meZeY9G99YS6hJCsQ9u6PRsAG3qfVwB1T7aQTVGLsmpxMiczV1dRDgzpbUxR7utpTRmN41iV7");
   dogecoin_ecc_stop();
 }
 ```
