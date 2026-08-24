@@ -99,13 +99,31 @@ consequences worth knowing:
 
 * The first run authenticates tens of thousands of commits and takes a long
   time. Later runs reuse that work.
-* Upstream is Savannah. The GitHub mirror is gone. If Savannah is slow or
-  unreachable, clone it once and point `GUIX_CHANNEL_URL` at the local copy:
+* Upstream is Savannah. The GitHub mirror is gone. Savannah also trips a libgit2
+  redirect bug in some Guix versions, which fails before any building starts:
+
+  ```
+  guix time-machine: error: Git error: cannot redirect from 'git.savannah.gnu.org' to ...
+  ```
+
+  Point `GUIX_CHANNEL_URL` somewhere that does not redirect. Codeberg carries the
+  same pinned commit:
 
   ```sh
-  git clone --bare https://git.savannah.gnu.org/git/guix.git ~/guix-repo.git
+  GUIX_CHANNEL_URL=https://codeberg.org/guix/guix.git ./contrib/guix/guix-build
+  ```
+
+  Or clone once and build from the local copy, which also helps when Savannah is
+  merely slow:
+
+  ```sh
+  git clone --bare https://git.savannah.gnu.org/git/guix.git $HOME/guix-repo.git
   GUIX_CHANNEL_URL=file://$HOME/guix-repo.git ./contrib/guix/guix-build
   ```
+
+  Changing the URL does not weaken anything. `--commit` pins the revision and
+  Guix authenticates it against the keyring either way, so any source carrying
+  that commit yields the same Guix.
 
 ## How it relates to gitian
 
