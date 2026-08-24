@@ -622,9 +622,6 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
  */
 void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char *ips)
 {
-    /* Long lived: it should climb back to its peer target after an outage
-       rather than sitting at whatever survived. */
-    client->nodegroup->auto_reconnect = true;
     dogecoin_node_group_add_peers_by_ip_or_seed(client->nodegroup, ips);
 }
 
