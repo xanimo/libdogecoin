@@ -26,6 +26,12 @@
     - [**sign_indexed_raw_transaction_ex**](#sign_indexed_raw_transaction_ex)
     - [**sign_transaction_ex**](#sign_transaction_ex)
     - [**sign_transaction_w_privkey_ex**](#sign_transaction_w_privkey_ex)
+  - [Address and scriptPubKey Conversion](#address-and-scriptpubkey-conversion)
+    - [**dogecoin_p2pkh_address_to_pubkey_hash**](#dogecoin_p2pkh_address_to_pubkey_hash)
+    - [**dogecoin_address_to_pubkey_hash**](#dogecoin_address_to_pubkey_hash)
+    - [**dogecoin_private_key_wif_to_pubkey_hash**](#dogecoin_private_key_wif_to_pubkey_hash)
+    - [**dogecoin_pubkey_hash_to_p2pkh_address**](#dogecoin_pubkey_hash_to_p2pkh_address)
+    - [**getAddrFromPubkeyHash**](#getaddrfrompubkeyhash)
 
 ## Introduction
 
@@ -539,3 +545,109 @@ if (!sign_transaction_w_privkey_ex(idx, wif, txhex, sizeof txhex)) {
 }
 ```
 
+
+---
+
+## Address and scriptPubKey Conversion
+
+These convert between a P2PKH address, its hash160, and the 25-byte P2PKH
+`scriptPubKey` that `add_utxo` and the `sign_*` functions expect. They are
+declared in `libdogecoin.h` and implemented in `src/tx.c`.
+
+Three representations are involved and mixing them up silently produces a
+well-formed but wrong address, so it is worth being precise:
+
+| Representation | Length | Example |
+|---|---|---|
+| P2PKH address | up to `P2PKHLEN` | `DNNS2bcM8LhqEe2FNnziawRiXPRKSqetoQ` |
+| hash160, hex | `PUBKEYHASHLEN` (41 with NUL) | `bcffd06893440814119018952af32315dad83c7c` |
+| scriptPubKey, hex | `SCRIPTPUBKEYLEN` (51 with NUL) | `76a914bcffd06893440814119018952af32315dad83c7c88ac` |
+
+### **dogecoin_p2pkh_address_to_pubkey_hash**
+
+`dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char p2pkh[P2PKHLEN], char scripthash[SCRIPTPUBKEYLEN])`
+
+Converts an address to the hex-encoded P2PKH `scriptPubKey` that spends to it,
+wrapping the hash160 as `76a914...88ac`. Despite the parameter name this is a
+scriptPubKey, not a bare hash160, so size the output buffer to
+`SCRIPTPUBKEYLEN`. Returns 1 on success and 0 if the address does not base58
+decode to 25 bytes.
+
+### **dogecoin_address_to_pubkey_hash**
+
+`char* dogecoin_address_to_pubkey_hash(char p2pkh[P2PKHLEN])`
+
+Returns the bare hash160 as hex, with no opcodes around it. The returned pointer
+is into a **static internal buffer**: do not free it, and copy it before the next
+call. Returns NULL if the address does not decode.
+
+### **dogecoin_private_key_wif_to_pubkey_hash**
+
+`char* dogecoin_private_key_wif_to_pubkey_hash(char private_key_wif[PRIVKEYWIFLEN])`
+
+Derives the address from a WIF private key and returns its `scriptPubKey` as hex.
+The buffer is allocated with `dogecoin_malloc` and the **caller owns it**, so
+free it with `dogecoin_free`. Returns NULL if the WIF is invalid.
+
+### **dogecoin_pubkey_hash_to_p2pkh_address**
+
+`dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey, size_t script_pubkey_len, char p2pkh[P2PKHLEN], const dogecoin_chainparams* chain)`
+
+The inverse: takes a scriptPubKey and writes the address it pays to.
+
+This one takes **raw bytes, not hex**, with the length passed separately, which
+is why it is `char*` rather than a sized array. Passing a hex string produces a
+wrong address rather than an error. Decode first with `utils_hex_to_uint8()`, or
+pass a `cstring`'s `->str` and `->len` straight from a `dogecoin_tx_out`.
+
+### **getAddrFromPubkeyHash**
+
+`int getAddrFromPubkeyHash(const char pubkey_hash[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN])`
+
+Convenience wrapper over the above that takes the **hex** scriptPubKey and a
+testnet flag instead of raw bytes and chainparams. It rejects anything that is
+not a full scriptPubKey, so a bare hash160 returns 0 rather than a wrong address.
+
+_C usage:_
+
+```C
+#include "libdogecoin.h"
+#include <stdio.h>
+
+int main() {
+  char wif[PRIVKEYWIFLEN], address[P2PKHLEN];
+  char script[SCRIPTPUBKEYLEN], roundtrip[P2PKHLEN];
+
+  dogecoin_ecc_start();
+  generatePrivPubKeypair(wif, address, false);
+
+  /* address -> scriptPubKey hex */
+  dogecoin_p2pkh_address_to_pubkey_hash(address, script);
+
+  /* the bare hash160, into a static buffer that must not be freed */
+  char* hash160 = dogecoin_address_to_pubkey_hash(address);
+
+  /* and back again */
+  getAddrFromPubkeyHash(script, false, roundtrip);
+
+  printf("address     : %s\n", address);
+  printf("hash160     : %s\n", hash160);
+  printf("scriptPubKey: %s\n", script);
+  printf("round trip  : %s\n", roundtrip);   /* equals address */
+
+  /* same scriptPubKey, straight from the WIF; caller frees this one */
+  char* from_wif = dogecoin_private_key_wif_to_pubkey_hash(wif);
+  dogecoin_free(from_wif);
+
+  dogecoin_ecc_stop();
+}
+```
+
+Output for one generated key:
+
+```
+address     : DNNS2bcM8LhqEe2FNnziawRiXPRKSqetoQ
+hash160     : bcffd06893440814119018952af32315dad83c7c
+scriptPubKey: 76a914bcffd06893440814119018952af32315dad83c7c88ac
+round trip  : DNNS2bcM8LhqEe2FNnziawRiXPRKSqetoQ
+```
