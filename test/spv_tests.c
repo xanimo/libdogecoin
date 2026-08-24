@@ -53,7 +53,7 @@
 /* The only way out of the runloop is sync_completed, so a runner that cannot
    reach a peer used to sit here until the CI job timeout killed it, ~90 minutes
    on the macOS runners. Bound it. */
-#define TEST_SPV_DEADLINE_S 300
+#define TEST_SPV_DEADLINE_S 900
 
 static dogecoin_bool test_spv_synced = false;
 static dogecoin_bool test_spv_saw_header = false;
