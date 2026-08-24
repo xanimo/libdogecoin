@@ -31,6 +31,7 @@
     - [**dogecoin_address_to_pubkey_hash**](#dogecoin_address_to_pubkey_hash)
     - [**dogecoin_private_key_wif_to_pubkey_hash**](#dogecoin_private_key_wif_to_pubkey_hash)
     - [**dogecoin_pubkey_hash_to_p2pkh_address**](#dogecoin_pubkey_hash_to_p2pkh_address)
+    - [**getAddrFromScriptPubKey**](#getaddrfromscriptpubkey)
     - [**getAddrFromPubkeyHash**](#getaddrfrompubkeyhash)
 
 ## Introduction
@@ -600,13 +601,35 @@ is why it is `char*` rather than a sized array. Passing a hex string produces a
 wrong address rather than an error. Decode first with `utils_hex_to_uint8()`, or
 pass a `cstring`'s `->str` and `->len` straight from a `dogecoin_tx_out`.
 
-### **getAddrFromPubkeyHash**
+### **getAddrFromScriptPubKey**
 
-`int getAddrFromPubkeyHash(const char pubkey_hash[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN])`
+`int getAddrFromScriptPubKey(const char script_pubkey_hex[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN])`
 
 Convenience wrapper over the above that takes the **hex** scriptPubKey and a
-testnet flag instead of raw bytes and chainparams. It rejects anything that is
-not a full scriptPubKey, so a bare hash160 returns 0 rather than a wrong address.
+testnet flag instead of raw bytes and chainparams.
+
+### **getAddrFromPubkeyHash**
+
+`int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN])`
+
+Takes a **bare hash160** as hex, so this is the inverse of
+`dogecoin_address_to_pubkey_hash` and the two round trip.
+
+The two wrappers differ only in which representation they accept, and each
+rejects the other's input on length rather than guessing, so passing the wrong
+one returns 0 instead of a wrong address:
+
+```
+address                               : noxKJyGPugPRN4wqvrwsrtYXuQCk7yQEsy
+getAddrFromPubkeyHash(hash160)        : rc=1 noxKJyGPugPRN4wqvrwsrtYXuQCk7yQEsy
+getAddrFromScriptPubKey(scriptPubKey) : rc=1 noxKJyGPugPRN4wqvrwsrtYXuQCk7yQEsy
+getAddrFromPubkeyHash(scriptPubKey)   : rc=0
+getAddrFromScriptPubKey(hash160)      : rc=0
+```
+
+Before 0.1.5 `getAddrFromPubkeyHash` took a scriptPubKey despite its name, and
+handing it a hash160 returned a well-formed but wrong address. Callers that
+passed a scriptPubKey should move to `getAddrFromScriptPubKey`.
 
 _C usage:_
 
@@ -627,8 +650,9 @@ int main() {
   /* the bare hash160, into a static buffer that must not be freed */
   char* hash160 = dogecoin_address_to_pubkey_hash(address);
 
-  /* and back again */
-  getAddrFromPubkeyHash(script, false, roundtrip);
+  /* and back again, from either representation */
+  getAddrFromScriptPubKey(script, false, roundtrip);
+  getAddrFromPubkeyHash(hash160, false, roundtrip);
 
   printf("address     : %s\n", address);
   printf("hash160     : %s\n", hash160);
