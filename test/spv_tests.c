@@ -35,6 +35,9 @@
 #include <string.h>
 #include <time.h>
 
+#include <event2/event.h>
+#include <event2/util.h>
+
 #include <test/utest.h>
 
 #include <dogecoin/arith_uint256.h>
@@ -47,14 +50,33 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
 
+/* The only way out of the runloop is sync_completed, so a runner that cannot
+   reach a peer used to sit here until the CI job timeout killed it, ~90 minutes
+   on the macOS runners. Bound it. */
+#define TEST_SPV_DEADLINE_S 300
+
+static dogecoin_bool test_spv_synced = false;
+static dogecoin_bool test_spv_saw_header = false;
+
 void test_spv_sync_completed(dogecoin_spv_client* client) {
+    test_spv_synced = true;
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
+    dogecoin_node_group_shutdown(client->nodegroup);
+}
+
+static void test_spv_deadline(evutil_socket_t fd, short event, void* ctx) {
+    dogecoin_spv_client* client = (dogecoin_spv_client*)ctx;
+    UNUSED(fd);
+    UNUSED(event);
+    printf("test_spv: no sync after %d s (headers seen: %s); giving up\n",
+           TEST_SPV_DEADLINE_S, test_spv_saw_header ? "yes" : "no");
     dogecoin_node_group_shutdown(client->nodegroup);
 }
 
 dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip) {
     UNUSED(node);
     if (newtip) {
+        test_spv_saw_header = true;
         printf("New headers tip height %d\n", newtip->height);
         if (newtip->height >= 4008284) {
             test_spv_sync_completed(client);
@@ -92,7 +114,20 @@ void test_spv()
     dogecoin_spv_client_discover_peers(client, NULL);
     printf("done\n");
     printf("Start interacting with the p2p network...\n");
+
+    test_spv_synced = false;
+    test_spv_saw_header = false;
+    struct timeval deadline_tv = { TEST_SPV_DEADLINE_S, 0 };
+    struct event* deadline = evtimer_new(client->nodegroup->event_base, test_spv_deadline, client);
+    u_assert_true(deadline != NULL);
+    evtimer_add(deadline, &deadline_tv);
+
     dogecoin_spv_client_runloop(client);
+
+    event_free(deadline);
+    /* Deliberately not asserted: an offline runner cannot sync and this test has
+       never asserted the outcome. The line says which happened. */
+    printf("test_spv: %s\n", test_spv_synced ? "synced" : "did not sync");
     dogecoin_spv_client_free(client);
     remove_all_hashes();
     remove_all_maps();
