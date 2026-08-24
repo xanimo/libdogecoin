@@ -418,6 +418,11 @@ jobs:
 
       - name: test libdogecoin
         if: ${{ matrix.run-tests }}
+        # The suite runs in well under a minute on a healthy runner. Capping the
+        # step means a hang costs 20 minutes instead of the job's 90, which is
+        # what a stuck test_spv used to burn on the macOS runners. The emulated
+        # armhf and aarch64 legs are the slow ones and still fit comfortably.
+        timeout-minutes: 20
         shell: bash
         run: |
             case "${{ matrix.name }}" in
