@@ -94,6 +94,12 @@ static dogecoin_bool ensure_filter_dir(const char *base, const dogecoin_chainpar
     if (!dir) return false;
     memcpy(dir, base, blen);
 
+    /* The datadir itself may not exist yet: on a first run mkdir("<base>/filter")
+       fails with ENOENT and every filter store silently falls back to no
+       persistence, so the whole chain is refetched on each start. */
+    dir[blen] = '\0';
+    if (!mkdir_one(dir)) { dogecoin_free(dir); return false; }
+
     strcpy(dir + blen, "/filter");
     if (!mkdir_one(dir)) { dogecoin_free(dir); return false; }
 
@@ -445,10 +451,25 @@ dogecoin_bool dogecoin_cfilters_db_load(
         migrate_legacy_filter_file(db->params, "cfilters.dat", path);
     }
 
-    struct stat sb;
-    dogecoin_bool create = (stat(path, &sb) != 0) || (sb.st_size < 8);
-
-    db->file = fopen(path, create ? "w+b" : "r+b");
+    /* Judge the handle, not the path. stat() then fopen() is a check-then-use:
+       the file can be replaced in between, and fstat on the descriptor
+       describes the file actually opened. Mirrors the cfheaders store. */
+    dogecoin_bool create = false;
+    db->file = fopen(path, "r+b");
+    if (db->file) {
+        struct stat sb;
+        if (fstat(CF_FILENO(db->file), &sb) != 0 || sb.st_size < 8) {
+            fclose(db->file);
+            db->file = NULL;
+        }
+    }
+    if (!db->file) {
+        /* Private, like the cfheaders store: a filter store an attacker can
+           rewrite makes an SPV client miss its own transactions. "w+b"
+           truncates, so no separate remove() is needed. */
+        db->file = dogecoin_fopen_private(path, "w+b");
+        create = true;
+    }
 
     if (!db->file) {
         /* Same aliasing rule as the cfheaders path above: `path` points into
