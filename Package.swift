@@ -74,6 +74,7 @@ let package = Package(
                 "src/buffer.c",
                 "src/chacha20.c",
                 "src/chainparams.c",
+                "src/context.c",
                 "src/cstr.c",
                 "src/ctaes.c",
                 "src/ecc.c",
