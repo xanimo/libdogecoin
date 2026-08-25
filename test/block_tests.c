@@ -367,7 +367,7 @@ void test_auxpow_deserialize_real_vector() {
     size_t blen = hexlen / 2;
     uint8_t* buf = dogecoin_malloc(blen);
     for (size_t k = 0; k < blen; k++) {
-        unsigned b; sscanf(block_hex + 2 * k, "%2x", &b); buf[k] = (uint8_t)b;
+        unsigned b = 0; u_assert_int_eq(sscanf(block_hex + 2 * k, "%2x", &b), 1); buf[k] = (uint8_t)b;
     }
 
     dogecoin_block_header* header = dogecoin_block_header_new();
@@ -565,7 +565,7 @@ void test_auxpow_deserialize_e2e() {
     {
         uint8_t buf[1024]; size_t off = 0;
         for (size_t k = 0; k < strlen(coinbase_hex) / 2; k++) {
-            unsigned b; sscanf(coinbase_hex + 2 * k, "%2x", &b); buf[off++] = (uint8_t)b;
+            unsigned b = 0; u_assert_int_eq(sscanf(coinbase_hex + 2 * k, "%2x", &b), 1); buf[off++] = (uint8_t)b;
         }
         for (int i = 0; i < 32; i++) buf[off++] = 0x00;          /* parent_hash */
         buf[off++] = 0x00;                                        /* parent_merkle_count = 0 */
@@ -599,7 +599,7 @@ void test_auxpow_deserialize_e2e() {
     {
         uint8_t buf[1024]; size_t off = 0;
         for (size_t k = 0; k < strlen(coinbase_hex) / 2; k++) {
-            unsigned b; sscanf(coinbase_hex + 2 * k, "%2x", &b); buf[off++] = (uint8_t)b;
+            unsigned b = 0; u_assert_int_eq(sscanf(coinbase_hex + 2 * k, "%2x", &b), 1); buf[off++] = (uint8_t)b;
         }
         for (int i = 0; i < 32; i++) buf[off++] = 0x00;          /* parent_hash */
         buf[off++] = 0x03;                                       /* parent_merkle_count = 3 */
@@ -655,7 +655,7 @@ void test_auxpow_deserialize_merkle_count_bounds() {
     uint8_t buf[512];
     size_t off = 0;
     for (size_t k = 0; k < cblen; k++) {
-        unsigned b; sscanf(coinbase_hex + 2 * k, "%2x", &b); buf[off++] = (uint8_t)b;
+        unsigned b = 0; u_assert_int_eq(sscanf(coinbase_hex + 2 * k, "%2x", &b), 1); buf[off++] = (uint8_t)b;
     }
     /* parent_hash (32 bytes) */
     for (int k = 0; k < 32; k++) buf[off++] = 0x11;

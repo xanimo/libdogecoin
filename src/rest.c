@@ -342,7 +342,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         if (!p) { evhttp_send_error(req, HTTP_BADREQUEST, "missing txid param"); evbuffer_free(evb); return; }
         p += 5;
         char txid_hex[DOGECOIN_HASH_HEX_LENGTH]; size_t n = 0;
-        while (p[n] && p[n] != '&' && n < DOGECOIN_HASH_LENGTH * 2) { txid_hex[n] = p[n]; n++; }
+        while (n < DOGECOIN_HASH_LENGTH * 2 && p[n] && p[n] != '&') { txid_hex[n] = p[n]; n++; }
         txid_hex[n] = '\0';
         if (n != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid length"); evbuffer_free(evb); return; }
         if (strspn(txid_hex, VALID_HEX_CHARS) != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
@@ -387,7 +387,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         if (!p) { evhttp_send_error(req, HTTP_BADREQUEST, "missing txid param"); evbuffer_free(evb); return; }
         p += 5;
         char txid_hex[DOGECOIN_HASH_HEX_LENGTH]; size_t n = 0;
-        while (p[n] && p[n] != '&' && n < DOGECOIN_HASH_LENGTH * 2) { txid_hex[n] = p[n]; n++; }
+        while (n < DOGECOIN_HASH_LENGTH * 2 && p[n] && p[n] != '&') { txid_hex[n] = p[n]; n++; }
         txid_hex[n] = '\0';
         if (n != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid length"); evbuffer_free(evb); return; }
         if (strspn(txid_hex, VALID_HEX_CHARS) != DOGECOIN_HASH_LENGTH * 2) { evhttp_send_error(req, HTTP_BADREQUEST, "invalid txid hex"); evbuffer_free(evb); return; }
@@ -399,7 +399,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         if (pv) {
             pv += (pv[1] == 'o') ? 5 : 2; // 'vout='=5, 'n='=2
             char numbuf[16]; size_t k = 0;
-            while (pv[k] && pv[k] != '&' && k < sizeof(numbuf) - 1) { numbuf[k] = pv[k]; k++; }
+            while (k < sizeof(numbuf) - 1 && pv[k] && pv[k] != '&') { numbuf[k] = pv[k]; k++; }
             numbuf[k] = '\0';
             want_vout = atoi(numbuf);
             have_vout = 1;
@@ -684,7 +684,7 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         }
         char txid[129] = {0};
         size_t n = 0;
-        while (id[n] && id[n] != '&' && n < sizeof(txid)-1) { txid[n] = id[n]; n++; }
+        while (n < sizeof(txid)-1 && id[n] && id[n] != '&') { txid[n] = id[n]; n++; }
 
         dogecoin_smpv_client* smpv = (dogecoin_smpv_client*)client->smpv_ctx;
         dogecoin_smpv_tx* tx = dogecoin_smpv_get_tx(smpv, txid);
