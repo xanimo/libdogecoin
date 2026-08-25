@@ -214,6 +214,10 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
     dogecoin_tx_out_copy(copy, txout);
     size_t length = 2;
     uint8_t* stripped_array = dogecoin_uint8_vla(txout->script_pubkey->len);
+    if (!stripped_array) {
+        dogecoin_tx_out_free(copy);
+        return false;
+    }
     dogecoin_mem_zero(stripped_array, txout->script_pubkey->len * sizeof(stripped_array[0]));
     // loop through 20 bytes of the script hash while stripping op codes
     // and copy from index 3 to 23:
@@ -234,6 +238,8 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
     }
     if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, P2PKHLEN)) {
         printf("failed to convert hash160 to p2pkh!\n");
+        dogecoin_free(stripped_array);
+        dogecoin_tx_out_free(copy);
         return false;
     }
     dogecoin_free(stripped_array);
@@ -246,21 +252,22 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
  * converts script_pubkey to a p2pkh address, and
  * frees the copy.
  *
- * @param script_pubkey_hex The raw scriptPubKey bytes, not a hex string.
- * @param script_pubkey_hex_length The length of those bytes.
+ * @param script_pubkey The raw scriptPubKey bytes, not a hex string.
+ * @param script_pubkey_len The length of those bytes.
  * @param p2pkh The variable out we want to contain the converted script hash in.
  *
  * @return int
  */
-dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, size_t script_pubkey_hex_length, char* p2pkh, const dogecoin_chainparams* chain) {
-    if (!script_pubkey_hex) return false;
+dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey, size_t script_pubkey_len, char* p2pkh, const dogecoin_chainparams* chain) {
+    if (!script_pubkey) return false;
     size_t length = 2;
-    uint8_t* stripped_array = dogecoin_uint8_vla(script_pubkey_hex_length);
-    dogecoin_mem_zero(stripped_array, script_pubkey_hex_length * sizeof(stripped_array[0]));
+    uint8_t* stripped_array = dogecoin_uint8_vla(script_pubkey_len);
+    if (!stripped_array) return false;
+    dogecoin_mem_zero(stripped_array, script_pubkey_len * sizeof(stripped_array[0]));
     // loop through 20 bytes of the script hash while stripping op codes
     // and copy from index 3 to 23:
-    for (; length < script_pubkey_hex_length - 4; length++) {
-        switch (script_pubkey_hex[length]) {
+    for (; length < script_pubkey_len - 4; length++) {
+        switch (script_pubkey[length]) {
             case OP_DUP:
                 break;
             case (char)OP_HASH160:
@@ -270,12 +277,13 @@ dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, siz
             case (char)OP_CHECKSIG:
                 break;
             default:
-                memcpy_safe(stripped_array, &script_pubkey_hex[3], 23);
+                memcpy_safe(stripped_array, &script_pubkey[3], 23);
                 break;
         }
     }
     if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, P2PKHLEN)) {
         printf("failed to convert hash160 to p2pkh!\n");
+        dogecoin_free(stripped_array);
         return false;
     }
     dogecoin_free(stripped_array);
@@ -371,7 +379,8 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
     dogecoin_privkey_decode_wif(private_key_wif, chain, &key);
     if (!dogecoin_privkey_is_valid(&key)) {
         debug_print("private key is not valid!\nchain: %s\n", chain->chainname);
-        return false;
+        dogecoin_privkey_cleanse(&key);
+        return NULL;
     }
 
     char new_wif_privkey[PRIVKEYWIFLEN];
@@ -384,15 +393,30 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
     dogecoin_pubkey_from_key(&key, &pubkey);
     if (!dogecoin_pubkey_is_valid(&pubkey)) {
         debug_print("pubkey is not valid!\nchain: %s\n", chain->chainname);
-        return false;
+        dogecoin_privkey_cleanse(&key);
+        dogecoin_pubkey_cleanse(&pubkey);
+        return NULL;
     }
 
     char* new_p2pkh_pubkey = dogecoin_char_vla(sizeout);
+    if (!new_p2pkh_pubkey) {
+        dogecoin_privkey_cleanse(&key);
+        dogecoin_pubkey_cleanse(&pubkey);
+        return NULL;
+    }
     dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, new_p2pkh_pubkey);
     dogecoin_privkey_cleanse(&key);
     dogecoin_pubkey_cleanse(&pubkey);
     char* script_hash = dogecoin_malloc(SCRIPTPUBKEYLEN);
-    if (!dogecoin_p2pkh_address_to_pubkey_hash(new_p2pkh_pubkey, script_hash)) return false;
+    if (!script_hash) {
+        dogecoin_free(new_p2pkh_pubkey);
+        return NULL;
+    }
+    if (!dogecoin_p2pkh_address_to_pubkey_hash(new_p2pkh_pubkey, script_hash)) {
+        dogecoin_free(new_p2pkh_pubkey);
+        dogecoin_free(script_hash);
+        return NULL;
+    }
     dogecoin_free(new_p2pkh_pubkey);
     return script_hash;
 }
