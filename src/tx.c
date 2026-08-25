@@ -246,7 +246,8 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
  * converts script_pubkey to a p2pkh address, and
  * frees the copy.
  *
- * @param script_pubkey The data to be copied which contains the script hash we want.
+ * @param script_pubkey_hex The raw scriptPubKey bytes, not a hex string.
+ * @param script_pubkey_hex_length The length of those bytes.
  * @param p2pkh The variable out we want to contain the converted script hash in.
  *
  * @return int
@@ -287,12 +288,13 @@ dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, siz
  * prepends OP_DUP and OP_HASH160 and appends OP_EQUALVERIFY and OP_CHECKSIG.
  *
  * @param p2pkh The variable out we want to contain the converted script hash in.
- * @param pubkey_hash The variable that will store the pubkey hash.
+ * @param pubkey_hash The variable that will store the scriptPubKey hex, at least
+ * SCRIPTPUBKEYLEN bytes.
  *
  * @return int
  */
 dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char* p2pkh, char* pubkey_hash) {
-    if (!p2pkh) return false;
+    if (!p2pkh || !pubkey_hash) return false;
 
     // strlen(p2pkh) + 1 = 35
     unsigned char dec[P2PKHLEN]; //problem is here, it works if its char**
@@ -306,10 +308,14 @@ dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char* p2pkh, char* pubkey_ha
     }
 
     //decoded bytes = [1-byte versionbits][20-byte hash][4-byte checksum]
+    if (decoded_length != 1 + 20 + 4) {
+        printf("unexpected base58 payload length\n");
+        return false;
+    }
     char* b58_decode_hex = utils_uint8_to_hex((const uint8_t*)dec, decoded_length - 4);
     //concatenate the fields
-    sprintf(pubkey_hash, "%02x%02x%02x%.40s%02x%02x", OP_DUP, OP_HASH160, 20, &b58_decode_hex[2], OP_EQUALVERIFY, OP_CHECKSIG);
-    return true;
+    int written = snprintf(pubkey_hash, SCRIPTPUBKEYLEN, "%02x%02x%02x%.40s%02x%02x", OP_DUP, OP_HASH160, 20, &b58_decode_hex[2], OP_EQUALVERIFY, OP_CHECKSIG);
+    return written == SCRIPTPUBKEYLEN - 1;
 }
 
 /**
@@ -385,8 +391,7 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
     dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, new_p2pkh_pubkey);
     dogecoin_privkey_cleanse(&key);
     dogecoin_pubkey_cleanse(&pubkey);
-    //2* (3-byte header + 20-byte hash + 2-byte footer) + 1-byte null terminator
-    char* script_hash = dogecoin_malloc(40 + 6 + 4 + 1);
+    char* script_hash = dogecoin_malloc(SCRIPTPUBKEYLEN);
     if (!dogecoin_p2pkh_address_to_pubkey_hash(new_p2pkh_pubkey, script_hash)) return false;
     dogecoin_free(new_p2pkh_pubkey);
     return script_hash;
@@ -1375,14 +1380,17 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
     return res;
 }
 
-/** This function gets the address from a given pubkey hash.
+/** This function gets the address from a given scriptPubKey.
  *
- * @param pubkey_hash The pointer to the pubkey hash.
+ * @param pubkey_hash The hex-encoded P2PKH scriptPubKey, not a bare hash160.
  * @param is_testnet The pointer to the chainparams which contain the prefixes for the address types.
  * @param p2pkh_address The address to send coins to, which can be a P2PKH, P2SH, or P2WPKH address.
  *
  * @return 1 if the address was added successfully, 0 otherwise.
  */
-int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
+int getAddrFromPubkeyHash(const char pubkey_hash[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
+    /* A bare hash160 zero-pads to 25 bytes here and yields a well-formed but wrong
+       address, so reject anything that is not a full scriptPubKey. */
+    if (!pubkey_hash || strlen(pubkey_hash) != SCRIPTPUBKEYLEN - 1) return false;
     return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
 }

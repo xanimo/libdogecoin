@@ -242,16 +242,13 @@ static void sweep_apply_tx_flags(const dogecoin_sweep_options* options, int txin
     }
 }
 
-/* Full P2PKH scriptPubKey hex: 6 + 40 + 4 hex chars + NUL (see transaction_tests.c). */
-#define SWEEP_SCRIPTPUBKEY_HEX_LEN (40 + 6 + 4 + 1)
-
 static char* sweep_script_pubkey_from_wallet(const dogecoin_paper_wallet* wallet)
 {
     char* script;
     if (!wallet || !wallet->address) {
         return NULL;
     }
-    script = dogecoin_calloc(1, SWEEP_SCRIPTPUBKEY_HEX_LEN);
+    script = dogecoin_calloc(1, SCRIPTPUBKEYLEN);
     if (!script) {
         return NULL;
     }

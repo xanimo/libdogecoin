@@ -215,7 +215,7 @@ typedef struct dogecoin_mutex_ {
 #define P2PKHLEN 35
 #define PRIVKEYHEXLEN DOGECOIN_ECKEY_PKEY_LENGTH * 2 + 1
 #define PUBKEYHEXLEN 67
-#define PUBKEYHASHLEN 41
+#define PUBKEYHASHLEN 41 // bare hash160 hex only, not a scriptPubKey
 #define SCRIPTPUBKEYLEN 51 // 40 + 6 + 4 + 1
 #define KEYPATHMAXLEN 256
 

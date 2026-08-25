@@ -39,7 +39,7 @@ static void test_tx_callback(const dogecoin_smpv_tx* tx, const char* address, vo
 static dogecoin_tx* build_test_tx_for_address(const char* address) {
     if (!address) return NULL;
 
-    char script_pubkey_hex[64];
+    char script_pubkey_hex[SCRIPTPUBKEYLEN];
     dogecoin_mem_zero(script_pubkey_hex, sizeof(script_pubkey_hex));
     if (!dogecoin_p2pkh_address_to_pubkey_hash((char*)address, script_pubkey_hex)) return NULL;
 
