@@ -249,7 +249,10 @@ char* dogecoin_address_to_pubkey_hash(char p2pkh[P2PKHLEN]);
 char* dogecoin_private_key_wif_to_pubkey_hash(char private_key_wif[PRIVKEYWIFLEN]);
 
 /* generate the p2pkh address from a given scriptPubKey hex */
-int getAddrFromPubkeyHash(const char pubkey_hash[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]);
+int getAddrFromScriptPubKey(const char script_pubkey_hex[SCRIPTPUBKEYLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]);
+
+/* generate the p2pkh address from a given hash160 hex, inverts dogecoin_address_to_pubkey_hash */
+int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]);
 
 /* privkey utilities */
 typedef struct dogecoin_key_ {

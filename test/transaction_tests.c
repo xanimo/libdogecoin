@@ -604,13 +604,13 @@ void test_transaction()
        exercise it exactly: an allocation of SCRIPTPUBKEYLEN must hold the result. */
     u_assert_int_eq((int)strlen(res), SCRIPTPUBKEYLEN - 1);
 
-    u_assert_true(getAddrFromPubkeyHash(res, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address));
+    u_assert_true(getAddrFromScriptPubKey(res, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address));
     u_assert_str_eq(p2pkh_address, internal_p2pkh_address);
 
     u_assert_int_eq(dogecoin_p2pkh_address_to_pubkey_hash(external_p2pkh_address, res), 1);
     u_assert_str_not_eq(res, utxo_scriptpubkey);
 
-    u_assert_true(getAddrFromPubkeyHash(res, isTestnetFromB58Prefix(external_p2pkh_address), p2pkh_address));
+    u_assert_true(getAddrFromScriptPubKey(res, isTestnetFromB58Prefix(external_p2pkh_address), p2pkh_address));
     u_assert_str_eq(p2pkh_address, external_p2pkh_address);
     dogecoin_free(res);
 
@@ -626,10 +626,15 @@ void test_transaction()
         u_assert_int_eq(bounded.guard[g], 0x7e);
     }
 
-    /* A bare hash160 used to round-trip to a well-formed but wrong address. */
+    /* getAddrFromPubkeyHash inverts dogecoin_address_to_pubkey_hash. */
     char* hash160 = dogecoin_address_to_pubkey_hash(internal_p2pkh_address);
     u_assert_int_eq((int)strlen(hash160), PUBKEYHASHLEN - 1);
-    u_assert_int_eq(getAddrFromPubkeyHash(hash160, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address), 0);
+    u_assert_true(getAddrFromPubkeyHash(hash160, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address));
+    u_assert_str_eq(p2pkh_address, internal_p2pkh_address);
+
+    /* Each rejects the other's input rather than returning a wrong address. */
+    u_assert_int_eq(getAddrFromScriptPubKey(hash160, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address), 0);
+    u_assert_int_eq(getAddrFromPubkeyHash(utxo_scriptpubkey, isTestnetFromB58Prefix(internal_p2pkh_address), p2pkh_address), 0);
 
     // ----------------------------------------------------------------
     // test conversion from private key (wif) to script hash
