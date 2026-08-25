@@ -106,7 +106,7 @@ void test_address()
     u_assert_int_eq(verifyP2pkhAddress(child_key_test, strlen(child_key_test)), true);
 
     /* ckd address generation */
-    size_t extoutsize = 112;
+    size_t extoutsize = HDKEYLEN;
     char* extout = dogecoin_char_vla(extoutsize);
     char* masterkey_main_ext = "dgpv51eADS3spNJh8h13wso3DdDAw3EJRqWvftZyjTNCFEG7gqV6zsZmucmJR6xZfvgfmzUthVC6LNicBeNNDQdLiqjQJjPeZnxG8uW3Q3gCA3e";
     int res = getDerivedHDAddress(masterkey_main_ext, 0, false, 0, extout, true);
@@ -133,6 +133,33 @@ void test_address()
     res = getDerivedHDAddress(masterkey_main_ext, 1, true, 1, extout, false);
     u_assert_int_eq(res, true);
     u_assert_str_eq(extout, "dgub8wfrZMXz8ojFcPziSubEoQ65sB4PYPyYTMo3PqFwf2Vx5zZ6ia17Nk2Py25c3dvq1e7ZnfBrurCS5wuagzRoBCXhJ2NeGU54NBytvuUuRyA");
+
+    /* issue #217: getDerivedHDAddress() returns a serialized extended key, not a
+       P2PKH address.  This is pinned deliberately so that any change to the
+       return shape is a conscious decision rather than an accident: the
+       function writes up to HDKEYLEN bytes, so every caller must size its
+       output buffer to HDKEYLEN and not to P2PKHLEN. */
+    dogecoin_mem_zero(extout, extoutsize);
+    res = getDerivedHDAddress(masterkey_main_ext, 0, false, 0, extout, true);
+    u_assert_int_eq(res, true);
+    u_assert_int_eq((int)strlen(extout), HDKEYLEN - 1);
+    u_assert_int_eq(strncmp(extout, "dgpv", 4), 0);
+    u_assert_int_eq(verifyP2pkhAddress(extout, strlen(extout)), false);
+
+    dogecoin_mem_zero(extout, extoutsize);
+    res = getDerivedHDAddress(masterkey_main_ext, 0, false, 0, extout, false);
+    u_assert_int_eq(res, true);
+    u_assert_int_eq((int)strlen(extout), HDKEYLEN - 1);
+    u_assert_int_eq(strncmp(extout, "dgub", 4), 0);
+    u_assert_int_eq(verifyP2pkhAddress(extout, strlen(extout)), false);
+
+    /* the address-returning counterpart does fit inside P2PKHLEN */
+    char p2pkh_out[P2PKHLEN];
+    dogecoin_mem_zero(p2pkh_out, sizeof(p2pkh_out));
+    res = getDerivedHDAddressAsP2PKH(masterkey_main_ext, 0, false, 0, p2pkh_out);
+    u_assert_int_eq(res, true);
+    u_assert_true(strlen(p2pkh_out) < P2PKHLEN);
+    u_assert_int_eq(verifyP2pkhAddress(p2pkh_out, strlen(p2pkh_out)), true);
 
     /* ckd p2pkh generation */
     res = getDerivedHDAddressAsP2PKH(masterkey_main_ext, 0, false, 0, extout);

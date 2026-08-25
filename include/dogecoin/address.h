@@ -57,7 +57,9 @@ LIBDOGECOIN_API char* getHDNodePrivateKeyWIFByPath(const char* masterkey, const 
 /* get derived hd extended address and compendium hdnode */
 LIBDOGECOIN_API dogecoin_hdnode* getHDNodeAndExtKeyByPath(const char* masterkey, const char* derived_path, char* outaddress, bool outprivkey);
 
-/* generate an extended hd public/private child address */
+/* generate an extended hd public/private child key.
+ * outaddress receives a serialized extended key, not an address, and must be at
+ * least HDKEYLEN bytes.  See issue #217. */
 LIBDOGECOIN_API int getDerivedHDAddress(const char* masterkey, uint32_t account, bool ischange, uint32_t addressindex, char* outaddress, bool outprivkey);
 
 /* generate an extended hd public/private child address as a P2PKH */
