@@ -169,6 +169,7 @@ extern void test_tool();
 extern void test_net_basics_plus_download_block();
 extern void test_protocol();
 extern void test_net_flag_defined();
+extern void test_net_peer_recovery();
 extern void test_reorg();
 extern void test_spv();
 extern void test_bip37_filter_state();
@@ -326,6 +327,7 @@ int main()
 #ifdef WITH_NET
     u_run_test(test_net_flag_defined);
     u_run_test(test_net_basics_plus_download_block);
+    u_run_test(test_net_peer_recovery);
     u_run_test(test_protocol);
     u_run_test(test_reorg);
     u_run_test(test_spv);
