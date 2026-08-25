@@ -557,12 +557,15 @@ void dogecoin_node_group_free(dogecoin_node_group* group)
     if (!group)
         return;
 
-    if (group->event_base) {
-        event_base_free(group->event_base);
-    }
-
+    /* Nodes first: freeing one releases its bufferevent and timer, which reach
+       back into the event_base, so tearing the base down first reads freed
+       memory whenever any node still holds live events. */
     if (group->nodes) {
         vector_free(group->nodes, true);
+    }
+
+    if (group->event_base) {
+        event_base_free(group->event_base);
     }
     dogecoin_free(group);
 }
