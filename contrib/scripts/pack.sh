@@ -35,7 +35,7 @@ DOCUMENTATION="`pwd`/doc/*.md README.md"
 DOCKER=""
 ERROR=""
 HOST=""
-LIB="`pwd`/.libs/libdogecoin.a `pwd`/include/dogecoin/dogecoin.h `pwd`/include/dogecoin/libdogecoin.h `pwd`/include/dogecoin/constants.h `pwd`/include/dogecoin/uthash.h"
+LIB="`pwd`/.libs/libdogecoin.a `pwd`/include/dogecoin/dogecoin.h `pwd`/include/dogecoin/libdogecoin.h `pwd`/include/dogecoin/constants.h `pwd`/include/dogecoin/cstr.h `pwd`/include/dogecoin/uthash.h"
 SHA=sha256sum
 BINARY_SUFFIX=""
 for i in "$@"

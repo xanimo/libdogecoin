@@ -374,6 +374,7 @@ INSTALL(FILES
     include/dogecoin/dogecoin.h
     include/dogecoin/libdogecoin.h
     include/dogecoin/uthash.h
+    include/dogecoin/cstr.h
     config/libdogecoin-config.h
     DESTINATION include/dogecoin
 )

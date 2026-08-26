@@ -24,9 +24,8 @@ include_HEADERS = \
     include/dogecoin/constants.h \
     include/dogecoin/dogecoin.h \
     include/dogecoin/libdogecoin.h \
-    include/dogecoin/bip38.h \
-    include/dogecoin/sweep.h \
     include/dogecoin/uthash.h \
+    include/dogecoin/cstr.h \
     config/libdogecoin-config.h
 noinst_HEADERS = \
     include/bip39/index.h \
@@ -50,7 +49,6 @@ noinst_HEADERS = \
     include/dogecoin/compact_filter.h \
     include/dogecoin/common.h \
     include/dogecoin/context.h \
-    include/dogecoin/cstr.h \
     include/dogecoin/ctaes.h \
     include/dogecoin/ecc.h \
     include/dogecoin/eckey.h \
