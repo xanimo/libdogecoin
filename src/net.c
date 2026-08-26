@@ -552,6 +552,40 @@ void dogecoin_node_group_shutdown(dogecoin_node_group *group) {
  *
  * @param group The group to free.
  */
+/* Render a peer's advertised service bits. The connect line used to print only
+   the user agent and height, so whether a peer offered NODE_COMPACT_FILTERS or
+   NODE_BLOOM could not be told from a log, only from a debugger or a capture. */
+static const char* dogecoin_node_services_str(uint64_t services, char* out, size_t len)
+{
+    static const struct { uint64_t bit; const char* name; } known[] = {
+        { DOGECOIN_NODE_NETWORK,         "NETWORK"         },
+        { DOGECOIN_NODE_GETUTXO,         "GETUTXO"         },
+        { DOGECOIN_NODE_BLOOM,           "BLOOM"           },
+        { NODE_WITNESS,                  "WITNESS"         },
+        { DOGECOIN_NODE_XTHIN,           "XTHIN"           },
+        { DOGECOIN_NODE_COMPACT_FILTERS, "COMPACT_FILTERS" },
+    };
+    size_t i, used;
+    uint64_t rest = services;
+    int n = snprintf(out, len, "0x%016" PRIx64 " [", (uint64_t)services);
+    if (n < 0 || (size_t)n >= len) { if (len) out[0] = 0; return out; }
+    used = (size_t)n;
+    for (i = 0; i < sizeof known / sizeof known[0]; i++) {
+        if (!(services & known[i].bit)) continue;
+        rest &= ~known[i].bit;
+        n = snprintf(out + used, len - used, "%s%s", used > (size_t)0 && out[used - 1] != '[' ? " " : "", known[i].name);
+        if (n < 0 || (size_t)n >= len - used) { out[len - 1] = 0; return out; }
+        used += (size_t)n;
+    }
+    if (rest) {
+        n = snprintf(out + used, len - used, "%sunknown:0x%" PRIx64, used > 0 && out[used - 1] != '[' ? " " : "", rest);
+        if (n < 0 || (size_t)n >= len - used) { out[len - 1] = 0; return out; }
+        used += (size_t)n;
+    }
+    snprintf(out + used, len - used, "]");
+    return out;
+}
+
 void dogecoin_node_group_free(dogecoin_node_group* group)
 {
     if (!group)
@@ -777,7 +811,10 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
             }
             node->services = v_msg_check.services;
             node->bestknownheight = v_msg_check.start_height;
-            node->nodegroup->log_write_cb("Connected to node %d: %s (%d)\n", node->nodeid, v_msg_check.useragent, v_msg_check.start_height);
+            char svc[160];
+            node->nodegroup->log_write_cb("Connected to node %d: %s (%d) services=%s\n",
+                                          node->nodeid, v_msg_check.useragent, v_msg_check.start_height,
+                                          dogecoin_node_services_str(v_msg_check.services, svc, sizeof svc));
             /* confirm version via verack */
             cstring* verack = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_VERACK, NULL, 0);
             dogecoin_node_send(node, verack);
