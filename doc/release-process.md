@@ -9,7 +9,7 @@ define(_PKG_VERSION_MAJOR, 0)
 define(_PKG_VERSION_MINOR, 1)
 define(_PKG_VERSION_BUILD, 5)
 define(_PKG_VERSION_IS_RELEASE, true)
-define(_PKG_VERSION_SUFFIX, [])
+define(_PKG_VERSION_SUFFIX, [-pre])
 ```
 
 Note it is `_PKG_VERSION_BUILD`, not `_PKG_VERSION_PATCH`. `_PKG_VERSION_IS_RELEASE`
@@ -37,7 +37,14 @@ Everything else derives from those macros:
   sandbox, so it carries a literal
 
 `contrib/scripts/check-version.sh` asserts all of these agree, and CI runs it on
-every push. It fails if `Package.swift` drifts, if the CMake derivation stops
+every push.
+
+`pack.sh` also carries its own list of headers to put in the tarball, separate
+from `include_HEADERS` and the CMake install list. A public header that gains an
+include of something that list does not ship still builds everywhere, and only
+the tarball breaks, on its first `#include`.
+`contrib/scripts/check-headers.sh` stages the packed set and compiles against
+it, so that fails in CI instead. It fails if `Package.swift` drifts, if the CMake derivation stops
 matching, or if a gitian descriptor grows a hardcoded version again.
 
 `_LIB_VERSION_{CURRENT,REVISION,AGE}` are separate: they are the libtool ABI
@@ -64,15 +71,18 @@ Bump `CURRENT` and reset `REVISION` when the ABI changes incompatibly.
 
 2. After the PR is merged,
    * if this is **not** a patch release, create a release branch named
-     `MAJOR.MINOR`, check it contains the right commits, and commit
-     `_PKG_VERSION_IS_RELEASE` as `true` with the intended `_PKG_VERSION_SUFFIX`
-     on that branch. Do not set it on a `-dev` branch
+     `MAJOR.MINOR`, check it contains the right commits, and make the fixation
+     commit on it: `_PKG_VERSION_IS_RELEASE` as `true` with the intended
+     `_PKG_VERSION_SUFFIX`, and the matching literal in `Package.swift`. That
+     commit does nothing else. It is the one built in gitian and released, and
+     after the release a new development branch opens and sets `IS_RELEASE`
+     back to `false`. Do not fixate on a `-dev` branch
    * if this **is** a patch release, open a PR with the bugfixes against the
      `MAJOR.MINOR` branch, including the changelog commit and the
      `_PKG_VERSION_BUILD` and `_LIB_VERSION_*` bumps
 
-3. Run `./contrib/scripts/check-version.sh` and confirm it reports the version
-   you intend to ship.
+3. Run `./contrib/scripts/check-version.sh` and `./contrib/scripts/check-headers.sh`,
+   and confirm the first reports the version you intend to ship.
 
 4. Tag the commit with `git tag -s vMAJOR.MINOR.BUILD`. The tag name and the
    version string must match: at `v0.1.4-pre` they did not, because the tag said

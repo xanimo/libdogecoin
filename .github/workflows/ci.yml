@@ -786,6 +786,12 @@ jobs:
       - name: check every version source agrees
         run: ./contrib/scripts/check-version.sh
 
+      # pack.sh carries its own header list for the tarball, so a public header
+      # can gain an include of something it does not ship and only the packaged
+      # tarball breaks, on its first #include.
+      - name: check the packed headers compile standalone
+        run: ./contrib/scripts/check-headers.sh
+
   swift:
     name: swiftpm-macos
     runs-on: macos-latest
