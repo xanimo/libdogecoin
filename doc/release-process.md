@@ -72,11 +72,22 @@ Bump `CURRENT` and reset `REVISION` when the ABI changes incompatibly.
 2. After the PR is merged,
    * if this is **not** a patch release, create a release branch named
      `MAJOR.MINOR`, check it contains the right commits, and make the fixation
-     commit on it: `_PKG_VERSION_IS_RELEASE` as `true` with the intended
-     `_PKG_VERSION_SUFFIX`, and the matching literal in `Package.swift`. That
-     commit does nothing else. It is the one built in gitian and released, and
-     after the release a new development branch opens and sets `IS_RELEASE`
-     back to `false`. Do not fixate on a `-dev` branch
+     commit on it. That commit carries four things and nothing else:
+
+     * `_PKG_VERSION_IS_RELEASE` as `true` with the intended
+       `_PKG_VERSION_SUFFIX` in `configure.ac`
+     * the matching literal in `Package.swift`
+     * `_PKG_VERSION_BUILD` in `include/dogecoin/version.h`, which feeds
+       `CLIENT_VERSION` into the library
+     * `_LIB_VERSION_{CURRENT,REVISION,AGE}`, the libtool ABI numbers, which are
+       not the package version. Adding an interface is `current++, revision=0,
+       age++`; changing or removing one is `current++, revision=0, age=0`.
+       Leaving them alone tells the linker the release is ABI-compatible with
+       the last one
+
+     It is the commit built in gitian and released, and after the release a new
+     development branch opens and sets `IS_RELEASE` back to `false`. Do not
+     fixate on a `-dev` branch
    * if this **is** a patch release, open a PR with the bugfixes against the
      `MAJOR.MINOR` branch, including the changelog commit and the
      `_PKG_VERSION_BUILD` and `_LIB_VERSION_*` bumps
@@ -94,6 +105,16 @@ Bump `CURRENT` and reset `REVISION` when the ABI changes incompatibly.
 
 6. Create a GitHub release linking the matching entry in `doc/changelog.md`.
    Mark it a pre-release if `_PKG_VERSION_SUFFIX` is non-empty.
+
+7. Open the next development branch and set `_PKG_VERSION_IS_RELEASE` back to
+   `false` on it, in a commit named `open MAJOR.MINOR-dev for development`. This
+   step is not optional and it is the one that gets skipped. Every release from
+   0.1.0 to 0.1.4 was followed by one; `fixate 0.1.5-pre` in June 2025 was not,
+   so `0.1.5-dev` carried `IS_RELEASE=true` for fourteen months and every build
+   off it reported a release version.
+
+   `./contrib/scripts/check-version.sh` will show the branch's version string, so
+   run it afterwards and confirm it ends in `-dev`.
 
 ## Reproducible builds
 

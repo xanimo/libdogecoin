@@ -67,6 +67,24 @@ else
     note "CMakeLists.txt" "(cmake not installed, skipped)"
 fi
 
+# version.h duplicates the components as C macros, which feed CLIENT_VERSION into
+# the library. Not shipped, but drift here makes the library report a wrong
+# version rather than fail to build.
+vh=include/dogecoin/version.h
+if [ -f "$vh" ]; then
+    vh_major=$(sed -n 's/^#define _PKG_VERSION_MAJOR \([0-9]*\)$/\1/p' "$vh" | head -1)
+    vh_minor=$(sed -n 's/^#define _PKG_VERSION_MINOR \([0-9]*\)$/\1/p' "$vh" | head -1)
+    vh_build=$(sed -n 's/^#define _PKG_VERSION_BUILD \([0-9]*\)$/\1/p' "$vh" | head -1)
+    vh_version="${vh_major}.${vh_minor}.${vh_build}"
+    if [ "$vh_version" = "${major}.${minor}.${build}" ]; then
+        note "version.h" "$vh_version"
+    else
+        bad "version.h" "$vh_version" "${major}.${minor}.${build}"
+    fi
+else
+    note "version.h" "(not found, skipped)"
+fi
+
 # The gitian descriptors must not name a version at all; they read it from the
 # configure run inside the build.
 if grep -nE '[0-9]+\.[0-9]+\.[0-9]+' contrib/gitian-descriptors/*.yml; then
