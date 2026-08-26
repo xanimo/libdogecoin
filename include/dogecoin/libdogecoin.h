@@ -1481,10 +1481,51 @@ dogecoin_bool dogecoin_bip38_is_confirmation_code(const char* code);
 --------------------------------------------------------------------------
 */
 
-typedef struct dogecoin_paper_wallet_ dogecoin_paper_wallet;
-typedef struct dogecoin_sweep_result_ dogecoin_sweep_result;
-typedef struct dogecoin_sweep_options_ dogecoin_sweep_options;
-typedef struct dogecoin_sweep_utxo_ dogecoin_sweep_utxo;
+typedef struct dogecoin_paper_wallet_ {
+    char* private_key_wif;
+    char* private_key_hex;
+    char* encrypted_private_key; /* BIP38 encrypted */
+    char* passphrase; /* For BIP38 decryption */
+    char* address;
+    dogecoin_bool compressed;
+    dogecoin_bool is_encrypted;
+    const dogecoin_chainparams* chain_params;
+} dogecoin_paper_wallet;
+typedef struct dogecoin_sweep_utxo_ {
+    char* txid;
+    int vout;
+    char* amount_doge;
+} dogecoin_sweep_utxo;
+typedef struct dogecoin_sweep_options_ {
+    char* destination_address;
+    uint64_t fee_per_byte; /* Fee in koinu per byte (see chain) */
+    uint64_t min_fee; /* Minimum fee in koinu */
+    uint64_t max_fee; /* Maximum fee in koinu */
+    dogecoin_bool use_rbf; /* Replace-by-fee (nSequence 0xfffffffd on inputs) */
+    uint32_t locktime; /* Locktime for transaction */
+    const dogecoin_chainparams* chain_params;
+    /*
+     * UTXO list: populate with dogecoin_sweep_options_set_utxo() (one input) or
+     * dogecoin_sweep_options_add_utxo() (several inputs, same private key).
+     * Amounts are Dogecoin decimal strings (same as transaction.c / finalize_transaction).
+     * libdogecoin does not query the chain; the application supplies prevouts.
+     */
+    dogecoin_sweep_utxo* utxos;
+    size_t utxo_count;
+    /* Mirrors first entry for backward compatibility */
+    char* utxo_txid;
+    int utxo_vout;
+    char* utxo_total_doge;
+} dogecoin_sweep_options;
+typedef struct dogecoin_sweep_result_ {
+    dogecoin_bool success;
+    char* error_message;
+    char* transaction_hex;
+    char* transaction_id;
+    uint64_t amount_swept;
+    uint64_t fee_paid;
+    char* destination_address;
+} dogecoin_sweep_result;
 typedef dogecoin_tx dogecoin_transaction;
 
 /* Initialize a paper wallet structure */

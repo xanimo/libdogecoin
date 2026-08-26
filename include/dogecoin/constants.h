@@ -38,6 +38,18 @@ LIBDOGECOIN_BEGIN_DECL
 #define KOINU_STRINGLEN 22
 #define SCRIPT_PUBKEY_STRINGLEN SCRIPTPUBKEYLEN
 
+/* BIP38 and sweep values a caller needs to size buffers and name arguments.
+   Here rather than in bip38.h/sweep.h because those are not installed, so a
+   consumer of the public header could not reach them. */
+#define BIP38_ENCRYPTED_KEY_LENGTH 58
+#define BIP38_INTERMEDIATE_CODE_MAXLEN 73
+#define BIP38_CONFIRMATION_CODE_MAXLEN 76
+#define BIP38_ADDRESS_MATCH_MAINNET 0u
+#define BIP38_ADDRESS_MATCH_INTEROP 1u
+#define DOGECOIN_SWEEP_DEFAULT_FEE_PER_BYTE 1000 /* 0.01 DOGE per KB */
+#define DOGECOIN_SWEEP_DEFAULT_MIN_FEE 1000 /* 0.01 DOGE */
+#define DOGECOIN_SWEEP_DEFAULT_MAX_FEE 1000000 /* 10 DOGE */
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_CONSTANTS_H__

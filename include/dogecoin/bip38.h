@@ -25,6 +25,7 @@
 
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/chainparams.h>
+#include <dogecoin/constants.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -44,11 +45,8 @@ LIBDOGECOIN_BEGIN_DECL
 #define BIP38_SCRYPT_DERIVED_SIZE 64
 
 /* BIP38 encrypted key length */
-#define BIP38_ENCRYPTED_KEY_LENGTH 58
 
 /* Intermediate passphrase code and confirmation code buffer sizes */
-#define BIP38_INTERMEDIATE_CODE_MAXLEN 73
-#define BIP38_CONFIRMATION_CODE_MAXLEN 76
 #define BIP38_SEEDB_LEN 24
 #define BIP38_INTERMEDIATE_PAYLOAD_LEN 49
 #define BIP38_CONFIRMATION_PAYLOAD_LEN 51
@@ -71,8 +69,6 @@ LIBDOGECOIN_BEGIN_DECL
  * Interop: also accepts testnet, regtest, and legacy Bitcoin P2PKH (0x00) for
  * strict BIP-0038 test vectors and cross-chain paper wallets.
  */
-#define BIP38_ADDRESS_MATCH_MAINNET 0u
-#define BIP38_ADDRESS_MATCH_INTEROP 1u
 
 /* EC multiplied key type (second byte of payload). */
 #define BIP38_TYPE_EC_MULTIPLIED 0x43
