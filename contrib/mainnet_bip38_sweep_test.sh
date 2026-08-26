@@ -71,7 +71,7 @@ SWEEP_MAX_FEE="${SWEEP_MAX_FEE:-100000000}"
 
 # Sweep API driver (exercises full sweep + BIP38 API and broadcasts the sweep).
 SWEEP_DRIVER="${SWEEP_DRIVER:-./mainnet_sweep_driver}"
-SWEEP_DRIVER_SRC="${SWEEP_DRIVER_SRC:-contrib/examples/mainnet_sweep_driver.c}"
+SWEEP_DRIVER_SRC="${SWEEP_DRIVER_SRC:-contrib/mainnet_sweep_driver.c}"
 
 TX_FEE_KOINU="${TX_FEE_KOINU:-2000000}"
 

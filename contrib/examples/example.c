@@ -1,6 +1,7 @@
 #include "libdogecoin.h"
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 // Example of how to use libdogecoin API functions:
 // gcc ./examples/example.c -I./include -L./lib -ldogecoin -levent -o example
@@ -22,6 +23,106 @@
 //  "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" first to set up the environment.
 //  then run: cl.exe contrib/examples/example.c /I"include\dogecoin" /link "build\Debug\dogecoin.lib" ncrypt.lib tbs.lib msvcrt.lib advapi32.lib event.lib /out:example.exe
 //  then run: example.exe
+
+static void print_sweep_result(const dogecoin_sweep_result* result)
+{
+    if (!result) {
+        printf("  (null result)\n");
+        return;
+    }
+    if (!result->success) {
+        printf("  sweep failed: %s\n",
+               result->error_message ? result->error_message : "unknown");
+        return;
+    }
+    printf("  txid: %s\n", result->transaction_id);
+    printf("  swept: %" PRIu64 " koinu, fee: %" PRIu64 " koinu\n",
+           result->amount_swept, result->fee_paid);
+    printf("  hex (first 80 chars): %.80s...\n", result->transaction_hex);
+}
+
+static dogecoin_bool sweep_wif_example(const dogecoin_chainparams* chain)
+{
+    dogecoin_paper_wallet* wallet;
+    dogecoin_sweep_options* opt;
+    dogecoin_sweep_result* result;
+    dogecoin_bool ok;
+
+    printf("\n--- WIF paper wallet sweep ---\n");
+
+    wallet = dogecoin_paper_wallet_new();
+    if (!wallet) {
+        return false;
+    }
+
+    /* Replace with your paper wallet WIF and real UTXO from your indexer. */
+    ok = dogecoin_paper_wallet_set_wif(wallet, "YOUR_WIF_HERE", chain);
+    if (!ok) {
+        printf("  Set YOUR_WIF_HERE to a valid WIF to run this example.\n");
+        dogecoin_paper_wallet_free(wallet);
+        return true; /* skip demo, not a hard failure */
+    }
+
+    opt = dogecoin_sweep_options_new(chain);
+    dogecoin_sweep_options_set_destination(opt, "D_DESTINATION_ADDRESS");
+    dogecoin_sweep_options_set_fee(
+        opt, dogecoin_sweep_fee_per_kb_to_per_byte(1000000ULL), 1000, 5000000);
+    dogecoin_sweep_options_set_utxo(
+        opt,
+        "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074",
+        1,
+        "12.0");
+
+    result = dogecoin_sweep_paper_wallet(wallet, opt);
+    print_sweep_result(result);
+    dogecoin_sweep_result_free(result);
+    dogecoin_sweep_options_free(opt);
+    dogecoin_paper_wallet_free(wallet);
+    return true;
+}
+
+static dogecoin_bool sweep_bip38_example(const dogecoin_chainparams* chain)
+{
+    dogecoin_paper_wallet* wallet;
+    dogecoin_sweep_options* opt;
+    dogecoin_sweep_result* result;
+
+    printf("\n--- BIP38 encrypted key sweep ---\n");
+
+    wallet = dogecoin_paper_wallet_new();
+    if (!wallet) {
+        return false;
+    }
+
+    /* Replace with scanned 6P… key, passphrase, and indexer UTXO data. */
+    if (!dogecoin_paper_wallet_set_encrypted(
+            wallet, "6P_YOUR_ENCRYPTED_KEY", "your-passphrase", chain)) {
+        printf("  Set 6P… key and passphrase to run this example.\n");
+        dogecoin_paper_wallet_free(wallet);
+        return true;
+    }
+
+    opt = dogecoin_sweep_options_new(chain);
+    dogecoin_sweep_options_set_destination(opt, "D_DESTINATION_ADDRESS");
+    dogecoin_sweep_options_set_fee(opt, 1000, 1000, 1000000);
+    dogecoin_sweep_options_add_utxo(
+        opt,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        0,
+        "50.0");
+    dogecoin_sweep_options_add_utxo(
+        opt,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        1,
+        "50.0");
+
+    result = dogecoin_sweep_paper_wallet(wallet, opt);
+    print_sweep_result(result);
+    dogecoin_sweep_result_free(result);
+    dogecoin_sweep_options_free(opt);
+    dogecoin_paper_wallet_free(wallet);
+    return true;
+}
 
 int main() {
 	dogecoin_ecc_start();
@@ -1398,6 +1499,17 @@ int main() {
 		dogecoin_pubkey_cleanse(&psbt_pub);
 		dogecoin_privkey_cleanse(&psbt_priv);
 		printf("PSBT example complete.\n");
+	}
+	// END ===========================================
+
+
+	// PAPER WALLET SWEEP EXAMPLE
+	printf("\n\nBEGIN PAPER WALLET SWEEP:\n\n");
+	{
+		const dogecoin_chainparams* sweep_chain = &dogecoin_chainparams_main;
+		sweep_wif_example(sweep_chain);
+		sweep_bip38_example(sweep_chain);
+		printf("Sweep example complete.\n");
 	}
 	// END ===========================================
 

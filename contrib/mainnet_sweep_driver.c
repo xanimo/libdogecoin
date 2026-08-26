@@ -39,7 +39,7 @@
  * the sweep API and capture evidence in the committed log file.
  *
  * Build (from repo root, after ./configure && make):
- *   gcc contrib/examples/mainnet_sweep_driver.c .libs/libdogecoin.a \
+ *   gcc contrib/mainnet_sweep_driver.c .libs/libdogecoin.a \
  *       $(pkg-config --libs libevent) -lpthread -Iinclude -Iinclude/dogecoin \
  *       -o mainnet_sweep_driver
  *
