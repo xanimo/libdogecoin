@@ -202,6 +202,24 @@ static dogecoin_bool spv_rescan_cb(uint32_t height, const uint256_t block_hash,
 /* Rescan cached cfilters (heights 1..cf_scan_start-1) against watched_scripts.
  * Called before starting the network download so that already-stored filters
  * are not skipped when scripts were registered after the previous sync. */
+/* Does this cfheaders batch continue the chain we already hold?
+ *
+ * Nothing ties a cfheaders response to the request that asked for it, so with
+ * two getcfheaders in flight -- which the CF response timeout causes by
+ * re-sending getcfcheckpt without cancelling the first -- both replies get
+ * appended and the same range lands twice. Anchoring on prev_filter_header also
+ * stops a peer splicing its own chain on above the last compiled-in checkpoint,
+ * where no other validation fires at all.
+ *
+ * An empty chain accepts anything: that batch establishes the anchor. */
+LIBDOGECOIN_API dogecoin_bool dogecoin_cfheaders_batch_extends_tip(
+    const dogecoin_compact_filter_state *cfstate, const uint8_t *prev_filter_header)
+{
+    if (!cfstate || !prev_filter_header) return false;
+    if (!cfstate->filter_headers || cfstate->filter_headers->len == 0) return true;
+    return memcmp(prev_filter_header, cfstate->cfheaders_tip_hash, 32) == 0;
+}
+
 static void spv_rescan_cached_cfilters(dogecoin_spv_client *client, uint32_t cf_scan_start)
 {
     if (!client->cfilters_db) return;
@@ -3011,15 +3029,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     client->nodegroup->log_write_cb("[bip157] cfheaders: type=%u n_hashes=%u\n",
                         cfh_msg.filter_type, (unsigned int)cfh_msg.filter_hashes->len);
 
-                /* A batch must extend the chain we already hold. Nothing ties a
-                   cfheaders response to the request that asked for it, so when
-                   two getcfheaders are in flight (the CF timeout re-sends
-                   getcfcheckpt without cancelling the first) both replies get
-                   appended and the same range lands twice. This also stops a
-                   peer splicing its own chain on above the last compiled-in
-                   checkpoint, where no anchor fires at all. */
-                if (cfstate->filter_headers->len > 0 &&
-                    memcmp(cfh_msg.prev_filter_header, cfstate->cfheaders_tip_hash, 32) != 0) {
+                if (!dogecoin_cfheaders_batch_extends_tip(cfstate,
+                                                          cfh_msg.prev_filter_header)) {
                     if (client->nodegroup && client->nodegroup->log_write_cb)
                         client->nodegroup->log_write_cb(
                             "[bip157] cfheaders from node %d do not extend tip %u, dropping %u hashes\n",
