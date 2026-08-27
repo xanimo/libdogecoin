@@ -1096,6 +1096,39 @@ dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client *client, const char *
             client->cfheaders_db = NULL;
         }
 
+        /* A cfheaders tip above the chain tip means the on-disk chain took an
+           append it should not have. The splice point is not recoverable from
+           the file, since heights are assigned from a running counter and stay
+           contiguous either way, so the whole cache goes rather than a
+           truncation that would leave the bad entries below the chain tip. */
+        if (client->cfheaders_db) {
+            dogecoin_blockindex *tip = client->headers_db->getchaintip(client->headers_db_ctx);
+            dogecoin_compact_filter_state *cfstate = client->cfilter_state;
+            /* tip->height == 0 is an unloaded or in-memory headers DB, which
+               says nothing about the cfheaders file: judging against it threw
+               away a full 6.27M-header cache in test_cfheadersdb. */
+            if (tip && tip->height > 0 &&
+                cfstate->cfheaders_tip_height > (uint32_t)tip->height) {
+                fprintf(stderr,
+                        "spv: cfheaders tip %u is above chain tip %d; discarding the cfheaders cache\n",
+                        cfstate->cfheaders_tip_height, tip->height);
+                if (cfstate->filter_headers->len > 0) {
+                    vector_free(cfstate->filter_headers, true);
+                    cfstate->filter_headers = vector_new(4096, dogecoin_free);
+                }
+                if (cfstate->filter_headers_flat) {
+                    dogecoin_free(cfstate->filter_headers_flat);
+                    cfstate->filter_headers_flat = NULL;
+                    cfstate->filter_headers_flat_len = 0;
+                }
+                dogecoin_mem_zero(cfstate->cfheaders_tip_hash, sizeof(uint256_t));
+                dogecoin_mem_zero(cfstate->genesis_filter_header, sizeof(uint256_t));
+                cfstate->cfheaders_tip_height  = 0;
+                cfstate->cfheaders_base_height = 0;
+                dogecoin_cfheaders_db_reset(client->cfheaders_db);
+            }
+        }
+
         client->cfilters_db = dogecoin_cfilters_db_new(client->chainparams, inmem);
         if (!dogecoin_cfilters_db_load(client->cfilters_db, client->cfilters_path)) {
             fprintf(stderr, "spv: failed to open cfilters.dat; continuing without persistence\n");
@@ -2977,6 +3010,24 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (client->nodegroup && client->nodegroup->log_write_cb)
                     client->nodegroup->log_write_cb("[bip157] cfheaders: type=%u n_hashes=%u\n",
                         cfh_msg.filter_type, (unsigned int)cfh_msg.filter_hashes->len);
+
+                /* A batch must extend the chain we already hold. Nothing ties a
+                   cfheaders response to the request that asked for it, so when
+                   two getcfheaders are in flight (the CF timeout re-sends
+                   getcfcheckpt without cancelling the first) both replies get
+                   appended and the same range lands twice. This also stops a
+                   peer splicing its own chain on above the last compiled-in
+                   checkpoint, where no anchor fires at all. */
+                if (cfstate->filter_headers->len > 0 &&
+                    memcmp(cfh_msg.prev_filter_header, cfstate->cfheaders_tip_hash, 32) != 0) {
+                    if (client->nodegroup && client->nodegroup->log_write_cb)
+                        client->nodegroup->log_write_cb(
+                            "[bip157] cfheaders from node %d do not extend tip %u, dropping %u hashes\n",
+                            node->nodeid, cfstate->cfheaders_tip_height,
+                            (unsigned int)cfh_msg.filter_hashes->len);
+                    dogecoin_cfheaders_msg_free(&cfh_msg);
+                    return;
+                }
 
                 uint256_t prev_header;
                 memcpy(prev_header, cfh_msg.prev_filter_header, 32);
