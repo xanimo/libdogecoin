@@ -220,6 +220,24 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_cfheaders_batch_extends_tip(
     return memcmp(prev_filter_header, cfstate->cfheaders_tip_hash, 32) == 0;
 }
 
+/* Where a cfilter scan should pick up: the highest height already scanned this
+   session or persisted in the store, else the caller's floor. Called every time
+   cfheaders reach the chain tip, which on a live chain is once per block, so it
+   has to move forward or the scan restarts for ever. */
+static uint32_t spv_cf_resume_from(dogecoin_spv_client *client, uint32_t floor)
+{
+    dogecoin_compact_filter_state *cfstate = client ? client->cfilter_state : NULL;
+    if (!cfstate) return floor;
+
+    uint32_t scanned_to = cfstate->filters_tip_height;
+    if (client->cfilters_db && client->cfilters_db->tip_height > scanned_to)
+        scanned_to = client->cfilters_db->tip_height;
+
+    if (scanned_to > 0 && floor <= scanned_to)
+        return scanned_to + 1;
+    return floor;
+}
+
 static void spv_rescan_cached_cfilters(dogecoin_spv_client *client, uint32_t cf_scan_start)
 {
     if (!client->cfilters_db) return;
@@ -3134,13 +3152,14 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             cf_scan_start < cfstate->cfheaders_base_height)
                             cf_scan_start = cfstate->cfheaders_base_height;
 
-                        /* If startup rescan already covered the cached cfilter range,
-                         * only download filters beyond that tip — avoids re-scanning
-                         * heights that are already in matched_block_hashes. */
-                        if (cfstate->rescan_done && client->cfilters_db &&
-                            client->cfilters_db->tip_height > 0 &&
-                            cf_scan_start <= client->cfilters_db->tip_height)
-                            cf_scan_start = client->cfilters_db->tip_height + 1;
+                        /* Resume from what has actually been scanned rather than from
+                           the floor. This ran only when rescan_done, which the startup
+                           rescan sets and which stays false on an empty filter store, so
+                           a fresh scan rewound to cf_scan_start every time cfheaders
+                           reached the tip -- once per block. Measured against a live
+                           chain from 6300000: 108000 filters downloaded, 12 restarts,
+                           6300000..6309000 covered, and it could never outrun the chain. */
+                        cf_scan_start = spv_cf_resume_from(client, cf_scan_start);
 
                         /* Rescan any cached filters stored before these scripts were registered. */
                         spv_rescan_cached_cfilters(client, cf_scan_start);
@@ -3292,12 +3311,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (cfstate->cfheaders_base_height > 0 &&
                             cf_scan_start < cfstate->cfheaders_base_height)
                             cf_scan_start = cfstate->cfheaders_base_height;
-                        /* If startup rescan already covered the cached cfilter range,
-                         * only download filters beyond that tip. */
-                        if (cfstate->rescan_done && client->cfilters_db &&
-                            client->cfilters_db->tip_height > 0 &&
-                            cf_scan_start <= client->cfilters_db->tip_height)
-                            cf_scan_start = client->cfilters_db->tip_height + 1;
+                        /* Resume from actual progress, not the floor. See the note at
+                           the matching clamp in the cfheaders completion path. */
+                        cf_scan_start = spv_cf_resume_from(client, cf_scan_start);
                          if (client->nodegroup && client->nodegroup->log_write_cb)
                              client->nodegroup->log_write_cb(
                                  "[bip157] cfheaders at tip (base=%u tip=%u), starting cfilter scan from %u [%us elapsed]\n",
@@ -5246,6 +5262,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_request_cfilters(dogecoin_spv_client 
                 }
             }
         }
+    }
+
+    /* Every fallback above reassigns batch_end after the cap was applied: the
+       checkpoint branch to an arbitrary checkpoint, the last one to the chain
+       tip. A tip substitution asked for 6309000..6349751, 40751 filters against
+       a limit of 1000, and the peer dropped us for it every time. Refuse rather
+       than send a request the server must reject; the CF timeout retries, and a
+       stalled scan is recoverable where a disconnect loop is not. */
+    if (batch_end < start_height ||
+        batch_end - start_height + 1 > MAX_GETCFILTERS_SIZE) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[bip157] getcfilters: refusing %u..%u, over the %u limit\n",
+                start_height, batch_end, (unsigned int)MAX_GETCFILTERS_SIZE);
+        return false;
     }
 
     dogecoin_getcfilters_msg msg;
