@@ -653,7 +653,13 @@ dogecoin_bool dogecoin_headers_db_get_block_hash_at_height(dogecoin_headers_db *
         if (h == target_height) {
             memcpy_safe(hash_out, rec, sizeof(uint256_t));
             /* Remember this position so the next forward lookup can skip ahead. */
-            db->scan_resume_pos    = ftell(db->headers_tree_file);
+            /* Start of the matched record, not the end of it. Storing the end
+               made a repeat lookup of the same height resume past its own
+               record -- the test is target_height >= scan_resume_height -- so
+               it scanned to EOF and reported not found. The second lookup of
+               any height failed, which is what drove the getcfilters stop-hash
+               fallback and the oversized request behind it. */
+            db->scan_resume_pos    = ftell(db->headers_tree_file) - SPV_HEADERS_FILE_REC_LEN;
             db->scan_resume_height = h;
             found = true;
             break;
@@ -702,7 +708,13 @@ dogecoin_bool dogecoin_headers_db_get_block_hash_at_height_seq(dogecoin_headers_
         h = le32toh(h);
         if (h == target_height) {
             memcpy_safe(hash_out, rec, sizeof(uint256_t));
-            db->scan_resume_pos    = ftell(db->headers_tree_file);
+            /* Start of the matched record, not the end of it. Storing the end
+               made a repeat lookup of the same height resume past its own
+               record -- the test is target_height >= scan_resume_height -- so
+               it scanned to EOF and reported not found. The second lookup of
+               any height failed, which is what drove the getcfilters stop-hash
+               fallback and the oversized request behind it. */
+            db->scan_resume_pos    = ftell(db->headers_tree_file) - SPV_HEADERS_FILE_REC_LEN;
             db->scan_resume_height = h;
             return true;
         }

@@ -1001,3 +1001,55 @@ void test_headers_db_write_appends()
     dogecoin_headers_db_free(db);
     unlink(path);
 }
+
+/* Looking up the same height twice must succeed twice.
+   scan_resume_pos stored the end of the matched record while the resume test
+   is "target >= scan_resume_height", so a repeat lookup restarted just past
+   the record it wanted and scanned to EOF. Against a real chain that made
+   every second lookup of a height miss, which forced the getcfilters stop-hash
+   fallback to substitute the chain tip and build a 40751-filter request
+   against a limit of 1000. */
+void test_headers_db_repeat_lookup()
+{
+    extern dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db *db,
+                                                   dogecoin_blockindex *bi);
+    const char *path = "test_headers_repeat.db";
+    unlink(path);
+
+    dogecoin_headers_db *db = dogecoin_headers_db_new(&dogecoin_chainparams_main, false);
+    u_assert_true(db != NULL);
+    u_assert_true(dogecoin_headers_db_load(db, path, false));
+
+    dogecoin_blockindex bi;
+    dogecoin_mem_zero(&bi, sizeof(bi));
+    uint32_t h;
+    for (h = 1; h <= 20; h++) {
+        bi.height = h;
+        memset(bi.hash, (int)h, sizeof(uint256_t));
+        u_assert_true(dogecoin_headers_db_write(db, &bi));
+    }
+    fflush(db->headers_tree_file);
+
+    uint256_t got;
+    uint8_t want[32];
+    memset(want, 10, sizeof(want));
+
+    /* First lookup populates the resume cursor. */
+    u_assert_true(dogecoin_headers_db_get_block_hash_at_height(db, 10, got));
+    u_assert_mem_eq(got, want, 32);
+
+    /* Same height again: must not resume past its own record. */
+    u_assert_true(dogecoin_headers_db_get_block_hash_at_height(db, 10, got));
+    u_assert_mem_eq(got, want, 32);
+
+    /* Forward from there still works, and so does going backwards. */
+    memset(want, 15, sizeof(want));
+    u_assert_true(dogecoin_headers_db_get_block_hash_at_height(db, 15, got));
+    u_assert_mem_eq(got, want, 32);
+    memset(want, 3, sizeof(want));
+    u_assert_true(dogecoin_headers_db_get_block_hash_at_height(db, 3, got));
+    u_assert_mem_eq(got, want, 32);
+
+    dogecoin_headers_db_free(db);
+    unlink(path);
+}
