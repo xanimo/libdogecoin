@@ -771,6 +771,51 @@ jobs:
   # depends tree nor autotools is involved: libevent and secp256k1 are vendored
   # in-tree and CMake drives them itself.
   # ---------------------------------------------------------------------------
+  version:
+    name: version-consistency
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+
+    steps:
+      - name: install packages
+        run: |
+          sudo apt-get update
+          DEBIAN_FRONTEND=noninteractive sudo apt-get install -y cmake libgmp-dev
+
+      - name: checkout
+        uses: actions/checkout@v5
+
+      # configure.ac is the only place the version is written down. This fails
+      # if Package.swift drifts from it, if the CMake derivation stops matching,
+      # or if a gitian descriptor grows a hardcoded version again.
+      - name: check every version source agrees
+        run: ./contrib/scripts/check-version.sh
+
+      # pack.sh carries its own header list for the tarball, so a public header
+      # can gain an include of something it does not ship and only the packaged
+      # tarball breaks, on its first #include.
+      - name: check the packed headers compile standalone
+        run: ./contrib/scripts/check-headers.sh
+
+  swift:
+    name: swiftpm-macos
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: swift version
+        run: swift --version
+
+      # Package.swift shipped without ever being built in CI, so it was free to
+      # rot against the C sources it lists.
+      - name: build the swift package
+        run: swift build -c release
+
   cmake-parity:
     name: x86_64-linux-cmake
     runs-on: ubuntu-22.04
@@ -1309,6 +1354,15 @@ jobs:
             --macos-team-id="$LIBDOGECOIN_DEV_APPLE_TEAM_ID" \
             --macos-keychain="$HOME/Library/Keychains/build.keychain" \
             --commit=${{ github.ref_name }}
+
+      - name: Notarize Gitian macOS tarballs
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.LIBDOGECOIN_DEV_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.LIBDOGECOIN_DEV_APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY: ${{ secrets.LIBDOGECOIN_DEV_APPLE_API_KEY }}
+        run: |
+          ./contrib/scripts/notarize-macos.sh --path=gitian/builds/${{ github.ref_name }}
 
       - name: Upload signed Gitian artifacts
         uses: actions/upload-artifact@v6

@@ -1,5 +1,5 @@
 ---
-name: "libdogecoin-osx-0.1.5-pre"
+name: "libdogecoin-osx"
 enable_cache: true
 suites:
 - "focal"
@@ -98,9 +98,13 @@ script: |
   # Create the release tarball using (arbitrarily) the first host
   ./autogen.sh
   CONFIG_SITE=${BASEPREFIX}/`echo "${HOSTS}" | awk '{print $1;}'`/share/config.site ./configure --prefix=/
-  git archive --format=tar --prefix=libdogecoin-0.1.5-pre/ HEAD | gzip -9n > libdogecoin-0.1.5-pre.tar.gz
-  SOURCEDIST=`echo libdogecoin-*.tar.gz`
-  DISTNAME=`echo ${SOURCEDIST} | sed 's/.tar.*//'`
+  # Version comes from the configure run above, so configure.ac stays the only
+  # place it is written down.
+  VERSION=`sed -n 's/^PACKAGE_VERSION = //p' Makefile | head -1`
+  test -n "${VERSION}"
+  DISTNAME=libdogecoin-${VERSION}
+  SOURCEDIST=${DISTNAME}.tar.gz
+  git archive --format=tar --prefix=${DISTNAME}/ HEAD | gzip -9n > ${SOURCEDIST}
   # Correct tar file order
   mkdir -p temp
   pushd temp
@@ -113,7 +117,7 @@ script: |
   for i in ${HOSTS}; do
     export PATH=${BASEPREFIX}/${i}/native/bin:${ORIGPATH}
     ./contrib/scripts/build.sh --host ${i} --depends
-    ./contrib/scripts/pack.sh --host=${i} --prefix=build --commit="0.1.5-pre"
+    ./contrib/scripts/pack.sh --host=${i} --prefix=build --commit="${VERSION}"
   done
 
   # Move them to gitian-builder/build/out/src

@@ -7,7 +7,11 @@ AC_PREREQ([2.68])
 define(_PKG_VERSION_MAJOR, 0)
 define(_PKG_VERSION_MINOR, 1)
 define(_PKG_VERSION_BUILD, 5)
+# true drops the suffix and yields a bare MAJOR.MINOR.BUILD; false yields -dev.
+# Set this on the release branch, not on a -dev branch.  A pre-release carries
+# its marker in _PKG_VERSION_SUFFIX instead, e.g. [-pre] or [-dogebox-pre].
 define(_PKG_VERSION_IS_RELEASE, true)
+define(_PKG_VERSION_SUFFIX, [-pre])
 
 # The library version is based on libtool versioning of the ABI. The set of
 # rules for updating the version can be found here:
@@ -17,7 +21,7 @@ define(_PKG_VERSION_IS_RELEASE, true)
 define(_LIB_VERSION_CURRENT, 1)
 define(_LIB_VERSION_REVISION, 0)
 define(_LIB_VERSION_AGE, 0)
-AC_INIT([libdogecoin],m4_join([.], _PKG_VERSION_MAJOR, _PKG_VERSION_MINOR, _PKG_VERSION_BUILD)m4_if(_PKG_VERSION_IS_RELEASE, [true], [-pre], [-dev]),[https://github.com/dogecoinfoundation/libdogecoin/issues],[libdogecoin],[https://github.com/dogecoinfoundation/libdogecoin])
+AC_INIT([libdogecoin],m4_join([.], _PKG_VERSION_MAJOR, _PKG_VERSION_MINOR, _PKG_VERSION_BUILD)m4_if(_PKG_VERSION_IS_RELEASE, [true], _PKG_VERSION_SUFFIX, [-dev]),[https://github.com/dogecoinfoundation/libdogecoin/issues],[libdogecoin],[https://github.com/dogecoinfoundation/libdogecoin])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 
