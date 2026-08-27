@@ -220,6 +220,7 @@ static struct option long_options[] = {
         {"logfile", required_argument, NULL, 'L'},
         {"cfheaders_path",   required_argument, NULL, 257},
         {"cfilters_path",    required_argument, NULL, 258},
+        {"cf_start_height",  required_argument, NULL, 259},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -240,7 +241,14 @@ static void print_usage() {
 (-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-q|--select_checkpoint) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
+    printf("\nCompact filters (BIP157):\n");
+    printf("        --cf_start_height <height>  scan watched scripts from <height> (1 = genesis).\n");
+    printf("                                    Default starts at chainbottom, or wherever an\n");
+    printf("                                    existing cfheaders file begins, so transactions\n");
+    printf("                                    below that are never examined.\n");
     printf("\nExamples: \n");
+    printf("Find a watched address's history from height 6300000 rather than from the chain tip:\n");
+    printf("> ./spvnode -a \"DSVw8wkkTXccdq78etZ3UwELrmpfvAiVt1\" --cf_start_height 6300000 scan\n\n");
     printf("Sync up to the chain tip and stores all headers in headers.db (quit once synced):\n");
     printf("> ./spvnode scan\n\n");
     printf("Sync up to the chain tip and give some debug output during that process:\n");
@@ -535,6 +543,7 @@ int main(int argc, char* argv[]) {
     char* logfile = NULL;
     char* cfheaders_path      = NULL;
     char* cfilters_path       = NULL;
+    uint32_t cf_start_height  = 0;
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
         print_usage();
@@ -642,6 +651,17 @@ int main(int argc, char* argv[]) {
                 case 258:
                     cfilters_path = optarg;
                     break;
+                case 259: {
+                    char *endp = NULL;
+                    errno = 0;
+                    unsigned long v = strtoul(optarg, &endp, 10);
+                    if (errno || !endp || *endp != '\0' || v == 0 || v > UINT32_MAX) {
+                        fprintf(stderr, "spvnode: --cf_start_height needs a height of 1 or more\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    cf_start_height = (uint32_t)v;
+                    break;
+                }
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -681,6 +701,12 @@ int main(int argc, char* argv[]) {
             client->cfheaders_path = strdup(cfheaders_path);
         if (cfilters_path)
             client->cfilters_path = strdup(cfilters_path);
+        /* Without this the cfheaders chain starts at chainbottom, or wherever a
+           previous run's cfheaders.dat happens to begin, and a filter cannot be
+           checked below the filter headers held for it. A watched address whose
+           transactions predate that floor is simply never looked at. */
+        if (cf_start_height)
+            client->cf_start_height = cf_start_height;
 
         if (no_cfilters || full_sync) {
             /* Disable BIP157 compact filter sync when:
