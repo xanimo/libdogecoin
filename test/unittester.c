@@ -172,6 +172,7 @@ extern void test_net_flag_defined();
 extern void test_net_peer_recovery();
 extern void test_reorg();
 extern void test_spv();
+extern void test_headers_db_write_appends();
 extern void test_bip37_filter_state();
 extern void test_bip37_merkleblock_vector();
 extern void test_cfheadersdb();
@@ -330,6 +331,7 @@ int main()
     u_run_test(test_net_peer_recovery);
     u_run_test(test_protocol);
     u_run_test(test_reorg);
+    u_run_test(test_headers_db_write_appends);
     u_run_test(test_spv);
     u_run_test(test_bip37_filter_state);
     u_run_test(test_bip37_merkleblock_vector);
