@@ -252,3 +252,62 @@ void test_net_basics_plus_download_block()
 
     dogecoin_node_group_free(group); //will also free the nodes structures from the heap
 }
+
+/* Covers the peer-recovery state machine without touching a socket: the retry
+   backoff schedule, and which addresses maintenance makes eligible again.
+   dogecoin_node_group_maintenance() ends in connect_next_nodes(), which only
+   arms async connects, so nothing here dials as long as the loop is not run. */
+void test_net_peer_recovery()
+{
+    /* Backoff doubles from the base and clamps at the max. */
+    dogecoin_node* n = dogecoin_node_new();
+    uint64_t expected[] = { 30, 60, 120, 240, 300, 300, 300 };
+    unsigned int i;
+    for (i = 0; i < sizeof expected / sizeof expected[0]; i++) {
+        uint64_t before = (uint64_t)time(NULL);
+        u_assert_uint32_eq(n->conn_failures, i);
+        dogecoin_node_arm_retry(n);
+        u_assert_true(n->retry_at >= before + expected[i]);
+        u_assert_true(n->retry_at <= before + expected[i] + 2);
+    }
+    u_assert_uint32_eq((uint32_t)expected[0], DOGECOIN_RETRY_BACKOFF_BASE_S);
+    u_assert_uint32_eq((uint32_t)expected[4], DOGECOIN_RETRY_BACKOFF_MAX_S);
+    dogecoin_node_free(n);
+
+    /* At target, maintenance is a no-op: a due address stays disconnected. */
+    dogecoin_node_group* group = dogecoin_node_group_new(NULL);
+    group->desired_amount_connected_nodes = 1;
+
+    dogecoin_node* connected = dogecoin_node_new();
+    u_assert_int_eq(dogecoin_node_set_ipport(connected, "192.0.2.1:22556"), true);
+    dogecoin_node_group_add_node(group, connected);
+    connected->state |= NODE_CONNECTED;
+
+    dogecoin_node* due = dogecoin_node_new();
+    u_assert_int_eq(dogecoin_node_set_ipport(due, "192.0.2.2:22556"), true);
+    dogecoin_node_group_add_node(group, due);
+    due->state |= NODE_DISCONNECTED | NODE_ERRORED;
+    due->retry_at = 0;
+
+    dogecoin_node_group_maintenance(group);
+    u_assert_int_eq((due->state & NODE_DISCONNECTED) == NODE_DISCONNECTED, true);
+
+    /* Below target, a due address is revived and its error bits cleared, while
+       one whose backoff has not elapsed is left alone. */
+    connected->state &= ~NODE_CONNECTED;
+    group->desired_amount_connected_nodes = 4;
+
+    dogecoin_node* waiting = dogecoin_node_new();
+    u_assert_int_eq(dogecoin_node_set_ipport(waiting, "192.0.2.3:22556"), true);
+    dogecoin_node_group_add_node(group, waiting);
+    waiting->state |= NODE_DISCONNECTED | NODE_ERRORED;
+    waiting->retry_at = (uint64_t)time(NULL) + 600;
+
+    dogecoin_node_group_maintenance(group);
+
+    u_assert_int_eq((due->state & NODE_DISCONNECTED) == NODE_DISCONNECTED, false);
+    u_assert_int_eq((due->state & NODE_ERRORED) == NODE_ERRORED, false);
+    u_assert_int_eq((waiting->state & NODE_DISCONNECTED) == NODE_DISCONNECTED, true);
+
+    dogecoin_node_group_free(group);
+}

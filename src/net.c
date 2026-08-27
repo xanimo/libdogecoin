@@ -278,6 +278,8 @@ void node_periodical_timer(int fd, short int event, void* ctx)
     if (node->time_started_con + DOGECOIN_CONNECT_TIMEOUT_S < now && ((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
         node->state = 0;
         node->time_started_con = 0;
+    node->retry_at = 0;
+    node->conn_failures = 0;
         node->state |= NODE_ERRORED;
         node->state |= NODE_TIMEOUT;
         dogecoin_node_connection_state_changed(node);
@@ -327,6 +329,7 @@ void event_cb(struct bufferevent* ev, short type, void* ctx)
         node->state = 0;
         node->state |= NODE_ERRORED;
         node->state |= NODE_DISCONNECTED;
+        dogecoin_node_arm_retry(node);
         if ((type & BEV_EVENT_EOF) != 0) {
             node->nodegroup->log_write_cb("Disconnected from the remote peer %d.\n", node->nodeid);
             node->state |= NODE_DISCONNECTED_FROM_REMOTE_PEER;
@@ -340,6 +343,8 @@ void event_cb(struct bufferevent* ev, short type, void* ctx)
         node->state |= NODE_CONNECTED;
         node->state &= ~NODE_CONNECTING;
         node->state &= ~NODE_ERRORED;
+        node->conn_failures = 0;
+        node->retry_at = 0;
         dogecoin_node_connection_state_changed(node);
     }
     node->nodegroup->log_write_cb("Connected nodes: %d\n", dogecoin_node_group_amount_of_connected_nodes(node->nodegroup, NODE_CONNECTED));
@@ -572,12 +577,22 @@ void dogecoin_node_group_free(dogecoin_node_group* group)
     if (!group)
         return;
 
-    if (group->event_base) {
-        event_base_free(group->event_base);
+    /* The group's own timer first, since it is the one event the group owns. */
+    if (group->maintenance_timer) {
+        event_del(group->maintenance_timer);
+        event_free(group->maintenance_timer);
+        group->maintenance_timer = NULL;
     }
 
+    /* Then the nodes: freeing one releases its bufferevent and timer, which
+       reach back into the event_base, so tearing the base down first reads
+       freed memory whenever any node still holds live events. */
     if (group->nodes) {
         vector_free(group->nodes, true);
+    }
+
+    if (group->event_base) {
+        event_base_free(group->event_base);
     }
     dogecoin_free(group);
 }
@@ -587,8 +602,22 @@ void dogecoin_node_group_free(dogecoin_node_group* group)
  *
  * @param group The dogecoin_node_group object.
  */
+static void dogecoin_node_group_maintenance_cb(evutil_socket_t fd, short event, void* ctx);
+
 void dogecoin_node_group_event_loop(dogecoin_node_group* group)
 {
+    /* Owned by the group, not by any node, so losing every peer does not leave
+       the loop with nothing scheduled. */
+    /* Opt in only. A group that does not ask for this keeps the old contract,
+       where the loop drains and dispatch returns once nothing is scheduled;
+       arming a persistent timer for everyone turns that into a hang. */
+    if (group->auto_reconnect && !group->maintenance_timer) {
+        struct timeval tv = { DOGECOIN_MAINTENANCE_TIMER_S, 0 };
+        group->maintenance_timer = event_new(group->event_base, -1,
+                                             EV_TIMEOUT | EV_PERSIST,
+                                             dogecoin_node_group_maintenance_cb, group);
+        if (group->maintenance_timer) event_add(group->maintenance_timer, &tv);
+    }
     event_base_dispatch(group->event_base);
 }
 
@@ -633,14 +662,70 @@ int dogecoin_node_group_amount_of_connected_nodes(dogecoin_node_group* group, en
  *
  * @return A boolean value.
  */
+/* Arm the retry backoff for a node that just failed. Doubling from
+   DOGECOIN_RETRY_BACKOFF_BASE_S and capped at DOGECOIN_RETRY_BACKOFF_MAX_S, so a
+   peer that is genuinely gone costs one attempt per cap rather than one per
+   maintenance tick. */
+void dogecoin_node_arm_retry(dogecoin_node* node)
+{
+    uint64_t backoff = DOGECOIN_RETRY_BACKOFF_BASE_S;
+    unsigned int shift = node->conn_failures;
+    if (shift > 4) shift = 4;           /* 30, 60, 120, 240, 300 */
+    backoff <<= shift;
+    if (backoff > DOGECOIN_RETRY_BACKOFF_MAX_S) backoff = DOGECOIN_RETRY_BACKOFF_MAX_S;
+    if (node->conn_failures < 16) node->conn_failures++;  /* clamped; shift caps at 4 */
+    node->retry_at = (uint64_t)time(NULL) + backoff;
+}
+
+/* Group heartbeat. Returns immediately while the group is at its target, so a
+   healthy node does no work here at all. Below target it makes failed addresses
+   eligible again once their backoff has expired, then lets
+   dogecoin_node_group_connect_next_nodes() apply its own per-round cap. */
+void dogecoin_node_group_maintenance(dogecoin_node_group* group)
+{
+    if (!group || !group->nodes) return;
+    if (dogecoin_node_group_amount_of_connected_nodes(group, NODE_CONNECTED) >=
+        group->desired_amount_connected_nodes)
+        return;
+
+    uint64_t now = (uint64_t)time(NULL);
+    size_t i = 0, revived = 0;
+    for (; i < group->nodes->len; i++) {
+        dogecoin_node* node = vector_idx(group->nodes, i);
+        if ((node->state & NODE_DISCONNECTED) != NODE_DISCONNECTED) continue;
+        if ((node->state & NODE_CONNECTING) == NODE_CONNECTING) continue;
+        if (node->retry_at > now) continue;
+        node->state &= ~(NODE_DISCONNECTED | NODE_ERRORED | NODE_TIMEOUT |
+                         NODE_DISCONNECTED_FROM_REMOTE_PEER);
+        revived++;
+    }
+    if (revived && group->log_write_cb)
+        group->log_write_cb("peer maintenance: %zu address(es) eligible again\n", revived);
+
+    dogecoin_node_group_connect_next_nodes(group);
+}
+
+static void dogecoin_node_group_maintenance_cb(evutil_socket_t fd, short event, void* ctx)
+{
+    UNUSED(fd);
+    UNUSED(event);
+    dogecoin_node_group_maintenance((dogecoin_node_group*)ctx);
+}
+
 dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group)
 {
     dogecoin_bool connected_at_least_to_one_node = false;
-    int connect_amount = group->desired_amount_connected_nodes - dogecoin_node_group_amount_of_connected_nodes(group, NODE_CONNECTED);
+    /* Count attempts already in flight against the target. Only CONNECTED was
+       counted before, so every caller recomputed the same shortfall and armed
+       more on top of connections that had not resolved yet: with a burst of
+       error callbacks that stacked up and overshot the target. A connect that
+       neither completes nor errors is bounded by DOGECOIN_CONNECT_TIMEOUT_S,
+       after which it errors and frees its slot. */
+    int in_flight = dogecoin_node_group_amount_of_connected_nodes(group, NODE_CONNECTED) +
+                    dogecoin_node_group_amount_of_connected_nodes(group, NODE_CONNECTING);
+    int connect_amount = group->desired_amount_connected_nodes - in_flight;
     if (connect_amount <= 0)
         return true;
-
-    connect_amount = connect_amount*3;
     size_t i = 0;
     for (; i < group->nodes->len; i++) {
         dogecoin_node* node = vector_idx(group->nodes, i);

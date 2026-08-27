@@ -601,6 +601,13 @@ int main(int argc, char* argv[]) {
         in_memory_headers = (dbfile && ((strcmp(dbfile, "0") == 0) || (strcmp(dbfile, "no") == 0)));
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, in_memory_headers, use_checkpoint, full_sync, maxnodes, http_server);
 
+        /* Long lived, so climb back to the peer target after an outage rather
+           than sitting at whatever survived. Set here and not in the library:
+           the maintenance timer is persistent, so a group that arms it never
+           drains, and dogecoin_node_group_event_loop() stops returning for
+           anything that runs the loop until nothing is scheduled. */
+        client->nodegroup->auto_reconnect = true;
+
         if (http_server) {
             evhttp_set_gencb(client->nodegroup->http_server, dogecoin_http_request_cb, client);
         }
