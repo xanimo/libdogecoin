@@ -230,12 +230,12 @@ dogecoin_sweep_get_stats(tx, opt, &inputs, &outputs, &in_value, &out_value, &fee
 
 ## Example program
 
-`contrib/examples/sweep_example.c` shows WIF and BIP38 sweep flows (offline, no broadcast).
+`contrib/examples/example.c` shows WIF and BIP38 sweep flows (offline, no broadcast) in its paper wallet sweep section.
 
-`contrib/examples/mainnet_sweep_driver.c` is a CLI driver for the full sweep API on mainnet (create, sign, validate, optional broadcast). Built automatically by `contrib/mainnet_bip38_sweep_test.sh`, or manually:
+`contrib/mainnet_sweep_driver.c` is a CLI driver for the full sweep API on mainnet (create, sign, validate, optional broadcast). Built automatically by `contrib/mainnet_bip38_sweep_test.sh`, or manually:
 
 ```bash
-gcc contrib/examples/mainnet_sweep_driver.c .libs/libdogecoin.a \
+gcc contrib/mainnet_sweep_driver.c .libs/libdogecoin.a \
     $(pkg-config --libs libevent) -lpthread -Iinclude -Iinclude/dogecoin \
     -o mainnet_sweep_driver
 ```
@@ -254,7 +254,7 @@ export FUNDED_ADDR="your_D_address"
 Build from the repo root after `make`:
 
 ```bash
-gcc contrib/examples/sweep_example.c .libs/libdogecoin.a -Iinclude/dogecoin -o sweep_example
+gcc contrib/examples/example.c .libs/libdogecoin.a -Iinclude/dogecoin -o example
 ```
 
 ## Testing
@@ -340,8 +340,8 @@ Constants: `BIP38_ADDRESS_MATCH_MAINNET`, `BIP38_ADDRESS_MATCH_INTEROP`, buffer 
 
 ### Related
 
-- `include/dogecoin/scrypt.h` — `dogecoin_scrypt_rfc7914()` (RFC 7914 KDF used by BIP38; normally called internally)
-- `contrib/examples/sweep_example.c` — minimal offline integration sample
-- `contrib/examples/mainnet_sweep_driver.c` — mainnet sweep API CLI driver
-- `contrib/mainnet_bip38_sweep_test.sh` — mainnet E2E test (requires `FUNDED_WIF` / `FUNDED_ADDR`)
-- `test/sweep_tests.c` — vectors and integration tests
+- `include/dogecoin/scrypt.h`, `dogecoin_scrypt_rfc7914()` (RFC 7914 KDF used by BIP38; normally called internally)
+- `contrib/examples/example.c`, consumer sample, includes the offline sweep flows
+- `contrib/mainnet_sweep_driver.c`, mainnet sweep API CLI driver
+- `contrib/mainnet_bip38_sweep_test.sh`, mainnet E2E test (requires `FUNDED_WIF` / `FUNDED_ADDR`)
+- `test/sweep_tests.c`, vectors and integration tests
