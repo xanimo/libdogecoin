@@ -215,6 +215,30 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_psbt_finalize_input(
  * Extract a fully signed transaction.  Returns NULL if any input
  * lacks a final_script_sig.  Caller owns the returned tx.
  */
+
+/* ── Accessors ────────────────────────────────────────────────
+   The struct is opaque to consumers, so these read back what the setters put
+   in. A caller-supplied finalizer needs them: building a scriptSig means
+   reading the partial signatures and the redeem script.
+   Each getter with a buffer reports the length it needs via (len_out) and
+   returns false when (out) is NULL or (cap) is too small, so size then fetch. */
+LIBDOGECOIN_API size_t dogecoin_psbt_num_inputs(const dogecoin_psbt *psbt);
+LIBDOGECOIN_API size_t dogecoin_psbt_num_outputs(const dogecoin_psbt *psbt);
+LIBDOGECOIN_API uint32_t dogecoin_psbt_get_version(const dogecoin_psbt *psbt);
+LIBDOGECOIN_API size_t dogecoin_psbt_input_num_partial_sigs(const dogecoin_psbt *psbt, size_t idx);
+LIBDOGECOIN_API dogecoin_bool dogecoin_psbt_input_get_partial_sig(
+    const dogecoin_psbt *psbt, size_t idx, size_t n,
+    uint8_t *pubkey_out, size_t pubkey_cap, size_t *pubkey_len_out,
+    uint8_t *sig_out, size_t sig_cap, size_t *sig_len_out);
+LIBDOGECOIN_API dogecoin_bool dogecoin_psbt_input_get_redeemscript(
+    const dogecoin_psbt *psbt, size_t idx, uint8_t *out, size_t cap, size_t *len_out);
+LIBDOGECOIN_API dogecoin_bool dogecoin_psbt_input_get_final_scriptsig(
+    const dogecoin_psbt *psbt, size_t idx, uint8_t *out, size_t cap, size_t *len_out);
+LIBDOGECOIN_API dogecoin_bool dogecoin_psbt_output_get_redeemscript(
+    const dogecoin_psbt *psbt, size_t idx, uint8_t *out, size_t cap, size_t *len_out);
+LIBDOGECOIN_API dogecoin_bool dogecoin_psbt_input_get_sighash(
+    const dogecoin_psbt *psbt, size_t idx, uint32_t *sighash_out);
+
 LIBDOGECOIN_API dogecoin_tx *dogecoin_psbt_extract(const dogecoin_psbt *psbt);
 
 /* extractor role: the finalized transaction as broadcastable hex; caller frees

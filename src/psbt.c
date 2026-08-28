@@ -1348,6 +1348,105 @@ char *dogecoin_psbt_extract_hex(const dogecoin_psbt *psbt)
     return hex;
 }
 
+/* ── Accessors ────────────────────────────────────────────────── */
+/*
+ * The struct is not in the installed header set, so a consumer holding a
+ * dogecoin_psbt could set fields and never read one back. That is survivable
+ * while the library finalizes for you; it is not once the caller supplies its
+ * own scriptSig, because building one means reading the partial signatures and
+ * the redeem script the signers left behind.
+ *
+ * Buffer-and-length throughout so no internal type reaches the signature. Each
+ * getter reports the length it needs when the buffer is too small, so a caller
+ * can size then fetch.
+ */
+
+size_t dogecoin_psbt_num_inputs(const dogecoin_psbt *psbt)
+{
+    return psbt ? psbt->num_inputs : 0;
+}
+
+size_t dogecoin_psbt_num_outputs(const dogecoin_psbt *psbt)
+{
+    return psbt ? psbt->num_outputs : 0;
+}
+
+uint32_t dogecoin_psbt_get_version(const dogecoin_psbt *psbt)
+{
+    return psbt ? psbt->version : 0;
+}
+
+size_t dogecoin_psbt_input_num_partial_sigs(const dogecoin_psbt *psbt, size_t idx)
+{
+    if (!psbt || idx >= psbt->num_inputs) return 0;
+    return psbt->inputs[idx].num_partial_sigs;
+}
+
+dogecoin_bool dogecoin_psbt_input_get_partial_sig(const dogecoin_psbt *psbt, size_t idx,
+                                                  size_t n,
+                                                  uint8_t *pubkey_out, size_t pubkey_cap,
+                                                  size_t *pubkey_len_out,
+                                                  uint8_t *sig_out, size_t sig_cap,
+                                                  size_t *sig_len_out)
+{
+    if (!psbt || idx >= psbt->num_inputs) return false;
+    const dogecoin_psbt_input *in = &psbt->inputs[idx];
+    if (n >= in->num_partial_sigs) return false;
+    const dogecoin_psbt_partialsig *ps = &in->partial_sigs[n];
+
+    if (pubkey_len_out) *pubkey_len_out = ps->pubkey_len;
+    if (sig_len_out)    *sig_len_out    = ps->sig_len;
+    if (!pubkey_out || !sig_out) return false;                 /* size query */
+    if (pubkey_cap < ps->pubkey_len || sig_cap < ps->sig_len) return false;
+
+    memcpy(pubkey_out, ps->pubkey, ps->pubkey_len);
+    memcpy(sig_out, ps->sig, ps->sig_len);
+    return true;
+}
+
+/* shared by the three cstring-valued getters below */
+static dogecoin_bool psbt_copy_cstring(const cstring *src, uint8_t *out, size_t cap,
+                                       size_t *len_out)
+{
+    if (!src) { if (len_out) *len_out = 0; return false; }
+    if (len_out) *len_out = src->len;
+    if (!out) return false;                                    /* size query */
+    if (cap < src->len) return false;
+    memcpy(out, src->str, src->len);
+    return true;
+}
+
+dogecoin_bool dogecoin_psbt_input_get_redeemscript(const dogecoin_psbt *psbt, size_t idx,
+                                                   uint8_t *out, size_t cap, size_t *len_out)
+{
+    if (!psbt || idx >= psbt->num_inputs) return false;
+    return psbt_copy_cstring(psbt->inputs[idx].redeem_script, out, cap, len_out);
+}
+
+dogecoin_bool dogecoin_psbt_input_get_final_scriptsig(const dogecoin_psbt *psbt, size_t idx,
+                                                      uint8_t *out, size_t cap, size_t *len_out)
+{
+    if (!psbt || idx >= psbt->num_inputs) return false;
+    return psbt_copy_cstring(psbt->inputs[idx].final_script_sig, out, cap, len_out);
+}
+
+dogecoin_bool dogecoin_psbt_output_get_redeemscript(const dogecoin_psbt *psbt, size_t idx,
+                                                    uint8_t *out, size_t cap, size_t *len_out)
+{
+    if (!psbt || idx >= psbt->num_outputs) return false;
+    return psbt_copy_cstring(psbt->outputs[idx].redeem_script, out, cap, len_out);
+}
+
+dogecoin_bool dogecoin_psbt_input_get_sighash(const dogecoin_psbt *psbt, size_t idx,
+                                              uint32_t *sighash_out)
+{
+    if (!psbt || idx >= psbt->num_inputs) return false;
+    const dogecoin_psbt_input *in = &psbt->inputs[idx];
+    if (!in->has_sighash_type) return false;
+    if (sighash_out) *sighash_out = in->sighash_type;
+    return true;
+}
+
 /* ── Validation ───────────────────────────────────────────────── */
 
 dogecoin_bool dogecoin_psbt_is_valid(const dogecoin_psbt *psbt)
