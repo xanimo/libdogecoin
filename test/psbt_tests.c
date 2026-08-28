@@ -1426,6 +1426,61 @@ static void test_psbt_combiner_conflict(void)
 }
 
 /* ── Entry point ────────────────────────────────────────────── */
+/* ── Test: caller-supplied finalizer and hex extractor ──────── */
+static void test_psbt_custom_finalizer(void)
+{
+    /* A redeem script the built-in finalizer cannot classify: the branch
+       selector plus a timelocked path is not any standard shape. */
+    dogecoin_tx *tx = make_unsigned_tx();
+    dogecoin_psbt *psbt = dogecoin_psbt_create(tx);
+    u_assert_not_null(psbt);
+
+    /* nothing finalized yet: extract and extract_hex both refuse */
+    u_assert_is_null(dogecoin_psbt_extract(psbt));
+    u_assert_is_null(dogecoin_psbt_extract_hex(psbt));
+    u_assert_true(dogecoin_psbt_is_finalized(psbt) == false);
+
+    /* the caller builds its own scriptSig: OP_0 <sig-ish> OP_0 */
+    const uint8_t script_sig[] = { 0x00, 0x02, 0xde, 0xad, 0x00 };
+    u_assert_true(dogecoin_psbt_input_set_final_scriptsig(psbt, 0, script_sig,
+                                                          sizeof(script_sig)));
+    u_assert_true(dogecoin_psbt_is_finalized(psbt));
+
+    /* it lands in the tx the extractor produces, byte for byte */
+    dogecoin_tx *final_tx = dogecoin_psbt_extract(psbt);
+    u_assert_not_null(final_tx);
+    dogecoin_tx_in *fin = vector_idx(final_tx->vin, 0);
+    u_assert_int_eq((int)fin->script_sig->len, (int)sizeof(script_sig));
+    u_assert_mem_eq(fin->script_sig->str, script_sig, sizeof(script_sig));
+    dogecoin_tx_free(final_tx);
+
+    /* the hex extractor agrees with serializing that same tx */
+    char *hex = dogecoin_psbt_extract_hex(psbt);
+    u_assert_not_null(hex);
+    u_assert_true(strlen(hex) > 0);
+    u_assert_true(strlen(hex) % 2 == 0);
+    /* the scriptSig bytes appear in the serialized transaction */
+    u_assert_not_null(strstr(hex, "0002dead00"));
+    dogecoin_free(hex);
+
+    /* replacing it replaces cleanly rather than leaking or appending */
+    const uint8_t other[] = { 0x51 };
+    u_assert_true(dogecoin_psbt_input_set_final_scriptsig(psbt, 0, other, 1));
+    char *hex2 = dogecoin_psbt_extract_hex(psbt);
+    u_assert_not_null(hex2);
+    u_assert_is_null(strstr(hex2, "0002dead00"));
+    dogecoin_free(hex2);
+
+    /* rejections */
+    u_assert_true(dogecoin_psbt_input_set_final_scriptsig(NULL, 0, other, 1) == false);
+    u_assert_true(dogecoin_psbt_input_set_final_scriptsig(psbt, 99, other, 1) == false);
+    u_assert_true(dogecoin_psbt_input_set_final_scriptsig(psbt, 0, NULL, 1) == false);
+    u_assert_is_null(dogecoin_psbt_extract_hex(NULL));
+
+    dogecoin_psbt_free(psbt);
+    dogecoin_tx_free(tx);
+}
+
 void test_psbt(void)
 {
     test_psbt_lifecycle();
@@ -1435,6 +1490,7 @@ void test_psbt(void)
     test_psbt_hex();
     test_psbt_updater();
     test_psbt_sign_finalize_extract();
+    test_psbt_custom_finalizer();
     test_psbt_combiner();
     test_psbt_combiner_conflict();
     test_psbt_duplicate_known_keys();

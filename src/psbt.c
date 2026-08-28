@@ -768,6 +768,28 @@ dogecoin_bool dogecoin_psbt_input_set_redeemscript(dogecoin_psbt *psbt, size_t i
     return true;
 }
 
+/* Finalizer role: install a scriptSig the caller built.
+ *
+ * dogecoin_psbt_finalize_input() classifies the input and builds the scriptSig
+ * for the shapes it recognises. BIP174 leaves the finalizer application
+ * specific precisely because a redeem script can be anything, and there was no
+ * way to complete a PSBT whose script did not classify -- the 0x07 field the
+ * serializer already writes could only ever be set by the built-in finalizer.
+ *
+ * Setting this marks the input finalized, so dogecoin_psbt_extract() will
+ * accept it. The caller is responsible for the scriptSig being correct; nothing
+ * here can check it without knowing the script semantics. */
+dogecoin_bool dogecoin_psbt_input_set_final_scriptsig(dogecoin_psbt *psbt, size_t idx,
+                                                      const uint8_t *script, size_t len)
+{
+    if (!psbt || idx >= psbt->num_inputs) return false;
+    if (!script && len) return false;
+    dogecoin_psbt_input *in = &psbt->inputs[idx];
+    if (in->final_script_sig) cstr_free(in->final_script_sig, true);
+    in->final_script_sig = cstr_new_buf((const char *)script, len);
+    return in->final_script_sig != NULL;
+}
+
 dogecoin_bool dogecoin_psbt_input_set_sighash(dogecoin_psbt *psbt, size_t idx,
                                                uint32_t sighash_type)
 {
@@ -1300,6 +1322,30 @@ dogecoin_tx *dogecoin_psbt_extract(const dogecoin_psbt *psbt)
         txin->script_sig = cstr_new_cstr(fss);
     }
     return tx;
+}
+
+/* Extractor role: the finalized transaction as broadcastable hex.
+ *
+ * dogecoin_psbt_extract() hands back a dogecoin_tx, and tx.h is not installed,
+ * so a consumer could produce the transaction and had no way to serialize it.
+ * dogecoin_tx_deserialize() is public with no inverse.
+ *
+ * Caller frees with dogecoin_free(). Returns NULL if any input is unfinalized. */
+char *dogecoin_psbt_extract_hex(const dogecoin_psbt *psbt)
+{
+    dogecoin_tx *tx = dogecoin_psbt_extract(psbt);
+    if (!tx) return NULL;
+
+    cstring *ser = cstr_new_sz(1024);
+    if (!ser) { dogecoin_tx_free(tx); return NULL; }
+    dogecoin_tx_serialize(ser, tx);
+    dogecoin_tx_free(tx);
+
+    char *hex = (char *)dogecoin_malloc(ser->len * 2 + 1);
+    if (!hex) { cstr_free(ser, true); return NULL; }
+    utils_bin_to_hex((unsigned char *)ser->str, ser->len, hex);
+    cstr_free(ser, true);
+    return hex;
 }
 
 /* ── Validation ───────────────────────────────────────────────── */

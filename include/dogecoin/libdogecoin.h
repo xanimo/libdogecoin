@@ -989,11 +989,21 @@ dogecoin_bool  dogecoin_psbt_combine(dogecoin_psbt* dst, const dogecoin_psbt* sr
 
 /* finalizer role: build final_script_sig for all inputs; returns true when all inputs are finalized */
 dogecoin_bool  dogecoin_psbt_finalize(dogecoin_psbt* psbt);
+/* finalizer role: install a scriptSig the caller built, for an input whose
+   redeem script dogecoin_psbt_finalize_input() cannot classify; fills the
+   0x07 per-input field and marks the input finalized, so the extractor will
+   accept it. The caller owns correctness: nothing here can validate a
+   scriptSig without knowing the script's semantics */
+dogecoin_bool  dogecoin_psbt_input_set_final_scriptsig(dogecoin_psbt* psbt, size_t idx, const uint8_t* script, size_t len);
+
 /* finalizer role: build final_script_sig for a single input */
 dogecoin_bool  dogecoin_psbt_finalize_input(dogecoin_psbt* psbt, size_t idx);
 
 /* extractor role: produce the fully-signed tx; returns NULL if any input lacks final_script_sig */
 dogecoin_tx*   dogecoin_psbt_extract(const dogecoin_psbt* psbt);
+/* extractor role: the finalized transaction as broadcastable hex; caller frees
+   with dogecoin_free(); NULL if any input lacks a final scriptSig */
+char*          dogecoin_psbt_extract_hex(const dogecoin_psbt* psbt);
 
 /* validation helpers */
 dogecoin_bool  dogecoin_psbt_is_valid(const dogecoin_psbt* psbt);
