@@ -589,12 +589,9 @@ static void cfh_par_finish(dogecoin_spv_client *client, dogecoin_node *node)
         cf_scan_start < cfstate->cfheaders_base_height)
         cf_scan_start = cfstate->cfheaders_base_height;
 
-    /* If startup rescan already covered the cached cfilter range,
-     * only download filters beyond that tip. */
-    if (cfstate->rescan_done && client->cfilters_db &&
-        client->cfilters_db->tip_height > 0 &&
-        cf_scan_start <= client->cfilters_db->tip_height)
-        cf_scan_start = client->cfilters_db->tip_height + 1;
+    /* Resume from actual progress, not the floor. See the note at the clamp in
+       the cfheaders completion path. */
+    cf_scan_start = spv_cf_resume_from(client, cf_scan_start);
 
     /* Rescan any cached filters (heights 1..cf_scan_start-1) that were stored
      * in a prior run before these watched scripts were registered. */
@@ -656,6 +653,22 @@ static void cfh_par_handle_response(dogecoin_spv_client *client,
         if (client->cfheaders_db)
             dogecoin_cfheaders_db_write_genesis(client->cfheaders_db,
                                                 cfh_msg->prev_filter_header);
+    }
+
+    /* A batch must continue the chunk it belongs to. Nothing ties a cfheaders
+       response to the request that asked for it, so a duplicate or reordered
+       reply is otherwise appended at ch->n_received and silently corrupts the
+       chunk. The height > ch->end check below bounds the damage to one chunk,
+       and the checkpoint anchor only fires where the compiled-in table has an
+       entry, which is nowhere above 6,239,000 on mainnet. */
+    if (ch->n_received > 0 &&
+        memcmp(cfh_msg->prev_filter_header, ch->prev_fh, 32) != 0) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[bip157-cfh-par] cfheaders from node %d do not extend chunk %u at %u, dropping %u hashes\n",
+                node->nodeid, (unsigned int)wi, ch->start + ch->n_received,
+                (unsigned int)cfh_msg->filter_hashes->len);
+        return;
     }
 
     uint8_t prev_fh[32];
