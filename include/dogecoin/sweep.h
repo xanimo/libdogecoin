@@ -23,6 +23,8 @@
 #ifndef __LIBDOGECOIN_SWEEP_H__
 #define __LIBDOGECOIN_SWEEP_H__
 
+#include <dogecoin/constants.h>
+
 #include <stdint.h>
 #include <stddef.h>
 #include <dogecoin/bip38.h>
@@ -87,9 +89,6 @@ typedef struct dogecoin_sweep_options_ {
 } dogecoin_sweep_options;
 
 /* Default sweep options */
-#define DOGECOIN_SWEEP_DEFAULT_FEE_PER_BYTE 1000 /* 0.01 DOGE per KB */
-#define DOGECOIN_SWEEP_DEFAULT_MIN_FEE 1000 /* 0.01 DOGE */
-#define DOGECOIN_SWEEP_DEFAULT_MAX_FEE 1000000 /* 10 DOGE */
 
 /*
  * Function declarations

@@ -5,13 +5,10 @@ This document describes BIP-0038 private key encryption and paper-wallet sweepin
 ## Including the Headers
 
 ```c
-#include <dogecoin/bip38.h>
-#include <dogecoin/sweep.h>
-#include <dogecoin/chainparams.h>
-#include <dogecoin/ecc.h>
+#include <dogecoin/libdogecoin.h>
 ```
 
-`libdogecoin.h` documents these APIs inline but does not include `bip38.h` / `sweep.h` (keeps enclave and minimal builds lean). Include the headers above when calling BIP38 or sweep functions.
+`libdogecoin.h` declares the BIP38 and sweep APIs inline and pulls in `constants.h`, which carries the buffer sizes and the address-match values, so it is the only header a consumer needs. `bip38.h` and `sweep.h` are internal and are not installed.
 
 Call `dogecoin_ecc_start()` before any signing or BIP38 scrypt work, and `dogecoin_ecc_stop()` when finished.
 
@@ -301,7 +298,7 @@ make check    # autotools
 | `dogecoin_bip38_get_flag_byte` | Raw BIP38 flag byte (valid payload; rejects bad magic/type/flags) |
 | `dogecoin_bip38_generate_lot_sequence` | Random lot + sequence for EC flow |
 
-Constants: `BIP38_ADDRESS_MATCH_MAINNET`, `BIP38_ADDRESS_MATCH_INTEROP`, buffer sizes (`BIP38_ENCRYPTED_KEY_LENGTH`, `BIP38_INTERMEDIATE_CODE_MAXLEN`, etc.) — see `include/dogecoin/bip38.h`.
+Constants: `BIP38_ADDRESS_MATCH_MAINNET`, `BIP38_ADDRESS_MATCH_INTEROP`, buffer sizes (`BIP38_ENCRYPTED_KEY_LENGTH`, `BIP38_INTERMEDIATE_CODE_MAXLEN`, etc.) — all in `constants.h`, reachable through `libdogecoin.h`.
 
 ### `sweep.h` — paper wallets and sweep
 
