@@ -846,3 +846,60 @@ void test_bip37_merkleblock_vector()
     remove_all_hashes();
     remove_all_maps();
 }
+
+/* A header write must append no matter where the shared read cursor sits.
+   Reads and writes use one FILE*, and a reopened DB is "r+b", so a write left
+   at a reader's position overwrites live records instead of extending the log.
+   Measured against a real peer before the fix: 15 headers arrived and 15
+   records were destroyed starting at the height the last read stopped on. */
+void test_headers_db_write_appends()
+{
+    extern dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db *db,
+                                                   dogecoin_blockindex *blockindex);
+    const char *path = "test_headers_append.db";
+    unlink(path);
+
+    dogecoin_headers_db *db = dogecoin_headers_db_new(&dogecoin_chainparams_main, false);
+    u_assert_true(db != NULL);
+    u_assert_true(dogecoin_headers_db_load(db, path, false));
+
+    dogecoin_blockindex bi;
+    dogecoin_mem_zero(&bi, sizeof(bi));
+    uint32_t h;
+    for (h = 1; h <= 8; h++) {
+        bi.height = h;
+        memset(bi.hash, (int)h, sizeof(uint256_t));
+        u_assert_true(dogecoin_headers_db_write(db, &bi));
+    }
+    fflush(db->headers_tree_file);
+
+    /* Park the cursor mid-file, as the sequential cfilter rescan lookup does. */
+    fseek(db->headers_tree_file,
+          SPV_HEADERS_FILE_HDR_LEN + 3 * SPV_HEADERS_FILE_REC_LEN, SEEK_SET);
+
+    bi.height = 9;
+    memset(bi.hash, 9, sizeof(uint256_t));
+    u_assert_true(dogecoin_headers_db_write(db, &bi));
+    fflush(db->headers_tree_file);
+
+    FILE *f = fopen(path, "rb");
+    u_assert_true(f != NULL);
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    u_assert_int_eq((int)sz,
+                    (int)(SPV_HEADERS_FILE_HDR_LEN + 9 * SPV_HEADERS_FILE_REC_LEN));
+
+    /* Heights 1..9 in order: record 3 survived, the write went to the end. */
+    fseek(f, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET);
+    uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+    for (h = 1; h <= 9; h++) {
+        u_assert_true(fread(rec, sizeof(rec), 1, f) == 1);
+        uint32_t got;
+        memcpy(&got, rec + 32, 4);
+        u_assert_uint32_eq(le32toh(got), h);
+    }
+    fclose(f);
+
+    dogecoin_headers_db_free(db);
+    unlink(path);
+}

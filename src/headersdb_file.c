@@ -288,6 +288,12 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
     ser_u32(rec, blockindex->height);
     ser_u256(rec, arith_to_uint256(&blockindex->chainwork));
     dogecoin_block_header_serialize(rec, &blockindex->header);
+    /* The file is an append-only log, but reads share this handle and leave the
+       cursor wherever they stopped. Only a freshly created DB gets "a+b", which
+       forces writes to the end; a reopened one gets "r+b", where a write lands
+       at the cursor and overwrites live records. Seek explicitly so no reader's
+       position can decide where a header goes. */
+    fseek(db->headers_tree_file, 0, SEEK_END);
     size_t res = fwrite(rec->str, rec->len, 1, db->headers_tree_file);
     if (!db->batch_write)
         dogecoin_file_commit(db->headers_tree_file);
