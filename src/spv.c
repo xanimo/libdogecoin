@@ -740,6 +740,8 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
  *
  * @return A boolean value.
  */
+static void par_hdr_prune_synced(dogecoin_spv_client *client);
+
 dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client *client, const char *file_path, dogecoin_bool prompt)
 {
     if (!client)
@@ -748,8 +750,13 @@ dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client *client, const char *
     if (!client->headers_db)
         return false;
 
-    return client->headers_db->load(client->headers_db_ctx, file_path, prompt);
+    if (!client->headers_db->load(client->headers_db_ctx, file_path, prompt))
+        return false;
 
+    /* Segments are planned before the DB is loaded, so the covered ones can
+       only be dropped here. */
+    par_hdr_prune_synced(client);
+    return true;
 }
 
 /**
@@ -3789,6 +3796,63 @@ LIBDOGECOIN_API void par_hdr_free(dogecoin_spv_client *client)
     dogecoin_free(s->segs);
     dogecoin_free(s);
     client->par_hdr = NULL;
+}
+
+/* Drop the segments a loaded headers DB already covers.
+ *
+ * par_hdr_init() plans from genesis off the checkpoint array alone, and
+ * spvnode enables it before loading the DB, so -H on a synced DB re-downloaded
+ * segment 0 from height 1, failed to connect it to a chaintip millions of
+ * blocks above, and only fell back to sequential after three attempts. */
+static void par_hdr_prune_synced(dogecoin_spv_client *client)
+{
+    par_hdr_state *s = client ? client->par_hdr : NULL;
+    if (!s || !client->headers_db) return;
+
+    dogecoin_blockindex *tip = client->headers_db->getchaintip(client->headers_db_ctx);
+    if (!tip || tip->height <= 0) return;
+    uint32_t tip_height = (uint32_t)tip->height;
+
+    uint32_t pruned = 0;
+    for (uint32_t i = 0; i < s->num_segs; i++) {
+        par_hdr_seg *seg = &s->segs[i];
+        if (seg->stop_height > tip_height) break;
+        seg->complete = true;
+        seg->flushed  = true;
+        dogecoin_free(seg->buf);
+        seg->buf   = NULL;
+        seg->count = 0;
+        seg->cap   = 0;
+        dogecoin_free(seg->tail_raw);
+        seg->tail_raw = NULL;
+        seg->tail_len = 0;
+        pruned = i + 1;
+    }
+
+    if (pruned == s->num_segs) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb(
+                "[par-hdr] headers DB at height %u covers every segment, syncing the tail sequentially\n",
+                tip_height);
+        par_hdr_free(client);
+        return;
+    }
+
+    s->flush_idx      = pruned;
+    s->last_flush_idx = pruned;
+
+    /* The segment straddling the tip resumes from it rather than from its
+       checkpoint start, so its flush connects onto the chaintip. */
+    par_hdr_seg *head = &s->segs[pruned];
+    if (head->start_height < tip_height) {
+        head->tip_height = tip_height;
+        memcpy(head->tip_hash, tip->hash, sizeof(uint256_t));
+    }
+
+    if (pruned && client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb(
+            "[par-hdr] headers DB at height %u, skipping %u already-synced segments\n",
+            tip_height, pruned);
 }
 
 /* Initialise parallel genesis header download for @client.
